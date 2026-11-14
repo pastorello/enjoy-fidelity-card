@@ -1,0 +1,21 @@
+# Dependencies & build
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.log
+
+# Claude Code (personal settings only; .claude/settings.json is shared)
+.claude/settings.local.json
+
+# Impeccable: platform engine binary is downloaded on demand by the launcher
+.claude/skills/impeccable/scripts/bin/
