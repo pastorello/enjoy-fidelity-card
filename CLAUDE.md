@@ -60,6 +60,12 @@ Indice completo: skill `using-agent-skills`.
   i problemi segnalati vanno risolti, non ignorati. Eventuali eccezioni (es. font del brand) si
   registrano con `npx impeccable ignores add-value …` motivandole.
 
+### Test E2E — [anthropics/skills · webapp-testing](https://github.com/anthropics/skills/tree/main/skills/webapp-testing)
+- Usa `webapp-testing` per verificare l'app in un browser reale con Playwright (Python):
+  screenshot, log della console, flussi completi.
+- Testa sempre con viewport da tablet (es. 1024×768 e 1366×1024, orizzontale e verticale) e input touch.
+- Lo script `.claude/skills/webapp-testing/scripts/with_server.py` avvia il dev server prima dei test.
+
 ## Regole di lavoro
 - Branch dedicato per ogni modifica; mai commit diretti su `main` senza richiesta esplicita.
 - Commit piccoli e atomici, messaggi in stile Conventional Commits (`feat:`, `fix:`, `chore:`…).
@@ -75,6 +81,7 @@ Da compilare quando lo stack è scelto (install, dev, test, lint, build, deploy)
 .claude/
   skills/        # skill di progetto (Addy Osmani + Impeccable)
   agents/        # subagent Impeccable
+  (webapp-testing in skills/: test E2E con Playwright)
   settings.json  # hook condivisi (detector Impeccable)
 docs/            # (da creare) specs/ e adr/
 skills-lock.json # versioni delle skill installate
