@@ -4,30 +4,79 @@ Istruzioni per gli agenti che lavorano su questo repository.
 
 ## Il progetto
 
-**Enjoy Fidelity Card** è un'applicazione per **tablet** installata **all'interno del locale Enjoy**.
-Serve a gestire la fidelity card dei clienti (iscrizione, raccolta punti/timbri, premi).
+**Enjoy Card** è la fidelity card a punti dell'**Enjoy Bar**. Il cliente accumula punti in base a
+quanto spende; il titolare decide quali premi offrire e scala i punti. La card NFC è uno strumento di
+marketing e una scorciatoia per riconoscere il cliente alla cassa: tutto funziona anche senza card,
+cercando il cliente per nome o telefono.
 
-> ⚠️ Fase iniziale: requisiti, stack e architettura **non sono ancora definiti**.
-> Le sezioni marcate `TBD` vanno completate prima di scrivere codice applicativo.
-> Non inventare requisiti: se manca un'informazione, chiedi (skill `interview-me`).
+**Fonti di verità** (in caso di dubbio valgono queste, non questo file):
+- Specifiche: https://claude.ai/artifact/59XU2sRGx1EoUtxS8mxN6S
+- Wireframe (telefono + tablet): https://claude.ai/artifact/K6PkvCmqMum8jV3cNuHD7n
+- Design system "Enjoy Bar": https://claude.ai/artifact/GY9B6wF97G5FCLapU8KRUH
 
-### Contesto d'uso (vincoli già noti)
-- Dispositivo: tablet fisso nel locale, uso in modalità kiosk / a schermo intero.
-- Utenti: staff del locale e/o clienti al banco → interfaccia touch-first, utilizzabile in piedi e di fretta.
-- Target touch minimi 48×48 px, testi leggibili a distanza di un braccio, alto contrasto (luce del locale variabile).
-- Connettività potenzialmente instabile → valutare il funzionamento offline e la sincronizzazione.
-- Dati personali dei clienti (nome, telefono/email, storico) → GDPR: consenso esplicito, minimizzazione dei dati, nessun dato sensibile in log o nel repo.
+Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, chiedi.
 
-### Requisiti funzionali — TBD
-- [ ] Chi usa il tablet: solo staff, solo clienti, entrambi?
-- [ ] Identificazione cliente: QR, numero di telefono, tessera fisica/NFC?
-- [ ] Meccanica: punti, timbri, livelli? Regole di accumulo e riscatto premi.
-- [ ] Area admin: gestione premi, statistiche, export.
-- [ ] Un solo locale o più sedi?
+## Contesto d'uso
+- **Prima versione: telefono Android** del titolare; altri titolari e camerieri installano la stessa app
+  sul proprio telefono. Su iPhone l'app funziona, ma solo con la ricerca (niente lettura card).
+- **Tablet della cassa** (BESTTAB A20, 10,1″, 1280×800 punti in orizzontale, senza NFC): fase successiva,
+  **solo se si compra un lettore NFC USB**.
+- Flusso a senso unico: il cliente consegna la card all'operatore e **non vede nulla**, nemmeno il saldo.
+- L'app **non contatta i clienti**: niente messaggi, offerte o campagne. Il telefono del cliente è facoltativo.
+- Clienti nell'ordine delle centinaia; più operatori in contemporanea su un archivio condiviso online.
+- Obiettivo di usabilità: **dalla card alla conferma della spesa in meno di 10 secondi**.
 
-### Stack — TBD
-Da decidere con la skill `spec-driven-development` e documentare con un ADR in `docs/adr/`.
-Opzioni da valutare: PWA (web app installabile in kiosk) vs app nativa/cross-platform; backend e database.
+## Architettura (decisa)
+- **App**: PWA in Chrome per Android. Lettura card con **Web NFC** (solo Chrome Android, solo HTTPS).
+- **Backend**: **Supabase** (Postgres, Auth, Row Level Security), piano gratuito.
+- **Hosting frontend**: statico con HTTPS (Vercel o Netlify, da scegliere).
+- **Card**: adesivi NTAG215, **solo lettura** dell'uid, mai scritte. Uid salvato in un solo formato:
+  esadecimale maiuscolo senza separatori (Web NFC dà `04:a1:b2:…`; i lettori USB spesso decimale e a
+  volte byte invertiti → normalizzare sempre).
+- **Lettore USB (tablet)**: emulazione tastiera; l'app ascolta i tasti in rapida sequenza chiusi da Invio,
+  senza un campo di testo sempre attivo. Web NFC e lettore USB sono due ingressi equivalenti.
+- **Importi**: tastierino numerico interno all'app, inserimento a centesimi come sui POS (1-2-5-0 = 12,50 €).
+
+## Regole di dominio (invarianti)
+- Importi in **centesimi interi**; rapporto in **centesimi per punto** (100 = 1 punto ogni 1 €).
+  Punti = parte intera di (centesimi ÷ centesimi per punto): **arrotondamento per difetto**.
+- Ogni movimento salva importo, punti, rapporto in vigore, operatore, data e ora: cambiare il rapporto
+  non altera lo storico.
+- **Saldo = somma dei punti di tutti i movimenti** (anche annullati: la correzione di segno opposto li compensa).
+- Il saldo **non scende mai sotto zero**: controllo sul server, nella stessa transazione del riscatto.
+- I movimenti **non si cancellano**: si annullano con un movimento di correzione. Una spesa non si annulla
+  se i suoi punti sono già stati spesi.
+- Ogni operazione porta un **identificativo generato dall'app** (idempotenza): doppio tocco o reinvio dopo
+  un errore di rete non registrano due volte.
+- **Nome del cliente unico** (per gli omonimi si aggiunge un dettaglio). Clienti anche senza card e senza telefono.
+- Un cliente ha **al massimo una card attiva**; card persa → la vecchia si disattiva, i punti restano.
+- Una card sconosciuta letta dalla schermata principale apre Nuovo cliente con la card già associata.
+
+## Ruoli
+- **Amministratore** (titolari): tutto, più operatori, catalogo premi, rapporto euro/punto, soglia di
+  conferma importo, export CSV, annullamento movimenti, cancellazione dati cliente.
+- **Operatore** (camerieri): cerca e crea clienti, consegna card, registra spese, riscatta premi, annulla
+  entro 10 secondi la propria spesa o il proprio riscatto appena registrati.
+- Account creati solo da un amministratore (invito via email, l'operatore sceglie la password).
+  Sessione persistente sul telefono; sul tablet condiviso: account di dispositivo + cambio operatore con
+  PIN di 4 cifre verificato sul server (blocco temporaneo dopo 5 errori).
+
+## Privacy (GDPR)
+- Consenso privacy obbligatorio alla registrazione; testi da far verificare al consulente del bar.
+- Cancellazione su richiesta: nome e telefono anonimizzati, movimenti conservati senza dati personali.
+- RLS: solo utenti autenticati leggono e scrivono.
+- Il repo è **pubblico**: niente dati reali di clienti, nemmeno nei fixture di test; nessun segreto nel repo.
+
+## Fasi
+1. **Prima versione** (telefono): account e ruoli, clienti, ricerca, spese, riscatti, configurazione, Web NFC.
+2. **Lancio**: consegna delle prime 50 Enjoy Card.
+3. **Tablet**: solo con lettore NFC USB; lettura da lettore e cambio operatore con PIN.
+
+## Punti aperti (da chiarire con `interview-me`, non decidere da soli)
+- Modello dati: mancano soglia di conferma importo, identificativo di idempotenza, descrizione del premio
+  libero, account di dispositivo; "importo in euro" vs "centesimi interi".
+- Regione dei dati Supabase (UE?), Vercel o Netlify, comportamento offline oltre al reinvio.
+- Rapporto euro/punto iniziale, amministratori al lancio, formato del lettore USB.
 
 ## Lingua
 - Comunicazione con l'utente e UI dell'app: **italiano**.
@@ -35,61 +84,55 @@ Opzioni da valutare: PWA (web app installabile in kiosk) vs app nativa/cross-pla
 
 ## Workflow con le skill
 
-Le skill sono installate a livello di progetto in `.claude/skills/` (tracciate in `skills-lock.json`).
+Skill di progetto in `.claude/skills/` (versioni in `skills-lock.json`).
 
 ### Ingegneria — [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
-Ciclo standard per ogni funzionalità:
-1. `interview-me` / `idea-refine` → chiarire i requisiti.
-2. `spec-driven-development` → spec scritta prima del codice (in `docs/specs/`).
+1. `interview-me` → chiudere i punti aperti.
+2. `spec-driven-development` → specifica nel repo (`docs/specs/`), derivata dalle fonti di verità.
 3. `planning-and-task-breakdown` → task piccoli e verificabili.
-4. `incremental-implementation` + `test-driven-development` → implementazione a piccoli passi, test prima.
+4. `incremental-implementation` + `test-driven-development` → piccoli passi, test prima.
 5. `code-review-and-quality` → review prima del merge.
-6. `security-and-hardening` → obbligatoria per tutto ciò che tocca dati dei clienti o autenticazione.
+6. `security-and-hardening` → obbligatoria per auth, RLS e dati dei clienti.
 
-Altre skill da usare quando pertinenti: `frontend-ui-engineering`, `api-and-interface-design`,
-`debugging-and-error-recovery`, `performance-optimization`, `documentation-and-adrs`,
-`git-workflow-and-versioning`, `ci-cd-and-automation`, `shipping-and-launch`.
-Indice completo: skill `using-agent-skills`.
+Altre quando pertinenti: `frontend-ui-engineering`, `api-and-interface-design`, `documentation-and-adrs`
+(decisioni in `docs/adr/`), `debugging-and-error-recovery`, `performance-optimization`,
+`git-workflow-and-versioning`, `ci-cd-and-automation`, `shipping-and-launch`. Indice: `using-agent-skills`.
 
 ### Design — [Impeccable](https://github.com/pbakaus/impeccable)
-- Prima di qualsiasi lavoro di UI: `/impeccable init` per creare il contesto di design del progetto.
-- Usa i comandi Impeccable (critique, audit, polish…) per rivedere ogni schermata.
-- Subagent disponibili in `.claude/agents/`: `impeccable-finish-reviewer`, `impeccable-documenter`,
+- La direzione visiva parte dai wireframe e dal design system "Enjoy Bar"; `/impeccable init` prima del
+  primo lavoro di UI.
+- L'hook in `.claude/settings.json` esegue il detector dopo ogni Edit/Write sui file UI: i problemi vanno
+  risolti; le eccezioni si registrano con `npx impeccable ignores add-value …` motivandole.
+- Subagent in `.claude/agents/`: `impeccable-finish-reviewer`, `impeccable-documenter`,
   `impeccable-asset-producer`, `impeccable-manual-edit-applier`.
-- L'hook in `.claude/settings.json` esegue il detector di Impeccable dopo ogni Edit/Write sui file UI:
-  i problemi segnalati vanno risolti, non ignorati. Eventuali eccezioni (es. font del brand) si
-  registrano con `npx impeccable ignores add-value …` motivandole.
+- Uso in piedi e di fretta: target touch ≥ 48 px, alto contrasto, azioni principali lontane dal bordo
+  inferiore (barre di Android).
 
-### Test E2E — [anthropics/skills · webapp-testing](https://github.com/anthropics/skills/tree/main/skills/webapp-testing)
-- Usa `webapp-testing` per verificare l'app in un browser reale con Playwright (Python):
-  screenshot, log della console, flussi completi.
-- Testa sempre con viewport da tablet (es. 1024×768 e 1366×1024, orizzontale e verticale) e input touch.
-- Lo script `.claude/skills/webapp-testing/scripts/with_server.py` avvia il dev server prima dei test.
+### Test E2E — [webapp-testing](https://github.com/anthropics/skills/tree/main/skills/webapp-testing)
+- Viewport principale: **telefono 390×844**; tablet **1280×800** solo per la fase tablet.
+- Web NFC non è disponibile in Playwright: simulare la lettura card con un adattatore finto.
 
 ## Regole di lavoro
 - Branch dedicato per ogni modifica; mai commit diretti su `main` senza richiesta esplicita.
-- Commit piccoli e atomici, messaggi in stile Conventional Commits (`feat:`, `fix:`, `chore:`…).
-- Nessun segreto nel repo: usa `.env` (ignorato) e mantieni aggiornato `.env.example`.
-- Il repo è **pubblico**: niente dati reali di clienti, nemmeno nei fixture di test.
-- Aggiornare questo file quando vengono prese decisioni su stack, architettura o comandi.
+- Commit piccoli, in stile Conventional Commits (`feat:`, `fix:`, `chore:`…).
+- Segreti solo in `.env` (ignorato); mantenere aggiornato `.env.example`.
+- Aggiornare questo file quando cambiano decisioni, architettura o comandi.
 
 ## Comandi — TBD
-Da compilare quando lo stack è scelto (install, dev, test, lint, build, deploy).
+Da compilare quando il progetto applicativo esiste (install, dev, test, lint, build, deploy).
 
 ## Struttura del repository
 ```
 .claude/
-  skills/        # skill di progetto (Addy Osmani + Impeccable)
+  skills/        # skill di progetto (Addy Osmani, Impeccable, webapp-testing)
   agents/        # subagent Impeccable
-  (webapp-testing in skills/: test E2E con Playwright)
-  settings.json  # hook condivisi (detector Impeccable)
+  settings.json  # hook Impeccable + plugin project-brain
 docs/            # (da creare) specs/ e adr/
 skills-lock.json # versioni delle skill installate
 ```
 
 ## Memoria di progetto — [project-brain](https://github.com/Ethan-YS/project-brain)
-Plugin installato a livello di progetto (`.claude/settings.json`). Comandi in linguaggio naturale:
-- "set up project brain" → crea la cartella `brain/` (PROJECT, MAP, STATUS, DECISIONS, HANDOFF).
-- "resume this project" → a inizio sessione legge `brain/MAP.md`, `brain/STATUS.md` e `brain/HANDOFF.md`.
+- "set up project brain" → crea `brain/` (PROJECT, MAP, STATUS, DECISIONS, HANDOFF). Previsto dopo l'intervista.
+- "resume this project" → a inizio sessione legge MAP, STATUS e HANDOFF.
 - "hand off" → prima di chiudere una sessione o quando il contesto è pieno, scrive `brain/HANDOFF.md`.
 - "update the project brain" → propone aggiornamenti, da approvare uno per uno.
