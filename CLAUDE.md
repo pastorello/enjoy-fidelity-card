@@ -2,6 +2,16 @@
 
 Istruzioni per gli agenti che lavorano su questo repository.
 
+## Primi 30 secondi di una nuova sessione
+
+Leggi `brain/MAP.md` e `brain/STATUS.md`; se `brain/HANDOFF.md` contiene un rapporto, leggilo.
+Poi riferisci in breve: progetto riconosciuto, a che punto siamo, ultimo bloccante. Non iniziare a
+lavorare in silenzio: conferma prima di aver capito.
+- Perimetro in dubbio → `brain/PROJECT.md` (non-obiettivi). Perché di una scelta → `brain/DECISIONS.md`.
+- `brain/` si aggiorna per la sessione successiva: STATUS, HANDOFF, registrazioni in MAP e RUNBOOK si
+  scrivono quando il lavoro avviene; DECISIONS e PROJECT solo per ciò che l'utente ha deciso (nel dubbio,
+  chiedi "questo è deciso?").
+
 ## Il progetto
 
 **Enjoy Card** è la fidelity card a punti dell'**Enjoy Bar**. Il cliente accumula punti in base a
@@ -72,11 +82,10 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
 2. **Lancio**: consegna delle prime 50 Enjoy Card.
 3. **Tablet**: solo con lettore NFC USB; lettura da lettore e cambio operatore con PIN.
 
-## Punti aperti (da chiarire con `interview-me`, non decidere da soli)
-- Modello dati: mancano soglia di conferma importo, identificativo di idempotenza, descrizione del premio
-  libero, account di dispositivo; "importo in euro" vs "centesimi interi".
-- Regione dei dati Supabase (UE?), Vercel o Netlify, comportamento offline oltre al reinvio.
-- Rapporto euro/punto iniziale, amministratori al lancio, formato del lettore USB.
+## Decisioni successive alle specifiche
+Registrate in `brain/DECISIONS.md` (intervista del 2026-11-16): consegna completa delle tre fasi, niente
+modalità offline, Supabase in UE, hosting Vercel, importi in centesimi ovunque, campi aggiunti al modello
+dati, lettore USB generico con formato dell'uid configurabile.
 
 ## Lingua
 - Comunicazione con l'utente e UI dell'app: **italiano**.
@@ -127,12 +136,13 @@ Da compilare quando il progetto applicativo esiste (install, dev, test, lint, bu
   skills/        # skill di progetto (Addy Osmani, Impeccable, webapp-testing)
   agents/        # subagent Impeccable
   settings.json  # hook Impeccable + plugin project-brain
+brain/           # memoria di progetto (stato, decisioni, passaggi tra sessioni)
 docs/            # (da creare) specs/ e adr/
 skills-lock.json # versioni delle skill installate
 ```
 
 ## Memoria di progetto — [project-brain](https://github.com/Ethan-YS/project-brain)
-- "set up project brain" → crea `brain/` (PROJECT, MAP, STATUS, DECISIONS, HANDOFF). Previsto dopo l'intervista.
+- `brain/` esiste (PROJECT, MAP, STATUS, DECISIONS, HANDOFF, topics/operations/RUNBOOK).
 - "resume this project" → a inizio sessione legge MAP, STATUS e HANDOFF.
 - "hand off" → prima di chiudere una sessione o quando il contesto è pieno, scrive `brain/HANDOFF.md`.
 - "update the project brain" → propone aggiornamenti, da approvare uno per uno.

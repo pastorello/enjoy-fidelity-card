@@ -1,0 +1,63 @@
+# brain/
+
+This folder holds **everything about this project itself** — for future sessions, new windows, new collaborators to pick up the project quickly.
+
+## Continuity layer (read every session)
+
+5 core files directly under `brain/`:
+
+| File | Answers | Time-scale |
+|---|---|---|
+| `PROJECT.md` | What is this project? Why does it exist? **What do we explicitly NOT do?** | Near-immutable |
+| `MAP.md` | What does the project look like? Where do I find what? | Evolves with structure |
+| `STATUS.md` | Where are we? Next step? What's blocked? | Instantaneous, overwritable |
+| `DECISIONS.md` | Why did we do X? Why didn't we do Y? | Append-only |
+| `HANDOFF.md` | The last shift's report: first thing to do, waits, what's still only in its head | Transient, overwritten per switch |
+
+`handoffs/` — past HANDOFFs archived as `YYYY-MM-DD-HHMM.md`.
+
+## Topic layer (read on demand)
+
+`topics/` — 4 categories, each business/technical doc placed by **what problem it answers**:
+
+- `systems/` — "How is this designed?"
+- `operations/` — "How do I operate it / what to do each release?"
+- `planning/` — "What are we going to build / how do we plan it?"
+- `feedback/` — "What is reality / what are users telling us?"
+
+Decision criterion: see `topics/README.md`.
+
+`operations/RUNBOOK.md` comes with the scaffold (v2.9): commands, health check, where to look when something breaks, numbered traps. Handoffs point into it instead of retelling.
+
+## How a new session uses this
+
+1. Read `MAP.md` first — understand structure + know where docs live
+2. Read `STATUS.md` next — know current progress
+3. If `HANDOFF.md` exists, read it — the last shift's report
+4. Read `PROJECT.md` / `DECISIONS.md` on demand — understand scope / trace why
+5. Use `MAP.md` §5 topic doc index to enter `topics/` content as needed
+
+## Maintenance disciplines
+
+- **Continuity layer 5 files don't overlap**: any piece of info should clearly belong to one of them. Mixing causes degradation.
+- **PROJECT shouldn't change often**: if it does, the project's definition is drifting — record that in DECISIONS.
+- **STATUS soft cap 80 lines / ~6,000 characters**: over that, settle content into MAP (structural) or DECISIONS (rationale), then overwrite.
+- **DECISIONS append-only**: never modify history. Even when overturning, do it with a new entry that supersedes the old one.
+- **HANDOFF overwritten at next window-switch**: what's still valid moves to STATUS / RUNBOOK first, then the previous version is archived to `handoffs/` — archives are history, never current (Trap 21).
+
+## Multi-workstream mode (v2.1, optional)
+
+If this project has parallel independent workstreams, the continuity layer splits:
+- Files become `STATUS_<workstream>.md` / `HANDOFF_<workstream>.md`
+- Archives become `handoffs/<workstream>/YYYY-MM-DD-HHMM.md`
+- PROJECT / MAP / DECISIONS / topics stay shared
+
+**Concurrent windows** (v2.8, optional): if several windows work at the same time, MAP §6 also holds a "Who's on it now" roster (workstream → current window). Each new window claims its row; everywhere else, name workstreams, not windows. Requests between workstreams live in both STATUS files. Shared files are edited in place, never rewritten.
+
+See METHODOLOGY §3.5 + §3.6.
+
+## Full methodology
+
+See [METHODOLOGY.md on GitHub](https://github.com/Ethan-YS/project-brain/blob/main/METHODOLOGY.md).
+
+(This file lives in `<your-project>/brain/`, so a relative link won't reach the methodology — always use the GitHub URL.)
