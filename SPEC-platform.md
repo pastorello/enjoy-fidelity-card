@@ -1,6 +1,6 @@
 # Spec: platform — V1
 
-Status: draft (in attesa di approvazione)
+Status: approved (2026-11-16)
 Modulo: `platform` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Fonti: specifiche, wireframe e design system
 "Enjoy Bar" (link in `brain/MAP.md` §5) · Decisioni: `brain/DECISIONS.md`.
 
@@ -66,7 +66,7 @@ Stile: CSS con custom properties generate dai token, niente framework CSS; font 
    - Migrazione iniziale: estensioni `pgcrypto` e `pgtap` (solo test), schema `app`, RLS attiva per
      impostazione predefinita su ogni nuova tabella (verificata da un test pgTAP).
    - Client unico in `src/lib/supabase.ts` da `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
-   - Progetti remoti: **produzione** e **staging** (vedi Open Questions), entrambi in UE.
+   - Progetti remoti: **produzione** e **staging**, entrambi in UE; le anteprime Vercel usano staging.
 9. **HTTPS in sviluppo**: `npm run dev:https` serve l'app in HTTPS sulla rete locale (certificato di
    sviluppo), per provarla sul telefono Android: Web NFC funziona solo in HTTPS.
 10. **CI (GitHub Actions)** su ogni PR e su `main`: typecheck, lint, test unitari, build, test database
@@ -193,11 +193,13 @@ export function PointsBadge({ points }: PointsBadgeProps) {
 
 ## Open Questions
 
-1. **Logo e icona**: servono il logo Enjoy in SVG (per l'header) e un'immagine quadrata per l'icona dell'app.
-   Li hai in file? Altrimenti li estraggo dal design system, se contiene il file.
-2. **Staging**: propongo due progetti Supabase gratuiti, produzione e staging (le anteprime Vercel usano
-   staging, così le prove non toccano dati veri). Va bene, o preferisci un solo progetto?
-3. **Account**: i progetti Supabase e Vercel li crei tu con il tuo account (io preparo configurazione e
-   istruzioni), oppure hai già un account/team da usare?
-4. **Monitoraggio errori**: lo vogliamo prima del lancio? Un servizio esterno riceve dati tecnici dagli
-   errori (in UE, senza dati dei clienti).
+Risolte il 2026-11-16:
+- **Staging**: sì, due progetti Supabase (produzione e staging), entrambi in UE.
+- **Account**: Supabase e Vercel li crea l'utente con il proprio account; l'agente prepara configurazione e
+  istruzioni e non crea account.
+
+Aperte (non bloccano l'avvio):
+1. **Logo e icona**: logo Enjoy in SVG e immagine quadrata per l'icona. Fino all'arrivo dei file si usa un
+   segnaposto testuale "Enjoy" nell'header e un'icona provvisoria; il criterio di installazione su Android
+   si verifica con l'icona definitiva.
+2. **Monitoraggio errori**: resta fuori da questa spec (vedi Out of Scope); da decidere prima del lancio.

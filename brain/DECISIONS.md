@@ -10,6 +10,19 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-16 — Staging separato e account creati dall'utente
+
+- **Decisione**: due progetti Supabase gratuiti in UE, produzione e staging; le anteprime Vercel usano
+  staging. Gli account Supabase e Vercel li crea l'utente con il proprio account; l'agente prepara
+  configurazione e istruzioni.
+- **Perché**: le prove sulle anteprime non devono mai toccare i dati veri dei clienti; gli account e la
+  fatturazione restano in mano al titolare del progetto.
+- **Alternative scartate (Rejected alternatives)**:
+  - Un solo progetto Supabase: le anteprime scriverebbero sul database di produzione.
+  - Account creati dall'agente: l'agente non gestisce credenziali né accetta termini di servizio.
+- **Ambito**: modulo `platform` (deploy, ambienti).
+- **Contesto**: approvazione di `SPEC-platform.md`.
+
 ### 2026-11-16 — Configurazione iniziale dai valori di esempio delle specifiche
 
 - **Decisione**: al primo avvio rapporto 1 punto ogni 1 € (100 centesimi per punto); catalogo premi,

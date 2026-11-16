@@ -5,7 +5,7 @@ specifica `SPEC-<id>.md` in questa cartella; questa mappa è l'indice di quelle 
 
 | Module id | Responsabilità | Dipende da | Spec |
 |---|---|---|---|
-| `platform` | Scheletro PWA, Supabase (UE), CI e deploy su Vercel, token del design system, struttura comune delle schermate | — | [SPEC-platform.md](SPEC-platform.md) (bozza) |
+| `platform` | Scheletro PWA, Supabase (UE), CI e deploy su Vercel, token del design system, struttura comune delle schermate | — | [SPEC-platform.md](SPEC-platform.md) (approvata) |
 | `identity` | Accesso, invito via email, password (scelta e recupero), ruoli, gestione e disattivazione operatori, sessione scaduta | platform | — |
 | `settings` | Rapporto euro/punto, soglia di conferma importo, formato del lettore USB | identity | — |
 | `customers` | Nuovo cliente (nome unico, telefono facoltativo, consenso), ricerca, modifica, anonimizzazione | identity | — |

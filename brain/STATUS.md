@@ -7,8 +7,8 @@
 
 ## Cosa stiamo facendo
 
-Spec-driven development: capability map approvata (`CAPABILITY-MAP.md`); `SPEC-platform.md` scritta,
-in attesa di approvazione e risposte alle Open Questions. Nessun codice applicativo ancora.
+Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Prossima fase:
+piano e task di `platform`. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 
@@ -17,7 +17,8 @@ in attesa di approvazione e risposte alle Open Questions. Nessun codice applicat
 
 ## Prossimi passi
 
-1. Approvazione di `SPEC-platform.md` (Open Questions: logo/icona, staging, account, monitoraggio).
+1. ~~Approvazione di `SPEC-platform.md`~~ fatto. Ancora aperti (non bloccanti): logo SVG/icona,
+   monitoraggio errori prima del lancio.
 2. `planning-and-task-breakdown` per `platform`, poi implementazione; poi spec dei moduli successivi
    nell'ordine della mappa (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
 3. `/impeccable init` partendo dal design system "Enjoy Bar" prima del primo lavoro di UI.
@@ -30,6 +31,7 @@ in attesa di approvazione e risposte alle Open Questions. Nessun codice applicat
   lancio, non lo sviluppo).
 - **Lettore NFC USB**: da scegliere e acquistare (blocca la fase tablet); verificare il formato dell'uid.
 - **Amministratori iniziali** (nomi/email): servono al primo deploy.
+- **Account Supabase (prod + staging, UE) e Vercel**: li crea l'utente; servono prima del deploy, non per lo sviluppo locale.
 
 ## Modifiche non pubblicate
 
