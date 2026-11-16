@@ -86,3 +86,10 @@ Da compilare quando lo stack è scelto (install, dev, test, lint, build, deploy)
 docs/            # (da creare) specs/ e adr/
 skills-lock.json # versioni delle skill installate
 ```
+
+## Memoria di progetto — [project-brain](https://github.com/Ethan-YS/project-brain)
+Plugin installato a livello di progetto (`.claude/settings.json`). Comandi in linguaggio naturale:
+- "set up project brain" → crea la cartella `brain/` (PROJECT, MAP, STATUS, DECISIONS, HANDOFF).
+- "resume this project" → a inizio sessione legge `brain/MAP.md`, `brain/STATUS.md` e `brain/HANDOFF.md`.
+- "hand off" → prima di chiudere una sessione o quando il contesto è pieno, scrive `brain/HANDOFF.md`.
+- "update the project brain" → propone aggiornamenti, da approvare uno per uno.
