@@ -7,8 +7,8 @@
 
 ## Cosa stiamo facendo
 
-Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Prossima fase:
-piano e task di `platform`. Nessun codice applicativo ancora.
+Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano e task di
+`platform` scritti (`tasks/plan.md`, `tasks/todo.md`), in attesa di approvazione. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 

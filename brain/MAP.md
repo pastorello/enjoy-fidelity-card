@@ -56,6 +56,7 @@ La lettura card ha un unico punto d'ingresso nell'app: telefono e lettore USB so
 | `CLAUDE.md` | Regole stabili: architettura, invarianti di dominio, ruoli, privacy, workflow skill | Ogni sessione (caricato in automatico) |
 | `CAPABILITY-MAP.md` | Moduli, dipendenze, ordine di costruzione, indice delle spec | Prima di scegliere su cosa lavorare |
 | `SPEC-platform.md` | Spec del modulo `platform` (approvata) | Prima di lavorare su scheletro, CI, deploy, UI base |
+| `tasks/plan.md`, `tasks/todo.md` | Piano e task del modulo in corso | Prima di implementare |
 | `docs/adr/` | (da creare) decisioni architetturali dettagliate | Quando una decisione richiede più di una voce in DECISIONS |
 
 ### operations/
