@@ -7,8 +7,8 @@
 
 ## Cosa stiamo facendo
 
-Fase di definizione chiusa: intento confermato con `interview-me` e `brain/` creato. Nessun codice
-applicativo ancora. Prossimo: portare la specifica nel repo.
+Spec-driven development: capability map approvata (`CAPABILITY-MAP.md`); `SPEC-platform.md` scritta,
+in attesa di approvazione e risposte alle Open Questions. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 
@@ -17,9 +17,9 @@ applicativo ancora. Prossimo: portare la specifica nel repo.
 
 ## Prossimi passi
 
-1. `spec-driven-development`: unire specifiche (doc), wireframe e `DECISIONS.md` in `docs/specs/`,
-   includendo le aggiunte al modello dati (DECISIONS 2026-11-16).
-2. `planning-and-task-breakdown`: piano dei task per le tre fasi.
+1. Approvazione di `SPEC-platform.md` (Open Questions: logo/icona, staging, account, monitoraggio).
+2. `planning-and-task-breakdown` per `platform`, poi implementazione; poi spec dei moduli successivi
+   nell'ordine della mappa (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
 3. `/impeccable init` partendo dal design system "Enjoy Bar" prima del primo lavoro di UI.
 4. Setup progetto: Supabase (regione UE), Vercel, struttura app PWA; compilare i comandi in
    `CLAUDE.md` e `brain/topics/operations/RUNBOOK.md`.

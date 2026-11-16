@@ -97,7 +97,7 @@ Skill di progetto in `.claude/skills/` (versioni in `skills-lock.json`).
 
 ### Ingegneria — [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
 1. `interview-me` → chiudere i punti aperti.
-2. `spec-driven-development` → specifica nel repo (`docs/specs/`), derivata dalle fonti di verità.
+2. `spec-driven-development` → una specifica per modulo (`SPEC-<id>.md` nella root), indice in `CAPABILITY-MAP.md`.
 3. `planning-and-task-breakdown` → task piccoli e verificabili.
 4. `incremental-implementation` + `test-driven-development` → piccoli passi, test prima.
 5. `code-review-and-quality` → review prima del merge.
@@ -137,7 +137,9 @@ Da compilare quando il progetto applicativo esiste (install, dev, test, lint, bu
   agents/        # subagent Impeccable
   settings.json  # hook Impeccable + plugin project-brain
 brain/           # memoria di progetto (stato, decisioni, passaggi tra sessioni)
-docs/            # (da creare) specs/ e adr/
+CAPABILITY-MAP.md # moduli, dipendenze, ordine di costruzione
+SPEC-<id>.md     # specifica di ogni modulo
+docs/adr/        # (da creare) decisioni architetturali
 skills-lock.json # versioni delle skill installate
 ```
 

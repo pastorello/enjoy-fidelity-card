@@ -54,7 +54,8 @@ La lettura card ha un unico punto d'ingresso nell'app: telefono e lettore USB so
 | File | Cos'è | Quando leggerlo |
 |---|---|---|
 | `CLAUDE.md` | Regole stabili: architettura, invarianti di dominio, ruoli, privacy, workflow skill | Ogni sessione (caricato in automatico) |
-| `docs/specs/` | (da creare) specifica derivata dalle fonti di verità | Prima di implementare |
+| `CAPABILITY-MAP.md` | Moduli, dipendenze, ordine di costruzione, indice delle spec | Prima di scegliere su cosa lavorare |
+| `SPEC-platform.md` | Spec del modulo `platform` (bozza) | Prima di lavorare su scheletro, CI, deploy, UI base |
 | `docs/adr/` | (da creare) decisioni architetturali dettagliate | Quando una decisione richiede più di una voce in DECISIONS |
 
 ### operations/
