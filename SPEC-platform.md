@@ -63,9 +63,14 @@ Stile: CSS con custom properties generate dai token, niente framework CSS; font 
 8. **Supabase**:
    - Progetto locale con `supabase init` / `supabase start` (Docker); cartelle `supabase/migrations`,
      `supabase/functions`, `supabase/tests`.
-   - Migrazione iniziale: estensioni `pgcrypto` e `pgtap` (solo test), schema `app`, RLS attiva per
-     impostazione predefinita su ogni nuova tabella (verificata da un test pgTAP).
-   - Client unico in `src/lib/supabase.ts` da `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`.
+   - Migrazione iniziale: estensione `pgcrypto`, schema `app` (accesso solo ad `authenticated` e
+     `service_role`, mai ad `anon`), schema `private` per funzioni interne, event trigger che attiva la RLS
+     su ogni tabella creata in `app` (verificato da un test pgTAP; `pgtap` si attiva solo nei test).
+   - Registrazione libera disattivata (`enable_signup = false`): gli account li crea un amministratore.
+     Storage di Supabase disattivato (non usato).
+   - Client unico `getSupabase()` in `src/lib/supabase.ts` da `VITE_SUPABASE_URL` e
+     `VITE_SUPABASE_PUBLISHABLE_KEY` (chiave *publishable*; rifiuta chiavi segrete e URL non HTTPS remoti).
+     Quali tabelle esporre via API si decide nelle spec dei moduli successivi.
    - Progetti remoti: **produzione** e **staging**, entrambi in UE; le anteprime Vercel usano staging.
 9. **HTTPS in sviluppo**: `npm run dev:https` serve l'app in HTTPS sulla rete locale (certificato di
    sviluppo), per provarla sul telefono Android: Web NFC funziona solo in HTTPS.

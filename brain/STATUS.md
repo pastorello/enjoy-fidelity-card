@@ -8,11 +8,11 @@
 ## Cosa stiamo facendo
 
 Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano `platform`
-approvato; task 1 (scaffold) fatto sul branch `feat/platform-scaffold`. Prossimo: task 2 e 3, poi Checkpoint A. Nessun codice applicativo ancora.
+approvato; task 1-3 fatti sul branch `feat/platform-scaffold`. Checkpoint A: revisione con l'utente, poi push e PR. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 
-- `npm run typecheck && npm run lint && npm test && npm run build` (tutti verdi al task 1).
+- `npm run typecheck && npm run lint && npm test && npm run build`; `npm run db:start && npm run db:test`.
 - `git log --oneline` e `git status -sb` per lo stato del repo.
 
 ## Prossimi passi

@@ -1,0 +1,2 @@
+-- Development seed. Fake data only: this repository is public, never put real
+-- customer data here.

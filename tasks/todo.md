@@ -26,9 +26,9 @@ react-hooks, jsx-a11y, type-aware), Prettier, Vitest + Testing Library, script n
 la RLS su ogni nuova tabella di `app`; test pgTAP; client `src/lib/supabase.ts` da variabili d'ambiente;
 `.env.example`; seed vuoto.
 **Accettazione:**
-- [ ] `npm run db:reset` applica la migrazione senza errori
-- [ ] pgTAP: una tabella creata in `app` ha la RLS attiva e, senza policy, un utente `authenticated` non legge righe
-- [ ] Il client fallisce in modo chiaro se mancano le variabili d'ambiente (test unitario)
+- [x] `npm run db:reset` applica la migrazione senza errori
+- [x] pgTAP: una tabella creata in `app` ha la RLS attiva e, senza policy, un utente `authenticated` non legge righe
+- [x] Il client fallisce in modo chiaro se mancano le variabili d'ambiente (test unitario)
 **Verifica:** `npm run db:start && npm run db:test && npm test`
 **Dipendenze:** 1 · **File:** supabase/config.toml, supabase/migrations/*_init.sql, supabase/tests/rls_default.test.sql, src/lib/supabase.ts, .env.example · **Dimensione:** M
 
