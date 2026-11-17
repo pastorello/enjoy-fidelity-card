@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App (types, lint, unit, build, E2E)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm test
+      - name: Check generated design tokens are up to date
+        run: npm run tokens && git diff --exit-code src/styles/tokens.css
+      - run: npx playwright install --with-deps chromium
+      - name: E2E (builds the app and serves it with production headers)
+        run: npm run e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  database:
+    name: Database (migrations + pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Start Postgres only and apply migrations
+        run: npx supabase db start
+      - run: npm run db:test
