@@ -33,3 +33,9 @@ test('no request leaves for third-party font or analytics hosts', async ({ page 
   await page.evaluate(() => document.fonts.ready);
   expect(external).toEqual([]);
 });
+
+test('search engines are told not to index the internal app', async ({ request }) => {
+  const response = await request.get('/robots.txt');
+  expect(response.headers()['content-type']).toContain('text/plain');
+  expect(await response.text()).toContain('Disallow: /');
+});
