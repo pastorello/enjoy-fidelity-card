@@ -75,8 +75,16 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     async (email: string, password: string): Promise<SignInOutcome> => {
       const result = await service.signIn(email, password);
       if (result !== 'ok') return result;
-      const userId = await service.currentUserId();
-      const operator = userId ? await service.loadOperator(userId) : null;
+      let operator: Operator | null;
+      try {
+        const userId = await service.currentUserId();
+        operator = userId ? await service.loadOperator(userId) : null;
+      } catch {
+        // The session is saved but its profile was never checked: do not keep it.
+        await endSession();
+        setState({ status: 'signed-out' });
+        return 'network';
+      }
       if (!operator) {
         await endSession();
         setState({ status: 'signed-out' });

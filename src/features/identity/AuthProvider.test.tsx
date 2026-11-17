@@ -89,6 +89,20 @@ describe('AuthProvider', () => {
     expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
   });
 
+  it('ends the new session and reports a network failure when the profile cannot be loaded', async () => {
+    const fake = createFakeAuthService();
+    fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+    const auth = renderWith(fake);
+    await waitFor(() => expect(state()).toHaveTextContent('out:-'));
+    let result: string | undefined;
+    await act(async () => {
+      result = await auth().signIn('giulia@example.com', 'password-di-prova');
+    });
+    expect(result).toBe('network');
+    expect(fake.service.signOut).toHaveBeenCalledOnce();
+    expect(state()).toHaveTextContent('out:-');
+  });
+
   it('reports wrong credentials and stays signed out', async () => {
     const fake = createFakeAuthService({ signInResult: 'invalid' });
     const auth = renderWith(fake);

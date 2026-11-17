@@ -66,8 +66,14 @@ export function LoginPage() {
     if (errors.email || errors.password) return;
 
     setBusy(true);
-    const outcome = await signIn(email.trim(), password);
-    setBusy(false);
+    let outcome: SignInOutcome;
+    try {
+      outcome = await signIn(email.trim(), password);
+    } catch {
+      outcome = 'unknown';
+    } finally {
+      setBusy(false);
+    }
     if (outcome !== 'ok') {
       setFailure(failureMessages[outcome]);
       if (outcome === 'invalid') setPassword('');

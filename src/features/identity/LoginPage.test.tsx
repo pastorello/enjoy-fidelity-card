@@ -49,6 +49,18 @@ describe('sign-in page', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
   });
 
+  it('reports a network failure and stops waiting when the profile cannot be loaded', async () => {
+    const fake = createFakeAuthService();
+    fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+    renderApp('/accedi', fake);
+    await fillAndSubmit('giulia@example.com', 'password-di-prova');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Connessione assente: controlla la rete e riprova.',
+    );
+    expect(screen.getByRole('button', { name: 'Accedi' })).not.toHaveAttribute('aria-busy');
+    expect(fake.service.signOut).toHaveBeenCalledOnce();
+  });
+
   it('refuses an account without an operator profile', async () => {
     renderApp('/accedi', createFakeAuthService({ operator: null }));
     await fillAndSubmit('nuovo@example.com', 'password-di-prova');
