@@ -32,6 +32,8 @@ del modulo `identity`.
 
 ## Bloccanti / da confermare
 
+- **Servizio di invio email** (da `info@enjoygaeta.it`): chiedere all'utente quale provider SMTP usa, da
+  citare nell'informativa privacy.
 - **Testo dell'informativa e del consenso privacy**: da far verificare al consulente del bar (blocca il
   lancio, non lo sviluppo).
 - **Lettore NFC USB**: da scegliere e acquistare (blocca la fase tablet); verificare il formato dell'uid.

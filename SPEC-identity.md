@@ -157,7 +157,9 @@ La CI avvia lo stack Supabase locale anche per E2E e integrazione.
 
 ## Out of Scope (Deferred)
 
-Rinviati dopo la V1 (decisione del 2026-11-17), da riprendere se il bar avrà un dominio e un servizio email:
+Rinviati dopo la V1 (decisione del 2026-11-17). Le email di Auth ora funzionano (`info@enjoygaeta.it`):
+"Password dimenticata" e "Cambia password" si aggiungono subito dopo la V1 con una spec aggiuntiva; il resto
+resta rinviato:
 - inviti via email, scelta della password dal link, "Password dimenticata";
 - schermata "Operatori" nell'app (elenco, disattiva, riattiva, reinvia l'invito);
 - cambio di ruolo dall'app (si fa con `private.add_operator`);
