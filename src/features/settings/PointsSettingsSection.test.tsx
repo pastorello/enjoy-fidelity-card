@@ -17,6 +17,17 @@ function normalized(element: HTMLElement) {
   return (element.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
+/** A promise the test settles by hand, to observe the loading and saving states. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((settle, fail) => {
+    resolve = settle;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('points section for operators', () => {
   it('shows the ratio read-only, without fields, Salva or threshold', async () => {
     renderApp('/impostazioni', operator());
@@ -119,15 +130,6 @@ async function replace(input: HTMLElement, text: string) {
   if (text !== '') await userEvent.type(input, text);
 }
 
-/** A promise the test settles by hand, to observe the saving state. */
-function deferred<T>() {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((settle) => {
-    resolve = settle;
-  });
-  return { promise, resolve };
-}
-
 describe('points and controls section for administrators', () => {
   it('shows both fields prefilled, the help text and Salva', async () => {
     const { section, ratio, threshold } = await openAdminSection();
@@ -193,6 +195,24 @@ describe('points and controls section for administrators', () => {
     expect(save).not.toHaveAttribute('aria-busy');
     expect(ratio).not.toHaveAttribute('readonly');
     expect(ratio).toHaveValue('2,00');
+  });
+
+  it('saves once when two submits arrive before the busy state renders', async () => {
+    const pending = deferred<UpdateSettingsResult>();
+    const settings = createFakeSettingsService();
+    settings.service.update.mockImplementationOnce(() => pending.promise);
+    const { section, save } = await openAdminSection(settings);
+    const form = save.closest('form')!;
+
+    act(() => {
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+    });
+    expect(settings.service.update).toHaveBeenCalledTimes(1);
+
+    await act(async () => pending.resolve({ status: 'ok', settings: { ...defaultSettings } }));
+    expect(await within(section).findAllByText('Impostazioni salvate.')).toHaveLength(1);
+    expect(settings.service.update).toHaveBeenCalledTimes(1);
   });
 
   it('removes the confirmation as soon as a field changes again', async () => {
@@ -289,7 +309,19 @@ describe('points and controls section for administrators', () => {
     await waitFor(() => expect(ratio).toHaveValue('1,50'));
   });
 
-  it('shows a loading state, then "Impostazioni non caricate" with Riprova', async () => {
+  it('shows a loading state inside the section, the rest of the page stays usable', async () => {
+    const settings = createFakeSettingsService();
+    settings.service.load.mockReturnValueOnce(new Promise(() => {}));
+    renderApp('/impostazioni', signedInFake(), settings);
+    const section = await screen.findByRole('region', { name: 'PUNTI E CONTROLLI' });
+    expect(within(section).getByRole('status')).toHaveTextContent('Caricamento…');
+    expect(within(section).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: 'Salva' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Esci' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: /Cambia password/ })).toBeInTheDocument();
+  });
+
+  it('shows "Impostazioni non caricate" with Riprova, which loads again', async () => {
     const settings = createFakeSettingsService({ loadResults: ['network', 'ok'] });
     renderApp('/impostazioni', signedInFake(), settings);
     const section = await screen.findByRole('region', { name: 'PUNTI E CONTROLLI' });
