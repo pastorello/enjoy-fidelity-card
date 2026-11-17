@@ -11,6 +11,10 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onC
   /** Says what is wrong and what to do; marks the field invalid. */
   error?: string | undefined;
   type?: 'text' | 'tel' | 'email' | 'password';
+  /** `inline`: label on the left, short right-aligned field on the right (48 px tall). */
+  layout?: 'stacked' | 'inline' | undefined;
+  /** Unit shown right after the field, e.g. "€". */
+  suffix?: string | undefined;
 };
 
 export function TextField({
@@ -20,6 +24,8 @@ export function TextField({
   hint,
   error,
   type = 'text',
+  layout = 'stacked',
+  suffix,
   className,
   ...rest
 }: TextFieldProps) {
@@ -27,11 +33,14 @@ export function TextField({
   const messageId = `${id}-message`;
   const message = error ?? hint;
 
-  return (
-    <div className={[styles.field, className].filter(Boolean).join(' ')}>
-      <label htmlFor={id} className={styles.label}>
-        {label}
-      </label>
+  const inline = layout === 'inline';
+  const labelElement = (
+    <label htmlFor={id} className={styles.label}>
+      {label}
+    </label>
+  );
+  const control = (
+    <>
       <input
         {...rest}
         id={id}
@@ -42,6 +51,26 @@ export function TextField({
         aria-invalid={error ? true : undefined}
         aria-describedby={message ? messageId : undefined}
       />
+      {suffix && <span className={styles.suffix}>{suffix}</span>}
+    </>
+  );
+
+  return (
+    <div
+      className={[styles.field, className].filter(Boolean).join(' ')}
+      data-layout={inline ? 'inline' : undefined}
+    >
+      {inline ? (
+        <div className={styles.row}>
+          {labelElement}
+          {control}
+        </div>
+      ) : (
+        <>
+          {labelElement}
+          {suffix ? <div className={styles.row}>{control}</div> : control}
+        </>
+      )}
       {error ? (
         <p id={messageId} className={styles.error}>
           <Icon name="circle-alert" size={18} />

@@ -55,3 +55,38 @@
   flex-shrink: 0;
   margin-top: 1px;
 }
+
+/* Field and suffix side by side (inline layout, or a suffix on a stacked field). */
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.suffix {
+  flex-shrink: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  color: var(--color-ink);
+}
+
+/* Inline layout (wireframe Impostazioni): label fills the row, short right-aligned field. */
+[data-layout='inline'] .label {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  color: var(--color-ink);
+}
+
+[data-layout='inline'] .input {
+  flex: 0 0 auto;
+  width: 112px;
+  min-height: 48px;
+  text-align: right;
+}
