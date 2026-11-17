@@ -142,10 +142,10 @@ disattivato e `reportNotEnabled()`; `invalid`/`unknown` → "Impostazioni non sa
 riprova." con i valori conservati. La ricarica su `visibilitychange` aggiorna i campi non toccati e non
 sovrascrive quelli modificati e non salvati.
 **Accettazione:**
-- [ ] Componente: rete assente → errore e valori conservati; rete tornata → nuovo Salva riuscito
-- [ ] Componente: forbidden → messaggio, Salva disattivato, `reportNotEnabled` chiamato (con ruolo aggiornato
+- [x] Componente: rete assente → errore e valori conservati; rete tornata → nuovo Salva riuscito
+- [x] Componente: forbidden → messaggio, Salva disattivato, `reportNotEnabled` chiamato (con ruolo aggiornato
       a operatore la sezione passa alla vista "PUNTI"); invalid e unknown → messaggio, valori conservati
-- [ ] Componente: un altro admin salva, la pagina torna visibile → campo modificato invariato, l'altro aggiornato
+- [x] Componente: un altro admin salva, la pagina torna visibile → campo modificato invariato, l'altro aggiornato
 **Verifica:** `npm test -- settings`
 **Dipendenze:** 3, 8 · **File:** src/features/settings/PointsSettingsSection.tsx, PointsSettingsSection.test.tsx,
 src/test/fakeSettingsService.ts · **Dimensione:** M

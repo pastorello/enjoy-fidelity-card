@@ -70,7 +70,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 3: Sezioni di `/impostazioni`
 - [x] Task 7: Vista operatore "PUNTI" (sola lettura), nota finale, stati di caricamento ed errore, ordine delle sezioni
 - [x] Task 8: Vista amministratore "PUNTI E CONTROLLI": campi, validazione, Salva, "Impostazioni salvate."
-- [ ] Task 9: Errori del salvataggio (rete, permesso negato, invalid/unknown) e ricarica che non sovrascrive i campi modificati
+- [x] Task 9: Errori del salvataggio (rete, permesso negato, invalid/unknown) e ricarica che non sovrascrive i campi modificati
 
 ### Checkpoint C: flusso admin/operatore verde nei test di componente; detector Impeccable pulito; confronto con i wireframe
 
