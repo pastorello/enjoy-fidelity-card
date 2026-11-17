@@ -73,7 +73,11 @@ repository.
 
 1. **Authentication → Users → Add user → Create new user**: email e password della persona, con
    **Auto Confirm User** attivo (così l'account è subito utilizzabile e non parte nessuna email).
-   Comunica la password di persona, non per messaggio.
+   Comunica la password di persona, non per messaggio; oppure usa una password lunga e casuale che non
+   comunichi a nessuno e, dopo il passo 2, scegli **Send password recovery** dalla riga dell'utente: la
+   persona riceve la mail e sceglie da sola la password su `/imposta-password`.
+   Non usare "Send magic link" né "Invite user": con le iscrizioni chiuse rispondono "Signups not allowed
+   for this instance", ed è giusto così (nessuno deve potersi creare un account da solo).
 2. **SQL Editor**, con una nuova query:
 
    ```sql

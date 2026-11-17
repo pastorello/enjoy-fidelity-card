@@ -105,11 +105,11 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
      icona NFC) «Tieni la card appoggiata» · «Scrivo il link per vedere i punti…», la nota con icona link
      «Con il link, Maria vede i suoi punti avvicinando la card al proprio telefono. Sulla card va solo il
      link: nessun dato personale.» e nel footer il pulsante secondario «Salta, lo scrivo più tardi» (è il
-     «Più tardi» del punto 8 durante la scrittura); link scritto → `navigate('/clienti/:id/modifica', { replace: true })` con messaggio
+     «Più tardi» del punto 8 durante la scrittura); link scritto → `navigate('/clienti/:id', { replace: true })` (Scheda cliente, come nelle tavole) con messaggio
      `role="status"` «Card …A1B2 associata»; scrittura non riuscita → resta sulla pagina con l'esito del
      punto 8, tavola "Associa-link-errore" («Scrivi di nuovo il link» / «Più tardi»); «Salta, lo scrivo più
      tardi», «Più tardi» o dispositivo che non scrive →
-     `/clienti/:id/modifica` con «Card …A1B2 associata. Link non scritto.»;
+     `/clienti/:id` (Scheda cliente) con «Card …A1B2 associata. Link non scritto.»;
    - **card di un altro cliente** (wireframe "Card già di un altro cliente"): riquadro, nota e footer
      lasciano il posto all'avviso `role="alert"` (restano intestazione e riga cliente): «Card già
      associata» · «Questa card è di Antonio Esposito. Una card può essere di un solo cliente: usa un'altra
@@ -553,7 +553,9 @@ Test scritti prima del codice (TDD). Solo dati finti (`@example.com`, nomi e uid
    «Senza card», dialogo di disattivazione, conferma «Card … associata», «Questa è già la card attiva…»,
    errori di rete e di caricamento, cliente anonimizzato in Associa card). Proposta: quelli scritti sopra,
    nello stile dei wireframe (default adottato).
-7. Dopo l'associazione. Proposta: ritorno a Modifica cliente con messaggio di conferma (default adottato).
+7. Dopo l'associazione. Risolta dalle tavole Associa-link e Associa-link-errore (2026-11-18): «Salta, lo
+   scrivo più tardi» e «Più tardi» portano alla Scheda cliente; per coerenza anche il link scritto torna
+   alla Scheda cliente `/clienti/:id`, con lo stesso messaggio di conferma. «Indietro» resta su Modifica cliente.
 8. Chi può disattivare/associare. Proposta: amministratori e operatori, come nelle specifiche (default
    adottato).
 9. Idempotenza di associazione e disattivazione. CLAUDE.md chiede un identificativo generato dall'app per
