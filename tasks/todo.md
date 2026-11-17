@@ -16,8 +16,8 @@ react-hooks, jsx-a11y, type-aware), Prettier, Vitest + Testing Library, script n
 ## Task 2: Formattazione importi e punti
 **Descrizione:** `formatCents` e `formatPoints` in `src/shared/format.ts`, test prima.
 **Accettazione:**
-- [ ] `formatCents(1250)` → "12,50 €", `formatCents(0)` → "0,00 €", `formatCents(123456)` → "1.234,56 €"
-- [ ] `formatPoints(45)` → "45 pt"; un valore non intero genera un errore
+- [x] `formatCents(1250)` → "12,50 €", `formatCents(0)` → "0,00 €", `formatCents(123456)` → "1.234,56 €"
+- [x] `formatPoints(45)` → "45 pt"; un valore non intero genera un errore
 **Verifica:** `npm test -- format`
 **Dipendenze:** 1 · **File:** src/shared/format.ts, src/shared/format.test.ts · **Dimensione:** XS
 
