@@ -4,6 +4,8 @@ import { createBrowserRouter, RouterProvider } from 'react-router';
 import { routes } from './app/routes';
 import { AuthProvider } from './features/identity/AuthProvider';
 import { supabaseAuthService } from './features/identity/supabaseAuthService';
+import { SettingsServiceProvider } from './features/settings/SettingsProvider';
+import { supabaseSettingsService } from './features/settings/supabaseSettingsService';
 import './styles/tokens.css';
 import './styles/fonts.css';
 import './styles/base.css';
@@ -16,7 +18,9 @@ const router = createBrowserRouter(routes);
 createRoot(container).render(
   <StrictMode>
     <AuthProvider service={supabaseAuthService}>
-      <RouterProvider router={router} />
+      <SettingsServiceProvider service={supabaseSettingsService}>
+        <RouterProvider router={router} />
+      </SettingsServiceProvider>
     </AuthProvider>
   </StrictMode>,
 );
