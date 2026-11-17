@@ -92,9 +92,9 @@ italiano della spec (punto 6) e `centsToEuroInput(cents)` → testo con virgola 
 allineato a destra, alto 48 px) e `suffix` ("€" dopo il campo); senza le prop nulla cambia. Esempio nella
 vetrina `/dev/ui`.
 **Accettazione:**
-- [ ] Test di componente: label associata, suffisso visibile, `aria-invalid`/`aria-describedby` con errore
+- [x] Test di componente: label associata, suffisso visibile, `aria-invalid`/`aria-describedby` con errore
       anche in linea; test esistenti di `TextField` verdi
-- [ ] Solo token CSS; detector Impeccable pulito
+- [x] Solo token CSS; detector Impeccable pulito
 **Verifica:** `npm test -- TextField`
 **Dipendenze:** nessuna · **File:** src/shared/ui/TextField.tsx, TextField.module.css, TextField.test.tsx,
 src/app/dev/UiGallery.tsx · **Dimensione:** S

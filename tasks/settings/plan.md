@@ -63,7 +63,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 3: `reportNotEnabled()` in `AuthProvider` (profilo assente → `/accedi`, presente → ruolo aggiornato)
 - [x] Task 4: `SettingsProvider` e `useSettings()` dentro `RequireAuth`, iniettati in `main.tsx` e `renderApp`
 - [x] Task 5: `parseEuroInput` e `centsToEuroInput` (funzioni pure, messaggi italiani)
-- [ ] Task 6: `TextField` con `layout="inline"` e `suffix`
+- [x] Task 6: `TextField` con `layout="inline"` e `suffix`
 
 ### Checkpoint B: suite unità/componenti verde; test esistenti di identity invariati e verdi
 
