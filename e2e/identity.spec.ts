@@ -66,11 +66,12 @@ test('settings show the account and "Esci" ends the session', async ({ page }) =
 test('touch targets of the settings page are at least 48 px', async ({ page }) => {
   await signIn(page);
   await page.goto('/impostazioni');
-  for (const target of [
-    page.getByRole('link', { name: 'Indietro' }),
-    page.getByRole('button', { name: 'Esci' }),
-  ]) {
-    const box = await target.boundingBox();
+  const boxes = await Promise.all(
+    [page.getByRole('link', { name: 'Indietro' }), page.getByRole('button', { name: 'Esci' })].map(
+      (target) => target.boundingBox(),
+    ),
+  );
+  for (const box of boxes) {
     expect(box?.height).toBeGreaterThanOrEqual(48);
     expect(box?.width).toBeGreaterThanOrEqual(48);
   }
