@@ -8,8 +8,8 @@ lint e test verdi e un commit Conventional Commits sul branch del modulo.
 segnaposto e pagina 404, error boundary globale in italiano con "Riprova", Oxlint (TypeScript, React,
 react-hooks, jsx-a11y, type-aware), Prettier, Vitest + Testing Library, script npm della spec.
 **Accettazione:**
-- [ ] `npm run build`, `typecheck` e `lint` passano senza warning
-- [ ] Test: `/` mostra "Enjoy Card"; una rotta sconosciuta mostra la 404; un errore mostra il boundary
+- [x] `npm run build`, `typecheck` e `lint` passano senza warning
+- [x] Test: `/` mostra "Enjoy Card"; una rotta sconosciuta mostra la 404; un errore mostra il boundary
 **Verifica:** `npm test && npm run build`; `npm run dev` apre `/`
 **Dipendenze:** nessuna · **File:** package.json, tsconfig*.json, vite.config.ts, .oxlintrc.json, src/app/*, src/main.tsx · **Dimensione:** M
 

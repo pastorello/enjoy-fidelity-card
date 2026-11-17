@@ -27,7 +27,7 @@ Alla fine, ogni modulo successivo aggiunge schermate, migrazioni e test senza nu
 Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Fondamenta
-- [ ] Task 1: Scaffold Vite + React + TS strict, router (`/`, 404), error boundary, Oxlint, Prettier, Vitest
+- [x] Task 1: Scaffold Vite + React + TS strict, router (`/`, 404), error boundary, Oxlint, Prettier, Vitest
 - [ ] Task 2: `format.ts` (`formatCents`, `formatPoints`) con TDD
 - [ ] Task 3: Supabase locale, migrazione iniziale (schema `app`, RLS automatica), test pgTAP, client
 
