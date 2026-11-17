@@ -63,6 +63,19 @@ describe('settings page', () => {
     ]);
   });
 
+  it('keeps the single section order of cross-review.md §1 for administrators', async () => {
+    renderApp('/impostazioni', signedInFake());
+    const account = await screen.findByRole('region', { name: 'Account' });
+    const points = screen.getByRole('region', { name: 'PUNTI E CONTROLLI' });
+    const accountSection = screen.getByRole('region', { name: 'ACCOUNT' });
+    // account box · PUNTI E CONTROLLI (settings) · ACCOUNT (identity-password); no final note
+    expect(Array.from(screen.getByRole('main').children)).toEqual([
+      account,
+      points,
+      accountSection,
+    ]);
+  });
+
   it('"Esci" ends the session and opens the sign-in page', async () => {
     const { router, fake } = renderApp('/impostazioni', signedInFake());
     await userEvent.click(await screen.findByRole('button', { name: 'Esci' }));

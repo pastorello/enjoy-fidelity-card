@@ -1,8 +1,10 @@
-import { useId, type InputHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes, type Ref } from 'react';
 import { Icon } from './Icon';
 import styles from './TextField.module.css';
 
 type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'id'> & {
+  /** The input element, e.g. to focus the first invalid field of a form. */
+  ref?: Ref<HTMLInputElement> | undefined;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -18,6 +20,7 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onC
 };
 
 export function TextField({
+  ref,
   label,
   value,
   onChange,
@@ -43,6 +46,7 @@ export function TextField({
     <>
       <input
         {...rest}
+        ref={ref}
         id={id}
         type={type}
         value={value}

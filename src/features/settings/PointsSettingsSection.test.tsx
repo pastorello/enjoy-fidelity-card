@@ -1,8 +1,9 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { createFakeSettingsService, defaultSettings } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
+import type { UpdateSettingsResult } from './types';
 
 const operator = () =>
   signedInFake({ operator: { id: 'op-2', name: 'Marco Prova', role: 'operator' } });
@@ -93,9 +94,213 @@ describe('points section for operators', () => {
 
   it('is not shown to administrators, nor is the final note', async () => {
     renderApp('/impostazioni', signedInFake());
-    await screen.findByRole('region', { name: 'ACCOUNT' });
+    await screen.findByRole('region', { name: 'PUNTI E CONTROLLI' });
     expect(screen.queryByRole('region', { name: 'PUNTI' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Il rapporto lo decide/)).not.toBeInTheDocument();
     expect(screen.queryByText(finalNote)).not.toBeInTheDocument();
+  });
+});
+
+const helpText =
+  'Il rapporto vale per le spese registrate da ora in poi. La conferma evita errori di battitura, come 1250 al posto di 12,50.';
+
+async function openAdminSection(settings = createFakeSettingsService()) {
+  const rendered = renderApp('/impostazioni', signedInFake(), settings);
+  const section = await screen.findByRole('region', { name: 'PUNTI E CONTROLLI' });
+  const ratio = await within(section).findByRole('textbox', { name: '1 punto ogni' });
+  const threshold = within(section).getByRole('textbox', { name: 'Chiedi conferma sopra' });
+  const save = within(section).getByRole('button', { name: 'Salva' });
+  return { ...rendered, section, ratio, threshold, save };
+}
+
+async function replace(input: HTMLElement, text: string) {
+  await userEvent.clear(input);
+  if (text !== '') await userEvent.type(input, text);
+}
+
+/** A promise the test settles by hand, to observe the saving state. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+describe('points and controls section for administrators', () => {
+  it('shows both fields prefilled, the help text and Salva', async () => {
+    const { section, ratio, threshold } = await openAdminSection();
+    expect(
+      within(section).getByRole('heading', { level: 2, name: 'PUNTI E CONTROLLI' }),
+    ).toBeInTheDocument();
+    expect(ratio).toHaveValue('1,00');
+    expect(threshold).toHaveValue('150,00');
+    for (const input of [ratio, threshold]) {
+      expect(input).toHaveAttribute('inputmode', 'decimal');
+      expect(input).not.toHaveAttribute('readonly');
+    }
+    expect(within(section).getAllByText('€')).toHaveLength(2);
+    expect(within(section).getByText(helpText)).toBeInTheDocument();
+    expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('saves both values together, confirms and shows the server values reformatted', async () => {
+    const { section, ratio, threshold, save, settings } = await openAdminSection();
+    await replace(ratio, '2');
+    await replace(threshold, '200');
+    await userEvent.click(save);
+
+    expect(settings.service.update).toHaveBeenCalledTimes(1);
+    expect(settings.service.update).toHaveBeenCalledWith({
+      centsPerPoint: 200,
+      confirmThresholdCents: 20000,
+    });
+    const live = within(section).getByRole('status');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    await waitFor(() => expect(live).toHaveTextContent('Impostazioni salvate.'));
+    expect(ratio).toHaveValue('2,00');
+    expect(threshold).toHaveValue('200,00');
+  });
+
+  it('keeps the live region in place before saving, so the message is announced', async () => {
+    const { section } = await openAdminSection();
+    const live = within(section).getByRole('status');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    expect(live).toBeEmptyDOMElement();
+  });
+
+  it('marks Salva busy and the fields read-only while saving; a double tap saves once', async () => {
+    const pending = deferred<UpdateSettingsResult>();
+    const settings = createFakeSettingsService();
+    settings.service.update.mockImplementationOnce(() => pending.promise);
+    const { section, ratio, threshold, save } = await openAdminSection(settings);
+
+    await replace(ratio, '2');
+    await userEvent.dblClick(save);
+    await userEvent.click(save);
+
+    expect(settings.service.update).toHaveBeenCalledTimes(1);
+    expect(save).toHaveAttribute('aria-busy', 'true');
+    expect(ratio).toHaveAttribute('readonly');
+    expect(threshold).toHaveAttribute('readonly');
+
+    pending.resolve({
+      status: 'ok',
+      settings: { ...defaultSettings, centsPerPoint: 200, updatedAt: '2026-11-17T10:00:00.000Z' },
+    });
+    expect(await within(section).findByText('Impostazioni salvate.')).toBeInTheDocument();
+    expect(save).not.toHaveAttribute('aria-busy');
+    expect(ratio).not.toHaveAttribute('readonly');
+    expect(ratio).toHaveValue('2,00');
+  });
+
+  it('removes the confirmation as soon as a field changes again', async () => {
+    const { section, ratio, save } = await openAdminSection();
+    await userEvent.click(save);
+    expect(await within(section).findByText('Impostazioni salvate.')).toBeInTheDocument();
+    await userEvent.type(ratio, '5');
+    expect(within(section).queryByText('Impostazioni salvate.')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['0', 'Deve essere maggiore di 0,00 €.'],
+    ['', 'Inserisci un importo, per esempio 1,00.'],
+    ['abc', 'Scrivi solo cifre e la virgola, per esempio 1,50.'],
+    ['1,555', 'Usa al massimo due decimali, per esempio 1,50.'],
+    ['1.250', 'Usa al massimo due decimali, per esempio 1,50.'],
+    ['100,01', 'Al massimo 100,00 € per punto.'],
+  ])('ratio "%s" → "%s", focus on the field, nothing sent', async (text, message) => {
+    const { ratio, threshold, save, settings } = await openAdminSection();
+    await replace(ratio, text);
+    await userEvent.click(save);
+
+    expect(ratio).toHaveAttribute('aria-invalid', 'true');
+    expect(ratio).toHaveAccessibleDescription(message);
+    expect(ratio).toHaveFocus();
+    expect(threshold).not.toHaveAttribute('aria-invalid');
+    expect(settings.service.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['0', 'Deve essere maggiore di 0,00 €.'],
+    ['', 'Inserisci un importo, per esempio 1,00.'],
+    ['abc', 'Scrivi solo cifre e la virgola, per esempio 1,50.'],
+    ['1,555', 'Usa al massimo due decimali, per esempio 1,50.'],
+    ['1.250', 'Usa al massimo due decimali, per esempio 1,50.'],
+    ['10000,01', 'Al massimo 10.000,00 €.'],
+  ])('threshold "%s" → "%s", focus on the field, nothing sent', async (text, message) => {
+    const { ratio, threshold, save, settings } = await openAdminSection();
+    await replace(threshold, text);
+    await userEvent.click(save);
+
+    expect(threshold).toHaveAttribute('aria-invalid', 'true');
+    expect(threshold).toHaveAccessibleDescription(message);
+    expect(threshold).toHaveFocus();
+    expect(ratio).not.toHaveAttribute('aria-invalid');
+    expect(settings.service.update).not.toHaveBeenCalled();
+  });
+
+  it('accepts the ratio and threshold at their maximum', async () => {
+    const { ratio, threshold, save, settings } = await openAdminSection();
+    await replace(ratio, '100,00');
+    await replace(threshold, '10000,00');
+    await userEvent.click(save);
+    expect(settings.service.update).toHaveBeenCalledWith({
+      centsPerPoint: 10000,
+      confirmThresholdCents: 1000000,
+    });
+  });
+
+  it('shows both errors and focuses the first invalid field', async () => {
+    const { ratio, threshold, save, settings } = await openAdminSection();
+    await replace(ratio, '0');
+    await replace(threshold, 'abc');
+    await userEvent.click(save);
+    expect(ratio).toHaveAccessibleDescription('Deve essere maggiore di 0,00 €.');
+    expect(threshold).toHaveAccessibleDescription(
+      'Scrivi solo cifre e la virgola, per esempio 1,50.',
+    );
+    expect(ratio).toHaveFocus();
+    expect(settings.service.update).not.toHaveBeenCalled();
+  });
+
+  it('clears the errors once the values are valid and saved', async () => {
+    const { section, ratio, save, settings } = await openAdminSection();
+    await replace(ratio, '0');
+    await userEvent.click(save);
+    expect(ratio).toHaveAttribute('aria-invalid', 'true');
+    await replace(ratio, '3');
+    await userEvent.click(save);
+    expect(settings.service.update).toHaveBeenCalledTimes(1);
+    expect(await within(section).findByText('Impostazioni salvate.')).toBeInTheDocument();
+    expect(ratio).not.toHaveAttribute('aria-invalid');
+    expect(ratio).toHaveValue('3,00');
+  });
+
+  it.each([['1.50'], ['1,5']])('reads "%s" as 1,50 €', async (text) => {
+    const { ratio, save, settings } = await openAdminSection();
+    await replace(ratio, text);
+    await userEvent.click(save);
+    expect(settings.service.update).toHaveBeenCalledWith({
+      centsPerPoint: 150,
+      confirmThresholdCents: 15000,
+    });
+    await waitFor(() => expect(ratio).toHaveValue('1,50'));
+  });
+
+  it('shows a loading state, then "Impostazioni non caricate" with Riprova', async () => {
+    const settings = createFakeSettingsService({ loadResults: ['network', 'ok'] });
+    renderApp('/impostazioni', signedInFake(), settings);
+    const section = await screen.findByRole('region', { name: 'PUNTI E CONTROLLI' });
+    const alert = await within(section).findByRole('alert');
+    expect(within(alert).getByRole('heading', { name: 'Impostazioni non caricate' })).toBeVisible();
+    expect(within(section).queryByRole('textbox')).not.toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: 'Salva' })).not.toBeInTheDocument();
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(settings.service.load).toHaveBeenCalledTimes(2);
+    expect(await within(section).findByRole('textbox', { name: '1 punto ogni' })).toHaveValue(
+      '1,00',
+    );
   });
 });

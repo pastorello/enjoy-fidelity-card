@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -51,6 +52,12 @@ describe('TextField', () => {
     const input = screen.getByRole('textbox', { name: 'Telefono' });
     expect(input).toHaveAttribute('type', 'tel');
     expect(input).toBeRequired();
+  });
+
+  it('forwards a ref to the input, so a form can focus the first invalid field', () => {
+    const ref = createRef<HTMLInputElement>();
+    render(<TextField ref={ref} label="Nome" value="" onChange={() => {}} />);
+    expect(ref.current).toBe(screen.getByRole('textbox', { name: 'Nome' }));
   });
 
   it('renders the stacked layout by default, without a suffix', () => {

@@ -31,3 +31,29 @@
 .hint {
   margin-top: 0;
 }
+
+/* Fields, help text and Salva sit 8 px apart, as in the wireframe "Impostazioni". */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The live region stays in the page while empty; it takes space only with its message. */
+.saved {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-accent-text);
+}
+
+.saved:not(:empty) {
+  margin-top: var(--space-2);
+}
+
+.saved svg {
+  flex-shrink: 0;
+}
