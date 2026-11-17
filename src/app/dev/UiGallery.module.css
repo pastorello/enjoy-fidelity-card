@@ -18,3 +18,14 @@
   padding: 0;
   list-style: none;
 }
+
+/* A movement's points delta: a figure, so Enjoy Display like the badge and the buttons. */
+.delta {
+  flex-shrink: 0;
+  font-family: var(--type-label-lg-family);
+  font-size: var(--type-label-lg-size);
+  line-height: var(--type-label-lg-line-height);
+  font-weight: var(--type-label-lg-weight);
+  letter-spacing: var(--type-label-lg-letter-spacing);
+  white-space: nowrap;
+}
