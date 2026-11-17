@@ -51,11 +51,11 @@ supabaseAuthService.test.ts, src/test/fakeAuthService.ts · **Dimensione:** M
 ricorda se la verifica è riuscita; `abandonRecovery()` chiude la sessione locale se la verifica è riuscita e
 il salvataggio no. Il cambio di sessione dovuto a `verifyOtp` non produce "sessione scaduta".
 **Accettazione:**
-- [ ] Test: dopo `network` su `updatePassword` un nuovo `completeRecovery` non richiama `verifyRecovery`;
+- [x] Test: dopo `network` su `updatePassword` un nuovo `completeRecovery` non richiama `verifyRecovery`;
       `same-password` dopo un errore di rete vale come successo
-- [ ] Test: verifica riuscita + `abandonRecovery` → stato "non collegato"; verifica con un altro account →
+- [x] Test: verifica riuscita + `abandonRecovery` → stato "non collegato"; verifica con un altro account →
       operatore del link, nessun messaggio di sessione scaduta; profilo assente → "not-enabled"
-- [ ] Le pagine non chiamano mai il servizio direttamente (solo `useAuth()`)
+- [x] Le pagine non chiamano mai il servizio direttamente (solo `useAuth()`)
 **Verifica:** `npm test -- AuthProvider`
 **Dipendenze:** 2 · **File:** src/features/identity/AuthProvider.tsx, AuthProvider.test.tsx · **Dimensione:** S
 
