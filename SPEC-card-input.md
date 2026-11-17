@@ -6,8 +6,8 @@ Rivista il 2026-11-17 per la decisione del titolare «punti visibili al cliente 
 Modulo: `card-input` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `platform`, `settings` ·
 Fonti: specifiche (sezioni "Architettura", "Contesto e vincoli", "Nuovo cliente e consegna della card"),
 wireframe Cerca cliente, Lettura card: primo avvio, Lettura card spenta, Associa card, Tablet: cerca cliente,
-Tablet: associa card, Tablet: cambio operatore (intestazione "Lettore NFC USB collegato"), note `n1`, `n2`,
-`nt2`, `nt3` ·
+Tablet: associa card, Tablet: cambio operatore (intestazione "Lettore NFC USB collegato"), Associa-link e
+Associa-link-errore (scrittura del link: i testi sono di `cards` punto 8), note `n1`, `n2`, `nt2`, `nt3` ·
 Decisioni: `brain/DECISIONS.md` (2026-11-16 "Lettore NFC USB generico con formato configurabile"; 2026-11-17
 "Punti visibili al cliente con la card": la card porta un link scritto dall'app, che `cards` genera e
 verifica).
@@ -229,7 +229,8 @@ lo stesso uid arriva identico dal lettore USB con il formato configurato; su And
      messaggio NDEF rovinato: l'esito resta `io`, e la card si ripara con `allowUnreadable`.
    - **3. Verifica** (`verifying`): la scrittura è riuscita solo quando una lettura di `expectedUid` riporta
      tra gli URL del messaggio esattamente `url`. Se Chrome non rilegge da solo la card rimasta appoggiata,
-     la schermata chiede di allontanarla e riavvicinarla (testo di `cards`). Lettura di un altro uid durante
+     la schermata chiede di allontanarla e riavvicinarla (testo di `cards` punto 8; la tavola "Associa-link"
+     mostra il passo `writing`: «Tieni la card appoggiata» · «Scrivo il link per vedere i punti…»). Lettura di un altro uid durante
      la verifica: con `url` tra i suoi URL → `wrong-card` con `otherUid` (il link è finito sulla card
      sbagliata), altrimenti ignorata; stesso uid con contenuto diverso → `verify-failed`; `readingerror` →
      ignorato (si attende un'altra lettura fino al tempo massimo).

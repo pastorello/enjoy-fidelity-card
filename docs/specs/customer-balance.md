@@ -60,8 +60,13 @@ Decisione del titolare del 2026-11-17 «Punti visibili al cliente con la card»:
 - `SPEC-tablet-kiosk.md`: Associa card dal lettore USB lascia "link non scritto" (testo «non ci scrive
   nulla» corretto sul tablet).
 - `CAPABILITY-MAP.md`: `cards` aggiunge `/s/:token` e dipende (morbidamente) da `ledger` per il saldo.
-- Wireframe "Associa o sostituisci card" («non ci scrive nulla») superato; nessun wireframe della pagina
-  pubblica (`cards` OQ 15).
+- Wireframe "Associa o sostituisci card" («non ci scrive nulla») superato dalle tavole definitive del
+  titolare "Associa-link" (scrittura del link: «Card associata a Maria», «Tieni la card appoggiata»,
+  «Scrivo il link per vedere i punti…», «Salta, lo scrivo più tardi») e "Associa-link-errore" («Link non
+  scritto», «Scrivi di nuovo il link», «Più tardi», «Puoi scriverlo anche dopo, da Modifica cliente.»);
+  pagina pubblica nelle tavole "Saldo-punti" («ENJOY YOUR POINTS», saldo in stile `figure`, «Mostra la card
+  alla cassa per usare i tuoi punti.») e "Saldo-card-non-attiva" («Card non attiva» · «Questa card non
+  mostra punti. Chiedi al bar.»): testi in `cards` punti 4, 8 e 9 (OQ 15 chiusa).
 - `docs/specs/cross-review.md` §3.1 (riga dell'informativa, `cards` OQ 16) e §3.2 (testi).
 - `SPEC-export.md`: nessuna modifica; facoltativo un caso pgTAP che le colonne esportate non includano
   nulla di `private.card_links`.
