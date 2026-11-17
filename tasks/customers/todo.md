@@ -79,8 +79,8 @@ supabase/seed.sql · **Dimensione:** M
 ("333 123 4521" per `+39`, E.164 per gli altri); `classifyQuery(text)` → `phone` / `name` / `none` con le
 soglie della spec.
 **Accettazione:**
-- [ ] Unità con gli stessi vettori del pgTAP (task 1 e 3), compresi `0771 123456` e numeri non validi
-- [ ] Classificazione: "4521", "+39 333 1", "333-123" → telefono; "45" → nessuna; "ro" → nome; "r" → nessuna
+- [x] Unità con gli stessi vettori del pgTAP (task 1 e 3), compresi `0771 123456` e numeri non validi
+- [x] Classificazione: "4521", "+39 333 1", "333-123" → telefono; "45" → nessuna; "ro" → nome; "r" → nessuna
 **Verifica:** `npm test -- customers`
 **Dipendenze:** nessuna · **File:** src/features/customers/phone.ts, phone.test.ts · **Dimensione:** S
 

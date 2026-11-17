@@ -69,7 +69,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: db:test verde; revisione di sicurezza su RLS, privilegi e RPC
 
 ### Fase 2: Contratto del frontend
-- [ ] Task 4: `phone.ts` e classificazione del testo cercato (funzioni pure)
+- [x] Task 4: `phone.ts` e classificazione del testo cercato (funzioni pure)
 - [ ] Task 5: Tipi, `errorCodes.ts`, `supabaseCustomerService`, guardia del confine; integrazione
 - [ ] Task 6: Servizio finto, `CustomerServiceProvider` in `main.tsx` e `renderApp`
 
