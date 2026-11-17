@@ -142,14 +142,31 @@ describe('protected pages', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Accedi' })).toBeInTheDocument();
   });
 
-  it('say the service is not configured when the saved profile cannot be loaded for that', async () => {
+  it.each([
+    ['misconfigured', 'Servizio non configurato: chiedi a un amministratore.'],
+    ['unavailable', 'Servizio momentaneamente non disponibile: riprova tra poco.'],
+  ] as const)(
+    'word a %s server when the saved profile cannot be loaded for that',
+    async (kind, message) => {
+      const fake = signedInFake();
+      fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+      renderApp('/', fake);
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(screen.queryByText('Controlla la connessione e riprova.')).not.toBeInTheDocument();
+    },
+  );
+
+  it('keep the fault message when "Riprova" fails again with a fault', async () => {
     const fake = signedInFake();
-    fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError('misconfigured'));
+    fake.service.loadOperator
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new ServerFaultError('misconfigured'));
     renderApp('/', fake);
+    await userEvent.click(await screen.findByRole('button', { name: 'Riprova' }));
     expect(
       await screen.findByText('Servizio non configurato: chiedi a un amministratore.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Controlla la connessione e riprova.')).not.toBeInTheDocument();
+    expect(fake.service.loadOperator).toHaveBeenCalledTimes(2);
   });
 
   it('offer "Riprova" when the profile cannot be loaded', async () => {
