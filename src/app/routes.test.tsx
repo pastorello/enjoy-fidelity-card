@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ErrorScreen } from './ErrorScreen';
+import { renderApp, signedInFake } from '../test/renderApp';
 import { rootRoute, routes } from './routes';
 
 function Boom(): never {
@@ -15,9 +16,11 @@ function renderAt(path: string) {
 }
 
 describe('routes', () => {
-  it('shows the placeholder home on /', () => {
-    renderAt('/');
-    expect(screen.getByRole('heading', { level: 1, name: 'Enjoy Card' })).toBeInTheDocument();
+  it('shows the placeholder home on / when signed in', async () => {
+    renderApp('/', signedInFake());
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Enjoy Card' }),
+    ).toBeInTheDocument();
   });
 
   it('shows the not-found page on an unknown path', () => {

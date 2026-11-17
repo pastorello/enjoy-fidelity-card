@@ -13,9 +13,9 @@ export type SignInOutcome = SignInResult | 'not-enabled';
 
 type AuthContextValue = {
   state: AuthState;
-  signIn(email: string, password: string): Promise<SignInOutcome>;
-  signOut(): Promise<void>;
-  retry(): Promise<void>;
+  signIn: (email: string, password: string) => Promise<SignInOutcome>;
+  signOut: () => Promise<void>;
+  retry: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);

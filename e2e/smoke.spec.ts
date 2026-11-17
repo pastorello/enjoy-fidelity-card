@@ -1,7 +1,8 @@
+import { signIn } from './auth';
 import { expect, test } from './fixtures';
 
 test('home loads with the green header and the brand fonts', async ({ page }) => {
-  await page.goto('/');
+  await signIn(page);
   await expect(page).toHaveTitle('Enjoy Card');
   const banner = page.getByRole('banner');
   await expect(banner.getByRole('heading', { level: 1, name: 'Enjoy Card' })).toBeVisible();
@@ -15,7 +16,8 @@ test('unknown paths show the Italian not-found page', async ({ page }) => {
   await page.goto('/non-esiste');
   await expect(page.getByRole('heading', { level: 1, name: 'Pagina non trovata' })).toBeVisible();
   await page.getByRole('link', { name: 'Torna all’inizio' }).click();
-  await expect(page).toHaveURL('/');
+  // The home needs a session: without one it opens the sign-in page.
+  await expect(page).toHaveURL('/accedi');
 });
 
 test('the component gallery is not part of the production build', async ({ page }) => {

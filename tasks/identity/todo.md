@@ -53,10 +53,10 @@ src/main.tsx · **Dimensione:** M
 account creati dall'amministratore); errore unico "Email o password non corretti"; `RequireAuth` su tutte
 le rotte tranne `/accedi` e la 404; dopo l'accesso si torna alla pagina richiesta.
 **Accettazione:**
-- [ ] Test di componente: errore generico, pulsante disattivato durante l'invio, etichette accessibili
-- [ ] E2E: senza sessione `/` porta a `/accedi`; accesso con l'utente del seed → home; credenziali sbagliate
+- [x] Test di componente: errore generico, pulsante disattivato durante l'invio, etichette accessibili
+- [x] E2E: senza sessione `/` porta a `/accedi`; accesso con l'utente del seed → home; credenziali sbagliate
       → messaggio generico; pagina richiesta ripristinata dopo l'accesso
-- [ ] Detector Impeccable pulito; screenshot 390×844 confrontato con il wireframe
+- [x] Detector Impeccable pulito; screenshot 390×844 confrontato con il wireframe
 **Verifica:** `npm test && npm run e2e`
 **Dipendenze:** 2, 3 · **File:** src/features/identity/LoginPage.tsx (+ .module.css, .test.tsx),
 RequireAuth.tsx, src/app/routes.tsx, e2e/identity.spec.ts · **Dimensione:** M
