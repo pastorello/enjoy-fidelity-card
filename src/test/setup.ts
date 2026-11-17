@@ -5,3 +5,17 @@ import { afterEach } from 'vitest';
 afterEach(() => {
   cleanup();
 });
+
+// jsdom does not implement <dialog>: minimal stand-ins for showModal/close.
+if (typeof HTMLDialogElement !== 'undefined' && !('showModal' in HTMLDialogElement.prototype)) {
+  Object.assign(HTMLDialogElement.prototype, {
+    showModal(this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    },
+    close(this: HTMLDialogElement) {
+      if (!this.hasAttribute('open')) return;
+      this.removeAttribute('open');
+      this.dispatchEvent(new Event('close'));
+    },
+  });
+}

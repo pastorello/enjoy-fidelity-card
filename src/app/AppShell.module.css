@@ -1,0 +1,94 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 64px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  background: var(--color-enjoy-green);
+  color: var(--color-on-green);
+}
+
+.header.withBack {
+  padding-left: var(--space-2);
+}
+
+/* On green the ring is white (on-green), not the green focus-ring. */
+.header :focus-visible {
+  outline-color: var(--color-on-green);
+}
+
+.heading {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  display: block;
+  height: 28px;
+  width: auto;
+}
+
+.title {
+  font-family: var(--type-screen-title-family);
+  font-size: var(--type-screen-title-size);
+  line-height: var(--type-screen-title-line-height);
+  font-weight: var(--type-screen-title-weight);
+  letter-spacing: var(--type-screen-title-letter-spacing);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.iconButton {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  color: var(--color-on-green);
+  text-decoration: none;
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-full);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+/* Actions stay reachable at the bottom, clear of Android's navigation bar. */
+.footer {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-divider);
+  background: var(--color-surface);
+}

@@ -68,13 +68,13 @@ in woff2 (OFL) con `@font-face`; `base.css` con focus ring.
 annulla); `AppShell` con header verde 64 px, logo provvisorio, pulsante account 48×48; schermata `/` dentro
 l'AppShell.
 **Accettazione:**
-- [ ] Il focus torna al pulsante che ha aperto il dialogo; Esc chiama `onCancel`
-- [ ] A 390×844 header, contenuto e area azioni rispettano il wireframe "Cerca cliente"
+- [x] Il focus torna al pulsante che ha aperto il dialogo; Esc chiama `onCancel`
+- [x] A 390×844 header, contenuto e area azioni rispettano il wireframe "Cerca cliente"
 **Verifica:** `npm test`; screenshot a 390×844
 **Dipendenze:** 5, 6 · **File:** src/shared/ui/ConfirmDialog.*, src/app/AppShell.*, src/app/routes.tsx · **Dimensione:** M
 
 ## Checkpoint B
-- [ ] Tutto verde; detector Impeccable pulito
+- [x] Tutto verde; detector Impeccable pulito
 - [ ] Schermata segnaposto vista dall'utente (screenshot 390×844)
 
 ## Task 8: PWA ed E2E

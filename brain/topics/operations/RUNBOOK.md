@@ -10,7 +10,7 @@ Prima volta: `npm install`, poi `cp .env.example .env` e incollare in `.env` il 
 mostrato da `npm run db:start` (Docker deve essere acceso).
 
 ```bash
-npm run dev                                 # app su http://localhost:5173
+npm run dev                                 # app su http://localhost:5173 (vetrina componenti: /dev/ui, solo in sviluppo)
 npm run typecheck && npm run lint && npm test && npm run build   # controlli prima di ogni commit
 npm run format                              # Prettier
 npm run db:start / db:stop                  # Supabase locale (Docker)
@@ -53,3 +53,7 @@ tutto verde = sano.
    fallisce se il CSS committato non coincide.
 8. Il rilevatore Impeccable ha la regola `cream-palette` disattivata (`.impeccable/config.json`): lo sfondo
    `paper` #faf5f1 è imposto dal design system del bar, non una scelta di default.
+9. jsdom non implementa `<dialog>`: `src/test/setup.ts` aggiunge `showModal`/`close` minimi. Esc nei test si
+   simula con l'evento `cancel` sul dialog, non con il tasto.
+10. Testing Library normalizza gli spazi: lo spazio indivisibile di `formatCents`/`formatPoints` nei test
+    va cercato con una regex (`/12,50\s+€/`).

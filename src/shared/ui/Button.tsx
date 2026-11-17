@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, MouseEvent, ReactNode, Ref } from 'react';
 import { Link, type LinkProps } from 'react-router';
 import styles from './Button.module.css';
 import { Icon, type IconName } from './Icon';
@@ -15,6 +15,7 @@ type CommonProps = {
 
 type ButtonProps = CommonProps &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
+    ref?: Ref<HTMLButtonElement>;
     type?: 'button' | 'submit';
     /** An operation is in progress: presses are ignored, focus stays on the button. */
     busy?: boolean;

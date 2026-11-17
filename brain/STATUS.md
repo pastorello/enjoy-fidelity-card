@@ -8,8 +8,8 @@
 ## Cosa stiamo facendo
 
 Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano `platform`
-approvato; task 1-3 in PR #3; task 4 (design system nel codice) fatto sul branch `feat/platform-design-system`.
-Prossimo: task 5-7, poi Checkpoint B. Nessun codice applicativo ancora.
+approvato; task 1-3 in PR #3, task 4 in PR #4; task 5-7 (componenti, AppShell) fatti sul branch
+`feat/platform-ui-components`. Checkpoint B: l'utente guarda le schermate (`/dev/ui`), poi task 8-11. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 

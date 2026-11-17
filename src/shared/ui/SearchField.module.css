@@ -11,13 +11,14 @@
   pointer-events: none;
 }
 
-.input {
+/* Scoped under .box so it wins over the shared field padding. */
+.box .input {
   padding-left: calc(var(--space-3) + var(--icon) + var(--space-1));
   padding-right: calc(var(--touch-target) + var(--space-1));
 }
 
 /* Our own clear button replaces the browser's. */
-.input::-webkit-search-cancel-button {
+.box .input::-webkit-search-cancel-button {
   appearance: none;
 }
 
