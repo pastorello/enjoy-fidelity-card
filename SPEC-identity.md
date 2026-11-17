@@ -27,7 +27,8 @@ entra nell'app dal telefono con email e password. Basta anche un solo utente.
 ## Cosa include
 
 1. **Accesso** (`/accedi`, wireframe "Accesso"): email e password, logo Enjoy, nota "Gli account li crea un
-   amministratore…". Nessun link "Password dimenticata?". Errore unico e generico per credenziali sbagliate
+   amministratore…". Nessun link "Password dimenticata?" (aggiunto poi da
+   [SPEC-identity-password.md](SPEC-identity-password.md)). Errore unico e generico per credenziali sbagliate
    ("Email o password non corretti"), senza dire quale dei due. Dopo l'accesso si torna alla pagina
    richiesta, altrimenti alla home.
 2. **Sessione**:
@@ -51,7 +52,9 @@ entra nell'app dal telefono con email e password. Basta anche un solo utente.
    legge più nulla. Per **rimetterlo** si ricrea l'utente e si richiama `private.add_operator` con lo stesso
    nome: il profilo viene ricollegato.
 6. **Password dimenticata**: niente email, quindi la si reimposta dal pannello di Supabase (cancella e
-   ricrea l'utente, poi `private.add_operator`), come al punto 5.
+   ricrea l'utente, poi `private.add_operator`), come al punto 5. **Sostituito** da
+   [SPEC-identity-password.md](SPEC-identity-password.md): link "Password dimenticata?" su `/accedi`, link via
+   email e "Cambia password" nelle Impostazioni; procedura remota in `docs/setup-accounts.md` §6.
 
 ### Modello dati e regole di accesso
 
@@ -79,6 +82,9 @@ created_at  timestamptz not null default now()
   imposta nella dashboard (Data API), come documentato.
 
 ### Configurazione di Auth
+
+> Le ultime tre voci non valgono più: email di Auth, URL di ritorno e template di recupero sono in
+> [SPEC-identity-password.md](SPEC-identity-password.md) ("Configurazione di Auth").
 
 - Registrazione libera spenta. Password minima 8 caratteri.
 - Nessun SMTP esterno: Auth non manda email (utenti creati già confermati).
@@ -164,6 +170,9 @@ resta rinviato:
 - schermata "Operatori" nell'app (elenco, disattiva, riattiva, reinvia l'invito);
 - cambio di ruolo dall'app (si fa con `private.add_operator`);
 - "Cambia password" dalle Impostazioni.
+
+"Password dimenticata", scelta della password dal link e "Cambia password" sono specificati in
+[SPEC-identity-password.md](SPEC-identity-password.md); inviti e schermata "Operatori" restano rinviati.
 
 Fuori anche:
 - PIN, account di dispositivo e cambio operatore sul tablet: modulo `tablet-kiosk`.

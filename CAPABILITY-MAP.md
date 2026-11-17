@@ -7,7 +7,7 @@ revisione incrociata: `docs/specs/`.
 | Module id | Responsabilità | Dipende da | Spec |
 |---|---|---|---|
 | `platform` | Scheletro PWA, Supabase (UE), CI e deploy su Vercel, token del design system, struttura comune delle schermate | — | [SPEC-platform.md](SPEC-platform.md) (approvata) |
-| `identity` | Accesso, uscita, sessione scaduta, ruoli; account creati a mano in Supabase (V1: niente inviti né email) | platform | [SPEC-identity.md](SPEC-identity.md), [SPEC-identity-password.md](SPEC-identity-password.md) |
+| `identity` | Accesso, uscita, sessione scaduta, ruoli; account creati a mano in Supabase (niente inviti); password dimenticata e cambio password con link via email | platform | [SPEC-identity.md](SPEC-identity.md) (V1), [SPEC-identity-password.md](SPEC-identity-password.md) (recupero password; procedura remota in `docs/setup-accounts.md` §6) |
 | `settings` | Rapporto euro/punto, soglia di conferma importo, formato del lettore USB | identity | [SPEC-settings.md](SPEC-settings.md) |
 | `customers` | Nuovo cliente (nome unico, telefono facoltativo, consenso), ricerca, modifica, anonimizzazione | identity | [SPEC-customers.md](SPEC-customers.md) |
 | `card-input` | Unico ingresso per la lettura card: Web NFC, permesso e NFC spento, normalizzazione uid, adattatore finto per i test | platform, settings | [SPEC-card-input.md](SPEC-card-input.md) |

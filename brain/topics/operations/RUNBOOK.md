@@ -29,18 +29,27 @@ bash ~/.claude/plugins/cache/sprout-labs/project-brain/*/scripts/doctor.sh .   #
 
 Account finti del seed (solo locale): `admin@example.com` (amministratore "Admin Prova") e
 `operatore@example.com` (operatore "Operatore Prova"), password `password-di-prova`.
+`recupero@example.com` ("Recupero Prova", operatore) è riservato a `e2e/password.spec.ts`, che ne cambia
+la password a ogni esecuzione: non usarlo altrove (`npm run db:reset` lo riporta a `password-di-prova`).
 
-Stack locale minimo per E2E e integrazione (Postgres, Auth, API REST: lo stesso della CI):
+Stack locale minimo per E2E e integrazione (Postgres, Auth, API REST, Mailpit: lo stesso della CI):
 
 ```bash
-npx supabase start -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
+npx supabase start -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta
 ```
+
+Email locali (recupero password): le cattura **Mailpit**, mai una casella vera. Si leggono su
+http://127.0.0.1:54324 (anche dall'app in sviluppo: "Password dimenticata?" → link nell'email di Mailpit);
+nei test con `e2e/mailpit.ts` (API `/api/v1/search`).
 
 ### Operatori
 
-Registrare, togliere, rimettere un operatore e reimpostare una password: `docs/setup-accounts.md` §4
-(pannello Supabase + `select private.add_operator('<email>', '<nome>', 'admin' | 'operator');` nello
-SQL Editor). Nei progetti online lo schema `app` va esposto nella Data API (§3 della stessa guida).
+Registrare, togliere, rimettere un operatore: `docs/setup-accounts.md` §4 (pannello Supabase +
+`select private.add_operator('<email>', '<nome>', 'admin' | 'operator');` nello SQL Editor). Nei progetti
+online lo schema `app` va esposto nella Data API (§3 della stessa guida). Password dimenticata: la persona
+usa "Password dimenticata?" su `/accedi` (o Impostazioni → Cambia password); nei progetti online serve la
+procedura del §6 (URL di ritorno, template "Reset password", minimo 8 caratteri), dalla dashboard, prima
+staging poi produzione, mai `supabase config push`.
 
 ### Pubblicazione
 
@@ -73,6 +82,9 @@ SQL Editor). Nei progetti online lo schema `app` va esposto nella Data API (§3 
 | `npm run e2e` si ferma con "Local Supabase is not running" | `npx supabase status` | avviare lo stack (comando sopra) |
 | Online: accesso con credenziali giuste dà "Connessione assente" | Schema `app` esposto nella Data API? | `docs/setup-accounts.md` §3 |
 | Online: "Account non abilitato" | Profilo collegato? `select * from app.operators;` nello SQL Editor | `private.add_operator` (§4 della guida) |
+| In locale l'email di recupero non arriva | Mailpit acceso? http://127.0.0.1:54324 (`npx supabase status`) | riavviare lo stack senza `mailpit` tra gli esclusi (`-x`); dopo modifiche a `config.toml`: `npx supabase stop && npm run db:start` |
+| Online: il link dell'email apre "Il link è scaduto o è già stato usato." | Template "Reset password" ancora quello predefinito (`#error_code=…` nell'URL)? | `docs/setup-accounts.md` §6 passo 2; link davvero usato o più vecchio di un'ora |
+| Online: il link apre la home e non `/imposta-password` | Redirect URLs del progetto | `docs/setup-accounts.md` §6 passo 1 (l'app inoltra comunque a `/imposta-password`) |
 
 ## 4. Trappole (numerate, solo aggiunte)
 
@@ -123,3 +135,22 @@ SQL Editor). Nei progetti online lo schema `app` va esposto nella Data API (§3 
 20. `private.add_operator` è eseguibile solo da `postgres` (SQL Editor): nessun ruolo dell'API la può
     chiamare. Gli account si creano con *Auto Confirm User* attivo, altrimenti Supabase manda un'email di
     conferma (da `info@enjoygaeta.it`).
+21. Le modifiche a `supabase/config.toml` (template email, URL di ritorno, limiti di Auth) non le applica
+    `db:reset`: serve riavviare lo stack (`npx supabase stop && npm run db:start`).
+22. `[auth.rate_limit] email_sent = 100` vale **solo in locale** (con 2 l'ora una sola esecuzione degli E2E
+    resterebbe senza email). Per questo e per gli URL `localhost`, `config.toml` non si porta mai nei progetti
+    online con `supabase config push`: Auth remota si configura dalla dashboard (`docs/setup-accounts.md` §6).
+23. Supabase usa il `redirectTo` della richiesta solo se combacia con una delle Redirect URLs (in locale sono
+    indirizzi esatti);
+    altrimenti il link punta a `site_url` (`/?token_hash=…&type=recovery`) e `RootLayout` lo inoltra a
+    `/imposta-password`. L'E2E controlla che il link inizi con `http://localhost:4173/imposta-password`.
+24. Mailpit conserva le email delle esecuzioni precedenti: i test filtrano per destinatario e per ora di
+    arrivo dopo la richiesta, e l'email inesistente è unica per esecuzione (`nessuno-<casuale>@example.com`).
+25. Un link di recupero già usato produce in console un `403` su `/auth/v1/verify` (lo stampa il browser):
+    è atteso come il `400` della trappola 17, ed `e2e/fixtures.ts` lo esclude.
+26. `isAuthRetryableFetchError` di supabase-js è vero anche per 502/503/504: non basta a dire "rete assente".
+    Per "Password dimenticata" ogni risposta HTTP è "inviato" (un 504 per invio lento esiste solo per gli
+    account veri e li rivelerebbe); "rete" solo con `status` 0 o `fetch` fallita.
+27. Il token del link si consuma solo con "Salva e accedi" (`verifyOtp` con `token_hash`), mai all'apertura:
+    le anteprime e gli antivirus delle caselle email non lo bruciano. Con il template predefinito di
+    Supabase (`{{ .ConfirmationURL }}`) succederebbe: il template va sempre incollato nei progetti online.

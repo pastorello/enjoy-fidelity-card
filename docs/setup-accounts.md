@@ -97,7 +97,11 @@ profilo viene ricollegato con il suo storico.
 
 ### Password dimenticata
 
-Finché non arriva "Password dimenticata" nell'app (spec aggiuntiva dopo la V1): cancella l'utente,
+La persona se la reimposta da sola dall'app: su `/accedi` tocca **"Password dimenticata?"**, riceve un link
+via email e sceglie una password nuova (chi è collegato usa **Impostazioni → ACCOUNT → Cambia password**,
+stesso link). Serve che la sezione 6 sia stata eseguita sul progetto in uso.
+
+Se l'email non arriva (sezione 6 non ancora fatta, casella sbagliata): come prima, cancella l'utente,
 ricrealo con una password nuova e richiama `private.add_operator` con lo stesso nome, come per rimettere un
 operatore.
 
@@ -119,7 +123,69 @@ operatore.
 4. **Settings → Git**: ramo di produzione `main`. Ogni PR riceve un'anteprima con i dati di staging.
 5. Ridistribuisci (Redeploy) dopo aver inserito le variabili.
 
-## 6. Fatto? Avvisa
+## 6. Email di Auth: link per scegliere una nuova password
+
+Serve a "Password dimenticata" e "Cambia password" (`SPEC-identity-password.md`, "Configurazione di Auth").
+Le email partono già da `info@enjoygaeta.it` (SMTP configurato dal titolare in entrambi i progetti); qui si
+impostano gli indirizzi di ritorno, il testo dell'email e le regole della password.
+
+Si fa **dalla dashboard**, **prima sullo staging** (`enjoy-card-staging`) e, solo quando la prova del passo 5
+riesce, sulla produzione (`enjoy-card-prod`). **Mai** `npx supabase config push`: porterebbe nei progetti
+online i valori di `supabase/config.toml`, pensati per il computer (indirizzi `localhost`, limite di 100
+email l'ora per i test).
+
+`<team>` è lo slug del team Vercel: si legge su vercel.com nell'indirizzo del team
+(`vercel.com/<team>`) o nell'URL di un'anteprima di una PR, che finisce con `-<team>.vercel.app`.
+
+| Voce | Staging | Produzione |
+|---|---|---|
+| Site URL | `http://localhost:5173` | `https://enjoy-fidelity-card.vercel.app` |
+| Redirect URLs | `http://localhost:5173/imposta-password` e `https://enjoy-fidelity-card-*-<team>.vercel.app/imposta-password` | `https://enjoy-fidelity-card.vercel.app/imposta-password` |
+| Lunghezza minima della password | 8 | 8 |
+| Scadenza del link (Email OTP Expiration) | 3600 secondi | 3600 secondi |
+
+> **Lo staging non riceve mai l'URL di produzione** (né come Site URL né tra le Redirect URLs): un link di
+> prova non deve portare ai dati veri. L'asterisco delle anteprime accetterebbe anche un progetto Vercel
+> altrui con lo stesso nome: per questo gli account dello staging non usano mai le password della
+> produzione.
+
+Per ciascun progetto, in quest'ordine:
+
+1. **Authentication → URL Configuration**:
+   - **Site URL**: il valore della tabella, poi **Save changes**;
+   - **Redirect URLs** → **Add URL**: aggiungi uno per uno gli indirizzi della tabella e salva. Se nell'elenco
+     c'è altro (per esempio un indirizzo di prova), toglilo: devono restare solo quelli della tabella.
+2. **Authentication → Emails** → scheda **Templates** → **Reset password**:
+   - **Subject heading**: `Enjoy Card: scegli una nuova password`;
+   - **Message body**: incolla tutto il contenuto di `supabase/templates/recovery.html` (dal file nel
+     computer, oppure su GitHub aprendo il file e toccando *Raw*) al posto del testo predefinito, poi
+     **Save changes**. Controlla che il pulsante contenga `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery`
+     e non più `{{ .ConfirmationURL }}`: con il testo predefinito i link si aprono come "link scaduto".
+   - Nella scheda **SMTP Settings** della stessa pagina controlla che l'SMTP personalizzato sia attivo con
+     mittente `info@enjoygaeta.it`: senza SMTP personalizzato Supabase non consente di cambiare i template
+     e limita gli invii a pochi indirizzi.
+3. **Authentication → Sign In / Providers** → riga **Email** (si apre un pannello):
+   - **Minimum password length**: `8`;
+   - **Email OTP Expiration**: `3600` (secondi, un'ora);
+   - **Save**. Nelle versioni più vecchie della dashboard la pagina si chiama **Authentication → Providers →
+     Email** e la lunghezza minima può stare in **Authentication → Policies** o **Attack Protection**.
+4. **Authentication → Rate Limits**: non cambiare nulla. Il limite di email l'ora dei progetti online resta
+   quello attuale (alzarlo va chiesto prima, vedi la spec).
+5. **Prova reale**, con un tuo account (non uno dei camerieri), dall'ambiente del progetto appena configurato:
+   - staging: apri l'anteprima di una PR (`https://enjoy-fidelity-card-…-<team>.vercel.app/accedi`),
+     **Password dimenticata?**, scrivi la tua email, **Invia il link**;
+   - produzione (solo dopo la prova riuscita sullo staging): la stessa cosa da
+     `https://enjoy-fidelity-card.vercel.app/accedi`;
+   - controlla che l'email arrivi da `info@enjoygaeta.it` con oggetto "Enjoy Card: scegli una nuova
+     password" (se non arriva, guarda nello spam), che **Scegli la password** apra `/imposta-password` **sullo
+     stesso ambiente** da cui l'hai chiesta, e che dopo **Salva e accedi** si entri nell'app; esci e accedi
+     con la password nuova.
+   - Se il link apre la home (`/?token_hash=…`) invece di `/imposta-password`, l'app inoltra lo stesso, ma
+     l'indirizzo non è tra le Redirect URLs: ricontrolla il passo 1.
+
+Se l'hosting cambia (vedi sezione 5), si aggiornano Site URL e Redirect URLs in entrambi i progetti.
+
+## 7. Fatto? Avvisa
 
 Mandami l'URL dell'anteprima di una PR: verifico console pulita, intestazioni di sicurezza, Lighthouse
 (PWA installabile, Accessibilità ≥ 95, Best Practices ≥ 95) e l'installazione su Android.
