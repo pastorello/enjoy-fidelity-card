@@ -25,8 +25,8 @@ supabase/seed.sql, supabase/config.toml · **Dimensione:** M
 chiave locale letta da `supabase status`; `vite.config.ts` aggiunge l'origine locale a `connect-src` solo
 per `vite preview`; il job `app` della CI avvia Supabase (solo i servizi necessari) prima di E2E.
 **Accettazione:**
-- [ ] La suite E2E esistente passa con lo stack locale avviato, anche se `.env` punta allo staging
-- [ ] Un test E2E verifica che l'app costruita per i test usi l'URL locale
+- [x] La suite E2E esistente passa con lo stack locale avviato, anche se `.env` punta allo staging
+- [x] Ogni test E2E fallisce se l'app chiama un progetto `*.supabase.co` (fixture automatica `onlyLocalSupabase`)
 - [ ] `vercel.json` invariato; CI verde sulla PR
 **Verifica:** `npm run db:start && npm run e2e`; CI su GitHub
 **Dipendenze:** 1 · **File:** playwright.config.ts, vite.config.ts, .github/workflows/ci.yml, e2e/smoke.spec.ts

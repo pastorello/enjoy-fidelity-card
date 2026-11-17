@@ -32,6 +32,21 @@ function productionHeaders(): Record<string, string> {
   return Object.fromEntries(global.headers.map(({ key, value }) => [key, value]));
 }
 
+/** Local Supabase API used by E2E (see playwright.config.ts). Preview CSP only, never vercel.json. */
+const LOCAL_SUPABASE_URL = 'http://localhost:54321';
+
+function previewHeaders(): Record<string, string> {
+  const headers = productionHeaders();
+  const csp = headers['Content-Security-Policy'];
+  if (csp) {
+    headers['Content-Security-Policy'] = csp.replace(
+      'connect-src ',
+      `connect-src ${LOCAL_SUPABASE_URL} `,
+    );
+  }
+  return headers;
+}
+
 export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
@@ -76,7 +91,7 @@ export default defineConfig(({ mode }) => ({
     }),
   ],
   server: mode === 'https' ? { host: true } : {},
-  preview: { headers: productionHeaders() },
+  preview: { headers: previewHeaders() },
   test: {
     environment: 'jsdom',
     globals: true,

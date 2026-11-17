@@ -1,7 +1,7 @@
 import { test as base, expect } from '@playwright/test';
 
 /** Fails the test on any console error or warning, or page error (CSP and header problems included). */
-export const test = base.extend<{ consoleErrors: string[] }>({
+export const test = base.extend<{ consoleErrors: string[]; onlyLocalSupabase: void }>({
   consoleErrors: [
     async ({ page }, use) => {
       const errors: string[] = [];
@@ -13,6 +13,18 @@ export const test = base.extend<{ consoleErrors: string[] }>({
       page.on('pageerror', (error) => errors.push(error.message));
       await use(errors);
       expect(errors, 'console errors').toEqual([]);
+    },
+    { auto: true },
+  ],
+  /** Fails the test if the app talks to a hosted Supabase project (staging or production). */
+  onlyLocalSupabase: [
+    async ({ page }, use) => {
+      const hosted: string[] = [];
+      page.on('request', (request) => {
+        if (new URL(request.url()).hostname.endsWith('.supabase.co')) hosted.push(request.url());
+      });
+      await use();
+      expect(hosted, 'requests to a hosted Supabase project').toEqual([]);
     },
     { auto: true },
   ],
