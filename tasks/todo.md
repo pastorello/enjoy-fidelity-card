@@ -5,13 +5,13 @@ lint e test verdi e un commit Conventional Commits sul branch del modulo.
 
 ## Task 1: Scaffold dell'app
 **Descrizione:** progetto Vite + React 19 + TS 7 strict (`noUncheckedIndexedAccess`), React Router con `/`
-segnaposto e pagina 404, error boundary globale in italiano con "Riprova", ESLint (typescript-eslint,
-react-hooks, jsx-a11y), Prettier, Vitest + Testing Library, script npm della spec.
+segnaposto e pagina 404, error boundary globale in italiano con "Riprova", Oxlint (TypeScript, React,
+react-hooks, jsx-a11y, type-aware), Prettier, Vitest + Testing Library, script npm della spec.
 **Accettazione:**
 - [ ] `npm run build`, `typecheck` e `lint` passano senza warning
 - [ ] Test: `/` mostra "Enjoy Card"; una rotta sconosciuta mostra la 404; un errore mostra il boundary
 **Verifica:** `npm test && npm run build`; `npm run dev` apre `/`
-**Dipendenze:** nessuna · **File:** package.json, tsconfig*.json, vite.config.ts, eslint.config.js, src/app/*, src/main.tsx · **Dimensione:** M
+**Dipendenze:** nessuna · **File:** package.json, tsconfig*.json, vite.config.ts, .oxlintrc.json, src/app/*, src/main.tsx · **Dimensione:** M
 
 ## Task 2: Formattazione importi e punti
 **Descrizione:** `formatCents` e `formatPoints` in `src/shared/format.ts`, test prima.

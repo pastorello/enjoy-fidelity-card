@@ -28,7 +28,7 @@ Versioni stabili al 2026-11-16, fissate da `package-lock.json`; aggiornamenti ma
 | Dati | `@supabase/supabase-js` 2, TanStack Query 5 per lo stato server |
 | Backend | Supabase (Postgres, Auth, RLS, Edge Functions); CLI `supabase` 3 come devDependency |
 | Test | Vitest 5 + Testing Library; pgTAP (`supabase test db`); Playwright 1.65 |
-| Qualità | ESLint 10 (typescript-eslint, react-hooks, jsx-a11y), Prettier |
+| Qualità | Oxlint 1 (regole TypeScript, React, react-hooks, jsx-a11y) con controllo sui tipi via `oxlint-tsgolint` 7; Prettier |
 | Hosting | Vercel (deploy da GitHub); Supabase in regione UE (Francoforte) |
 | Runtime | Node 24, npm |
 
@@ -84,7 +84,7 @@ npm run dev                 # Vite in locale (http://localhost:5173)
 npm run dev:https           # HTTPS sulla rete locale, per il telefono
 npm run tokens              # rigenera src/styles/tokens.css da design/tokens.json
 npm run typecheck           # tsc --noEmit
-npm run lint                # eslint . --max-warnings 0
+npm run lint                # oxlint --type-aware --deny-warnings
 npm run format              # prettier --write .
 npm test                    # vitest run
 npm run test:watch          # vitest
