@@ -38,7 +38,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: db:test e la suite E2E esistente verdi in locale e in CI
 
 ### Fase 2: Accesso
-- [ ] Task 3: `AuthProvider`, `useSession`, `useCurrentOperator` (test con client finto)
+- [x] Task 3: `AuthProvider`, `useSession`, `useCurrentOperator` (test con client finto)
 - [ ] Task 4: Pagina `/accedi` e guardia `RequireAuth` su tutte le rotte
 - [ ] Task 5: Impostazioni con riquadro account ed "Esci"; pulsante account nell'`AppShell`
 

@@ -41,9 +41,9 @@ per `vite preview`; il job `app` della CI avvia Supabase (solo i servizi necessa
 `useSession`, `useCurrentOperator` (legge da `app.operators` il profilo collegato: loading / operatore /
 nessun profilo), `signIn`, `signOut`.
 **Accettazione:**
-- [ ] Test con client finto: stato iniziale di caricamento, sessione presente, sessione assente, profilo
+- [x] Test con client finto: stato iniziale di caricamento, sessione presente, sessione assente, profilo
       mancante
-- [ ] I componenti non chiamano mai `getSupabase()` direttamente (solo questi hook)
+- [x] I componenti non chiamano mai `getSupabase()` direttamente (solo questi hook)
 **Verifica:** `npm test -- identity`
 **Dipendenze:** 1 · **File:** src/features/identity/AuthProvider.tsx, useCurrentOperator.ts, *.test.tsx,
 src/main.tsx · **Dimensione:** M
