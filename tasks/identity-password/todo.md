@@ -72,11 +72,11 @@ il salvataggio no. Il cambio di sessione dovuto a `verifyOtp` non produce "sessi
 all'accesso" / "Torna alle impostazioni"; `network` → "Connessione assente: controlla la rete e riprova." con
 il modulo compilato. Collegato: precompilata da `currentEmail()`, modificabile; l'email non passa mai in URL.
 **Accettazione:**
-- [ ] Componente: "Inserisci l'email" / "Email non valida"; stessa conferma per qualunque email; rete → errore
+- [x] Componente: "Inserisci l'email" / "Email non valida"; stessa conferma per qualunque email; rete → errore
       e reinvio; doppio tocco = una sola richiesta; `redirectTo` non dipende dall'input
-- [ ] Componente: non collegato → Indietro a `/accedi`; collegato → email precompilata, Indietro e "Torna
+- [x] Componente: non collegato → Indietro a `/accedi`; collegato → email precompilata, Indietro e "Torna
       alle impostazioni" verso `/impostazioni`
-- [ ] Detector Impeccable pulito; target ≥ 48 px; screenshot 390×844 confrontato con il wireframe
+- [x] Detector Impeccable pulito; target ≥ 48 px; screenshot 390×844 confrontato con il wireframe
 **Verifica:** `npm test -- ForgotPasswordPage && npm run e2e`
 **Dipendenze:** 3 · **File:** src/features/identity/ForgotPasswordPage.tsx (+ .module.css, .test.tsx),
 src/app/routes.tsx · **Dimensione:** M
