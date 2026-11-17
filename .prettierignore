@@ -11,3 +11,4 @@ design/tokens.json
 playwright-report
 test-results
 dev-dist
+.mcp.json

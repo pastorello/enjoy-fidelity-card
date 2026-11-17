@@ -86,3 +86,7 @@ tutto verde = sano. In CI: i due job di `CI` verdi sulla PR (`gh pr checks <n>`)
     in `main` (2026-11-17: su `main` era arrivata solo la #1). Preferire PR con base `main`; se si impilano,
     unire dal basso e cambiare la base della successiva in `main` prima di unirla (GitHub lo fa da solo
     solo se il ramo unito viene eliminato).
+15. Il server MCP di Supabase (`.mcp.json`) punta al progetto di **staging** (`kpizaczyrlyywuidqitn`) con
+    permessi di scrittura. Non va mai collegato alla produzione senza `read_only=true`: in produzione le
+    migrazioni si applicano solo a mano, dopo la prova su staging. Si attiva riaprendo Claude Code e
+    autenticandosi con `/mcp`.
