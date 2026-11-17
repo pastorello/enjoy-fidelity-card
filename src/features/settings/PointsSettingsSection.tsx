@@ -28,21 +28,37 @@ export function PointsSettingsSection() {
 
 function AdminPointsSection() {
   const settings = useSettings();
+  const { heading, retry } = useRetryKeepingFocus(settings);
 
   return (
     <section aria-labelledby="settings-points" className={styles.section}>
-      <h2 id="settings-points" className={styles.sectionTitle}>
+      <h2 ref={heading} id="settings-points" tabIndex={-1} className={styles.sectionTitle}>
         PUNTI E CONTROLLI
       </h2>
       {settings.status === 'loading' && <StatusView kind="loading" />}
       {settings.status === 'error' && (
-        <StatusView kind="error" title="Impostazioni non caricate" onRetry={settings.retry} />
+        <StatusView kind="error" title="Impostazioni non caricate" onRetry={retry} />
       )}
       {settings.status === 'ready' && (
         <PointsAndControlsForm settings={settings.settings} save={settings.save} />
       )}
     </section>
   );
+}
+
+/**
+ * "Riprova" swaps the error view, button included, for the loading one: without this the focus
+ * would fall back to <body>. It moves to the section heading, which stays mounted while the
+ * section loads, fails again or shows its content.
+ */
+function useRetryKeepingFocus(settings: SettingsContextValue) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  const retry = () => {
+    if (settings.status !== 'error') return;
+    settings.retry();
+    heading.current?.focus();
+  };
+  return { heading, retry };
 }
 
 type Field = 'ratio' | 'threshold';
@@ -206,15 +222,16 @@ function PointsAndControlsForm({
 
 function OperatorPointsSection() {
   const settings = useSettings();
+  const { heading, retry } = useRetryKeepingFocus(settings);
 
   return (
     <section aria-labelledby="settings-points" className={styles.section}>
-      <h2 id="settings-points" className={styles.sectionTitle}>
+      <h2 ref={heading} id="settings-points" tabIndex={-1} className={styles.sectionTitle}>
         PUNTI
       </h2>
       {settings.status === 'loading' && <StatusView kind="loading" />}
       {settings.status === 'error' && (
-        <StatusView kind="error" title="Impostazioni non caricate" onRetry={settings.retry} />
+        <StatusView kind="error" title="Impostazioni non caricate" onRetry={retry} />
       )}
       {settings.status === 'ready' && (
         <>

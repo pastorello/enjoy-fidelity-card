@@ -93,6 +93,25 @@ describe('points section for operators', () => {
     expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('keeps focus inside the section after Riprova, while loading and on a new error', async () => {
+    const settings = createFakeSettingsService({ loadResults: ['network'] });
+    renderApp('/impostazioni', operator(), settings);
+    const section = await screen.findByRole('region', { name: 'PUNTI' });
+    const alert = await within(section).findByRole('alert');
+    const heading = within(section).getByRole('heading', { level: 2, name: 'PUNTI' });
+    const pending = deferred<never>();
+    settings.service.load.mockReturnValueOnce(pending.promise);
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(within(section).getByRole('status')).toHaveTextContent('Caricamento…');
+    expect(heading).toHaveFocus();
+
+    await act(async () => pending.reject(new Error('offline')));
+    expect(await within(section).findByRole('alert')).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(section.contains(document.activeElement)).toBe(true);
+  });
+
   it('shows only the error state, without data, when no row is visible', async () => {
     const settings = createFakeSettingsService({ loadResults: ['not-found'] });
     renderApp('/impostazioni', operator(), settings);
@@ -319,6 +338,25 @@ describe('points and controls section for administrators', () => {
     expect(within(section).queryByRole('button', { name: 'Salva' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Esci' })).toBeEnabled();
     expect(screen.getByRole('link', { name: /Cambia password/ })).toBeInTheDocument();
+  });
+
+  it('keeps focus inside the section after Riprova, while loading and on a new error', async () => {
+    const settings = createFakeSettingsService({ loadResults: ['network'] });
+    renderApp('/impostazioni', signedInFake(), settings);
+    const section = await screen.findByRole('region', { name: 'PUNTI E CONTROLLI' });
+    const alert = await within(section).findByRole('alert');
+    const heading = within(section).getByRole('heading', { level: 2, name: 'PUNTI E CONTROLLI' });
+    const pending = deferred<never>();
+    settings.service.load.mockReturnValueOnce(pending.promise);
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(within(section).getByRole('status')).toHaveTextContent('Caricamento…');
+    expect(heading).toHaveFocus();
+
+    await act(async () => pending.reject(new Error('offline')));
+    expect(await within(section).findByRole('alert')).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(section.contains(document.activeElement)).toBe(true);
   });
 
   it('shows "Impostazioni non caricate" with Riprova, which loads again', async () => {
