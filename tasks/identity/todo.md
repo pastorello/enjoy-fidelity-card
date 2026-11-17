@@ -11,11 +11,11 @@ Conventional Commits sul branch del modulo. Test prima del codice (`test-driven-
 attivi; `private.add_operator(email, name, role)` eseguibile solo da `postgres`. Schema `app` esposto in
 `config.toml`. Seed con un amministratore e un operatore finti (`@example.com`).
 **Accettazione:**
-- [ ] pgTAP: un utente senza profilo, o con profilo scollegato, non legge `operators`; un operatore attivo
+- [x] pgTAP: un utente senza profilo, o con profilo scollegato, non legge `operators`; un operatore attivo
       la legge; nessuno ci scrive direttamente; `is_admin()` vero solo per gli admin
-- [ ] pgTAP: `add_operator` crea, ricollega per nome, rifiuta email inesistente o già collegata;
+- [x] pgTAP: `add_operator` crea, ricollega per nome, rifiuta email inesistente o già collegata;
       `authenticated` non può eseguirla
-- [ ] pgTAP: cancellare l'utente lascia il profilo con `user_id` null
+- [x] pgTAP: cancellare l'utente lascia il profilo con `user_id` null
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** nessuna · **File:** supabase/migrations/*_identity.sql, supabase/tests/identity.test.sql,
 supabase/seed.sql, supabase/config.toml · **Dimensione:** M
