@@ -39,6 +39,12 @@ jobs:
         run: npm run test:integration
       - name: E2E (builds the app and serves it with production headers)
         run: npm run e2e
+      - name: Show Auth and gateway logs
+        if: failure()
+        run: |
+          docker logs supabase_auth_enjoy-card-app 2>&1 | tail -n 200
+          docker logs supabase_kong_enjoy-card-app 2>&1 | tail -n 100
+          docker inspect supabase_auth_enjoy-card-app --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'MAILER_(SUBJECTS|TEMPLATES)'
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v7
