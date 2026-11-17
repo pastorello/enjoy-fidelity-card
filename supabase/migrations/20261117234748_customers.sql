@@ -214,3 +214,140 @@ $$;
 -- Explicit grants: never rely on the default privileges.
 revoke execute on function app.create_customer(uuid, text, text, boolean, text) from public, anon;
 grant execute on function app.create_customer(uuid, text, text, boolean, text) to authenticated;
+
+-- update_customer ------------------------------------------------------------------
+-- Any active operator; the last write wins. The phone sent empty clears it.
+create function app.update_customer(
+  p_customer_id uuid,
+  p_name text,
+  p_phone text,
+  p_notes text
+)
+returns app.customer_summary
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_name text := private.clean_name(p_name);
+  v_phone text := nullif(btrim(p_phone, E' \t\n\r\f\v'), '');
+  v_notes text := nullif(btrim(p_notes, E' \t\n\r\f\v'), '');
+  v_row app.customers;
+  v_taken_id uuid;
+  v_constraint text;
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  -- Locked before the check, so an anonymization cannot slip in between.
+  select * into v_row from app.customers where id = p_customer_id for update;
+  if not found then
+    raise exception 'customer_not_found' using errcode = 'P0001';
+  end if;
+  if v_row.anonymized_at is not null then
+    raise exception 'customer_anonymized' using errcode = 'P0001';
+  end if;
+
+  if v_name is null or v_name = '' then
+    raise exception 'name_required' using errcode = 'P0001';
+  end if;
+  if length(v_name) > 80 then
+    raise exception 'name_too_long' using errcode = 'P0001';
+  end if;
+  if v_phone is not null then
+    v_phone := private.normalize_phone(v_phone);
+    if v_phone is null then
+      raise exception 'phone_invalid' using errcode = 'P0001';
+    end if;
+  end if;
+  if length(v_notes) > 500 then
+    raise exception 'notes_too_long' using errcode = 'P0001';
+  end if;
+
+  select id into v_taken_id
+  from app.customers
+  where name_key = private.customer_name_key(v_name) and id <> p_customer_id;
+  if found then
+    raise exception 'customer_name_taken' using errcode = 'P0001', detail = v_taken_id::text;
+  end if;
+
+  begin
+    update app.customers
+    set name = v_name, phone = v_phone, notes = v_notes
+    where id = p_customer_id
+    returning * into v_row;
+  exception when unique_violation then
+    -- A concurrent request took the name first.
+    get stacked diagnostics v_constraint = constraint_name;
+    if v_constraint = 'customers_name_key' then
+      select id into strict v_taken_id
+      from app.customers
+      where name_key = private.customer_name_key(v_name) and id <> p_customer_id;
+      raise exception 'customer_name_taken' using errcode = 'P0001', detail = v_taken_id::text;
+    else
+      raise;
+    end if;
+  end;
+
+  return (v_row.id, v_row.name, v_row.phone, v_row.notes, v_row.anonymized_at, 0, null)
+    ::app.customer_summary;
+end;
+$$;
+
+revoke execute on function app.update_customer(uuid, text, text, text) from public, anon;
+grant execute on function app.update_customer(uuid, text, text, text) to authenticated;
+
+-- anonymize_customer ---------------------------------------------------------------
+-- Admins only (GDPR erasure): the row and its consent time stay, the personal
+-- data goes. Repeating it on an anonymized customer changes nothing.
+create function app.anonymize_customer(p_customer_id uuid)
+returns app.customer_summary
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row app.customers;
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+  if not private.is_admin() then
+    raise exception 'forbidden' using errcode = 'P0001';
+  end if;
+
+  select * into v_row from app.customers where id = p_customer_id for update;
+  if not found then
+    raise exception 'customer_not_found' using errcode = 'P0001';
+  end if;
+
+  if v_row.anonymized_at is null then
+    begin
+      update app.customers
+      set name = 'Cliente cancellato ' || left(v_row.id::text, 8),
+          phone = null,
+          notes = null,
+          anonymized_at = now()
+      where id = p_customer_id
+      returning * into v_row;
+    exception when unique_violation then
+      -- Another customer already has that name (typed by hand, or the same
+      -- first 8 characters of the id): the full id is unique.
+      update app.customers
+      set name = 'Cliente cancellato ' || v_row.id::text,
+          phone = null,
+          notes = null,
+          anonymized_at = now()
+      where id = p_customer_id
+      returning * into v_row;
+    end;
+  end if;
+
+  return (v_row.id, v_row.name, v_row.phone, v_row.notes, v_row.anonymized_at, 0, null)
+    ::app.customer_summary;
+end;
+$$;
+
+revoke execute on function app.anonymize_customer(uuid) from public, anon;
+grant execute on function app.anonymize_customer(uuid) to authenticated;

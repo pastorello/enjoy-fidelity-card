@@ -2,7 +2,7 @@
 -- (SPEC-customers.md, "Modello dati e regole di accesso"). Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(48);
+select plan(72);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -284,6 +284,167 @@ select ok(
   (select relrowsecurity from pg_class where oid = 'app.customers'::regclass),
   'customers has row level security'
 );
+
+-- update_customer ---------------------------------------------------------------------
+-- Customers used below, written directly by postgres.
+insert into app.customers (id, name, phone, privacy_consent_at, notes, created_by, create_operation_id)
+values
+  ('00000000-0000-4000-c200-000000000001', 'Marco Neri', '+393330000001', now(), 'Caffè macchiato',
+   (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()),
+  ('00000000-0000-4000-c200-000000000002', 'Già Cancellato', null, now(), null,
+   (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()),
+  ('a1b2c3d4-0000-4000-c200-000000000003', 'Sara Gialli', '+393330000003', '2026-11-01 10:00+01',
+   'Senza zucchero', (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid());
+update app.customers set anonymized_at = now()
+where id = '00000000-0000-4000-c200-000000000002';
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000003","role":"authenticated"}', true);
+select throws_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'Marco Neri', null, null)$$,
+  'P0001', 'not_operator', 'a user without a profile cannot update a customer'
+);
+select throws_ok(
+  $$select app.anonymize_customer('00000000-0000-4000-c200-000000000001')$$,
+  'P0001', 'not_operator', 'a user without a profile cannot anonymize a customer'
+);
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000002","role":"authenticated"}', true);
+select ok(
+  has_function_privilege('authenticated', 'app.update_customer(uuid, text, text, text)', 'execute'),
+  'authenticated can execute update_customer'
+);
+select ok(
+  has_function_privilege('authenticated', 'app.anonymize_customer(uuid)', 'execute'),
+  'authenticated can execute anonymize_customer'
+);
+select results_eq(
+  $$select id, name, phone, notes, anonymized_at, balance, last_served_at
+    from app.update_customer('00000000-0000-4000-c200-000000000001', ' Marco   Neri Serapo ', '333 000 0009', ' Al banco ')$$,
+  $$values ('00000000-0000-4000-c200-000000000001'::uuid, 'Marco Neri Serapo'::text, '+393330000009'::text,
+            'Al banco'::text, null::timestamptz, 0, null::timestamptz)$$,
+  'an operator updates name, phone and notes, cleaned and normalized'
+);
+select results_eq(
+  $$select phone, notes
+    from app.update_customer('00000000-0000-4000-c200-000000000001', 'Marco Neri Serapo', '  ', '')$$,
+  $$values (null::text, null::text)$$,
+  'an emptied phone and notes become null'
+);
+select lives_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'marco neri serapo', null, null)$$,
+  'renaming a customer to its own equivalent name is allowed'
+);
+select throws_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'nicolo  rossi', null, null)$$,
+  'P0001', 'customer_name_taken', 'renaming to a name already used is refused'
+);
+select is(
+  public.customers_test_error_detail(
+    $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'NICOLÒ ROSSI', null, null)$$
+  ),
+  (select id::text from app.customers where create_operation_id = '00000000-0000-4000-c100-000000000001'),
+  'the rename refusal carries the other customer id in detail'
+);
+select throws_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-000000000001', '  ', null, null)$$,
+  'P0001', 'name_required', 'update refuses a blank name'
+);
+select throws_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-000000000001', repeat('c', 81), null, null)$$,
+  'P0001', 'name_too_long', 'update refuses a name of 81 characters'
+);
+select throws_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'Marco Neri', '12', null)$$,
+  'P0001', 'phone_invalid', 'update refuses an invalid phone'
+);
+select throws_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'Marco Neri', null, repeat('n', 501))$$,
+  'P0001', 'notes_too_long', 'update refuses notes of 501 characters'
+);
+select throws_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-0000000000ff', 'Chi Sono', null, null)$$,
+  'P0001', 'customer_not_found', 'update of an unknown id is refused'
+);
+select throws_ok(
+  $$select app.update_customer(null, 'Chi Sono', null, null)$$,
+  'P0001', 'customer_not_found', 'update of a null id is refused'
+);
+select throws_ok(
+  $$select app.update_customer('00000000-0000-4000-c200-000000000002', 'Nuovo Nome', null, null)$$,
+  'P0001', 'customer_anonymized', 'update of an anonymized customer is refused'
+);
+
+-- anonymize_customer ------------------------------------------------------------------
+select throws_ok(
+  $$select app.anonymize_customer('a1b2c3d4-0000-4000-c200-000000000003')$$,
+  'P0001', 'forbidden', 'an operator cannot anonymize a customer'
+);
+reset role;
+select results_eq(
+  $$select name, phone, notes, anonymized_at from app.customers
+    where id = 'a1b2c3d4-0000-4000-c200-000000000003'$$,
+  $$values ('Sara Gialli'::text, '+393330000003'::text, 'Senza zucchero'::text, null::timestamptz)$$,
+  'the refused anonymization leaves the row unchanged'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000001","role":"authenticated"}', true);
+select throws_ok(
+  $$select app.anonymize_customer('00000000-0000-4000-c200-0000000000ff')$$,
+  'P0001', 'customer_not_found', 'anonymizing an unknown id is refused'
+);
+select results_eq(
+  $$select id, name, phone, notes, anonymized_at, balance
+    from app.anonymize_customer('a1b2c3d4-0000-4000-c200-000000000003')$$,
+  $$values ('a1b2c3d4-0000-4000-c200-000000000003'::uuid, 'Cliente cancellato a1b2c3d4'::text,
+            null::text, null::text, now(), 0)$$,
+  'an admin anonymizes: technical name, phone and notes null, anonymized_at set'
+);
+reset role;
+select results_eq(
+  $$select name, phone, notes, anonymized_at, privacy_consent_at from app.customers
+    where id = 'a1b2c3d4-0000-4000-c200-000000000003'$$,
+  $$values ('Cliente cancellato a1b2c3d4'::text, null::text, null::text, now(),
+            '2026-11-01 10:00+01'::timestamptz)$$,
+  'the anonymized row stays, with its consent time'
+);
+-- A later anonymized_at would show the second call changed the row.
+update app.customers set anonymized_at = '2026-11-02 12:00+01'
+where id = 'a1b2c3d4-0000-4000-c200-000000000003';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000001","role":"authenticated"}', true);
+select results_eq(
+  $$select name, anonymized_at from app.anonymize_customer('a1b2c3d4-0000-4000-c200-000000000003')$$,
+  $$values ('Cliente cancellato a1b2c3d4'::text, '2026-11-02 12:00+01'::timestamptz)$$,
+  'a second anonymization returns the customer unchanged'
+);
+reset role;
+select results_eq(
+  $$select name, phone, notes, anonymized_at from app.customers
+    where id = 'a1b2c3d4-0000-4000-c200-000000000003'$$,
+  $$values ('Cliente cancellato a1b2c3d4'::text, null::text, null::text,
+            '2026-11-02 12:00+01'::timestamptz)$$,
+  'a second anonymization changes nothing'
+);
+-- A customer already named like the technical name of another: the anonymized
+-- name falls back to the full id, still unique.
+insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
+values
+  ('b1b2c3d4-0000-4000-c200-000000000004', 'Cliente cancellato b1b2c3d4', now(),
+   (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()),
+  ('b1b2c3d4-0000-4000-c200-000000000005', 'Omonimo Tecnico', now(),
+   (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid());
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000001","role":"authenticated"}', true);
+select is(
+  (select name from app.anonymize_customer('b1b2c3d4-0000-4000-c200-000000000005')),
+  'Cliente cancellato b1b2c3d4-0000-4000-c200-000000000005',
+  'a taken technical name falls back to the full id'
+);
+reset role;
 
 select * from finish();
 rollback;
