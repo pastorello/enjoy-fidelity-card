@@ -92,3 +92,26 @@ test('touch targets of the forgot-password page are at least 48 px', async ({ pa
     expect(box?.width).toBeGreaterThanOrEqual(48);
   }
 });
+
+test('touch targets of the reset-password page are at least 48 px', async ({ page }) => {
+  // A made-up token: opening the page never consumes or checks it.
+  await page.goto('/imposta-password?token_hash=e2e-non-valido&type=recovery');
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Scegli una nuova password' }),
+  ).toBeVisible();
+  const boxes = await Promise.all(
+    [
+      page.getByLabel('Nuova password'),
+      page.getByLabel('Ripeti la password'),
+      page.getByRole('button', { name: 'Salva e accedi' }),
+    ].map((target) => target.boundingBox()),
+  );
+  for (const box of boxes) {
+    expect(box?.height).toBeGreaterThanOrEqual(48);
+    expect(box?.width).toBeGreaterThanOrEqual(48);
+  }
+
+  await page.goto('/imposta-password');
+  const again = page.getByRole('link', { name: 'Chiedi un nuovo link' });
+  expect((await again.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+});
