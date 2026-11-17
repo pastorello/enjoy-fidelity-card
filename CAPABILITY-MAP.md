@@ -6,7 +6,7 @@ specifica `SPEC-<id>.md` in questa cartella; questa mappa è l'indice di quelle 
 | Module id | Responsabilità | Dipende da | Spec |
 |---|---|---|---|
 | `platform` | Scheletro PWA, Supabase (UE), CI e deploy su Vercel, token del design system, struttura comune delle schermate | — | [SPEC-platform.md](SPEC-platform.md) (approvata) |
-| `identity` | Accesso, invito via email, password (scelta e recupero), ruoli, gestione e disattivazione operatori, sessione scaduta | platform | [SPEC-identity.md](SPEC-identity.md) (bozza) |
+| `identity` | Accesso, uscita, sessione scaduta, ruoli; account creati a mano in Supabase (V1: niente inviti né email) | platform | [SPEC-identity.md](SPEC-identity.md) |
 | `settings` | Rapporto euro/punto, soglia di conferma importo, formato del lettore USB | identity | — |
 | `customers` | Nuovo cliente (nome unico, telefono facoltativo, consenso), ricerca, modifica, anonimizzazione | identity | — |
 | `card-input` | Unico ingresso per la lettura card: Web NFC, permesso e NFC spento, normalizzazione uid, adattatore finto per i test | platform, settings | — |

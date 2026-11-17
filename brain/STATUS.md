@@ -24,8 +24,8 @@ del modulo `identity`.
    più avanti). Mancano: scelta del piano di hosting (Hobby vieta l'uso commerciale), account Supabase
    (`docs/setup-accounts.md`) con `db push` su staging e verifica dell'event trigger, installazione su
    Android.
-2. `SPEC-identity.md` scritta (bozza, 2026-11-17), in attesa di approvazione e risposte alle Open
-   Questions (SMTP, nomi visibili, riattivazione, reinvio, cambio ruolo); poi gli altri nell'ordine di `CAPABILITY-MAP.md`
+2. `SPEC-identity.md` approvata (2026-11-17): solo accesso, account creati a mano in Supabase, niente
+   email; prossimo passo il piano dei task in `tasks/`; poi gli altri nell'ordine di `CAPABILITY-MAP.md`
    (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
@@ -35,7 +35,10 @@ del modulo `identity`.
   lancio, non lo sviluppo).
 - **Lettore NFC USB**: da scegliere e acquistare (blocca la fase tablet); verificare il formato dell'uid.
 - **Amministratori iniziali** (nomi/email): servono al primo deploy.
-- **Account Supabase (prod + staging, UE) e Vercel**: li crea l'utente seguendo `docs/setup-accounts.md`.
+- **Account Supabase creati** (2026-11-17): staging `kpizaczyrlyywuidqitn` (usato da `.env` locale e dalle
+  anteprime), prod `mxylhfwvwwspepzevccf` (solo Vercel Production). Variabili Vercel `VITE_SUPABASE_*`: Production = prod,
+  Preview/Development = staging (2026-11-17). Manca `db push`. Rimosse le 16 variabili aggiunte
+  dall'integrazione Supabase di Vercel (chiavi segrete incluse); l'integrazione resta da disinstallare.
 - **Vercel Hobby vieta l'uso commerciale**: decidere tra Vercel Pro o un altro hosting prima del deploy.
 
 ## Modifiche non pubblicate

@@ -10,6 +10,24 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-17 — identity V1: solo accesso, account creati a mano in Supabase
+
+- **Decisione**: in V1 il modulo `identity` copre solo accesso, sessione e uscita. Gli account si creano e
+  si tolgono dal pannello di Supabase (utente già confermato) e si registrano come operatori con una
+  funzione SQL. Niente servizio email, niente inviti, niente "Password dimenticata", niente schermata
+  Operatori, niente cambio di ruolo dall'app. Per togliere qualcuno si cancella l'utente; per rimetterlo
+  lo si ricrea. Visibilità di nomi ed email tra colleghi: nessuna restrizione particolare, lo staff si
+  conosce. Basta anche un solo utente.
+- **Perché**: il bar non ha un dominio internet, e senza dominio un servizio email (Brevo) non può
+  spedire inviti affidabili; all'utente in V1 interessa solo poter entrare nell'app.
+- **Alternative scartate (Rejected alternatives)**:
+  - Brevo con un dominio da comprare: costo e configurazione DNS non giustificati per la V1.
+  - Brevo con mittente Gmail: Brevo sostituisce il mittente, le email rischiano lo spam.
+  - Email predefinita di Supabase: scrive solo agli indirizzi del team, con pochi invii all'ora.
+- **Ambito**: modulo `identity`; si discosta dalle specifiche (inviti via email). Da riprendere se arriva
+  un dominio.
+- **Contesto**: revisione delle Open Questions di `SPEC-identity.md`.
+
 ### 2026-11-17 — Oxlint al posto di ESLint, TypeScript 7
 
 - **Decisione**: linting con Oxlint (regole TypeScript, React, react-hooks, jsx-a11y) e controllo basato sui

@@ -67,7 +67,8 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
   conferma importo, export CSV, annullamento movimenti, cancellazione dati cliente.
 - **Operatore** (camerieri): cerca e crea clienti, consegna card, registra spese, riscatta premi, annulla
   entro 10 secondi la propria spesa o il proprio riscatto appena registrati.
-- Account creati solo da un amministratore (invito via email, l'operatore sceglie la password).
+- Account creati solo da un amministratore. **V1**: a mano dal pannello di Supabase, niente inviti né email
+  (il bar non ha un dominio; `brain/DECISIONS.md` 2026-11-17).
   Sessione persistente sul telefono; sul tablet condiviso: account di dispositivo + cambio operatore con
   PIN di 4 cifre verificato sul server (blocco temporaneo dopo 5 errori).
 
