@@ -68,6 +68,15 @@ describe('AuthProvider', () => {
     expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
   });
 
+  it('shows an error state, not signed out, when the saved session cannot be refreshed offline', async () => {
+    const fake = createFakeAuthService({ userId: 'user-1' });
+    fake.service.currentUserId.mockRejectedValueOnce(new Error('offline'));
+    const auth = renderWith(fake);
+    await waitFor(() => expect(state()).toHaveTextContent('error'));
+    await act(() => auth().retry());
+    expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
+  });
+
   it('signs in and loads the operator', async () => {
     const fake = createFakeAuthService();
     const auth = renderWith(fake);

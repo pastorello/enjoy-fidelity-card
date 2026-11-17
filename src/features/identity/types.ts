@@ -21,7 +21,7 @@ export type SignedOutReason = 'expired' | 'not-enabled';
  * implementation; tests pass a fake.
  */
 export type AuthService = {
-  /** The user id of the session saved on this device, if any. */
+  /** The user id of the session saved on this device, if any. Throws on network errors. */
   currentUserId(): Promise<string | null>;
   signIn(email: string, password: string): Promise<SignInResult>;
   /** Ends the session on this device only. */

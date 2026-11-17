@@ -20,7 +20,12 @@ function isRole(value: unknown): value is Operator['role'] {
 
 export const supabaseAuthService: AuthService = {
   async currentUserId() {
-    const { data } = await getSupabase().auth.getSession();
+    const { data, error } = await getSupabase().auth.getSession();
+    // Offline (or 5xx) while refreshing an expired token: the session is still saved and
+    // will work again, so this is a network error ("Riprova"), not a sign-out.
+    if (isAuthRetryableFetchError(error)) {
+      throw new Error(`Cannot refresh the saved session: ${error.message}`);
+    }
     return data.session?.user.id ?? null;
   },
 
