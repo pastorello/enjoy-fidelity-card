@@ -67,8 +67,9 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
   conferma importo, export CSV, annullamento movimenti, cancellazione dati cliente.
 - **Operatore** (camerieri): cerca e crea clienti, consegna card, registra spese, riscatta premi, annulla
   entro 10 secondi la propria spesa o il proprio riscatto appena registrati.
-- Account creati solo da un amministratore. **V1**: a mano dal pannello di Supabase, niente inviti né email
-  (il bar non ha un dominio; `brain/DECISIONS.md` 2026-11-17).
+- Account creati solo da un amministratore. **V1**: a mano dal pannello di Supabase + `private.add_operator`
+  (`docs/setup-accounts.md` §4), niente inviti dall'app. Le email di Auth partono da `info@enjoygaeta.it`;
+  "Password dimenticata" arriva con una spec aggiuntiva dopo la V1 (`brain/DECISIONS.md` 2026-11-17).
   Sessione persistente sul telefono; sul tablet condiviso: account di dispositivo + cambio operatore con
   PIN di 4 cifre verificato sul server (blocco temporaneo dopo 5 errori).
 
@@ -133,13 +134,14 @@ Altre quando pertinenti: `frontend-ui-engineering`, `api-and-interface-design`, 
 npm install                 # dipendenze (Node 24, vedi .nvmrc)
 npm run dev                 # app in sviluppo; vetrina componenti su /dev/ui
 npm run dev:https           # HTTPS sulla rete locale, per il telefono
-npm run typecheck && npm run lint && npm test   # controlli prima di ogni commit
+npm run typecheck && npm run lint && npm run format:check && npm test   # controlli prima di ogni commit
 npm run format              # Prettier
-npm run e2e                 # Playwright sulla build (390×844)
+npm run e2e                 # Playwright sulla build (390×844), contro Supabase locale
 npm run build               # build di produzione
 npm run db:start / db:stop  # Supabase locale (Docker)
 npm run db:reset            # riapplica migrazioni e seed
 npm run db:test             # test pgTAP
+npm run test:integration    # Vitest contro Supabase locale (tests/integration/)
 npm run tokens              # rigenera i token CSS da design/tokens.json
 npm run icons               # rigenera le icone PWA
 ```

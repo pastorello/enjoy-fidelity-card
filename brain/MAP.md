@@ -16,6 +16,7 @@
 |---|---|---|---|
 | App PWA | Interfaccia per telefono (390×844) e tablet (1280×800); lettura card via Web NFC e lettore USB | base pronta (`platform`) | `src/` |
 | Backend Supabase | Postgres, Auth, RLS; transazioni di spesa/riscatto con controllo saldo e idempotenza | base pronta (schema `app`, RLS automatica) | `supabase/` |
+| Identità (`identity`) | Accesso email/password, sessione, guardia delle rotte, Impostazioni con Esci; profili `app.operators`, ruoli, `private.add_operator` | in corso (PR #13, `feat/identity`) | `src/features/identity/`, `supabase/migrations/*_identity.sql`, `supabase/tests/identity.test.sql` |
 | Tooling agenti | Skill, subagent e hook di progetto | stabile | `.claude/` |
 | Memoria di progetto | Stato, decisioni, passaggi tra sessioni | stabile | `brain/` |
 
@@ -59,8 +60,12 @@ La lettura card ha un unico punto d'ingresso nell'app: telefono e lettore USB so
 | `SPEC-identity.md` | Spec del modulo `identity` (approvata) | Prima di lavorare su accesso, ruoli, operatori |
 | `PRODUCT.md` | Contesto di prodotto per Impeccable (utenti, ambiente, tono "tu", vincoli di marchio) | Prima di ogni lavoro di UI |
 | `design/tokens.json` | Copia dei token del design system "Enjoy Bar" (fonte di `src/styles/tokens.css`) | Quando cambiano colori, testo o misure |
-| `tasks/plan.md`, `tasks/todo.md` | Piano e task del modulo in corso | Prima di implementare |
-| `docs/setup-accounts.md` | Guida per creare Supabase (prod + staging) e Vercel, e applicare le migrazioni | Prima del primo deploy |
+| `tasks/plan.md`, `tasks/todo.md` | Piano e task del modulo `platform` | Storico |
+| `tasks/identity/` | Piano e task del modulo `identity` | Prima di lavorare su `identity` |
+| `tests/integration/` | Test Vitest contro lo stack Supabase locale (`npm run test:integration`, config `vitest.integration.config.ts`) | Quando si tocca Auth, RLS o il seed |
+| `e2e/` | Test Playwright; `fixtures.ts` (console pulita, niente Supabase online), `auth.ts` (accesso con gli account del seed) | Prima di scrivere un test E2E |
+| `supabase/seed.sql` | Account finti per sviluppo e test (mai dati reali) | Quando servono utenti di prova |
+| `docs/setup-accounts.md` | Guida per creare Supabase (prod + staging) e Vercel, applicare le migrazioni, esporre lo schema `app`, gestire operatori e password | Prima del primo deploy; quando si aggiunge o toglie un operatore |
 | `docs/adr/` | (da creare) decisioni architetturali dettagliate | Quando una decisione richiede più di una voce in DECISIONS |
 
 ### operations/

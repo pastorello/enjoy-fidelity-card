@@ -16,15 +16,31 @@ npm run format                              # Prettier
 npm run db:start / db:stop                  # Supabase locale (Docker)
 npm run db:reset                            # riapplica migrazioni + seed
 npm run db:test                             # test pgTAP in supabase/tests/
+npm run test:integration                    # Vitest contro lo stack locale (tests/integration/), Supabase acceso
 npx supabase migration new <nome> </dev/null   # nuova migrazione (vedi trappola 5)
 npm run tokens                              # rigenera src/styles/tokens.css da design/tokens.json
 npm run icons                               # rigenera le icone PWA da design/enjoy-badge-solo-negative.png
-npm run e2e                                 # Playwright sulla build, 390×844, con le intestazioni di vercel.json
+npm run e2e                                 # Playwright sulla build, 390×844, contro Supabase locale (deve essere acceso)
 npm run dev:https                           # HTTPS sulla rete locale (certificato autofirmato), per il telefono
 npx impeccable detect src/                  # scansione design (anche su URL del dev server)
 npx skills add <owner>/<repo> --skill <nome> --agent claude-code   # aggiungere una skill di progetto
 bash ~/.claude/plugins/cache/sprout-labs/project-brain/*/scripts/doctor.sh .   # controllo di brain/
 ```
+
+Account finti del seed (solo locale): `admin@example.com` (amministratore "Admin Prova") e
+`operatore@example.com` (operatore "Operatore Prova"), password `password-di-prova`.
+
+Stack locale minimo per E2E e integrazione (Postgres, Auth, API REST: lo stesso della CI):
+
+```bash
+npx supabase start -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
+```
+
+### Operatori
+
+Registrare, togliere, rimettere un operatore e reimpostare una password: `docs/setup-accounts.md` §4
+(pannello Supabase + `select private.add_operator('<email>', '<nome>', 'admin' | 'operator');` nello
+SQL Editor). Nei progetti online lo schema `app` va esposto nella Data API (§3 della stessa guida).
 
 ### Pubblicazione
 
@@ -44,8 +60,8 @@ bash ~/.claude/plugins/cache/sprout-labs/project-brain/*/scripts/doctor.sh .   #
 
 ## 2. Controllo di salute
 
-`npm run typecheck && npm run lint && npm test && npm run e2e` e, con Supabase acceso, `npm run db:test`:
-tutto verde = sano. In CI: i due job di `CI` verdi sulla PR (`gh pr checks <n>`).
+`npm run typecheck && npm run lint && npm run format:check && npm test` e, con Supabase acceso,
+`npm run db:test && npm run test:integration && npm run e2e`: tutto verde = sano. In CI: i due job di `CI` verdi sulla PR (`gh pr checks <n>`).
 
 ## 3. Quando qualcosa non va, guarda qui
 
@@ -54,6 +70,9 @@ tutto verde = sano. In CI: i due job di `CI` verdi sulla PR (`gh pr checks <n>`)
 | Una skill o un plugin appena installato non compare | Ricaricare Claude Code (nuova sessione) | `claude plugin list` |
 | L'app si ferma con "Missing VITE_SUPABASE_…" | `.env` assente o incompleto | `.env.example`, `npx supabase status` |
 | `db:start` / `db:reset` scade in attesa di un container | `docker ps` (container non sani) | `npx supabase stop` e di nuovo `db:start` |
+| `npm run e2e` si ferma con "Local Supabase is not running" | `npx supabase status` | avviare lo stack (comando sopra) |
+| Online: accesso con credenziali giuste dà "Connessione assente" | Schema `app` esposto nella Data API? | `docs/setup-accounts.md` §3 |
+| Online: "Account non abilitato" | Profilo collegato? `select * from app.operators;` nello SQL Editor | `private.add_operator` (§4 della guida) |
 
 ## 4. Trappole (numerate, solo aggiunte)
 
@@ -90,3 +109,17 @@ tutto verde = sano. In CI: i due job di `CI` verdi sulla PR (`gh pr checks <n>`)
     permessi di scrittura. Non va mai collegato alla produzione senza `read_only=true`: in produzione le
     migrazioni si applicano solo a mano, dopo la prova su staging. Si attiva riaprendo Claude Code e
     autenticandosi con `/mcp`.
+16. `.env` punta allo **staging**: E2E e test di integrazione non lo usano. `playwright.config.ts` legge la
+    chiave locale da `supabase status` e la passa a Vite (vince su `.env`); un controllo automatico fa
+    fallire ogni test che chiama `*.supabase.co`. Il server di anteprima non si riusa mai
+    (`reuseExistingServer: false`): potrebbe essere stato costruito contro lo staging.
+17. Un accesso con credenziali sbagliate produce in console un `400` su `/auth/v1/token` (lo stampa il
+    browser, non l'app): è atteso, e `e2e/fixtures.ts` lo esclude dal controllo "console pulita". Ogni altro
+    errore in console fa fallire il test.
+18. La CSP di produzione (`vercel.json`) non ammette `http://localhost:54321`: l'origine locale è aggiunta
+    a `connect-src` solo nelle intestazioni di `vite preview` (`vite.config.ts`), mai in `vercel.json`.
+19. Un utente cancellato in Authentication → Users ha ancora un token valido fino a un'ora: la sicurezza sta
+    nella RLS (controlla il profilo collegato, non il token). L'app se ne accorge al ritorno in primo piano.
+20. `private.add_operator` è eseguibile solo da `postgres` (SQL Editor): nessun ruolo dell'API la può
+    chiamare. Gli account si creano con *Auto Confirm User* attivo, altrimenti Supabase manda un'email di
+    conferma (da `info@enjoygaeta.it`).

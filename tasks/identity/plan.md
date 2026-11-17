@@ -46,7 +46,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 3: Account tolto e consegna
 - [x] Task 6: Account tolto o senza profilo → `/accedi` con messaggio; test di integrazione contro lo stack locale
-- [ ] Task 7: Procedura in `docs/setup-accounts.md`, RUNBOOK, CLAUDE.md
+- [x] Task 7: Procedura in `docs/setup-accounts.md`, RUNBOOK, CLAUDE.md
 - [ ] Task 8: Pubblicazione su staging e produzione (con l'utente)
 
 ### Checkpoint C: criteri di successo della spec; prova su Android; PR pronta per `code-review-and-quality`

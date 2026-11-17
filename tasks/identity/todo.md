@@ -102,8 +102,8 @@ src/features/identity/RequireAuth.tsx, package.json, .github/workflows/ci.yml ·
 amministratore, togliere e rimettere un operatore, reimpostare una password. RUNBOOK (procedure e
 trappole trovate), CLAUDE.md (`test:integration`), `brain/MAP.md`.
 **Accettazione:**
-- [ ] Ogni passo della procedura indica la schermata esatta di Supabase o la riga SQL da eseguire
-- [ ] Nessun segreto né dato reale nei documenti
+- [x] Ogni passo della procedura indica la schermata esatta di Supabase o la riga SQL da eseguire
+- [x] Nessun segreto né dato reale nei documenti
 **Verifica:** rilettura con l'utente
 **Dipendenze:** 6 · **File:** docs/setup-accounts.md, brain/topics/operations/RUNBOOK.md, CLAUDE.md,
 brain/MAP.md · **Dimensione:** S
