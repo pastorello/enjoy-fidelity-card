@@ -80,10 +80,10 @@ src/features/identity/RequireAuth.tsx, src/main.tsx, src/test/renderApp.tsx · *
 **Descrizione:** funzioni pure `parseEuroInput(text, { max })` → centesimi o errore con il messaggio
 italiano della spec (punto 6) e `centsToEuroInput(cents)` → testo con virgola e due decimali.
 **Accettazione:**
-- [ ] Unità: "1" → 100, "1,5"/"1,50"/"1.50" → 150, " 2 " → 200; "" vuoto, "abc"/"-1" caratteri non validi,
+- [x] Unità: "1" → 100, "1,5"/"1,50"/"1.50" → 150, " 2 " → 200; "" vuoto, "abc"/"-1" caratteri non validi,
       "1,555"/"1.250" più di due decimali, "0"/"0,00" zero; "100,00" ok e "100,01" oltre il massimo del
       rapporto; "10000,00" ok e "10000,01" oltre il massimo della soglia
-- [ ] Unità: `centsToEuroInput` 100 → "1,00", 15000 → "150,00", 5 → "0,05"
+- [x] Unità: `centsToEuroInput` 100 → "1,00", 15000 → "150,00", 5 → "0,05"
 **Verifica:** `npm test -- parseEuroInput`
 **Dipendenze:** nessuna · **File:** src/features/settings/parseEuroInput.ts (+ .test.ts) · **Dimensione:** S
 
