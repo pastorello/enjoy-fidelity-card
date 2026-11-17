@@ -42,7 +42,7 @@ Supabase Auth. È la prima volta che l'app manda email: E2E e CI passano a usare
 Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Fondamenta (alto rischio)
-- [ ] Task 1: Config di Auth locale, template `recovery`, helper Mailpit, test di integrazione e Mailpit in CI
+- [x] Task 1: Config di Auth locale, template `recovery`, helper Mailpit, test di integrazione e Mailpit in CI
 - [ ] Task 2: `AuthService` esteso: tipi, mappatura degli errori in `supabaseAuthService`, fake esteso
 - [ ] Task 3: `AuthProvider`: `completeRecovery`, `abandonRecovery`, `currentEmail`
 

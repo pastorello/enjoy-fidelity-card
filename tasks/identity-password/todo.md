@@ -17,12 +17,13 @@ messaggi per destinatario dopo un istante dato (`/api/v1/search`) ed estrazione 
 Test di integrazione contro lo stack locale con un utente creato e tolto dal test. CI: `mailpit` tolto da
 `-x` nel job `app`.
 **Accettazione:**
-- [ ] Integrazione: `resetPasswordForEmail` con `redirectTo` `http://localhost:4173/imposta-password` →
+- [x] Integrazione: `resetPasswordForEmail` con `redirectTo` `http://localhost:4173/imposta-password` →
       un'email in Mailpit con oggetto e testi del template e link che inizia con
       `http://localhost:4173/imposta-password?token_hash=` e contiene `type=recovery`
-- [ ] Integrazione: `verifyOtp({ type: 'recovery', token_hash })` del link → sessione; `updateUser` con 7
+- [x] Integrazione: `verifyOtp({ type: 'recovery', token_hash })` del link → sessione; `updateUser` con 7
       caratteri → `weak_password`; con 8 → ok; secondo `verifyOtp` con lo stesso token → errore (link usato)
-- [ ] `config.toml` senza `https://127.0.0.1:3000`; CI verde con Mailpit avviato
+- [x] `config.toml` senza `https://127.0.0.1:3000`; CI verde con Mailpit avviato (in locale con lo
+      stesso `supabase start -x …` della CI; la CI su GitHub si conferma alla prima push del branch)
 **Verifica:** `npx supabase stop && npm run db:start && npm run test:integration`; CI su GitHub
 **Dipendenze:** nessuna · **File:** supabase/config.toml, supabase/templates/recovery.html, e2e/mailpit.ts,
 tests/integration/password.test.ts, .github/workflows/ci.yml · **Dimensione:** M
