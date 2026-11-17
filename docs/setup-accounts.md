@@ -58,7 +58,9 @@ nei progetti online va aggiunto a mano, in **entrambi** i progetti, dopo il prim
    ricarica lo schema: è normale, basta attendere e riprovare.
 
 Senza questo passo l'accesso fallisce anche con email e password giuste e la rete funzionante: l'app
-dice "Connessione assente: controlla la rete e riprova." perché non riesce a leggere il profilo.
+dice "Servizio non configurato: chiedi a un amministratore." perché non riesce a leggere il profilo. Un
+"Servizio momentaneamente non disponibile: riprova tra poco." subito dopo il salvataggio è invece il
+`PGRST002` del punto 3.
 
 ## 4. Operatori e amministratori
 
