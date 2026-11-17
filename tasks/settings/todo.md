@@ -110,10 +110,10 @@ l'operatore, la nota finale "Operatori, premi, esportazioni e annullamenti dei m
 amministratori." come ultimo elemento. Stati: `StatusView kind="loading"` nella sezione; errore "Impostazioni
 non caricate" con Riprova; `not-found` solo stato di errore, senza dati.
 **Accettazione:**
-- [ ] Componente: operatore vede testo e rapporto, niente campi né Salva né soglia; nota finale ultima
-- [ ] Componente: ordine account · PUNTI · ACCOUNT (asserzione esistente aggiornata all'ordine unico di
+- [x] Componente: operatore vede testo e rapporto, niente campi né Salva né soglia; nota finale ultima
+- [x] Componente: ordine account · PUNTI · ACCOUNT (asserzione esistente aggiornata all'ordine unico di
       `cross-review.md` §1); caricamento ed errore con Riprova che richiama `load`
-- [ ] Detector Impeccable pulito; screenshot 390×844 confrontato con il wireframe
+- [x] Detector Impeccable pulito; screenshot 390×844 confrontato con il wireframe
 **Verifica:** `npm test -- settings SettingsPage`
 **Dipendenze:** 4 · **File:** src/features/settings/PointsSettingsSection.tsx (+ .module.css, .test.tsx),
 src/features/identity/SettingsPage.tsx, SettingsPage.test.tsx · **Dimensione:** M

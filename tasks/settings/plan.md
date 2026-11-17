@@ -68,7 +68,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: suite unità/componenti verde; test esistenti di identity invariati e verdi
 
 ### Fase 3: Sezioni di `/impostazioni`
-- [ ] Task 7: Vista operatore "PUNTI" (sola lettura), nota finale, stati di caricamento ed errore, ordine delle sezioni
+- [x] Task 7: Vista operatore "PUNTI" (sola lettura), nota finale, stati di caricamento ed errore, ordine delle sezioni
 - [ ] Task 8: Vista amministratore "PUNTI E CONTROLLI": campi, validazione, Salva, "Impostazioni salvate."
 - [ ] Task 9: Errori del salvataggio (rete, permesso negato, invalid/unknown) e ricarica che non sovrascrive i campi modificati
 
