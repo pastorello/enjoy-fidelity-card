@@ -90,11 +90,11 @@ nuovo link" per `token_hash` mancante, `type` ≠ `recovery`, `error` nel framme
 in mappe `Record<Result, string>`. Avviso "Sei collegato come {nome}: salvando, accederai con l'account del
 link."; uscita dalla pagina dopo una verifica riuscita → `abandonRecovery()`.
 **Accettazione:**
-- [ ] Componente: < 8 caratteri, oltre 72 byte UTF-8 (anche 40 "è" = 80 byte), password diverse; doppio tocco
+- [x] Componente: < 8 caratteri, oltre 72 byte UTF-8 (anche 40 "è" = 80 byte), password diverse; doppio tocco
       = una sola richiesta; link mancante/scaduto → "Chiedi un nuovo link" → `/password-dimenticata`
-- [ ] Componente: `same-password`, `weak`, `unknown`, rete su verifica e su salvataggio con i testi della spec;
+- [x] Componente: `same-password`, `weak`, `unknown`, rete su verifica e su salvataggio con i testi della spec;
       reinvio dopo rete senza seconda verifica; profilo assente → `/accedi` "Account non abilitato"
-- [ ] Componente: avviso per l'utente collegato, che senza link resta collegato; uscita dopo verifica riuscita
+- [x] Componente: avviso per l'utente collegato, che senza link resta collegato; uscita dopo verifica riuscita
       → "non collegato". Detector Impeccable pulito; target ≥ 48 px; screenshot 390×844 vs wireframe
 **Verifica:** `npm test -- ResetPasswordPage && npm run e2e`
 **Dipendenze:** 3 · **File:** src/features/identity/ResetPasswordPage.tsx (+ .module.css, .test.tsx),
