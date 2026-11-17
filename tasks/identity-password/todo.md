@@ -104,7 +104,7 @@ src/app/routes.tsx · **Dimensione:** M
 **Descrizione:** se Supabase scarta il `redirectTo`, il link arriva a `/?token_hash=…&type=recovery`.
 `RootLayout` inoltra a `/imposta-password` conservando la query, prima di `RequireAuth`.
 **Accettazione:**
-- [ ] Componente: `/?token_hash=abc&type=recovery` senza sessione → `/imposta-password?token_hash=abc&type=recovery`,
+- [x] Componente: `/?token_hash=abc&type=recovery` senza sessione → `/imposta-password?token_hash=abc&type=recovery`,
       non `/accedi`; `/` senza query invariato
 **Verifica:** `npm test -- routes`
 **Dipendenze:** 5 · **File:** src/app/RootLayout.tsx, src/app/routes.test.tsx · **Dimensione:** S
