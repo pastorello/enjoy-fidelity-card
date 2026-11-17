@@ -24,10 +24,10 @@ del modulo `identity`.
    più avanti). Mancano: scelta del piano di hosting (Hobby vieta l'uso commerciale), account Supabase
    (`docs/setup-accounts.md`) con `db push` su staging e verifica dell'event trigger, installazione su
    Android.
-2. **Modulo `identity`** (piano in `tasks/identity/`, PR #13 bozza su `feat/identity`): task 1-5 fatti
-   (database, E2E/CI su Supabase locale, sessione, `/accedi`, Impostazioni con Esci). Prossimo:
-   Checkpoint B (Lighthouse su `/accedi`, revisione `security-and-hardening`), poi task 6-8. Dopo `identity`,
-   gli altri moduli nell'ordine di `CAPABILITY-MAP.md`.
+2. **Sviluppo autonomo** (richiesta dell'utente 2026-11-17): `identity` V1 completo (PR #13, CI verde,
+   migrazioni applicate allo staging). Specifiche di tutti i moduli in repo (`SPEC-*.md`, `docs/specs/`),
+   approvate per delega con i default. Rami in catena, ognuno con PR verso `main` (unire in ordine):
+   `feat/identity` → `feat/identity-password` → un ramo per modulo nell'ordine di `CAPABILITY-MAP.md`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
