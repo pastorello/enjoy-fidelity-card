@@ -39,10 +39,10 @@ idempotente su `create_operation_id`, `unique_violation` intercettati per vincol
 `private.is_admin()` (`forbidden` altrimenti, `customer_not_found`): nome `'Cliente cancellato ' || <8
 caratteri dell'id>`, `phone`/`notes` null, `anonymized_at = now()`, idempotente.
 **Accettazione:**
-- [ ] pgTAP: rinomina su un nome equivalente già usato rifiutata con `detail`; telefono svuotato → null;
+- [x] pgTAP: rinomina su un nome equivalente già usato rifiutata con `detail`; telefono svuotato → null;
       id inesistente → `customer_not_found`; modifica di un anonimizzato → `customer_anonymized`;
       utente senza profilo → `not_operator`
-- [ ] pgTAP: operatore → `forbidden` e riga invariata; admin → nome tecnico, phone e notes null,
+- [x] pgTAP: operatore → `forbidden` e riga invariata; admin → nome tecnico, phone e notes null,
       `anonymized_at` valorizzato, `privacy_consent_at` e riga presenti; seconda chiamata non cambia nulla
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1 · **File:** supabase/migrations/*_customers.sql, supabase/tests/customers.test.sql ·
