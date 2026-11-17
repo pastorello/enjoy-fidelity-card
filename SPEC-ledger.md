@@ -293,7 +293,8 @@ const op = useOperation(() => service.recordPurchase({ customerId, amountCents }
   `private.acting_operator_id()`; ruoli verificati sul server; solo dati finti nei test e nel seed
   (`@example.com`, nomi inventati, telefoni `+39333000…`, uid finti); nessun segreto nel repo.
 - **Ask first**: coda offline o reinvio automatico in background; cambiare la finestra di 10 s; permettere
-  l'annullo di una correzione; correzioni manuali di punti; mostrare qualcosa al cliente; limiti diversi
+  l'annullo di una correzione; correzioni manuali di punti; mostrare al cliente altro oltre al saldo della pagina pubblica di `cards`
+  (`/s/:token`); limiti diversi
   per importo o punti.
 - **Never**: `update`/`delete` di `app.movements`; calcolare il saldo solo nel client per decidere; numeri
   decimali in euro; nuovo `operation_id` su un reinvio; dati personali del cliente nei movimenti; chiave

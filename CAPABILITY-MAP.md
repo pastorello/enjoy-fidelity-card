@@ -11,7 +11,7 @@ revisione incrociata: `docs/specs/`.
 | `settings` | Rapporto euro/punto, soglia di conferma importo, formato del lettore USB | identity | [SPEC-settings.md](SPEC-settings.md) |
 | `customers` | Nuovo cliente (nome unico, telefono facoltativo, consenso), ricerca, modifica, anonimizzazione | identity | [SPEC-customers.md](SPEC-customers.md) |
 | `card-input` | Unico ingresso per la lettura card: Web NFC, permesso e NFC spento, normalizzazione uid, adattatore finto per i test | platform, settings | [SPEC-card-input.md](SPEC-card-input.md) |
-| `cards` | Associa/sostituisci card, una card attiva per cliente, card già associata, card sconosciuta → nuovo cliente | customers, card-input | [SPEC-cards.md](SPEC-cards.md) |
+| `cards` | Associa/sostituisci card, una card attiva per cliente, card già associata, card sconosciuta → nuovo cliente; link ai punti scritto sulla card e pagina pubblica del saldo `/s/:token` | customers, card-input | [SPEC-cards.md](SPEC-cards.md) |
 | `rewards` | Catalogo premi (nome, punti, attivo) | identity | [SPEC-rewards.md](SPEC-rewards.md) |
 | `ledger` | Movimenti: spesa con tastierino e punti, riscatto (catalogo o libero), saldo, annullo entro 10 s, correzioni, idempotenza, saldo ≥ 0 | customers, settings, rewards | [SPEC-ledger.md](SPEC-ledger.md) |
 | `export` | Esportazione CSV di clienti e movimenti | customers, ledger | [SPEC-export.md](SPEC-export.md) |

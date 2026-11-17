@@ -30,11 +30,15 @@ marketing, senza rallentare la cassa: dalla card alla conferma della spesa in me
 
 - **Non contattiamo i clienti** (messaggi, offerte, campagne), perché il titolare non lo vuole: il telefono
   del cliente serve solo a trovarlo più in fretta, ed è facoltativo.
-- **Nessuna schermata per il cliente**, nemmeno il saldo: il flusso è a senso unico, il cliente consegna la
-  card all'operatore. Tenerlo fuori semplifica privacy e interfaccia.
+- **Nessuna area per il cliente oltre al saldo**: niente account, accesso, nome, movimenti o premi. L'unica
+  cosa che il cliente vede è il proprio saldo, avvicinando la card al suo telefono (pagina pubblica dal
+  link scritto sulla card, decisione del titolare del 2026-11-17). Alla cassa il flusso resta a senso unico:
+  il cliente consegna la card all'operatore.
 - **Niente funzionamento offline** (coda di spese in attesa di rete), perché l'utente l'ha escluso
   esplicitamente. Resta solo il reinvio idempotente dopo un errore di rete.
-- **Non scriviamo le card**: l'app legge solo l'uid del tag; tutto lo stato vive sul server.
+- **Sulle card scriviamo solo il link ai punti**: un record URL con un token segreto e casuale (mai l'uid),
+  scritto dall'app con Web NFC alla consegna e verificato rileggendolo. Saldo e stato restano sul server; le
+  card non si bloccano in sola lettura (scelta irreversibile, esclusa per ora dal titolare).
 - **Nessuna lettura card su iPhone**: Web NFC esiste solo in Chrome per Android; su iPhone l'app funziona
   con la sola ricerca.
 

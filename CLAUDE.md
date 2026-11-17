@@ -31,7 +31,8 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
   sul proprio telefono. Su iPhone l'app funziona, ma solo con la ricerca (niente lettura card).
 - **Tablet della cassa** (BESTTAB A20, 10,1″, 1280×800 punti in orizzontale, senza NFC): fase successiva,
   **solo se si compra un lettore NFC USB**.
-- Flusso a senso unico: il cliente consegna la card all'operatore e **non vede nulla**, nemmeno il saldo.
+- Flusso a senso unico alla cassa: il cliente consegna la card all'operatore e lì non vede nulla. Il proprio
+  **saldo** lo vede da solo avvicinando la card al suo telefono (pagina pubblica dal link sulla card).
 - L'app **non contatta i clienti**: niente messaggi, offerte o campagne. Il telefono del cliente è facoltativo.
 - Clienti nell'ordine delle centinaia; più operatori in contemporanea su un archivio condiviso online.
 - Obiettivo di usabilità: **dalla card alla conferma della spesa in meno di 10 secondi**.
@@ -40,7 +41,8 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
 - **App**: PWA in Chrome per Android. Lettura card con **Web NFC** (solo Chrome Android, solo HTTPS).
 - **Backend**: **Supabase** (Postgres, Auth, Row Level Security), piano gratuito.
 - **Hosting frontend**: statico con HTTPS (Vercel o Netlify, da scegliere).
-- **Card**: adesivi NTAG215, **solo lettura** dell'uid, mai scritte. Uid salvato in un solo formato:
+- **Card**: adesivi NTAG215. La cassa legge solo l'uid; alla consegna l'app scrive sulla card **solo un link ai
+  punti** con un token segreto e casuale (mai l'uid), senza bloccarla in sola lettura. Uid salvato in un solo formato:
   esadecimale maiuscolo senza separatori (Web NFC dà `04:a1:b2:…`; i lettori USB spesso decimale e a
   volte byte invertiti → normalizzare sempre).
 - **Lettore USB (tablet)**: emulazione tastiera; l'app ascolta i tasti in rapida sequenza chiusi da Invio,
