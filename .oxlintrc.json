@@ -17,20 +17,47 @@
     "typescript/await-thenable": "error",
     "typescript/consistent-type-imports": "error",
     "eqeqeq": "error",
-    "no-console": ["warn", { "allow": ["error"] }]
+    "no-console": [
+      "warn",
+      {
+        "allow": ["error"]
+      }
+    ]
   },
   "overrides": [
     {
       "files": ["vite.config.ts", "*.config.ts"],
-      "rules": { "import/no-default-export": "off" }
+      "rules": {
+        "import/no-default-export": "off"
+      }
     },
     {
       "files": ["scripts/**"],
-      "rules": { "no-console": "off" }
+      "rules": {
+        "no-console": "off"
+      }
     },
     {
       "files": ["src/test/setup.ts", "src/main.tsx"],
-      "rules": { "import/no-unassigned-import": "off" }
+      "rules": {
+        "import/no-unassigned-import": "off"
+      }
+    },
+    {
+      "files": ["src/features/**/*Page.tsx", "src/app/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/supabaseAuthService"],
+                "message": "Pages reach Supabase Auth only through useAuth() (SPEC-identity-password)."
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "ignorePatterns": ["dist", "coverage", "node_modules", ".claude"]
