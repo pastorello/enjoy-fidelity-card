@@ -8,9 +8,9 @@
 ## Cosa stiamo facendo
 
 Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano `platform`
-approvato; task 1-11 fatti (PR #2-#6 unite nei rami impilati, non in `main`: vedi RUNBOOK trappola 14);
-PR `release/platform` → `main` porta tutto. Poi Checkpoint C: account Supabase/hosting, anteprima,
-Lighthouse e prova su Android. Nessun codice applicativo ancora.
+approvato; task 1-11 fatti e in `main` (PR #7, 2026-11-17; rami vecchi eliminati). Manca il
+Checkpoint C: scelta dell'hosting, account Supabase, anteprima, Lighthouse e prova su Android. Poi la spec
+del modulo `identity`.
 
 ## Come verificarlo
 
@@ -19,14 +19,12 @@ Lighthouse e prova su Android. Nessun codice applicativo ancora.
 
 ## Prossimi passi
 
-1. ~~Approvazione di `SPEC-platform.md`~~ fatto. Logo e icona: PNG ufficiali nel design system
-   (`enjoy-lettering-negative.png` per la barra, `enjoy-badge-solo-negative.png` per l'icona), da usare
-   nei task 7-8. Ancora aperto: monitoraggio errori prima del lancio.
-2. `planning-and-task-breakdown` per `platform`, poi implementazione; poi spec dei moduli successivi
-   nell'ordine della mappa (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
-3. `/impeccable init` partendo dal design system "Enjoy Bar" prima del primo lavoro di UI.
-4. Setup progetto: Supabase (regione UE), Vercel, struttura app PWA; compilare i comandi in
-   `CLAUDE.md` e `brain/topics/operations/RUNBOOK.md`.
+1. **Checkpoint C di `platform`**: l'utente sceglie l'hosting (Vercel Pro o alternativa) e crea gli account
+   (`docs/setup-accounts.md`); `db push` su staging con verifica dell'event trigger; anteprima, Lighthouse
+   (PWA, Accessibilità ≥ 95, Best Practices ≥ 95) e installazione su Android.
+2. Spec del modulo `identity` (`SPEC-identity.md`), poi gli altri nell'ordine di `CAPABILITY-MAP.md`
+   (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
+3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
 
@@ -39,7 +37,7 @@ Lighthouse e prova su Android. Nessun codice applicativo ancora.
 
 ## Modifiche non pubblicate
 
-- Nessuna: tutto su GitHub. Da unire in `main`: PR `release/platform`.
+- Nessuna: tutto in `main`.
 
 ## Ultima sessione
 
