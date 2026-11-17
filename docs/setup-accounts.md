@@ -52,7 +52,10 @@ Le tabelle dell'app stanno nello schema `app`, protetto dalla RLS. In locale lo 
 nei progetti online va aggiunto a mano, in **entrambi** i progetti, dopo il primo `db push`:
 
 1. **Project Settings → Data API** (o **Integrations → Data API → Settings**, secondo la versione della dashboard).
-2. **Exposed schemas**: aggiungi `app` (lascia `public`) e salva.
+2. **Exposed schemas**: aggiungi `app` (lascia `public`) e salva. Il menu elenca `app` solo dopo che le
+   migrazioni sono state applicate al progetto (`npx supabase db push`, sezione 2): se non c'è, manca il push.
+3. Subito dopo il salvataggio, per qualche secondo l'API può rispondere con l'errore `PGRST002` mentre
+   ricarica lo schema: è normale, basta attendere e riprovare.
 
 Senza questo passo l'accesso fallisce anche con email e password giuste e la rete funzionante: l'app
 dice "Connessione assente: controlla la rete e riprova." perché non riesce a leggere il profilo.
@@ -136,6 +139,9 @@ email l'ora per i test).
 
 `<team>` è lo slug del team Vercel: si legge su vercel.com nell'indirizzo del team
 (`vercel.com/<team>`) o nell'URL di un'anteprima di una PR, che finisce con `-<team>.vercel.app`.
+Per questo progetto il team è `lucapastorello23-2780s-projects`: nello staging l'indirizzo delle anteprime da
+aggiungere è quindi
+`https://enjoy-fidelity-card-*-lucapastorello23-2780s-projects.vercel.app/imposta-password`.
 
 | Voce | Staging | Produzione |
 |---|---|---|
