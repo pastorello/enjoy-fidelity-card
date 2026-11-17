@@ -28,6 +28,10 @@ del modulo `identity`.
    migrazioni applicate allo staging). Specifiche di tutti i moduli in repo (`SPEC-*.md`, `docs/specs/`),
    approvate per delega con i default. Rami in catena, ognuno con PR verso `main` (unire in ordine):
    `feat/identity` → `feat/identity-password` → un ramo per modulo nell'ordine di `CAPABILITY-MAP.md`.
+   **`identity-password` completo** su `feat/identity-password` (2026-11-17): password dimenticata e cambio
+   password via email, controlli tutti verdi in locale (Mailpit incluso), PR verso `main` da unire dopo
+   #13. Resta la procedura remota del titolare (`docs/setup-accounts.md` §6). **Prossimo modulo:
+   `settings`** (`SPEC-settings.md`), su un ramo nuovo che parte da `feat/identity-password`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -46,7 +50,7 @@ del modulo `identity`.
 
 ## Modifiche non pubblicate
 
-- Nessuna: tutto in `main`.
+- Rami in catena non ancora in `main`: `feat/identity` (PR #13), `feat/identity-password`.
 
 ## Ultima sessione
 

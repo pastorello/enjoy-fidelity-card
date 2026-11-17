@@ -158,7 +158,7 @@ mai `supabase config push`; la sezione V1 "reimpostare una password" rimanda al 
 brain/topics/operations/RUNBOOK.md, brain/MAP.md · **Dimensione:** S
 
 ## Checkpoint C
-- [ ] Criteri di successo 1-7 e 9 di SPEC-identity-password verificati; criterio 8: procedura pronta
+- [x] Criteri di successo 1-7 e 9 di SPEC-identity-password verificati; criterio 8: procedura pronta
       (esecuzione remota a carico dell'orchestratore, fuori da questo piano)
 - [ ] CI verde sulla PR (base `main`)
 - [ ] PR pronta per `code-review-and-quality`
