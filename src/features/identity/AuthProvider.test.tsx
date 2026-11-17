@@ -295,6 +295,20 @@ describe('AuthProvider', () => {
       expect(state()).toHaveTextContent('in:Marco Prova');
     });
 
+    it('still counts same-password as saved when another failure came after the lost save', async () => {
+      const fake = createFakeAuthService({
+        recoveryUser: linkUser,
+        updatePasswordResults: ['network', 'unknown', 'same-password'],
+      });
+      const auth = renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('out:-'));
+      expect(await complete(auth)).toBe('save-network');
+      expect(await complete(auth)).toBe('save-unknown');
+      expect(await complete(auth)).toBe('ok');
+      expect(fake.service.verifyRecovery).toHaveBeenCalledOnce();
+      expect(state()).toHaveTextContent('in:Marco Prova');
+    });
+
     it('verifies a different link again', async () => {
       const fake = createFakeAuthService({ updatePasswordResults: ['network', 'ok'] });
       const auth = renderWith(fake);

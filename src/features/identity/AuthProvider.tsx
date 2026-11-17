@@ -61,7 +61,8 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   const verifying = useRef(false);
   // The link whose session is active but whose password is not saved yet.
   const verifiedToken = useRef<string | null>(null);
-  // The last save failed offline: it may have reached the server anyway.
+  // A save for the verified link failed offline: it may have reached the server anyway. Kept
+  // until the save succeeds, the recovery is abandoned or another link is verified.
   const saveMayHaveLanded = useRef(false);
 
   const endSession = useCallback(async () => {
@@ -221,8 +222,10 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       // After a lost answer, 'same-password' means the first request did save this password.
       const landed = saved === 'ok' || (saved === 'same-password' && saveMayHaveLanded.current);
       if (!landed) {
-        saveMayHaveLanded.current = saved === 'network';
-        if (saved === 'network') return 'save-network';
+        if (saved === 'network') {
+          saveMayHaveLanded.current = true;
+          return 'save-network';
+        }
         if (saved === 'unknown') return 'save-unknown';
         return saved;
       }
