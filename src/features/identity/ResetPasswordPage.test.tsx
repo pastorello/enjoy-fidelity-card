@@ -106,6 +106,13 @@ describe('reset password page', () => {
       expect(fake.service.updatePassword).not.toHaveBeenCalled();
     });
 
+    it('accepts exactly 8 characters', async () => {
+      const { fake, router } = renderApp(LINK);
+      await fill('12345678');
+      await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+      expect(fake.service.updatePassword).toHaveBeenCalledExactlyOnceWith('12345678');
+    });
+
     it('accepts exactly 72 bytes', async () => {
       const { fake } = renderApp(LINK);
       await fill('è'.repeat(36));
@@ -233,6 +240,18 @@ describe('reset password page', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Salva e accedi' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(fake.service.verifyRecovery).toHaveBeenCalledTimes(2);
+  });
+
+  it('after a lost verification, shows the expired-link view if the first one had landed', async () => {
+    const fake = createFakeAuthService({ verifyResults: ['network', 'invalid-link'] });
+    const { router } = renderApp(LINK, fake);
+    await fill('nuova-password');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Connessione assente: riprova.');
+    await userEvent.click(screen.getByRole('button', { name: 'Salva e accedi' }));
+    expect(await screen.findByRole('heading', { level: 1, name: INVALID })).toBeInTheDocument();
+    expect(fake.service.verifyRecovery).toHaveBeenCalledTimes(2);
+    expect(fake.service.updatePassword).not.toHaveBeenCalled();
+    await expectInvalidLinkView(router);
   });
 
   it('sends an account without profile to the sign-in page as "not enabled"', async () => {
