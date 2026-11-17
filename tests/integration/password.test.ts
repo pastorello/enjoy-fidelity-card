@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { isAuthApiError } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { linkHref, waitForMessageTo } from '../../e2e/mailpit';
 import { localSupabase, memoryClient } from './localSupabase';
@@ -76,5 +77,84 @@ describe('password recovery email (local stack + Mailpit)', () => {
     const reused = await again.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash });
     expect(reused.error).not.toBeNull();
     expect(reused.data.session).toBeNull();
+  });
+});
+
+describe('saving a recovered password (local stack)', () => {
+  /** Another throwaway user, so this block never waits on the email rate limit of the first. */
+  const otherEmail = `recupero-${randomUUID()}@example.com`;
+  const oldPassword = randomPassword(16);
+  let otherId: string | undefined;
+
+  beforeAll(async () => {
+    const { data, error } = await admin.auth.admin.createUser({
+      email: otherEmail,
+      password: oldPassword,
+      email_confirm: true,
+    });
+    if (error) throw error;
+    otherId = data.user.id;
+  });
+
+  afterAll(async () => {
+    if (otherId) await admin.auth.admin.deleteUser(otherId).catch(() => undefined);
+  });
+
+  it('answers same_password to a repeated save and signs the other devices out', async () => {
+    // Device B: signed in with the old password before the recovery.
+    const deviceB = memoryClient(local.url, local.publishableKey);
+    const signedIn = await deviceB.auth.signInWithPassword({
+      email: otherEmail,
+      password: oldPassword,
+    });
+    expect(signedIn.error).toBeNull();
+
+    // The emailed link carries this hashed token (sent without email, as Mailpit is tested above).
+    const link = await admin.auth.admin.generateLink({ type: 'recovery', email: otherEmail });
+    expect(link.error).toBeNull();
+    const tokenHash = link.data.properties?.hashed_token ?? '';
+
+    // Device A: the recovery page, as AuthProvider drives it.
+    const deviceA = memoryClient(local.url, local.publishableKey);
+    const verified = await deviceA.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash });
+    expect(verified.error).toBeNull();
+
+    const newPassword = randomPassword(12);
+    const saved = await deviceA.auth.updateUser({ password: newPassword });
+    expect(saved.error).toBeNull();
+
+    // A retry after a lost answer sends the same password again: the idempotent case. This is
+    // the very error supabaseAuthService.test.ts maps to 'same-password' (AuthProvider then
+    // counts it as saved); the mapper lives next to the browser client, so it is not imported.
+    const repeated = await deviceA.auth.updateUser({ password: newPassword });
+    expect(isAuthApiError(repeated.error)).toBe(true);
+    expect(repeated.error?.status).toBe(422);
+    expect(repeated.error?.code).toBe('same_password');
+
+    // GoTrue already drops the other sessions when the password changes; the app's own
+    // signOut({ scope: 'others' }) must also work in a recovery session. Device C signs in
+    // after the save, so only that call can sign it out.
+    const deviceC = memoryClient(local.url, local.publishableKey);
+    const signedInC = await deviceC.auth.signInWithPassword({
+      email: otherEmail,
+      password: newPassword,
+    });
+    expect(signedInC.error).toBeNull();
+
+    const others = await deviceA.auth.signOut({ scope: 'others' });
+    expect(others.error).toBeNull();
+
+    // B (old password) and C have their refresh tokens revoked; A keeps its session.
+    const refreshedB = await deviceB.auth.refreshSession();
+    expect(refreshedB.error).not.toBeNull();
+    expect(refreshedB.data.session).toBeNull();
+    const refreshedC = await deviceC.auth.refreshSession();
+    expect(refreshedC.error).not.toBeNull();
+    expect(refreshedC.data.session).toBeNull();
+    const refreshedA = await deviceA.auth.refreshSession();
+    expect(refreshedA.error).toBeNull();
+    const userA = await deviceA.auth.getUser();
+    expect(userA.error).toBeNull();
+    expect(userA.data.user?.email).toBe(otherEmail);
   });
 });
