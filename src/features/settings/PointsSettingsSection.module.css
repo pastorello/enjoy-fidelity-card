@@ -1,0 +1,33 @@
+/* Sections and the final note sit 24 px apart, as in the wireframe (the shell already adds 16 px). */
+.section,
+.note {
+  margin-top: var(--space-2);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+.ratio {
+  margin: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+}
+
+.hint,
+.note {
+  margin-bottom: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+.hint {
+  margin-top: 0;
+}
