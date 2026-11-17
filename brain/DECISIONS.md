@@ -10,6 +10,19 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-18 — Enjoy Display nel repo pubblico
+
+- **Decisione**: Enjoy Display, il font del bar arrivato con il design system "Enjoy Bar", si usa nell'app per
+  titoli, etichette, pulsanti e cifre, ed è incluso nel repo pubblico (`public/fonts/EnjoyDisplay-Regular.woff2`)
+  come gli altri font, servito dall'app stessa.
+- **Perché**: permesso esplicito del titolare ("mettilo pure nel repo pubblico"); il font non ha la licenza
+  SIL Open Font License di Texturina e Stint Ultra Condensed, quindi serviva il suo consenso.
+- **Alternative scartate (Rejected alternatives)**:
+  - Tenere il file fuori dal repo e caricarlo al deploy: più passaggi, senza bisogno dopo il permesso.
+  - Continuare con il solo Texturina per i titoli: il design system ora assegna titoli e cifre a Enjoy Display.
+- **Ambito**: `public/fonts/`, `src/styles/fonts.css`, token tipografici (`design/tokens.json`).
+- **Contesto**: aggiornamento del design system "Enjoy Bar" del 2026-11-18.
+
 ### 2026-11-17 — Il cliente vede il proprio saldo con la card; sulla card si scrive solo un link
 
 - **Decisione**: il cliente vede il proprio saldo punti avvicinando la Enjoy Card al suo telefono (Android o

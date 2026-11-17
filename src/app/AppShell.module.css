@@ -69,8 +69,10 @@
   height: 36px;
   border: 2px solid currentColor;
   border-radius: var(--radius-full);
+  font-family: var(--type-label-family);
   font-size: var(--type-label-size);
   font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-letter-spacing);
 }
 
 .main {

@@ -42,6 +42,54 @@ describe('buildTokensCss', () => {
     expect(css).toContain('--type-body-family: var(--font-brand);');
   });
 
+  it('routes titles, labels and figures to the Enjoy Display family', () => {
+    expect(css).toContain('--font-display: "Enjoy Display", "Texturina", Georgia, serif;');
+    for (const style of [
+      'figure',
+      'screen-title',
+      'section-title',
+      'display',
+      'headline',
+      'title',
+      'spaced-caps',
+      'caption',
+      'label',
+      'label-lg',
+    ]) {
+      expect(css).toContain(`--type-${style}-family: var(--font-display);`);
+    }
+    expect(css).toContain('--type-section-title-letter-spacing: 0.02em;');
+    expect(css).toContain('--type-title-letter-spacing: 0.02em;');
+  });
+
+  it('lets a style override its group family', () => {
+    const custom = minimal({
+      type: {
+        fonts: [],
+        families: { brand: 'Serif', display: 'Display' },
+        groups: [
+          {
+            name: 'Text',
+            family: 'brand',
+            styles: [
+              { name: 'body', fontSize: '16px', lineHeight: 1.5, fontWeight: 400 },
+              {
+                name: 'label',
+                family: 'display',
+                fontSize: '16px',
+                lineHeight: 1.2,
+                fontWeight: 600,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const out = buildTokensCss(custom);
+    expect(out).toContain('--type-body-family: var(--font-brand);');
+    expect(out).toContain('--type-label-family: var(--font-display);');
+  });
+
   it('emits spacing, radius, size and breakpoint scales', () => {
     expect(css).toContain('--space-3: 16px;');
     expect(css).toContain('--radius-none: 0px;');

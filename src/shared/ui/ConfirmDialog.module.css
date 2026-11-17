@@ -31,6 +31,7 @@
   font-size: var(--type-section-title-size);
   line-height: var(--type-section-title-line-height);
   font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
 }
 
 .description {

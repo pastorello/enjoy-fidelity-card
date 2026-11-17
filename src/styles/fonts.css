@@ -1,5 +1,16 @@
-/* Self-hosted fonts (SIL Open Font License, see public/fonts/*-OFL.txt).
-   No requests to Google Fonts: privacy and an installed app. */
+/* Self-hosted fonts. No requests to Google Fonts: privacy and an installed app.
+   - Enjoy Display: the bar's own font (titles, labels, figures), from the "Enjoy Bar"
+     design system. Not OFL: committed to this public repo with the owner's explicit
+     permission (brain/DECISIONS.md, 2026-11-18). One weight, uppercase glyphs only.
+   - Texturina, Stint Ultra Condensed: SIL Open Font License, see public/fonts/*-OFL.txt. */
+
+@font-face {
+  font-family: 'Enjoy Display';
+  src: url('/fonts/EnjoyDisplay-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
 
 @font-face {
   font-family: 'Texturina';
