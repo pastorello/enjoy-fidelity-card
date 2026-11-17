@@ -19,3 +19,4 @@ coverage/
 
 # Impeccable: platform engine binary is downloaded on demand by the launcher
 .claude/skills/impeccable/scripts/bin/
+.impeccable/hook.cache.json
