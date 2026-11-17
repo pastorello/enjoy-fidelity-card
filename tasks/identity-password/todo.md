@@ -160,5 +160,5 @@ brain/topics/operations/RUNBOOK.md, brain/MAP.md · **Dimensione:** S
 ## Checkpoint C
 - [x] Criteri di successo 1-7 e 9 di SPEC-identity-password verificati; criterio 8: procedura pronta
       (esecuzione remota a carico dell'orchestratore, fuori da questo piano)
-- [ ] CI verde sulla PR (base `main`)
-- [ ] PR pronta per `code-review-and-quality`
+- [x] CI verde sulla PR (base `main`, #14)
+- [x] PR pronta per `code-review-and-quality`
