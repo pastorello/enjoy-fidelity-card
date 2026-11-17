@@ -48,7 +48,8 @@ test('settings show the account and "Esci" ends the session', async ({ page }) =
     .getByRole('link', { name: `Account e impostazioni: ${seedAccounts.admin.name}` })
     .click();
   await expect(page).toHaveURL('/impostazioni');
-  const account = page.getByRole('region', { name: 'Account' });
+  // Exact: the ACCOUNT section ("Cambia password") is a second region with the same word.
+  const account = page.getByRole('region', { name: 'Account', exact: true });
   await expect(account).toContainText(seedAccounts.admin.name);
   await expect(account).toContainText('Amministratore');
 
@@ -67,14 +68,29 @@ test('touch targets of the settings page are at least 48 px', async ({ page }) =
   await signIn(page);
   await page.goto('/impostazioni');
   const boxes = await Promise.all(
-    [page.getByRole('link', { name: 'Indietro' }), page.getByRole('button', { name: 'Esci' })].map(
-      (target) => target.boundingBox(),
-    ),
+    [
+      page.getByRole('link', { name: 'Indietro' }),
+      page.getByRole('button', { name: 'Esci' }),
+      page.getByRole('link', { name: /Cambia password/ }),
+    ].map((target) => target.boundingBox()),
   );
   for (const box of boxes) {
     expect(box?.height).toBeGreaterThanOrEqual(48);
     expect(box?.width).toBeGreaterThanOrEqual(48);
   }
+});
+
+test('"Password dimenticata?" on the sign-in page is a 48 px target to the recovery page', async ({
+  page,
+}) => {
+  await page.goto('/accedi');
+  const link = page.getByRole('link', { name: 'Password dimenticata?' });
+  const box = await link.boundingBox();
+  expect(box?.height).toBeGreaterThanOrEqual(48);
+  expect(box?.width).toBeGreaterThanOrEqual(48);
+  await link.click();
+  await expect(page).toHaveURL('/password-dimenticata');
+  await expect(page.getByRole('heading', { level: 1, name: 'Password dimenticata' })).toBeVisible();
 });
 
 test('touch targets of the forgot-password page are at least 48 px', async ({ page }) => {

@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button } from '../../shared/ui/Button';
+import { ListRow } from '../../shared/ui/ListRow';
 import { useAuth, useCurrentOperator } from './AuthProvider';
 import { roleLabel } from './types';
 import styles from './SettingsPage.module.css';
 
 /**
- * Wireframes "Impostazioni" and "Impostazioni operatore". V1 has only the account box; the
- * settings, rewards and export modules add their sections here.
+ * Wireframes "Impostazioni" and "Impostazioni operatore". Section order is fixed in
+ * docs/specs/cross-review.md: account box · PUNTI (settings) · ACCOUNT · GESTIONE (rewards) ·
+ * LETTORE CARD (tablet-kiosk) · ESPORTA DATI (export) · final note (settings).
  */
 export function SettingsPage() {
   const operator = useCurrentOperator();
@@ -35,6 +37,19 @@ export function SettingsPage() {
         <Button variant="secondary" busy={busy} onClick={() => void handleSignOut()}>
           Esci
         </Button>
+      </section>
+      <section aria-labelledby="settings-account" className={styles.section}>
+        <h2 id="settings-account" className={styles.sectionTitle}>
+          ACCOUNT
+        </h2>
+        <ul className={styles.list}>
+          {/* The email is read from the session by the next page, never passed in the URL. */}
+          <ListRow
+            to="/password-dimenticata"
+            title="Cambia password"
+            subtitle="Ricevi un link via email"
+          />
+        </ul>
       </section>
     </AppShell>
   );

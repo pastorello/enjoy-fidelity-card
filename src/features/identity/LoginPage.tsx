@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Navigate, useLocation } from 'react-router';
+import { Link, Navigate, useLocation } from 'react-router';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { ScreenTitle } from '../../shared/ui/ScreenTitle';
@@ -126,6 +126,9 @@ export function LoginPage() {
           Accedi
         </Button>
       </form>
+      <Link to="/password-dimenticata" className={styles.forgot}>
+        Password dimenticata?
+      </Link>
       <p className={styles.note}>
         Gli account li crea un amministratore: se non riesci ad accedere, rivolgiti a chi gestisce
         l’app.

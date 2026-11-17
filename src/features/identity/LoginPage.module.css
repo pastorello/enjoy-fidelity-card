@@ -59,6 +59,16 @@
   margin-top: 2px;
 }
 
+.forgot {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: var(--touch-target);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  touch-action: manipulation;
+}
+
 .note {
   margin-top: var(--space-2);
   font-size: var(--type-body-sm-size);
