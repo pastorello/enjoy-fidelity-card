@@ -92,7 +92,8 @@ export function ResetPasswordPage() {
     return (
       <main className={styles.page}>
         <Brand />
-        <ScreenTitle>Il link è scaduto o è già stato usato.</ScreenTitle>
+        {/* Focus only when the view replaced the form after "Salva e accedi". */}
+        <ScreenTitle focusOnMount={invalidLink}>Il link è scaduto o è già stato usato.</ScreenTitle>
         <ButtonLink to="/password-dimenticata" block className={styles.submit}>
           Chiedi un nuovo link
         </ButtonLink>

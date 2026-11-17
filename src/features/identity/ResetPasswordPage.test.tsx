@@ -153,6 +153,10 @@ describe('reset password page', () => {
       const { router } = renderApp(LINK, fake);
       await fill('nuova-password');
       expect(fake.service.updatePassword).not.toHaveBeenCalled();
+      // The focused button is gone: the new heading takes focus so a screen reader reads it.
+      await waitFor(() =>
+        expect(screen.getByRole('heading', { level: 1, name: INVALID })).toHaveFocus(),
+      );
       await expectInvalidLinkView(router);
     });
   });
