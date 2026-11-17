@@ -10,6 +10,26 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-17 — Il cliente vede il proprio saldo con la card; sulla card si scrive solo un link
+
+- **Decisione**: il cliente vede il proprio saldo punti avvicinando la Enjoy Card al suo telefono (Android o
+  iPhone recente), senza app e senza accesso. Alla consegna l'app della cassa scrive sulla card, con Web NFC,
+  un solo record URL `https://<app>/s/<token>` con un token segreto casuale (mai l'uid), verificato
+  rileggendo la card; la pagina pubblica mostra solo i punti, senza nome, e un messaggio neutro per card
+  sostituite o link non validi. Le card non si bloccano in sola lettura. L'app continua a non contattare i
+  clienti. Nessun costo aggiuntivo. Il lavoro sta nei moduli `cards` e `card-input` (nessun modulo nuovo).
+- **Perché**: richiesta del titolare; costo nullo; il token casuale rende impossibile indovinare i link.
+- **Alternative scartate (Rejected alternatives)**:
+  - SMS o email con il saldo: l'app non contatta i clienti e avrebbero un costo.
+  - Link con l'uid della card: chiunque può leggere l'uid, i link sarebbero indovinabili.
+  - Card bloccate in sola lettura: irreversibile, esclusa per ora.
+  - Modulo separato `balance`: duplicava `cards` (`docs/specs/customer-balance.md`).
+- **Ambito**: `cards`, `card-input`, pagina pubblica `/s/:token`; sostituisce i non-obiettivi "nessuna
+  schermata per il cliente" e "non scriviamo le card" in `brain/PROJECT.md`.
+- **Contesto**: richiesta del titolare del 2026-11-17, confermata ("va bene, procedi così"). Da decidere
+  prima del lancio: il dominio scritto sulle card (default `enjoy-fidelity-card.vercel.app`). Wireframe
+  delle nuove schermate da aggiungere alla tela (l'utente li aggiorna con Claude Design).
+
 ### 2026-11-17 — Sviluppo autonomo di tutti i moduli, con i default delle specifiche
 
 - **Decisione**: l'utente ha chiesto di completare l'intera applicazione in autonomia e di essere chiamato

@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -51,5 +52,116 @@ describe('TextField', () => {
     const input = screen.getByRole('textbox', { name: 'Telefono' });
     expect(input).toHaveAttribute('type', 'tel');
     expect(input).toBeRequired();
+  });
+
+  it('forwards a ref to the input, so a form can focus the first invalid field', () => {
+    const ref = createRef<HTMLInputElement>();
+    render(<TextField ref={ref} label="Nome" value="" onChange={() => {}} />);
+    expect(ref.current).toBe(screen.getByRole('textbox', { name: 'Nome' }));
+  });
+
+  it('renders the stacked layout by default, without a suffix', () => {
+    const { container } = render(<TextField label="Nome" value="" onChange={() => {}} />);
+    expect(container.firstElementChild).not.toHaveAttribute('data-layout');
+    expect(screen.queryByText('€')).not.toBeInTheDocument();
+  });
+
+  describe('inline layout', () => {
+    it('keeps the label associated and shows the suffix', () => {
+      const { container } = render(
+        <TextField
+          label="1 punto ogni"
+          value="1,00"
+          onChange={() => {}}
+          layout="inline"
+          suffix="€"
+          inputMode="decimal"
+        />,
+      );
+      const input = screen.getByRole('textbox', { name: '1 punto ogni' });
+      expect(input).toHaveValue('1,00');
+      expect(input).toHaveAttribute('inputmode', 'decimal');
+      expect(screen.getByText('€')).toBeVisible();
+      expect(container.firstElementChild).toHaveAttribute('data-layout', 'inline');
+    });
+
+    it('keeps the suffix out of the accessible name', () => {
+      render(
+        <TextField
+          label="Chiedi conferma sopra"
+          value="150,00"
+          onChange={() => {}}
+          layout="inline"
+          suffix="€"
+        />,
+      );
+      expect(screen.getByRole('textbox', { name: 'Chiedi conferma sopra' })).toBeInTheDocument();
+    });
+
+    it('describes the input with its unit, so screen readers hear it', () => {
+      render(
+        <TextField
+          label="Chiedi conferma sopra"
+          value="150,00"
+          onChange={() => {}}
+          layout="inline"
+          suffix="€"
+        />,
+      );
+      expect(
+        screen.getByRole('textbox', { name: 'Chiedi conferma sopra' }),
+      ).toHaveAccessibleDescription('€');
+    });
+
+    it('describes a stacked input with its unit too', () => {
+      render(
+        <TextField label="Importo" value="" onChange={() => {}} suffix="€" hint="Facoltativo" />,
+      );
+      expect(screen.getByRole('textbox', { name: 'Importo' })).toHaveAccessibleDescription(
+        '€ Facoltativo',
+      );
+    });
+
+    it('links the unit and an error to the input and marks it invalid', () => {
+      render(
+        <TextField
+          label="1 punto ogni"
+          value="0"
+          onChange={() => {}}
+          layout="inline"
+          suffix="€"
+          error="Scrivi solo cifre e la virgola, per esempio 1,50."
+        />,
+      );
+      const input = screen.getByRole('textbox', { name: '1 punto ogni' });
+      expect(input).toHaveAttribute('aria-invalid', 'true');
+      expect(input).toHaveAccessibleDescription(
+        '€ Scrivi solo cifre e la virgola, per esempio 1,50.',
+      );
+    });
+
+    it('links a hint to the input', () => {
+      render(
+        <TextField
+          label="1 punto ogni"
+          value="1,00"
+          onChange={() => {}}
+          layout="inline"
+          hint="Facoltativo"
+        />,
+      );
+      const input = screen.getByRole('textbox', { name: '1 punto ogni' });
+      expect(input).not.toHaveAttribute('aria-invalid');
+      expect(input).toHaveAccessibleDescription('Facoltativo');
+    });
+
+    it('reports typed text', async () => {
+      const onChange = vi.fn<(value: string) => void>();
+      render(
+        <TextField label="1 punto ogni" value="" onChange={onChange} layout="inline" suffix="€" />,
+      );
+      await userEvent.type(screen.getByRole('textbox'), '2');
+      expect(onChange).toHaveBeenCalledWith('2');
+    });
   });
 });

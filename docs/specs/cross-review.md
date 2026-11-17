@@ -173,3 +173,12 @@ avanti con quello.
       - se manda tutti i 7 byte;
       - la densità reale dello schermo del BESTTAB A20.
     - *Default:* formato `hex`, modificabile da Impostazioni → LETTORE CARD; layout a 1280×800 punti.
+
+## 4. Aggiornamento del 2026-11-17: saldo visibile al cliente
+
+Decisione del titolare (vedi `brain/DECISIONS.md`): il cliente vede il proprio saldo dal link scritto sulla
+card. Il lavoro è in `SPEC-cards.md` (scrittura del link, pagina pubblica `/s/:token`, nuova schermata di
+proprietà di `cards`) e `SPEC-card-input.md` (scrittura con Web NFC). Dettagli e controlli di sicurezza:
+`docs/specs/customer-balance.md`. Domande aggiunte per il titolare (default adottati): dominio scritto sulle
+card (`enjoy-fidelity-card.vercel.app`), card non bloccate (accettato), riga dell'informativa privacy per il
+consulente, testi della pagina pubblica da allineare ai wireframe che il titolare aggiunge alla tela.

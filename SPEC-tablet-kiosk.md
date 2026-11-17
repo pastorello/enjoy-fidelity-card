@@ -104,7 +104,8 @@ chi è alla cassa. Le card si leggono con un lettore NFC USB in emulazione tasti
    sempre da `normalizeUid()`), senza modificarlo. In una sessione di dispositivo `CardReaderSession` si
    monta solo con un turno valido (sotto la guardia del cassiere, non su `/cassa`). Lettura dalla home =
    come sul telefono (card nota → Registra spesa, sconosciuta → Nuovo cliente con card); in Nuovo cliente
-   e Associa card la card letta si associa. Le schermate usano `CardReadPanel mode="usb"` con i testi dei
+   e Associa card la card letta si associa; il lettore USB non può scrivere, quindi il link ai punti resta
+   "non scritto" e si scrive poi da un telefono Android (`SPEC-cards.md`, decisione 2026-11-17). Le schermate usano `CardReadPanel mode="usb"` con i testi dei
    wireframe ("Passa la card sul lettore" / "L'app riceve il codice dal lettore da sola, senza bisogno di
    toccare un campo. Una card nuova apre la registrazione del cliente."; Associa card "Passa la card nuova
    sul lettore"; Nuovo cliente, pannello `aria-label="Card"` "Card (facoltativa)" / "Passa una card nuova

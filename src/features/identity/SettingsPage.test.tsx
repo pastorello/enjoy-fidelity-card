@@ -28,7 +28,7 @@ describe('settings page', () => {
   it.each([
     ['administrators', 'admin'],
     ['operators', 'operator'],
-  ] as const)('offers "Cambia password" to %s, right after the account box', async (_, role) => {
+  ] as const)('offers "Cambia password" to %s', async (_, role) => {
     const { router } = renderApp(
       '/impostazioni',
       signedInFake({ operator: { id: 'op-2', name: 'Marco Prova', role } }),
@@ -39,12 +39,41 @@ describe('settings page', () => {
     expect(row).toHaveTextContent('Ricevi un link via email');
     // The email never travels in the navigation: the destination is the bare path.
     expect(row).toHaveAttribute('href', '/password-dimenticata');
-    const account = screen.getByRole('region', { name: 'Account' });
-    expect(account.nextElementSibling).toBe(section);
     await userEvent.click(row);
     expect(router.state.location.pathname).toBe('/password-dimenticata');
     expect(router.state.location.search).toBe('');
     expect(router.state.location.state).toBeNull();
+  });
+
+  it('keeps the single section order of cross-review.md §1 for operators', async () => {
+    renderApp(
+      '/impostazioni',
+      signedInFake({ operator: { id: 'op-2', name: 'Marco Prova', role: 'operator' } }),
+    );
+    const account = await screen.findByRole('region', { name: 'Account' });
+    const points = screen.getByRole('region', { name: 'PUNTI' });
+    const accountSection = screen.getByRole('region', { name: 'ACCOUNT' });
+    const note = screen.getByText(/li gestiscono gli amministratori\.$/);
+    // account box · PUNTI (settings) · ACCOUNT (identity-password) · final note (settings)
+    expect(Array.from(screen.getByRole('main').children)).toEqual([
+      account,
+      points,
+      accountSection,
+      note,
+    ]);
+  });
+
+  it('keeps the single section order of cross-review.md §1 for administrators', async () => {
+    renderApp('/impostazioni', signedInFake());
+    const account = await screen.findByRole('region', { name: 'Account' });
+    const points = screen.getByRole('region', { name: 'PUNTI E CONTROLLI' });
+    const accountSection = screen.getByRole('region', { name: 'ACCOUNT' });
+    // account box · PUNTI E CONTROLLI (settings) · ACCOUNT (identity-password); no final note
+    expect(Array.from(screen.getByRole('main').children)).toEqual([
+      account,
+      points,
+      accountSection,
+    ]);
   });
 
   it('"Esci" ends the session and opens the sign-in page', async () => {

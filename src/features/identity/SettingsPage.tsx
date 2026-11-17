@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button } from '../../shared/ui/Button';
 import { ListRow } from '../../shared/ui/ListRow';
+import { OperatorFinalNote, PointsSettingsSection } from '../settings/PointsSettingsSection';
 import { useAuth, useCurrentOperator } from './AuthProvider';
 import { roleLabel } from './types';
 import styles from './SettingsPage.module.css';
@@ -38,6 +39,7 @@ export function SettingsPage() {
           Esci
         </Button>
       </section>
+      <PointsSettingsSection />
       <section aria-labelledby="settings-account" className={styles.section}>
         <h2 id="settings-account" className={styles.sectionTitle}>
           ACCOUNT
@@ -51,6 +53,7 @@ export function SettingsPage() {
           />
         </ul>
       </section>
+      <OperatorFinalNote />
     </AppShell>
   );
 }

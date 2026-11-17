@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createFakeAuthService, fakeOperator } from '../../test/fakeAuthService';
 import type { Operator } from './types';
-import { AuthProvider, useAuth } from './AuthProvider';
+import { AuthProvider, useAuth, useCurrentOperator } from './AuthProvider';
 
 function Probe() {
   const auth = useAuth();
@@ -14,6 +14,16 @@ function Probe() {
         ? `out:${auth.state.reason ?? '-'}`
         : auth.state.status;
   return <p data-testid="state">{text}</p>;
+}
+
+/** The role seen by screens behind <RequireAuth>, or '-' when nobody is signed in. */
+function RoleProbe() {
+  const { state } = useAuth();
+  return <p data-testid="role">{state.status === 'signed-in' ? <Role /> : '-'}</p>;
+}
+
+function Role() {
+  return <>{useCurrentOperator().role}</>;
 }
 
 function renderWith(fake: ReturnType<typeof createFakeAuthService>) {
@@ -28,6 +38,7 @@ function renderWith(fake: ReturnType<typeof createFakeAuthService>) {
   render(
     <AuthProvider service={fake.service}>
       <Probe />
+      <RoleProbe />
       <Capture />
     </AuthProvider>,
   );
@@ -38,6 +49,7 @@ function renderWith(fake: ReturnType<typeof createFakeAuthService>) {
 }
 
 const state = () => screen.getByTestId('state');
+const role = () => screen.getByTestId('role');
 
 async function complete(
   auth: () => ReturnType<typeof useAuth>,
@@ -49,6 +61,15 @@ async function complete(
     outcome = await auth().completeRecovery(tokenHash, password);
   });
   return outcome;
+}
+
+/** A promise the test settles by hand. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
 }
 
 function setVisibility(value: DocumentVisibilityState) {
@@ -473,6 +494,19 @@ describe('AuthProvider', () => {
       expect(fake.service.signOut).not.toHaveBeenCalled();
     });
 
+    it('updates a changed role', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      renderWith(fake);
+      await waitFor(() => expect(role()).toHaveTextContent('admin'));
+      fake.setProfile({ ...fakeOperator, role: 'operator' });
+      act(() => {
+        fireEvent.focus(window);
+      });
+      await waitFor(() => expect(role()).toHaveTextContent('operator'));
+      expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
+      expect(fake.service.signOut).not.toHaveBeenCalled();
+    });
+
     it('stays signed in when the check fails offline', async () => {
       const fake = createFakeAuthService({ userId: 'user-1' });
       renderWith(fake);
@@ -508,6 +542,71 @@ describe('AuthProvider', () => {
       unmount();
       fireEvent.focus(window);
       expect(fake.service.loadOperator).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('reportNotEnabled', () => {
+    const asOperator: Operator = { ...fakeOperator, role: 'operator' };
+
+    it('ends the session as not enabled when the profile is gone', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      const auth = renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('in:'));
+      fake.removeProfile();
+      await act(() => auth().reportNotEnabled());
+      expect(state()).toHaveTextContent('out:not-enabled');
+      expect(fake.service.signOut).toHaveBeenCalledOnce();
+    });
+
+    it('updates the role when the profile is still there', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      const auth = renderWith(fake);
+      await waitFor(() => expect(role()).toHaveTextContent('admin'));
+      fake.setProfile(asOperator);
+      await act(() => auth().reportNotEnabled());
+      expect(role()).toHaveTextContent('operator');
+      expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
+      expect(fake.service.loadOperator).toHaveBeenLastCalledWith('user-1');
+      expect(fake.service.signOut).not.toHaveBeenCalled();
+    });
+
+    it('keeps the session and the role when the check fails offline', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      const auth = renderWith(fake);
+      await waitFor(() => expect(role()).toHaveTextContent('admin'));
+      fake.setProfile(asOperator);
+      fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+      await act(() => auth().reportNotEnabled());
+      expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
+      expect(role()).toHaveTextContent('admin');
+      expect(fake.service.signOut).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when signed out', async () => {
+      const fake = createFakeAuthService();
+      const auth = renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('out:-'));
+      await act(() => auth().reportNotEnabled());
+      expect(fake.service.loadOperator).not.toHaveBeenCalled();
+      expect(state()).toHaveTextContent('out:-');
+    });
+
+    it('checks again even while a foreground check is running, and keeps the newer answer', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      const auth = renderWith(fake);
+      await waitFor(() => expect(role()).toHaveTextContent('admin'));
+      // The foreground check reads the profile before the role changes and answers late.
+      const stale = deferred<Operator | null>();
+      fake.service.loadOperator.mockReturnValueOnce(stale.promise);
+      act(() => {
+        fireEvent.focus(window);
+      });
+      fake.setProfile(asOperator);
+      await act(() => auth().reportNotEnabled());
+      expect(fake.service.loadOperator).toHaveBeenCalledTimes(3);
+      expect(role()).toHaveTextContent('operator');
+      await act(async () => stale.resolve(fakeOperator));
+      expect(role()).toHaveTextContent('operator');
     });
   });
 });

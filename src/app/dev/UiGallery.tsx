@@ -15,6 +15,8 @@ export function UiGallery() {
   const [search, setSearch] = useState('Rossi');
   const [name, setName] = useState('Maria Rossi');
   const [phone, setPhone] = useState('');
+  const [ratio, setRatio] = useState('1,00');
+  const [threshold, setThreshold] = useState('15o');
   const [dialogOpen, setDialogOpen] = useState(false);
 
   return (
@@ -48,6 +50,23 @@ export function UiGallery() {
           value={phone}
           onChange={setPhone}
           hint="Facoltativo"
+        />
+        <TextField
+          label="1 punto ogni"
+          layout="inline"
+          suffix="€"
+          inputMode="decimal"
+          value={ratio}
+          onChange={setRatio}
+        />
+        <TextField
+          label="Chiedi conferma sopra"
+          layout="inline"
+          suffix="€"
+          inputMode="decimal"
+          value={threshold}
+          onChange={setThreshold}
+          error="Scrivi solo cifre e la virgola, per esempio 1,50."
         />
       </section>
 

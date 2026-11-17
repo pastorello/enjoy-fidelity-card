@@ -4,6 +4,8 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 4173;
 // Same origin as LOCAL_SUPABASE_URL in vite.config.ts (allowed by the preview CSP).
 const LOCAL_SUPABASE_URL = 'http://localhost:54321';
+/** Specs that change global state (the settings row): kept out of the parallel `phone` project. */
+const SHARED_STATE_SPECS = /settings\.spec\.ts$/;
 
 /**
  * E2E always runs against the local Supabase stack, never against the staging project that `.env`
@@ -39,6 +41,15 @@ export default defineConfig({
       name: 'phone',
       // Main target: Android phone, 390×844 (CLAUDE.md).
       use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
+      testIgnore: SHARED_STATE_SPECS,
+    },
+    {
+      // Specs that change the one shared configuration row: they run after every `phone` test,
+      // serially, and put the initial values back (SPEC-settings, Testing Strategy).
+      name: 'phone-settings',
+      use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
+      testMatch: SHARED_STATE_SPECS,
+      dependencies: ['phone'],
     },
   ],
   webServer: {

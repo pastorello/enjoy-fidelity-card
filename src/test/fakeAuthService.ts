@@ -38,7 +38,8 @@ function sequence<T>(results: readonly T[], fallback: T): () => T {
 /**
  * In-memory AuthService for component tests. `endSession()` simulates an expired session,
  * `switchUser()` another tab or a link saving a different user's session, `removeProfile()`
- * an administrator removing the account while the app is open. Every method is a `vi.fn`, so
+ * an administrator removing the account while the app is open, `setProfile()` an administrator
+ * changing it (such as the role). Every method is a `vi.fn`, so
  * tests count calls (double taps, retries without a second verification) with `toHaveBeenCalledTimes`.
  */
 export function createFakeAuthService({
@@ -116,6 +117,9 @@ export function createFakeAuthService({
     },
     removeProfile() {
       profile = null;
+    },
+    setProfile(nextOperator: Operator | null) {
+      profile = nextOperator;
     },
   };
 }

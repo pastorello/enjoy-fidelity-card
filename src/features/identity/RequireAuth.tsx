@@ -1,12 +1,16 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { StatusView } from '../../shared/ui/StatusView';
+import { SettingsProvider } from '../settings/SettingsProvider';
 import { useAuth } from './AuthProvider';
 import styles from './RequireAuth.module.css';
 
 /** Location state of /accedi: the page to go back to after signing in. */
 export type SignInLocationState = { from?: string };
 
-/** Layout route: its pages need a signed-in operator, otherwise /accedi. */
+/**
+ * Layout route: its pages need a signed-in operator, otherwise /accedi. It also mounts
+ * <SettingsProvider>, so the configuration loads once per session and never without an operator.
+ */
 export function RequireAuth() {
   const { state, retry } = useAuth();
   const location = useLocation();
@@ -34,5 +38,10 @@ export function RequireAuth() {
     const from = `${location.pathname}${location.search}`;
     return <Navigate to="/accedi" replace state={{ from } satisfies SignInLocationState} />;
   }
-  return <Outlet />;
+  // Keyed by operator: another user signing in on this device loads the configuration again.
+  return (
+    <SettingsProvider key={state.operator.id}>
+      <Outlet />
+    </SettingsProvider>
+  );
 }
