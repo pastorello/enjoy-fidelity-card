@@ -8,8 +8,8 @@
 ## Cosa stiamo facendo
 
 Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano `platform`
-approvato; task 1-3 in PR #3, task 4 in PR #4; task 5-7 (componenti, AppShell) fatti sul branch
-`feat/platform-ui-components`. Checkpoint B: l'utente guarda le schermate (`/dev/ui`), poi task 8-11. Nessun codice applicativo ancora.
+approvato; task 1-3 PR #3, 4 PR #4, 5-7 PR #5, 8-11 PR #6 (CI verde). Manca il Checkpoint C: account
+Supabase/Vercel dell'utente, anteprima, Lighthouse e prova su Android. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 
@@ -33,7 +33,8 @@ approvato; task 1-3 in PR #3, task 4 in PR #4; task 5-7 (componenti, AppShell) f
   lancio, non lo sviluppo).
 - **Lettore NFC USB**: da scegliere e acquistare (blocca la fase tablet); verificare il formato dell'uid.
 - **Amministratori iniziali** (nomi/email): servono al primo deploy.
-- **Account Supabase (prod + staging, UE) e Vercel**: li crea l'utente; servono prima del deploy, non per lo sviluppo locale.
+- **Account Supabase (prod + staging, UE) e Vercel**: li crea l'utente seguendo `docs/setup-accounts.md`.
+- **Vercel Hobby vieta l'uso commerciale**: decidere tra Vercel Pro o un altro hosting prima del deploy.
 
 ## Modifiche non pubblicate
 

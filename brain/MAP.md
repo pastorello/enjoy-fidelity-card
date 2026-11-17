@@ -7,15 +7,15 @@
 
 ## 1. Avvio rapido
 
-Nessun codice applicativo ancora: niente da avviare. I comandi arriveranno con il setup dell'app
-(vedi `STATUS.md` → Prossimi passi) e andranno qui e in `topics/operations/RUNBOOK.md`.
+`npm install`, `npm run db:start`, `npm run dev`. Comandi completi in `CLAUDE.md` e
+`topics/operations/RUNBOOK.md`.
 
 ## 2. Moduli
 
 | Modulo | Responsabilità | Stato | Posizione |
 |---|---|---|---|
-| App PWA | Interfaccia per telefono (390×844) e tablet (1280×800); lettura card via Web NFC e lettore USB | pianificato | — |
-| Backend Supabase | Postgres, Auth, RLS; transazioni di spesa/riscatto con controllo saldo e idempotenza | pianificato | — |
+| App PWA | Interfaccia per telefono (390×844) e tablet (1280×800); lettura card via Web NFC e lettore USB | base pronta (`platform`) | `src/` |
+| Backend Supabase | Postgres, Auth, RLS; transazioni di spesa/riscatto con controllo saldo e idempotenza | base pronta (schema `app`, RLS automatica) | `supabase/` |
 | Tooling agenti | Skill, subagent e hook di progetto | stabile | `.claude/` |
 | Memoria di progetto | Stato, decisioni, passaggi tra sessioni | stabile | `brain/` |
 
@@ -59,6 +59,7 @@ La lettura card ha un unico punto d'ingresso nell'app: telefono e lettore USB so
 | `PRODUCT.md` | Contesto di prodotto per Impeccable (utenti, ambiente, tono "tu", vincoli di marchio) | Prima di ogni lavoro di UI |
 | `design/tokens.json` | Copia dei token del design system "Enjoy Bar" (fonte di `src/styles/tokens.css`) | Quando cambiano colori, testo o misure |
 | `tasks/plan.md`, `tasks/todo.md` | Piano e task del modulo in corso | Prima di implementare |
+| `docs/setup-accounts.md` | Guida per creare Supabase (prod + staging) e Vercel, e applicare le migrazioni | Prima del primo deploy |
 | `docs/adr/` | (da creare) decisioni architetturali dettagliate | Quando una decisione richiede più di una voce in DECISIONS |
 
 ### operations/
