@@ -56,13 +56,13 @@ righe; mai anonimizzati); `app.get_customer(p_customer_id)` (anche anonimizzati,
 `app.customers_served_today()` vuota con la firma definitiva. Tutte con `not_operator`. Seed con 5 clienti
 finti (telefoni `+39333000000x`).
 **Accettazione:**
-- [ ] pgTAP: "rossi mari" trova "Maria Rossi"; "nicolo" trova "Nicolò"; "4521" e "333 123" trovano il
+- [x] pgTAP: "rossi mari" trova "Maria Rossi"; "nicolo" trova "Nicolò"; "4521" e "333 123" trovano il
       telefono; "50%" e "a_b" cercati alla lettera; ordine alfabetico; 25 clienti → 21 righe; anonimizzati
       esclusi; testo corto → nessuna riga
-- [ ] pgTAP: `get_customer` restituisce anche un anonimizzato; `customers_served_today()` vuota; utente
+- [x] pgTAP: `get_customer` restituisce anche un anonimizzato; `customers_served_today()` vuota; utente
       senza profilo → `not_operator` da tutte e tre; `performs_within` media < 50 ms su 10 esecuzioni con
       1 000 clienti generati nel test
-- [ ] `npm run db:reset` carica il seed senza errori; nessun dato reale
+- [x] `npm run db:reset` carica il seed senza errori; nessun dato reale
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 2 · **File:** supabase/migrations/*_customers.sql, supabase/tests/customers.test.sql,
 supabase/seed.sql · **Dimensione:** M

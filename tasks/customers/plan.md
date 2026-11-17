@@ -64,7 +64,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 1: Database (rischio più alto)
 - [x] Task 1: Tabella `customers`, chiave del nome, RLS e `create_customer` idempotente; pgTAP
 - [x] Task 2: `update_customer` e `anonymize_customer`; pgTAP
-- [ ] Task 3: Letture `search_customers`, `get_customer`, `customers_served_today`; prestazioni; seed
+- [x] Task 3: Letture `search_customers`, `get_customer`, `customers_served_today`; prestazioni; seed
 
 ### Checkpoint A: db:test verde; revisione di sicurezza su RLS, privilegi e RPC
 
