@@ -52,7 +52,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 4: Pagina `/password-dimenticata` (conferma neutra, rete, doppio tocco, precompilazione)
 - [x] Task 5: Pagina `/imposta-password` (validazioni, link non valido, errori, reinvio, avviso collegato)
 - [x] Task 6: Inoltro di riserva `/?token_hash=…&type=recovery` → `/imposta-password` in `RootLayout`
-- [ ] Task 7: Ingressi: link "Password dimenticata?" su Accesso e sezione ACCOUNT nelle Impostazioni
+- [x] Task 7: Ingressi: link "Password dimenticata?" su Accesso e sezione ACCOUNT nelle Impostazioni
 
 ### Checkpoint B: componenti verdi; schermate conformi ai wireframe; detector Impeccable pulito; revisione di sicurezza
 

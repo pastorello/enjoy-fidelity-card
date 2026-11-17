@@ -115,9 +115,9 @@ src/app/routes.tsx · **Dimensione:** M
 "Cambia password" / "Ricevi un link via email" → `/password-dimenticata`, subito dopo il riquadro account
 (ordine di `docs/specs/cross-review.md`), per amministratori e operatori.
 **Accettazione:**
-- [ ] Componente: link su Accesso con la destinazione giusta; sezione ACCOUNT visibile ad admin e operatore,
+- [x] Componente: link su Accesso con la destinazione giusta; sezione ACCOUNT visibile ad admin e operatore,
       dopo il riquadro account, senza email nella destinazione
-- [ ] Detector Impeccable pulito; target ≥ 48 px; screenshot 390×844 vs wireframe "Accesso" e
+- [x] Detector Impeccable pulito; target ≥ 48 px; screenshot 390×844 vs wireframe "Accesso" e
       "Impostazioni (operatore)"
 **Verifica:** `npm test -- LoginPage SettingsPage && npm run e2e`
 **Dipendenze:** 4 · **File:** src/features/identity/LoginPage.tsx, LoginPage.test.tsx, SettingsPage.tsx,
