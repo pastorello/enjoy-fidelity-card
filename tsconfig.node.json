@@ -19,6 +19,7 @@
     "playwright.config.ts",
     "scripts",
     "e2e",
-    "tests"
+    "tests",
+    "src/vite-env.d.ts"
   ]
 }
