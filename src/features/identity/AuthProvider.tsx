@@ -25,6 +25,8 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   const [state, setState] = useState<AuthState>({ status: 'loading' });
   // Supabase reports every sign-out, ours included: only the others mean "expired".
   const signingOut = useRef(false);
+  // The user whose profile was checked for the signed-in state; null when not signed in.
+  const checkedUser = useRef<string | null>(null);
 
   const endSession = useCallback(async () => {
     signingOut.current = true;
@@ -36,10 +38,14 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   }, [service]);
 
   const restore = useCallback(async (): Promise<AuthState> => {
+    checkedUser.current = null;
     const userId = await service.currentUserId();
     if (!userId) return { status: 'signed-out' };
     const operator = await service.loadOperator(userId);
-    if (operator) return { status: 'signed-in', operator };
+    if (operator) {
+      checkedUser.current = userId;
+      return { status: 'signed-in', operator };
+    }
     await endSession();
     return { status: 'signed-out', reason: 'not-enabled' };
   }, [service, endSession]);
@@ -59,25 +65,32 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       (next) => active && setState(next),
       () => active && setState({ status: 'error' }),
     );
-    const unsubscribe = service.onSignedOut(() => {
-      if (signingOut.current) return;
-      setState((current) =>
-        current.status === 'signed-in' ? { status: 'signed-out', reason: 'expired' } : current,
-      );
+    const unsubscribe = service.onAuthChange((userId) => {
+      // Only a signed-in state can go stale; restore and signIn check their own session.
+      if (signingOut.current || checkedUser.current === null) return;
+      if (userId === checkedUser.current) return;
+      checkedUser.current = null;
+      if (userId === null) {
+        setState({ status: 'signed-out', reason: 'expired' });
+      } else {
+        // Another user's session was saved (other tab, link): check its profile again.
+        void retry();
+      }
     });
     return () => {
       active = false;
       unsubscribe();
     };
-  }, [service, restore]);
+  }, [service, restore, retry]);
 
   const signIn = useCallback(
     async (email: string, password: string): Promise<SignInOutcome> => {
       const result = await service.signIn(email, password);
       if (result !== 'ok') return result;
+      let userId: string | null;
       let operator: Operator | null;
       try {
-        const userId = await service.currentUserId();
+        userId = await service.currentUserId();
         operator = userId ? await service.loadOperator(userId) : null;
       } catch {
         // The session is saved but its profile was never checked: do not keep it.
@@ -85,11 +98,12 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
         setState({ status: 'signed-out' });
         return 'network';
       }
-      if (!operator) {
+      if (!userId || !operator) {
         await endSession();
         setState({ status: 'signed-out' });
         return 'not-enabled';
       }
+      checkedUser.current = userId;
       setState({ status: 'signed-in', operator });
       return 'ok';
     },
@@ -97,6 +111,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   );
 
   const signOut = useCallback(async () => {
+    checkedUser.current = null;
     await endSession();
     setState({ status: 'signed-out' });
   }, [endSession]);

@@ -28,6 +28,9 @@ export type AuthService = {
   signOut(): Promise<void>;
   /** The profile linked to this user, or null when there is none (removed or never linked). */
   loadOperator(userId: string): Promise<Operator | null>;
-  /** Called when the session ends without the user asking (expired, revoked, other tab). */
-  onSignedOut(listener: () => void): () => void;
+  /**
+   * Called when the saved session changes outside the app's own calls: with its user id
+   * (signed in or refreshed, here or in another tab) or null (expired, revoked, other tab).
+   */
+  onAuthChange(listener: (userId: string | null) => void): () => void;
 };

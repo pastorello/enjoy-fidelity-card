@@ -59,10 +59,12 @@ export const supabaseAuthService: AuthService = {
     return { id: row.id, name: row.name, role: row.role };
   },
 
-  onSignedOut(listener) {
-    const { data } = getSupabase().auth.onAuthStateChange((event) => {
+  onAuthChange(listener) {
+    const { data } = getSupabase().auth.onAuthStateChange((event, session) => {
       // Never await Supabase calls inside this callback (it holds the auth lock).
-      if (event === 'SIGNED_OUT') setTimeout(listener, 0);
+      // Only SIGNED_OUT means "no session": other events without one say nothing new.
+      const userId = event === 'SIGNED_OUT' ? null : session?.user.id;
+      if (userId !== undefined) setTimeout(() => listener(userId), 0);
     });
     return () => data.subscription.unsubscribe();
   },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readSupabaseEnv } from './supabase';
+import { readSupabaseEnv, supabaseClientOptions } from './supabase';
 
 const LOCAL_URL = 'http://127.0.0.1:54321';
 const PUBLISHABLE = 'sb_publishable_test_key';
@@ -52,5 +52,15 @@ describe('readSupabaseEnv', () => {
         VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_secret_abc',
       }),
     ).toThrow(/secret/i);
+  });
+});
+
+describe('supabaseClientOptions', () => {
+  it('never takes a session from a link: no flow of the app signs in from the URL', () => {
+    expect(supabaseClientOptions.auth?.detectSessionInUrl).toBe(false);
+  });
+
+  it('uses PKCE, so a bare token link cannot set a session', () => {
+    expect(supabaseClientOptions.auth?.flowType).toBe('pkce');
   });
 });

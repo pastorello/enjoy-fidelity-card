@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { describe, expect, it } from 'vitest';
 import { createFakeAuthService, fakeOperator } from '../../test/fakeAuthService';
+import type { Operator } from './types';
 import { AuthProvider, useAuth } from './AuthProvider';
 
 function Probe() {
@@ -142,5 +143,33 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(state()).toHaveTextContent('in:'));
     act(() => fake.endSession());
     expect(state()).toHaveTextContent('out:expired');
+  });
+
+  it('checks the profile again when the saved session switches to another user', async () => {
+    const fake = createFakeAuthService({ userId: 'user-1' });
+    renderWith(fake);
+    await waitFor(() => expect(state()).toHaveTextContent(`in:${fakeOperator.name}`));
+    const other: Operator = { id: 'op-2', name: 'Marco Prova', role: 'operator' };
+    act(() => fake.switchUser('user-2', other));
+    await waitFor(() => expect(state()).toHaveTextContent('in:Marco Prova'));
+    expect(fake.service.loadOperator).toHaveBeenLastCalledWith('user-2');
+  });
+
+  it('ends a switched session whose user has no profile', async () => {
+    const fake = createFakeAuthService({ userId: 'user-1' });
+    renderWith(fake);
+    await waitFor(() => expect(state()).toHaveTextContent(`in:${fakeOperator.name}`));
+    act(() => fake.switchUser('user-2', null));
+    await waitFor(() => expect(state()).toHaveTextContent('out:not-enabled'));
+    expect(fake.service.signOut).toHaveBeenCalledOnce();
+  });
+
+  it('ignores session events for the same user, such as a token refresh', async () => {
+    const fake = createFakeAuthService({ userId: 'user-1' });
+    renderWith(fake);
+    await waitFor(() => expect(state()).toHaveTextContent(`in:${fakeOperator.name}`));
+    act(() => fake.switchUser('user-1', fakeOperator));
+    expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
+    expect(fake.service.loadOperator).toHaveBeenCalledOnce();
   });
 });

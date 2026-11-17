@@ -10,27 +10,37 @@ type FakeOptions = {
   signInResult?: SignInResult;
 };
 
-/** In-memory AuthService for component tests. `endSession()` simulates an expired session. */
+/**
+ * In-memory AuthService for component tests. `endSession()` simulates an expired session,
+ * `switchUser()` another tab or a link saving a different user's session.
+ */
 export function createFakeAuthService({
   userId = null,
   operator = fakeOperator,
   signInResult = 'ok',
 }: FakeOptions = {}) {
   let currentUser = userId;
-  const listeners = new Set<() => void>();
+  let profile = operator;
+  const listeners = new Set<(userId: string | null) => void>();
+  const notify = (id: string | null) => {
+    for (const listener of listeners) listener(id);
+  };
 
   const service = {
     currentUserId: vi.fn<AuthService['currentUserId']>(() => Promise.resolve(currentUser)),
     signIn: vi.fn<AuthService['signIn']>(() => {
-      if (signInResult === 'ok') currentUser = 'user-1';
+      if (signInResult === 'ok') {
+        currentUser = 'user-1';
+        notify(currentUser);
+      }
       return Promise.resolve(signInResult);
     }),
     signOut: vi.fn<AuthService['signOut']>(() => {
       currentUser = null;
       return Promise.resolve();
     }),
-    loadOperator: vi.fn<AuthService['loadOperator']>(() => Promise.resolve(operator)),
-    onSignedOut: vi.fn<AuthService['onSignedOut']>((listener) => {
+    loadOperator: vi.fn<AuthService['loadOperator']>(() => Promise.resolve(profile)),
+    onAuthChange: vi.fn<AuthService['onAuthChange']>((listener) => {
       listeners.add(listener);
       return () => {
         listeners.delete(listener);
@@ -42,7 +52,12 @@ export function createFakeAuthService({
     service,
     endSession() {
       currentUser = null;
-      for (const listener of listeners) listener();
+      notify(null);
+    },
+    switchUser(nextUserId: string, nextOperator: Operator | null) {
+      currentUser = nextUserId;
+      profile = nextOperator;
+      notify(nextUserId);
     },
   };
 }
