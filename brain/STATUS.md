@@ -8,8 +8,9 @@
 ## Cosa stiamo facendo
 
 Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano `platform`
-approvato; task 1-3 PR #3, 4 PR #4, 5-7 PR #5, 8-11 PR #6 (CI verde). Manca il Checkpoint C: account
-Supabase/Vercel dell'utente, anteprima, Lighthouse e prova su Android. Nessun codice applicativo ancora.
+approvato; task 1-11 fatti (PR #2-#6 unite nei rami impilati, non in `main`: vedi RUNBOOK trappola 14);
+PR `release/platform` → `main` porta tutto. Poi Checkpoint C: account Supabase/hosting, anteprima,
+Lighthouse e prova su Android. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 
@@ -38,8 +39,7 @@ Supabase/Vercel dell'utente, anteprima, Lighthouse e prova su Android. Nessun co
 
 ## Modifiche non pubblicate
 
-- Branch `docs/claude-md-from-spec` (CLAUDE.md + brain/) non ancora su GitHub.
-- 2 commit locali su `main` non pubblicati (skill webapp-testing, plugin project-brain).
+- Nessuna: tutto su GitHub. Da unire in `main`: PR `release/platform`.
 
 ## Ultima sessione
 

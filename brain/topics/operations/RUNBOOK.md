@@ -82,3 +82,7 @@ tutto verde = sano. In CI: i due job di `CI` verdi sulla PR (`gh pr checks <n>`)
     leggere l'indirizzo stampato in console.
 13. `glob` e `minimatch` sono forzati con `overrides` in `package.json` (vulnerabilità in workbox-build):
     toglierli quando workbox-build li aggiorna.
+14. PR impilate (ognuna con base sulla precedente): unendole, ciascuna finisce nel ramo sotto di lei e non
+    in `main` (2026-11-17: su `main` era arrivata solo la #1). Preferire PR con base `main`; se si impilano,
+    unire dal basso e cambiare la base della successiva in `main` prima di unirla (GitHub lo fa da solo
+    solo se il ramo unito viene eliminato).
