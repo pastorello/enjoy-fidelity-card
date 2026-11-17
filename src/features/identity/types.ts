@@ -13,6 +13,11 @@ export function roleLabel(role: Role): string {
 
 export type SignInResult = 'ok' | 'invalid' | 'network' | 'rate-limited' | 'unknown';
 
+/** Every HTTP answer is 'sent', so no answer reveals whether the account exists. */
+export type ResetRequestResult = 'sent' | 'network';
+export type VerifyRecoveryResult = 'ok' | 'invalid-link' | 'network' | 'unknown';
+export type UpdatePasswordResult = 'ok' | 'same-password' | 'weak' | 'network' | 'unknown';
+
 /** Why the app is signed out, shown on the sign-in page. */
 export type SignedOutReason = 'expired' | 'not-enabled';
 
@@ -33,4 +38,14 @@ export type AuthService = {
    * (signed in or refreshed, here or in another tab) or null (expired, revoked, other tab).
    */
   onAuthChange(listener: (userId: string | null) => void): () => void;
+  /** The email of the session saved on this device, or null. No network call while it is valid. */
+  currentEmail(): Promise<string | null>;
+  /** Asks for the recovery email; `redirectTo` is the app's own page, never user input. */
+  requestPasswordReset(email: string, redirectTo: string): Promise<ResetRequestResult>;
+  /** Consumes the link token and replaces this device's session with the link user's. */
+  verifyRecovery(tokenHash: string): Promise<VerifyRecoveryResult>;
+  /** Sets the password of the current session's user. */
+  updatePassword(password: string): Promise<UpdatePasswordResult>;
+  /** Revokes the sessions of the same user on other devices; never fails. */
+  signOutOtherDevices(): Promise<void>;
 };

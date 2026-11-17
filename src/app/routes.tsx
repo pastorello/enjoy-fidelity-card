@@ -1,6 +1,8 @@
 import type { RouteObject } from 'react-router';
+import { ForgotPasswordPage } from '../features/identity/ForgotPasswordPage';
 import { LoginPage } from '../features/identity/LoginPage';
 import { RequireAuth } from '../features/identity/RequireAuth';
+import { ResetPasswordPage } from '../features/identity/ResetPasswordPage';
 import { SettingsPage } from '../features/identity/SettingsPage';
 import { HomePage } from './HomePage';
 import { NotFoundPage } from './NotFoundPage';
@@ -19,6 +21,8 @@ export const routes: RouteObject[] = [
     ...rootRoute,
     children: [
       { path: 'accedi', Component: LoginPage },
+      { path: 'password-dimenticata', Component: ForgotPasswordPage },
+      { path: 'imposta-password', Component: ResetPasswordPage },
       // Every page below needs a signed-in operator.
       {
         Component: RequireAuth,

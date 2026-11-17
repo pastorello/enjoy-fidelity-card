@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -21,6 +21,57 @@ describe('routes', () => {
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Enjoy Card' }),
     ).toBeInTheDocument();
+  });
+
+  describe('fallback recovery link on site_url', () => {
+    it('forwards /?token_hash=…&type=recovery to /imposta-password keeping the query', async () => {
+      const { router } = renderApp('/?token_hash=abc&type=recovery');
+      await waitFor(() => expect(router.state.location.pathname).toBe('/imposta-password'));
+      expect(router.state.location.search).toBe('?token_hash=abc&type=recovery');
+      expect(router.state.historyAction).toBe('REPLACE');
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Scegli una nuova password' }),
+      ).toBeInTheDocument();
+    });
+
+    it('forwards before RequireAuth: never lands on /accedi without a session', async () => {
+      const { router } = renderApp('/?token_hash=abc&type=recovery');
+      await screen.findByRole('heading', { level: 1, name: 'Scegli una nuova password' });
+      expect(router.state.location.pathname).not.toBe('/accedi');
+    });
+
+    it('forwards also when signed in, without consuming the token', async () => {
+      const { router, fake } = renderApp('/?token_hash=abc&type=recovery', signedInFake());
+      await waitFor(() => expect(router.state.location.pathname).toBe('/imposta-password'));
+      expect(router.state.location.search).toBe('?token_hash=abc&type=recovery');
+      expect(fake.service.verifyRecovery).not.toHaveBeenCalled();
+    });
+
+    it('leaves / without a query unchanged (signed out → /accedi)', async () => {
+      const { router } = renderApp('/');
+      await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    });
+
+    it('leaves / without a query unchanged (signed in → home)', async () => {
+      const { router } = renderApp('/', signedInFake());
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Enjoy Card' }),
+      ).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe('/');
+    });
+
+    it.each([
+      ['another type', '/?token_hash=abc&type=signup'],
+      ['no token_hash', '/?type=recovery'],
+    ])('does not forward with %s', async (_label, path) => {
+      const { router } = renderApp(path);
+      await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    });
+
+    it('does not forward from other paths', async () => {
+      const { router } = renderApp('/impostazioni?token_hash=abc&type=recovery');
+      await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    });
   });
 
   it('shows the not-found page on an unknown path', () => {

@@ -25,6 +25,28 @@ describe('settings page', () => {
     expect(within(account).getByText('Amministratore')).toBeInTheDocument();
   });
 
+  it.each([
+    ['administrators', 'admin'],
+    ['operators', 'operator'],
+  ] as const)('offers "Cambia password" to %s, right after the account box', async (_, role) => {
+    const { router } = renderApp(
+      '/impostazioni',
+      signedInFake({ operator: { id: 'op-2', name: 'Marco Prova', role } }),
+    );
+    const section = await screen.findByRole('region', { name: 'ACCOUNT' });
+    expect(within(section).getByRole('heading', { level: 2, name: 'ACCOUNT' })).toBeInTheDocument();
+    const row = within(section).getByRole('link', { name: /Cambia password/ });
+    expect(row).toHaveTextContent('Ricevi un link via email');
+    // The email never travels in the navigation: the destination is the bare path.
+    expect(row).toHaveAttribute('href', '/password-dimenticata');
+    const account = screen.getByRole('region', { name: 'Account' });
+    expect(account.nextElementSibling).toBe(section);
+    await userEvent.click(row);
+    expect(router.state.location.pathname).toBe('/password-dimenticata');
+    expect(router.state.location.search).toBe('');
+    expect(router.state.location.state).toBeNull();
+  });
+
   it('"Esci" ends the session and opens the sign-in page', async () => {
     const { router, fake } = renderApp('/impostazioni', signedInFake());
     await userEvent.click(await screen.findByRole('button', { name: 'Esci' }));

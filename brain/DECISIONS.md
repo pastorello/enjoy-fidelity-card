@@ -10,6 +10,19 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-17 — Sviluppo autonomo di tutti i moduli, con i default delle specifiche
+
+- **Decisione**: l'utente ha chiesto di completare l'intera applicazione in autonomia e di essere chiamato
+  solo per informazioni o decisioni indispensabili. Le specifiche di tutti i moduli rimanenti
+  (`SPEC-identity-password`, `settings`, `customers`, `rewards`, `card-input`, `cards`, `ledger`, `export`,
+  `tablet-kiosk`) sono considerate approvate per delega; le loro Open Questions adottano i default proposti,
+  raccolti in `docs/specs/cross-review.md` §3 da rivedere con il titolare prima del lancio.
+- **Perché**: nessuna di quelle domande blocca lo sviluppo; ogni default è conservativo e reversibile.
+- **Alternative scartate (Rejected alternatives)**:
+  - Fermarsi a ogni specifica per l'approvazione: contrario alla richiesta esplicita dell'utente.
+- **Ambito**: tutti i moduli dopo `identity`.
+- **Contesto**: messaggio dell'utente del 2026-11-17 ("chiudi tutta l'applicazione").
+
 ### 2026-11-17 — Email di Auth attive; "Password dimenticata" subito dopo la V1
 
 - **Decisione**: il bar ha il dominio `enjoygaeta.it`; le email di Supabase Auth partono da

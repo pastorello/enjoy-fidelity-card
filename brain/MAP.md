@@ -17,6 +17,7 @@
 | App PWA | Interfaccia per telefono (390×844) e tablet (1280×800); lettura card via Web NFC e lettore USB | base pronta (`platform`) | `src/` |
 | Backend Supabase | Postgres, Auth, RLS; transazioni di spesa/riscatto con controllo saldo e idempotenza | base pronta (schema `app`, RLS automatica) | `supabase/` |
 | Identità (`identity`) | Accesso email/password, sessione, guardia delle rotte, Impostazioni con Esci; profili `app.operators`, ruoli, `private.add_operator` | in corso (PR #13, `feat/identity`) | `src/features/identity/`, `supabase/migrations/*_identity.sql`, `supabase/tests/identity.test.sql` |
+| Recupero password (`identity`, spec aggiuntiva) | "Password dimenticata?" su `/accedi`, `/password-dimenticata`, `/imposta-password` (link `token_hash` + `verifyOtp`), "Cambia password" nelle Impostazioni; email di Auth (Mailpit in locale) | completo (`feat/identity-password`, PR verso `main` dopo #13); procedura remota da eseguire (`docs/setup-accounts.md` §6) | `src/features/identity/` (ForgotPasswordPage, ResetPasswordPage), `supabase/templates/recovery.html`, `e2e/password.spec.ts`, `e2e/mailpit.ts`, `tests/integration/password.test.ts`, `scripts/reload-auth-templates.sh` (riavvio di Auth dopo `supabase start`, RUNBOOK trappola 28) |
 | Tooling agenti | Skill, subagent e hook di progetto | stabile | `.claude/` |
 | Memoria di progetto | Stato, decisioni, passaggi tra sessioni | stabile | `brain/` |
 
@@ -58,14 +59,18 @@ La lettura card ha un unico punto d'ingresso nell'app: telefono e lettore USB so
 | `CAPABILITY-MAP.md` | Moduli, dipendenze, ordine di costruzione, indice delle spec | Prima di scegliere su cosa lavorare |
 | `SPEC-platform.md` | Spec del modulo `platform` (approvata) | Prima di lavorare su scheletro, CI, deploy, UI base |
 | `SPEC-identity.md` | Spec del modulo `identity` (approvata) | Prima di lavorare su accesso, ruoli, operatori |
+| `SPEC-identity-password.md` | Spec aggiuntiva di `identity`: password dimenticata e cambio password via email (approvata) | Prima di toccare recupero password, email di Auth, URL di ritorno |
+| `SPEC-<id>.md`, `docs/specs/` | Spec degli altri moduli; contratto comune (`contract.md`) e revisione incrociata (`cross-review.md`, ordine delle sezioni di `/impostazioni`) | Prima di lavorare su un modulo |
 | `PRODUCT.md` | Contesto di prodotto per Impeccable (utenti, ambiente, tono "tu", vincoli di marchio) | Prima di ogni lavoro di UI |
 | `design/tokens.json` | Copia dei token del design system "Enjoy Bar" (fonte di `src/styles/tokens.css`) | Quando cambiano colori, testo o misure |
 | `tasks/plan.md`, `tasks/todo.md` | Piano e task del modulo `platform` | Storico |
 | `tasks/identity/` | Piano e task del modulo `identity` | Prima di lavorare su `identity` |
+| `tasks/identity-password/` | Piano e task del recupero password | Prima di lavorare sul recupero password |
 | `tests/integration/` | Test Vitest contro lo stack Supabase locale (`npm run test:integration`, config `vitest.integration.config.ts`) | Quando si tocca Auth, RLS o il seed |
-| `e2e/` | Test Playwright; `fixtures.ts` (console pulita, niente Supabase online), `auth.ts` (accesso con gli account del seed) | Prima di scrivere un test E2E |
-| `supabase/seed.sql` | Account finti per sviluppo e test (mai dati reali) | Quando servono utenti di prova |
-| `docs/setup-accounts.md` | Guida per creare Supabase (prod + staging) e Vercel, applicare le migrazioni, esporre lo schema `app`, gestire operatori e password | Prima del primo deploy; quando si aggiunge o toglie un operatore |
+| `e2e/` | Test Playwright; `fixtures.ts` (console pulita, niente Supabase online), `auth.ts` (accesso con gli account del seed), `mailpit.ts` (lettura delle email locali) | Prima di scrivere un test E2E |
+| `supabase/seed.sql` | Account finti per sviluppo e test (mai dati reali); `recupero@example.com` riservato a `e2e/password.spec.ts` | Quando servono utenti di prova |
+| `supabase/templates/recovery.html` | Email "Reset password" (locale da `config.toml`; nei progetti online si incolla a mano) | Quando cambia il testo dell'email di recupero |
+| `docs/setup-accounts.md` | Guida per creare Supabase (prod + staging) e Vercel, applicare le migrazioni, esporre lo schema `app`, gestire operatori; §6 email di Auth (URL di ritorno, template, minimo 8 caratteri) | Prima del primo deploy; quando si aggiunge o toglie un operatore; prima di attivare il recupero password online |
 | `docs/adr/` | (da creare) decisioni architetturali dettagliate | Quando una decisione richiede più di una voce in DECISIONS |
 
 ### operations/

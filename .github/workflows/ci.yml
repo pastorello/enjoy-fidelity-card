@@ -31,14 +31,22 @@ jobs:
       - name: Check generated design tokens are up to date
         run: npm run tokens && git diff --exit-code src/styles/tokens.css
       - run: npx playwright install --with-deps chromium
-      - name: Start local Supabase (database, Auth, REST only)
+      - name: Start local Supabase (database, Auth, REST, Mailpit)
         run: >-
           npx supabase start
-          -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
+          -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta
+      - name: Reload Auth email templates (Auth can start before the gateway serves them)
+        run: ./scripts/reload-auth-templates.sh
       - name: Integration (Vitest against the local stack)
         run: npm run test:integration
       - name: E2E (builds the app and serves it with production headers)
         run: npm run e2e
+      - name: Show Auth and gateway logs
+        if: failure()
+        run: |
+          docker logs supabase_auth_enjoy-card-app 2>&1 | tail -n 200
+          docker logs supabase_kong_enjoy-card-app 2>&1 | tail -n 100
+          docker inspect supabase_auth_enjoy-card-app --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'MAILER_(SUBJECTS|TEMPLATES)'
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v7

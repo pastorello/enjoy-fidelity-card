@@ -20,7 +20,19 @@ describe('sign-in page', () => {
     expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'email');
     expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password');
     expect(screen.getByText(/Gli account li crea un amministratore/)).toBeInTheDocument();
-    expect(screen.queryByText(/Password dimenticata/)).not.toBeInTheDocument();
+  });
+
+  it('links "Password dimenticata?" below the button to the recovery page', async () => {
+    const { router } = renderApp('/accedi');
+    const link = await screen.findByRole('link', { name: 'Password dimenticata?' });
+    expect(link).toHaveAttribute('href', '/password-dimenticata');
+    // Below "Accedi", above the V1 note.
+    const button = screen.getByRole('button', { name: 'Accedi' });
+    const note = screen.getByText(/Gli account li crea un amministratore/);
+    expect(button.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(link.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await userEvent.click(link);
+    expect(router.state.location.pathname).toBe('/password-dimenticata');
   });
 
   it('asks for the missing fields without calling the server', async () => {

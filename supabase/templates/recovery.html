@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- Colors from design/tokens.json: paper, black ink, Enjoy green (email clients ignore CSS variables). -->
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Enjoy Card: scegli una nuova password</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 24px 16px;
+      background: #faf5f1;
+      color: #000000;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 16px;
+      line-height: 1.5;
+    "
+  >
+    <p style="margin: 0 0 16px">
+      Hai chiesto di scegliere una nuova password per l’Enjoy Card. Tocca il pulsante: il link vale
+      un’ora e si usa una volta sola.
+    </p>
+    <p style="margin: 0 0 24px">
+      <a
+        href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery"
+        style="
+          display: inline-block;
+          min-height: 48px;
+          padding: 14px 24px;
+          border-radius: 8px;
+          background: #00603a;
+          color: #ffffff;
+          font-weight: bold;
+          text-decoration: none;
+          box-sizing: border-box;
+        "
+        >Scegli la password</a
+      >
+    </p>
+    <p style="margin: 0">
+      Se non l’hai chiesto tu, ignora questa email: la password resta quella di prima.
+    </p>
+  </body>
+</html>
