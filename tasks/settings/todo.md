@@ -160,11 +160,11 @@ src/test/fakeSettingsService.ts · **Dimensione:** M
 `dependencies: ['phone']` e `testMatch` su `settings.spec.ts`, escluso dal progetto `phone`;
 `e2e/settings.spec.ts` in modalità seriale, ripristino 100 / 15000 in `afterAll` tramite l'admin del seed.
 **Accettazione:**
-- [ ] Admin: ordine delle sezioni e valori iniziali come nel wireframe; "2,00" e "200,00", Salva,
+- [x] Admin: ordine delle sezioni e valori iniziali come nel wireframe; "2,00" e "200,00", Salva,
       "Impostazioni salvate.", ricarica della pagina → stessi valori; "1,555" → "Usa al massimo due decimali"
-- [ ] Operatore: "1 punto ogni 2,00 € di spesa" (spazi normalizzati), "Il rapporto lo decide un
+- [x] Operatore: "1 punto ogni 2,00 € di spesa" (spazi normalizzati), "Il rapporto lo decide un
       amministratore.", nessun campo modificabile, nota finale ultima
-- [ ] Target di tocco ≥ 48 px; nessun errore in console; nessuna chiamata a `*.supabase.co`
+- [x] Target di tocco ≥ 48 px; nessun errore in console; nessuna chiamata a `*.supabase.co`
 **Verifica:** `npm run db:reset && npm run e2e` (due volte di fila: il ripristino lascia lo stato iniziale)
 **Dipendenze:** 9 · **File:** playwright.config.ts, e2e/settings.spec.ts · **Dimensione:** S
 

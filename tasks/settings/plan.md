@@ -75,7 +75,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint C: flusso admin/operatore verde nei test di componente; detector Impeccable pulito; confronto con i wireframe
 
 ### Fase 4: E2E e chiusura
-- [ ] Task 10: Progetto Playwright `phone-settings` ed `e2e/settings.spec.ts`
+- [x] Task 10: Progetto Playwright `phone-settings` ed `e2e/settings.spec.ts`
 - [ ] Task 11: Documentazione e memoria di progetto; verifica finale dei criteri di successo
 
 ### Checkpoint D: gli 8 criteri di successo verificati; quality bar completa verde; PR pronta per `code-review-and-quality`
