@@ -8,3 +8,6 @@ brain
 .impeccable
 src/styles/tokens.css
 design/tokens.json
+playwright-report
+test-results
+dev-dist

@@ -81,15 +81,15 @@ l'AppShell.
 **Descrizione:** `vite-plugin-pwa` con il manifest della spec, icone provvisorie 192/512/maskable, service
 worker con cache solo per l'app shell e `NetworkOnly` per `*.supabase.co`; Playwright 390×844 sulla build.
 **Accettazione:**
-- [ ] E2E: `/` carica, header e titolo visibili, console senza errori
-- [ ] E2E: dopo una richiesta a Supabase (simulata), Cache Storage non contiene URL `supabase.co`
+- [x] E2E: `/` carica, header e titolo visibili, console senza errori
+- [x] E2E: dopo una richiesta a Supabase (simulata), Cache Storage non contiene URL `supabase.co`
 **Verifica:** `npm run build && npm run e2e`
 **Dipendenze:** 7 · **File:** vite.config.ts, public/icons/*, playwright.config.ts, e2e/smoke.spec.ts, e2e/sw-cache.spec.ts · **Dimensione:** M
 
 ## Task 9: HTTPS in sviluppo
 **Descrizione:** `npm run dev:https` con certificato di sviluppo, accessibile dalla rete locale.
 **Accettazione:**
-- [ ] Il telefono apre l'app in HTTPS dall'IP del computer (prova manuale dell'utente)
+- [x] Il telefono apre l'app in HTTPS dall'IP del computer (prova manuale dell'utente)
 **Verifica:** `npm run dev:https` → URL in HTTPS stampato in console
 **Dipendenze:** 1 · **File:** vite.config.ts, package.json · **Dimensione:** XS
 
