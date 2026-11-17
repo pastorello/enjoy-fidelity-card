@@ -34,8 +34,9 @@ entra nell'app dal telefono con email e password. Basta anche un solo utente.
    - persistente sul telefono (resta aperta finché non si esce);
    - tutte le pagine tranne `/accedi` richiedono un utente collegato e **registrato come operatore**;
      senza sessione si va su `/accedi`;
-   - sessione scaduta o account tolto: si torna su `/accedi` con il messaggio "La sessione è scaduta:
-     accedi di nuovo";
+   - sessione scaduta: si torna su `/accedi` con il messaggio "La sessione è scaduta: accedi di nuovo";
+   - utente senza profilo collegato (account tolto o non ancora registrato con `private.add_operator`): si
+     torna su `/accedi` con "Account non abilitato: chiedi a un amministratore." (deciso il 2026-11-17);
    - **Esci** chiude la sessione su questo telefono.
 3. **Impostazioni** (`/impostazioni`, wireframe "Impostazioni" e "Impostazioni operatore"): riquadro account
    (iniziale, nome, ruolo, "Esci"). Il pulsante account dell'`AppShell` (iniziale nel cerchio) porta qui.
