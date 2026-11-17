@@ -58,8 +58,8 @@ in woff2 (OFL) con `@font-face`; `base.css` con focus ring.
 **Descrizione:** `ListRow` (min 64 px, tocco su tutta la riga), `PointsBadge`, `ScreenTitle`, `StatusView`
 (caricamento, vuoto, errore con "Riprova").
 **Accettazione:**
-- [ ] `StatusView` errore chiama `onRetry`; caricamento annunciato con `role="status"`
-- [ ] `PointsBadge` usa `formatPoints`
+- [x] `StatusView` errore chiama `onRetry`; caricamento annunciato con `role="status"`
+- [x] `PointsBadge` usa `formatPoints`
 **Verifica:** `npm test -- shared/ui`
 **Dipendenze:** 4, 2 · **File:** src/shared/ui/{ListRow,PointsBadge,ScreenTitle,StatusView}.* · **Dimensione:** M
 

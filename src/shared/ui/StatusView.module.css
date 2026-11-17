@@ -1,0 +1,68 @@
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  text-align: center;
+  color: var(--color-ink);
+}
+
+.mutedIcon {
+  color: var(--color-ink-muted);
+}
+
+.title {
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+}
+
+.description {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+  max-width: 36ch;
+}
+
+.loading {
+  display: flex;
+  font-size: var(--type-body-lg-size);
+  color: var(--color-ink-muted);
+}
+
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Screen error: raised panel, title in danger-text, explanation in ink. */
+.error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+}
+
+.errorHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-danger-text);
+}
+
+.errorText {
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+.retry {
+  margin-top: var(--space-2);
+}
