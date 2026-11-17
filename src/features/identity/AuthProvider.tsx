@@ -1,6 +1,12 @@
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { AuthService, Operator, SignedOutReason, SignInResult } from './types';
+import type {
+  AuthService,
+  Operator,
+  ResetRequestResult,
+  SignedOutReason,
+  SignInResult,
+} from './types';
 
 export type AuthState =
   | { status: 'loading' }
@@ -34,6 +40,8 @@ type AuthContextValue = {
   retry: () => Promise<void>;
   /** The email of the saved session (prefills "Password dimenticata"), or null. */
   currentEmail: () => Promise<string | null>;
+  /** Asks for the recovery email; every server answer is 'sent', only no answer is 'network'. */
+  requestPasswordReset: (email: string, redirectTo: string) => Promise<ResetRequestResult>;
   /** Verifies the link (once per link), saves the password and signs in as the link's user. */
   completeRecovery: (tokenHash: string, password: string) => Promise<RecoveryOutcome>;
   /** Leaving the recovery page: a verified link whose password was not saved signs out. */
@@ -183,6 +191,10 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   }, [endSession]);
 
   const currentEmail = useCallback(() => service.currentEmail(), [service]);
+  const requestPasswordReset = useCallback(
+    (email: string, redirectTo: string) => service.requestPasswordReset(email, redirectTo),
+    [service],
+  );
 
   const completeRecovery = useCallback(
     async (tokenHash: string, password: string): Promise<RecoveryOutcome> => {
@@ -251,8 +263,26 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   }, [endSession]);
 
   const value = useMemo(
-    () => ({ state, signIn, signOut, retry, currentEmail, completeRecovery, abandonRecovery }),
-    [state, signIn, signOut, retry, currentEmail, completeRecovery, abandonRecovery],
+    () => ({
+      state,
+      signIn,
+      signOut,
+      retry,
+      currentEmail,
+      requestPasswordReset,
+      completeRecovery,
+      abandonRecovery,
+    }),
+    [
+      state,
+      signIn,
+      signOut,
+      retry,
+      currentEmail,
+      requestPasswordReset,
+      completeRecovery,
+      abandonRecovery,
+    ],
   );
   return <AuthContext value={value}>{children}</AuthContext>;
 }

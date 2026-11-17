@@ -76,3 +76,19 @@ test('touch targets of the settings page are at least 48 px', async ({ page }) =
     expect(box?.width).toBeGreaterThanOrEqual(48);
   }
 });
+
+test('touch targets of the forgot-password page are at least 48 px', async ({ page }) => {
+  await page.goto('/password-dimenticata');
+  await expect(page.getByRole('heading', { level: 1, name: 'Password dimenticata' })).toBeVisible();
+  const boxes = await Promise.all(
+    [
+      page.getByRole('link', { name: 'Indietro' }),
+      page.getByLabel('Email'),
+      page.getByRole('button', { name: 'Invia il link' }),
+    ].map((target) => target.boundingBox()),
+  );
+  for (const box of boxes) {
+    expect(box?.height).toBeGreaterThanOrEqual(48);
+    expect(box?.width).toBeGreaterThanOrEqual(48);
+  }
+});
