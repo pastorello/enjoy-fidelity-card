@@ -66,15 +66,15 @@ RequireAuth.tsx, src/app/routes.tsx, e2e/identity.spec.ts · **Dimensione:** M
 account (iniziale, nome, ruolo) ed "Esci". Il pulsante account dell'`AppShell` mostra l'iniziale
 dell'operatore e porta qui.
 **Accettazione:**
-- [ ] Test di componente: nome e ruolo in italiano ("Amministratore", "Operatore"), iniziale nel cerchio
-- [ ] E2E: home → pulsante account → Impostazioni → Esci → `/accedi`; tornare indietro non riapre i dati
-- [ ] Detector Impeccable pulito; target touch ≥ 48 px
+- [x] Test di componente: nome e ruolo in italiano ("Amministratore", "Operatore"), iniziale nel cerchio
+- [x] E2E: home → pulsante account → Impostazioni → Esci → `/accedi`; tornare indietro non riapre i dati
+- [x] Detector Impeccable pulito; target touch ≥ 48 px
 **Verifica:** `npm test && npm run e2e`
 **Dipendenze:** 4 · **File:** src/features/identity/SettingsPage.tsx (+ .module.css, .test.tsx),
 src/app/routes.tsx, src/app/HomePage.tsx, e2e/identity.spec.ts · **Dimensione:** M
 
 ## Checkpoint B
-- [ ] Flusso accesso → home → Impostazioni → Esci verde in E2E
+- [x] Flusso accesso → home → Impostazioni → Esci verde in E2E
 - [ ] Accessibilità Lighthouse ≥ 95 su `/accedi`
 - [ ] Revisione `security-and-hardening` su auth e RLS, problemi risolti
 - [ ] Revisione con l'utente

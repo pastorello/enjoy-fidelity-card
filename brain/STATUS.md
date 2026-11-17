@@ -24,9 +24,9 @@ del modulo `identity`.
    più avanti). Mancano: scelta del piano di hosting (Hobby vieta l'uso commerciale), account Supabase
    (`docs/setup-accounts.md`) con `db push` su staging e verifica dell'event trigger, installazione su
    Android.
-2. **Modulo `identity`** (piano in `tasks/identity/`, PR #13 bozza su `feat/identity`): task 1-2 fatti
-   (database con `operators`/`add_operator`/seed; E2E e CI contro Supabase locale). Checkpoint A raggiunto,
-   in attesa di revisione dell'utente; poi task 3-5 (sessione, `/accedi`, Impostazioni). Dopo `identity`,
+2. **Modulo `identity`** (piano in `tasks/identity/`, PR #13 bozza su `feat/identity`): task 1-5 fatti
+   (database, E2E/CI su Supabase locale, sessione, `/accedi`, Impostazioni con Esci). Prossimo:
+   Checkpoint B (Lighthouse su `/accedi`, revisione `security-and-hardening`), poi task 6-8. Dopo `identity`,
    gli altri moduli nell'ordine di `CAPABILITY-MAP.md`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 

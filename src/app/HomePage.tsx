@@ -1,10 +1,12 @@
+import { useCurrentOperator } from '../features/identity/AuthProvider';
 import { StatusView } from '../shared/ui/StatusView';
 import { AppShell } from './AppShell';
 
 /** Placeholder until the customers module provides the real home ("Cerca cliente"). */
 export function HomePage() {
+  const operator = useCurrentOperator();
   return (
-    <AppShell>
+    <AppShell account={{ name: operator.name, to: '/impostazioni' }}>
       <StatusView
         kind="empty"
         icon="nfc"

@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router';
 import { LoginPage } from '../features/identity/LoginPage';
 import { RequireAuth } from '../features/identity/RequireAuth';
+import { SettingsPage } from '../features/identity/SettingsPage';
 import { HomePage } from './HomePage';
 import { NotFoundPage } from './NotFoundPage';
 import { RootLayout } from './RootLayout';
@@ -19,7 +20,13 @@ export const routes: RouteObject[] = [
     children: [
       { path: 'accedi', Component: LoginPage },
       // Every page below needs a signed-in operator.
-      { Component: RequireAuth, children: [{ index: true, Component: HomePage }] },
+      {
+        Component: RequireAuth,
+        children: [
+          { index: true, Component: HomePage },
+          { path: 'impostazioni', Component: SettingsPage },
+        ],
+      },
       // Component showcase, development builds only.
       ...(import.meta.env.DEV ? [{ path: 'dev/ui', Component: UiGallery }] : []),
       { path: '*', Component: NotFoundPage },

@@ -41,3 +41,37 @@ test('the session survives a reload', async ({ page }) => {
   await expect(page).toHaveURL('/');
   await expect(page.getByText('Enjoy Card è quasi pronta')).toBeVisible();
 });
+
+test('settings show the account and "Esci" ends the session', async ({ page }) => {
+  await signIn(page, seedAccounts.admin.email);
+  await page
+    .getByRole('link', { name: `Account e impostazioni: ${seedAccounts.admin.name}` })
+    .click();
+  await expect(page).toHaveURL('/impostazioni');
+  const account = page.getByRole('region', { name: 'Account' });
+  await expect(account).toContainText(seedAccounts.admin.name);
+  await expect(account).toContainText('Amministratore');
+
+  await page.getByRole('button', { name: 'Esci' }).click();
+  await expect(page).toHaveURL('/accedi');
+  await expect(page.getByText(/sessione è scaduta/)).toHaveCount(0);
+
+  // Going back does not reopen a page behind the sign-in.
+  await page.goBack();
+  await expect(page).toHaveURL('/accedi');
+  await page.goto('/impostazioni');
+  await expect(page).toHaveURL('/accedi');
+});
+
+test('touch targets of the settings page are at least 48 px', async ({ page }) => {
+  await signIn(page);
+  await page.goto('/impostazioni');
+  for (const target of [
+    page.getByRole('link', { name: 'Indietro' }),
+    page.getByRole('button', { name: 'Esci' }),
+  ]) {
+    const box = await target.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(48);
+    expect(box?.width).toBeGreaterThanOrEqual(48);
+  }
+});

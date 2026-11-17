@@ -40,7 +40,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 2: Accesso
 - [x] Task 3: `AuthProvider`, `useSession`, `useCurrentOperator` (test con client finto)
 - [x] Task 4: Pagina `/accedi` e guardia `RequireAuth` su tutte le rotte
-- [ ] Task 5: Impostazioni con riquadro account ed "Esci"; pulsante account nell'`AppShell`
+- [x] Task 5: Impostazioni con riquadro account ed "Esci"; pulsante account nell'`AppShell`
 
 ### Checkpoint B: flusso completo in E2E; detector Impeccable pulito; revisione di sicurezza
 
