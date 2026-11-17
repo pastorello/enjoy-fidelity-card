@@ -18,6 +18,8 @@ const failureMessages: Record<Exclude<SignInOutcome, 'ok'>, string> = {
   'rate-limited': 'Troppi tentativi. Aspetta qualche minuto e riprova.',
   unknown: 'Accesso non riuscito. Riprova tra poco.',
   'not-enabled': NOT_ENABLED,
+  misconfigured: 'Servizio non configurato: chiedi a un amministratore.',
+  unavailable: 'Servizio momentaneamente non disponibile: riprova tra poco.',
 };
 
 const reasonMessages: Record<SignedOutReason, string> = {

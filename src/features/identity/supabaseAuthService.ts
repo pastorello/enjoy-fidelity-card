@@ -1,5 +1,6 @@
 import { isAuthApiError, isAuthRetryableFetchError } from '@supabase/supabase-js';
 import type { AuthError } from '@supabase/supabase-js';
+import { ServerFaultError, serverFaultFor } from '../../lib/serverFault';
 import { getSupabase } from '../../lib/supabase';
 import type {
   AuthService,
@@ -84,12 +85,14 @@ export const supabaseAuthService: AuthService = {
   },
 
   async loadOperator(userId) {
-    const { data, error } = await getSupabase()
+    const { data, error, status } = await getSupabase()
       .schema('app')
       .from('operators')
       .select('id, name, role')
       .eq('user_id', userId)
       .maybeSingle();
+    const fault = serverFaultFor(error, status);
+    if (fault) throw new ServerFaultError(fault);
     if (error) throw new Error(`Cannot load the operator profile: ${error.message}`);
     if (!data) return null;
     const row: { id: unknown; name: unknown; role: unknown } = data;

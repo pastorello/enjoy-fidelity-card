@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
+import { ServerFaultError } from '../../lib/serverFault';
 import { createFakeAuthService, fakeOperator } from '../../test/fakeAuthService';
 import type { Operator } from './types';
 import { AuthProvider, useAuth, useCurrentOperator } from './AuthProvider';
@@ -140,6 +141,23 @@ describe('AuthProvider', () => {
     expect(fake.service.signOut).toHaveBeenCalledOnce();
     expect(state()).toHaveTextContent('out:-');
   });
+
+  it.each(['misconfigured', 'unavailable'] as const)(
+    'reports a %s server, not a network failure, when the profile cannot be loaded',
+    async (kind) => {
+      const fake = createFakeAuthService();
+      fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+      const auth = renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('out:-'));
+      let result: string | undefined;
+      await act(async () => {
+        result = await auth().signIn('giulia@example.com', 'password-di-prova');
+      });
+      expect(result).toBe(kind);
+      expect(fake.service.signOut).toHaveBeenCalledOnce();
+      expect(state()).toHaveTextContent('out:-');
+    },
+  );
 
   it('reports wrong credentials and stays signed out', async () => {
     const fake = createFakeAuthService({ signInResult: 'invalid' });

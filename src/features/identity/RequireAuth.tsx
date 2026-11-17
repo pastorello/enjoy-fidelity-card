@@ -4,6 +4,12 @@ import { SettingsProvider } from '../settings/SettingsProvider';
 import { useAuth } from './AuthProvider';
 import styles from './RequireAuth.module.css';
 
+const errorDescriptions = {
+  network: 'Controlla la connessione e riprova.',
+  misconfigured: 'Servizio non configurato: chiedi a un amministratore.',
+  unavailable: 'Servizio momentaneamente non disponibile: riprova tra poco.',
+} as const;
+
 /** Location state of /accedi: the page to go back to after signing in. */
 export type SignInLocationState = { from?: string };
 
@@ -28,7 +34,7 @@ export function RequireAuth() {
         <StatusView
           kind="error"
           title="Impossibile caricare il tuo account"
-          description="Controlla la connessione e riprova."
+          description={errorDescriptions[state.fault ?? 'network']}
           onRetry={() => void retry()}
         />
       </div>

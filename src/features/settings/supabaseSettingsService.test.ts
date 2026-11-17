@@ -126,6 +126,20 @@ describe('update', () => {
     await expect(supabaseSettingsService.update(input)).resolves.toEqual({ status: 'forbidden' });
   });
 
+  it('42501 on the schema (server misconfigured) is unknown, not forbidden', async () => {
+    db.rpc.mockResolvedValue({
+      data: null,
+      error: {
+        code: '42501',
+        message: 'permission denied for schema app',
+        details: null,
+        hint: null,
+      },
+      status: 403,
+    });
+    await expect(supabaseSettingsService.update(input)).resolves.toEqual({ status: 'unknown' });
+  });
+
   it('22023 (out of range) is invalid', async () => {
     db.rpc.mockResolvedValue(pgError('22023', 400));
     await expect(supabaseSettingsService.update(input)).resolves.toEqual({ status: 'invalid' });

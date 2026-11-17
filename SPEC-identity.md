@@ -38,6 +38,16 @@ entra nell'app dal telefono con email e password. Basta anche un solo utente.
    - sessione scaduta: si torna su `/accedi` con il messaggio "La sessione è scaduta: accedi di nuovo";
    - utente senza profilo collegato (account tolto o non ancora registrato con `private.add_operator`): si
      torna su `/accedi` con "Account non abilitato: chiedi a un amministratore." (deciso il 2026-11-17);
+   - profilo non caricabile all'accesso o all'apertura: il messaggio dice di chi è il problema:
+
+     | Causa | Risposta del server | Messaggio |
+     |---|---|---|
+     | Nessuna rete (fetch fallita, offline) | nessuna risposta | "Connessione assente: controlla la rete e riprova." |
+     | Server non configurato: schema `app` non esposto nella Data API, o senza permessi | 406 `PGRST106`, 403 `42501` "permission denied for schema app" | "Servizio non configurato: chiedi a un amministratore." |
+     | Data API in ricarica | 503 `PGRST002` (o qualsiasi 503) | "Servizio momentaneamente non disponibile: riprova tra poco." |
+
+     All'apertura dell'app gli stessi testi sostituiscono la descrizione della schermata "Impossibile
+     caricare il tuo account" (con "Riprova");
    - **Esci** chiude la sessione su questo telefono.
 3. **Impostazioni** (`/impostazioni`, wireframe "Impostazioni" e "Impostazioni operatore"): riquadro account
    (iniziale, nome, ruolo, "Esci"). Il pulsante account dell'`AppShell` (iniziale nel cerchio) porta qui.

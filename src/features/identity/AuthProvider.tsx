@@ -1,5 +1,7 @@
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { ServerFaultError } from '../../lib/serverFault';
+import type { ServerFault } from '../../lib/serverFault';
 import type {
   AuthService,
   Operator,
@@ -10,12 +12,21 @@ import type {
 
 export type AuthState =
   | { status: 'loading' }
-  /** The profile could not be loaded (network): the app offers "Riprova". */
-  | { status: 'error' }
+  /**
+   * The profile could not be loaded: the app offers "Riprova". `fault` is set when the server
+   * answered with a fault (misconfigured, unavailable) rather than not answering at all.
+   */
+  | { status: 'error'; fault?: ServerFault }
   | { status: 'signed-out'; reason?: SignedOutReason }
   | { status: 'signed-in'; operator: Operator };
 
-export type SignInOutcome = SignInResult | 'not-enabled';
+export type SignInOutcome = SignInResult | 'not-enabled' | ServerFault;
+
+function errorState(error: unknown): AuthState {
+  return error instanceof ServerFaultError
+    ? { status: 'error', fault: error.kind }
+    : { status: 'error' };
+}
 
 /**
  * Result of "Salva e accedi" on the recovery page. Verification and save failures are kept
@@ -101,8 +112,8 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     setState({ status: 'loading' });
     try {
       setState(await restore());
-    } catch {
-      setState({ status: 'error' });
+    } catch (error) {
+      setState(errorState(error));
     }
   }, [restore]);
 
@@ -110,7 +121,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     let active = true;
     restore().then(
       (next) => active && setState(next),
-      () => active && setState({ status: 'error' }),
+      (error: unknown) => active && setState(errorState(error)),
     );
     const unsubscribe = service.onAuthChange((userId) => {
       // Only a signed-in state can go stale; restore and signIn check their own session.
@@ -201,11 +212,11 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       try {
         userId = await service.currentUserId();
         operator = userId ? await service.loadOperator(userId) : null;
-      } catch {
+      } catch (error) {
         // The session is saved but its profile was never checked: do not keep it.
         await endSession();
         setState({ status: 'signed-out' });
-        return 'network';
+        return error instanceof ServerFaultError ? error.kind : 'network';
       }
       if (!userId || !operator) {
         await endSession();
@@ -274,9 +285,9 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       try {
         userId = await service.currentUserId();
         operator = userId ? await service.loadOperator(userId) : null;
-      } catch {
+      } catch (error) {
         // The password is saved and the session kept: "Riprova" loads the profile, as on restore.
-        setState({ status: 'error' });
+        setState(errorState(error));
         return 'ok';
       }
       if (!userId || !operator) {

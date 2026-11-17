@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { ServerFaultError } from '../../lib/serverFault';
 import { createFakeAuthService } from '../../test/fakeAuthService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
@@ -73,6 +74,17 @@ describe('sign-in page', () => {
     expect(fake.service.signOut).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ['misconfigured', 'Servizio non configurato: chiedi a un amministratore.'],
+    ['unavailable', 'Servizio momentaneamente non disponibile: riprova tra poco.'],
+  ] as const)('tells a %s server apart from a missing connection', async (kind, message) => {
+    const fake = createFakeAuthService();
+    fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+    renderApp('/accedi', fake);
+    await fillAndSubmit('giulia@example.com', 'password-di-prova');
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+  });
+
   it('refuses an account without an operator profile', async () => {
     renderApp('/accedi', createFakeAuthService({ operator: null }));
     await fillAndSubmit('nuovo@example.com', 'password-di-prova');
@@ -128,6 +140,16 @@ describe('protected pages', () => {
     fake.endSession();
     expect(await screen.findByText('La sessione è scaduta: accedi di nuovo.')).toHaveRole('status');
     expect(screen.getByRole('heading', { level: 1, name: 'Accedi' })).toBeInTheDocument();
+  });
+
+  it('say the service is not configured when the saved profile cannot be loaded for that', async () => {
+    const fake = signedInFake();
+    fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError('misconfigured'));
+    renderApp('/', fake);
+    expect(
+      await screen.findByText('Servizio non configurato: chiedi a un amministratore.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Controlla la connessione e riprova.')).not.toBeInTheDocument();
   });
 
   it('offer "Riprova" when the profile cannot be loaded', async () => {

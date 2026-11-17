@@ -1,3 +1,4 @@
+import { serverFaultFor } from '../../lib/serverFault';
 import { getSupabase } from '../../lib/supabase';
 import { SettingsLoadError, USB_UID_FORMATS } from './types';
 import type { Settings, SettingsService, UpdateSettingsResult, UsbUidFormat } from './types';
@@ -45,6 +46,8 @@ function toSettings(data: unknown): Settings | null {
 
 function updateResultFor(answer: Answer): UpdateSettingsResult {
   if (isNoResponse(answer)) return { status: 'network' };
+  // A misconfigured or unavailable server is not the user's fault: never 'forbidden'.
+  if (serverFaultFor(answer.error, answer.status)) return { status: 'unknown' };
   if (answer.error) {
     // 42501: not (or no longer) an admin. 22023: a value outside the limits.
     if (answer.error.code === '42501') return { status: 'forbidden' };
