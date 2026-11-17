@@ -17,14 +17,14 @@ p_confirm_threshold_cents, p_usb_uid_format default null)` `security definer`, `
 42501 se non admin, 22023 fuori dai limiti o formato sconosciuto, null = formato invariato, aggiorna
 `updated_at`/`updated_by` e restituisce la riga; `revoke execute` da `public, anon`, `grant` ad `authenticated`.
 **Accettazione:**
-- [ ] pgTAP: una sola riga 100 / 15000 / `'hex'` / `updated_by` null; secondo `insert` e `delete` falliscono;
+- [x] pgTAP: una sola riga 100 / 15000 / `'hex'` / `updated_by` null; secondo `insert` e `delete` falliscono;
       operatore attivo legge, utente senza profilo e `anon` no; `update`/`insert`/`delete` diretti negati ad
       `authenticated`; `anon` senza `execute` su `update_settings`
-- [ ] pgTAP: `update_settings` da operatore e da utente senza profilo → 42501 con riga invariata; da admin
+- [x] pgTAP: `update_settings` da operatore e da utente senza profilo → 42501 con riga invariata; da admin
       aggiorna valori, `updated_at` e `updated_by` (= id del profilo admin, verifica di `acting_operator_id()`);
       0, negativi, 10001, 1000001, formato sconosciuto → 22023; limiti esatti 1, 10000, 1000000 accettati;
       null lascia il formato, `'dec'` lo cambia; chiamata ripetuta con gli stessi valori → stessi valori
-- [ ] pgTAP: `acting_operator_id()` senza `execute` per `authenticated` e `anon`
+- [x] pgTAP: `acting_operator_id()` senza `execute` per `authenticated` e `anon`
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** nessuna · **File:** supabase/migrations/*_settings.sql, supabase/tests/settings.test.sql ·
 **Dimensione:** M

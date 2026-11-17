@@ -54,7 +54,7 @@ con `useSettings()`. È il primo modulo dopo `identity`: introduce anche `privat
 Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Fondamenta (rischio più alto)
-- [ ] Task 1: Migrazione `settings`: tabella a riga unica, policy, `acting_operator_id()`, `update_settings`; pgTAP
+- [x] Task 1: Migrazione `settings`: tabella a riga unica, policy, `acting_operator_id()`, `update_settings`; pgTAP
 - [ ] Task 2: Tipi, `supabaseSettingsService`, servizio finto; test di integrazione contro lo stack locale
 
 ### Checkpoint A: db:test e test:integration verdi; revisione di sicurezza su RLS e funzioni
