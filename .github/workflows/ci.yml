@@ -31,6 +31,12 @@ jobs:
       - name: Check generated design tokens are up to date
         run: npm run tokens && git diff --exit-code src/styles/tokens.css
       - run: npx playwright install --with-deps chromium
+      - name: Start local Supabase (database, Auth, REST only)
+        run: >-
+          npx supabase start
+          -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,mailpit,postgres-meta
+      - name: Integration (Vitest against the local stack)
+        run: npm run test:integration
       - name: E2E (builds the app and serves it with production headers)
         run: npm run e2e
       - name: Upload Playwright report

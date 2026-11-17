@@ -7,9 +7,9 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onC
   value: string;
   onChange: (value: string) => void;
   /** Short help under the field. */
-  hint?: string;
+  hint?: string | undefined;
   /** Says what is wrong and what to do; marks the field invalid. */
-  error?: string;
+  error?: string | undefined;
   type?: 'text' | 'tel' | 'email' | 'password';
 };
 

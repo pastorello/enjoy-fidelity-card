@@ -10,6 +10,23 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-17 — Email di Auth attive; "Password dimenticata" subito dopo la V1
+
+- **Decisione**: il bar ha il dominio `enjoygaeta.it`; le email di Supabase Auth partono da
+  `info@enjoygaeta.it`, configurato dall'utente su staging e produzione. Si completa la V1 di `identity`
+  così com'è (account creati a mano) e subito dopo si aggiungono "Password dimenticata" e "Cambia password"
+  (wireframe "Password dimenticata" e "Imposta password"). Inviti via email e schermata Operatori restano
+  rinviati.
+- **Perché**: il vincolo "niente dominio, niente email" della voce precedente non vale più; il recupero
+  password costa poco ed evita di cancellare e ricreare l'utente. Gli inviti servono solo con molti
+  operatori.
+- **Alternative scartate (Rejected alternatives)**:
+  - Rimettere subito inviti e gestione operatori: lavoro grande, non necessario con pochi operatori.
+  - Restare senza email: rinuncia a un recupero password ormai gratuito.
+- **Ambito**: modulo `identity` (aggiunta dopo la V1). Sostituisce in parte la voce "identity V1: solo
+  accesso" (il motivo "nessun dominio").
+- **Contesto**: l'utente ha collegato l'account email in Supabase e ha accettato la proposta.
+
 ### 2026-11-17 — identity V1: solo accesso, account creati a mano in Supabase
 
 - **Decisione**: in V1 il modulo `identity` copre solo accesso, sessione e uscita. Gli account si creano e

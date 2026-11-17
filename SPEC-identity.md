@@ -34,8 +34,9 @@ entra nell'app dal telefono con email e password. Basta anche un solo utente.
    - persistente sul telefono (resta aperta finché non si esce);
    - tutte le pagine tranne `/accedi` richiedono un utente collegato e **registrato come operatore**;
      senza sessione si va su `/accedi`;
-   - sessione scaduta o account tolto: si torna su `/accedi` con il messaggio "La sessione è scaduta:
-     accedi di nuovo";
+   - sessione scaduta: si torna su `/accedi` con il messaggio "La sessione è scaduta: accedi di nuovo";
+   - utente senza profilo collegato (account tolto o non ancora registrato con `private.add_operator`): si
+     torna su `/accedi` con "Account non abilitato: chiedi a un amministratore." (deciso il 2026-11-17);
    - **Esci** chiude la sessione su questo telefono.
 3. **Impostazioni** (`/impostazioni`, wireframe "Impostazioni" e "Impostazioni operatore"): riquadro account
    (iniziale, nome, ruolo, "Esci"). Il pulsante account dell'`AppShell` (iniziale nel cerchio) porta qui.
@@ -156,7 +157,9 @@ La CI avvia lo stack Supabase locale anche per E2E e integrazione.
 
 ## Out of Scope (Deferred)
 
-Rinviati dopo la V1 (decisione del 2026-11-17), da riprendere se il bar avrà un dominio e un servizio email:
+Rinviati dopo la V1 (decisione del 2026-11-17). Le email di Auth ora funzionano (`info@enjoygaeta.it`):
+"Password dimenticata" e "Cambia password" si aggiungono subito dopo la V1 con una spec aggiuntiva; il resto
+resta rinviato:
 - inviti via email, scelta della password dal link, "Password dimenticata";
 - schermata "Operatori" nell'app (elenco, disattiva, riattiva, reinvia l'invito);
 - cambio di ruolo dall'app (si fa con `private.add_operator`);

@@ -13,5 +13,12 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "scripts", "e2e"]
+  "include": [
+    "vite.config.ts",
+    "vitest.integration.config.ts",
+    "playwright.config.ts",
+    "scripts",
+    "e2e",
+    "tests"
+  ]
 }

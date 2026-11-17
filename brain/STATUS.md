@@ -24,13 +24,16 @@ del modulo `identity`.
    più avanti). Mancano: scelta del piano di hosting (Hobby vieta l'uso commerciale), account Supabase
    (`docs/setup-accounts.md`) con `db push` su staging e verifica dell'event trigger, installazione su
    Android.
-2. `SPEC-identity.md` approvata (2026-11-17): solo accesso, account creati a mano in Supabase, niente
-   email; prossimo passo il piano dei task in `tasks/`; poi gli altri nell'ordine di `CAPABILITY-MAP.md`
-   (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
+2. **Modulo `identity`** (piano in `tasks/identity/`, PR #13 bozza su `feat/identity`): task 1-5 fatti
+   (database, E2E/CI su Supabase locale, sessione, `/accedi`, Impostazioni con Esci). Prossimo:
+   Checkpoint B (Lighthouse su `/accedi`, revisione `security-and-hardening`), poi task 6-8. Dopo `identity`,
+   gli altri moduli nell'ordine di `CAPABILITY-MAP.md`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
 
+- **Servizio di invio email** (da `info@enjoygaeta.it`): chiedere all'utente quale provider SMTP usa, da
+  citare nell'informativa privacy.
 - **Testo dell'informativa e del consenso privacy**: da far verificare al consulente del bar (blocca il
   lancio, non lo sviluppo).
 - **Lettore NFC USB**: da scegliere e acquistare (blocca la fase tablet); verificare il formato dell'uid.

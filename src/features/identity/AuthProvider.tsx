@@ -1,0 +1,170 @@
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import type { AuthService, Operator, SignedOutReason, SignInResult } from './types';
+
+export type AuthState =
+  | { status: 'loading' }
+  /** The profile could not be loaded (network): the app offers "Riprova". */
+  | { status: 'error' }
+  | { status: 'signed-out'; reason?: SignedOutReason }
+  | { status: 'signed-in'; operator: Operator };
+
+export type SignInOutcome = SignInResult | 'not-enabled';
+
+type AuthContextValue = {
+  state: AuthState;
+  signIn: (email: string, password: string) => Promise<SignInOutcome>;
+  signOut: () => Promise<void>;
+  retry: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+/** Holds who is signed in on this device. Only this feature talks to Supabase Auth. */
+export function AuthProvider({ service, children }: { service: AuthService; children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({ status: 'loading' });
+  // Supabase reports every sign-out, ours included: only the others mean "expired".
+  const signingOut = useRef(false);
+  // The user whose profile was checked for the signed-in state; null when not signed in.
+  const checkedUser = useRef<string | null>(null);
+
+  const endSession = useCallback(async () => {
+    signingOut.current = true;
+    try {
+      await service.signOut();
+    } finally {
+      signingOut.current = false;
+    }
+  }, [service]);
+
+  const restore = useCallback(async (): Promise<AuthState> => {
+    checkedUser.current = null;
+    const userId = await service.currentUserId();
+    if (!userId) return { status: 'signed-out' };
+    const operator = await service.loadOperator(userId);
+    if (operator) {
+      checkedUser.current = userId;
+      return { status: 'signed-in', operator };
+    }
+    await endSession();
+    return { status: 'signed-out', reason: 'not-enabled' };
+  }, [service, endSession]);
+
+  const retry = useCallback(async () => {
+    setState({ status: 'loading' });
+    try {
+      setState(await restore());
+    } catch {
+      setState({ status: 'error' });
+    }
+  }, [restore]);
+
+  useEffect(() => {
+    let active = true;
+    restore().then(
+      (next) => active && setState(next),
+      () => active && setState({ status: 'error' }),
+    );
+    const unsubscribe = service.onAuthChange((userId) => {
+      // Only a signed-in state can go stale; restore and signIn check their own session.
+      if (signingOut.current || checkedUser.current === null) return;
+      if (userId === checkedUser.current) return;
+      checkedUser.current = null;
+      if (userId === null) {
+        setState({ status: 'signed-out', reason: 'expired' });
+      } else {
+        // Another user's session was saved (other tab, link): check its profile again.
+        void retry();
+      }
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [service, restore, retry]);
+
+  // An administrator can remove the account while the app is open: its token keeps working
+  // until it expires, but the profile is gone. Re-check it (one small query) whenever the app
+  // comes back to the foreground.
+  useEffect(() => {
+    let checking = false;
+    const recheck = async () => {
+      const userId = checkedUser.current;
+      if (checking || userId === null || signingOut.current) return;
+      checking = true;
+      let operator: Operator | null;
+      try {
+        operator = await service.loadOperator(userId);
+      } catch {
+        return; // Offline: keep the session, the next foreground event checks again.
+      } finally {
+        checking = false;
+      }
+      // Signed out, or switched to another user, while the check was running.
+      if (checkedUser.current !== userId) return;
+      if (operator) return;
+      checkedUser.current = null;
+      await endSession();
+      setState({ status: 'signed-out', reason: 'not-enabled' });
+    };
+    const onFocus = () => void recheck();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void recheck();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [service, endSession]);
+
+  const signIn = useCallback(
+    async (email: string, password: string): Promise<SignInOutcome> => {
+      const result = await service.signIn(email, password);
+      if (result !== 'ok') return result;
+      let userId: string | null;
+      let operator: Operator | null;
+      try {
+        userId = await service.currentUserId();
+        operator = userId ? await service.loadOperator(userId) : null;
+      } catch {
+        // The session is saved but its profile was never checked: do not keep it.
+        await endSession();
+        setState({ status: 'signed-out' });
+        return 'network';
+      }
+      if (!userId || !operator) {
+        await endSession();
+        setState({ status: 'signed-out' });
+        return 'not-enabled';
+      }
+      checkedUser.current = userId;
+      setState({ status: 'signed-in', operator });
+      return 'ok';
+    },
+    [service, endSession],
+  );
+
+  const signOut = useCallback(async () => {
+    checkedUser.current = null;
+    await endSession();
+    setState({ status: 'signed-out' });
+  }, [endSession]);
+
+  const value = useMemo(() => ({ state, signIn, signOut, retry }), [state, signIn, signOut, retry]);
+  return <AuthContext value={value}>{children}</AuthContext>;
+}
+
+export function useAuth(): AuthContextValue {
+  const value = use(AuthContext);
+  if (!value) throw new Error('useAuth must be used inside <AuthProvider>');
+  return value;
+}
+
+/** The signed-in operator. Only for screens behind <RequireAuth>. */
+export function useCurrentOperator(): Operator {
+  const { state } = useAuth();
+  if (state.status !== 'signed-in') throw new Error('useCurrentOperator needs a signed-in user');
+  return state.operator;
+}

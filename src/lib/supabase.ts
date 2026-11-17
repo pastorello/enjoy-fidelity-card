@@ -1,4 +1,8 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  createClient,
+  type SupabaseClient,
+  type SupabaseClientOptions,
+} from '@supabase/supabase-js';
 
 export type SupabaseEnv = {
   url: string;
@@ -44,13 +48,21 @@ export function readSupabaseEnv(env: RawEnv): SupabaseEnv {
   return { url, publishableKey };
 }
 
+/**
+ * No flow of the app signs in from a link, so a URL carrying tokens must never replace the
+ * saved session. PKCE keeps a future link flow (password recovery) from accepting bare tokens.
+ */
+export const supabaseClientOptions = {
+  auth: { detectSessionInUrl: false, flowType: 'pkce' },
+} satisfies SupabaseClientOptions<'public'>;
+
 let client: SupabaseClient | undefined;
 
 /** The single Supabase client of the app, created on first use. */
 export function getSupabase(): SupabaseClient {
   if (!client) {
     const { url, publishableKey } = readSupabaseEnv(import.meta.env);
-    client = createClient(url, publishableKey);
+    client = createClient(url, publishableKey, supabaseClientOptions);
   }
   return client;
 }
