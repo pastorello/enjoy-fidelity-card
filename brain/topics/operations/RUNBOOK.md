@@ -17,6 +17,7 @@ npm run db:start / db:stop                  # Supabase locale (Docker)
 npm run db:reset                            # riapplica migrazioni + seed
 npm run db:test                             # test pgTAP in supabase/tests/
 npx supabase migration new <nome> </dev/null   # nuova migrazione (vedi trappola 5)
+npm run tokens                              # rigenera src/styles/tokens.css da design/tokens.json
 npx impeccable detect src/                  # scansione design (anche su URL del dev server)
 npx skills add <owner>/<repo> --skill <nome> --agent claude-code   # aggiungere una skill di progetto
 bash ~/.claude/plugins/cache/sprout-labs/project-brain/*/scripts/doctor.sh .   # controllo di brain/
@@ -47,3 +48,8 @@ tutto verde = sano.
    resta appeso. Usare `</dev/null` e poi scrivere il file creato.
 6. Lo schema `app` attiva la RLS da solo su ogni nuova tabella (event trigger), ma una tabella senza policy
    resta illeggibile: ogni tabella nuova vuole le sue policy e il suo test pgTAP.
+7. `src/styles/tokens.css` è generato: non si modifica a mano e Prettier lo ignora. Si cambia
+   `design/tokens.json` (copia del design system "Enjoy Bar") e si lancia `npm run tokens`; un test
+   fallisce se il CSS committato non coincide.
+8. Il rilevatore Impeccable ha la regola `cream-palette` disattivata (`.impeccable/config.json`): lo sfondo
+   `paper` #faf5f1 è imposto dal design system del bar, non una scelta di default.

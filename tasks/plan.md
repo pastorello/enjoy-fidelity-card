@@ -34,7 +34,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: typecheck, lint, test, db:test verdi; revisione con l'utente
 
 ### Fase 2: Aspetto e componenti
-- [ ] Task 4: `/impeccable init`, token (`design/tokens.json` → `tokens.css`), font self-hosted, base.css
+- [x] Task 4: `/impeccable init`, token (`design/tokens.json` → `tokens.css`), font self-hosted, base.css
 - [ ] Task 5: `Button`, `TextField`, `SearchField` con test di accessibilità
 - [ ] Task 6: `ListRow`, `PointsBadge`, `ScreenTitle`, `StatusView`
 - [ ] Task 7: `ConfirmDialog` e `AppShell` con schermata segnaposto

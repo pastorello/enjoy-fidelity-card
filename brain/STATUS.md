@@ -8,7 +8,8 @@
 ## Cosa stiamo facendo
 
 Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano `platform`
-approvato; task 1-3 fatti sul branch `feat/platform-scaffold`. Checkpoint A: revisione con l'utente, poi push e PR. Nessun codice applicativo ancora.
+approvato; task 1-3 in PR #3; task 4 (design system nel codice) fatto sul branch `feat/platform-design-system`.
+Prossimo: task 5-7, poi Checkpoint B. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 
@@ -17,8 +18,9 @@ approvato; task 1-3 fatti sul branch `feat/platform-scaffold`. Checkpoint A: rev
 
 ## Prossimi passi
 
-1. ~~Approvazione di `SPEC-platform.md`~~ fatto. Ancora aperti (non bloccanti): logo SVG/icona,
-   monitoraggio errori prima del lancio.
+1. ~~Approvazione di `SPEC-platform.md`~~ fatto. Logo e icona: PNG ufficiali nel design system
+   (`enjoy-lettering-negative.png` per la barra, `enjoy-badge-solo-negative.png` per l'icona), da usare
+   nei task 7-8. Ancora aperto: monitoraggio errori prima del lancio.
 2. `planning-and-task-breakdown` per `platform`, poi implementazione; poi spec dei moduli successivi
    nell'ordine della mappa (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
 3. `/impeccable init` partendo dal design system "Enjoy Bar" prima del primo lavoro di UI.

@@ -41,8 +41,8 @@ la RLS su ogni nuova tabella di `app`; test pgTAP; client `src/lib/supabase.ts` 
 `scripts/build-tokens` → `src/styles/tokens.css` (solo tema Chiaro); font Texturina e Stint Ultra Condensed
 in woff2 (OFL) con `@font-face`; `base.css` con focus ring.
 **Accettazione:**
-- [ ] `npm run tokens` rigenera un CSS identico a quello committato (test)
-- [ ] Nessuna richiesta a domini esterni per i font
+- [x] `npm run tokens` rigenera un CSS identico a quello committato (test)
+- [x] Nessuna richiesta a domini esterni per i font
 **Verifica:** `npm run tokens && git diff --exit-code src/styles/tokens.css`; DevTools → Network
 **Dipendenze:** 1 · **File:** design/tokens.json, scripts/build-tokens.ts, src/styles/{tokens,base,fonts}.css, public/fonts/* · **Dimensione:** M
 

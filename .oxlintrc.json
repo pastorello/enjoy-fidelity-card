@@ -25,6 +25,10 @@
       "rules": { "import/no-default-export": "off" }
     },
     {
+      "files": ["scripts/**"],
+      "rules": { "no-console": "off" }
+    },
+    {
       "files": ["src/test/setup.ts", "src/main.tsx"],
       "rules": { "import/no-unassigned-import": "off" }
     }

@@ -204,7 +204,7 @@ Risolte il 2026-11-16:
   istruzioni e non crea account.
 
 Aperte (non bloccano l'avvio):
-1. **Logo e icona**: logo Enjoy in SVG e immagine quadrata per l'icona. Fino all'arrivo dei file si usa un
-   segnaposto testuale "Enjoy" nell'header e un'icona provvisoria; il criterio di installazione su Android
-   si verifica con l'icona definitiva.
+1. **Logo e icona**: il design system contiene i PNG ufficiali (`enjoy-lettering-negative.png` per la
+   barra verde, `enjoy-badge-solo-negative.png` su quadrato `enjoy-green` per l'icona). Si usano quelli;
+   un SVG resta preferibile se arriva il vettoriale.
 2. **Monitoraggio errori**: resta fuori da questa spec (vedi Out of Scope); da decidere prima del lancio.

@@ -1,0 +1,26 @@
+/* Self-hosted fonts (SIL Open Font License, see public/fonts/*-OFL.txt).
+   No requests to Google Fonts: privacy and an installed app. */
+
+@font-face {
+  font-family: 'Texturina';
+  src: url('/fonts/Texturina-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Texturina';
+  src: url('/fonts/Texturina-Variable-Italic.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Stint Ultra Condensed';
+  src: url('/fonts/StintUltraCondensed-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
