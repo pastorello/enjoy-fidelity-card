@@ -56,6 +56,7 @@ La lettura card ha un unico punto d'ingresso nell'app: telefono e lettore USB so
 | `CLAUDE.md` | Regole stabili: architettura, invarianti di dominio, ruoli, privacy, workflow skill | Ogni sessione (caricato in automatico) |
 | `CAPABILITY-MAP.md` | Moduli, dipendenze, ordine di costruzione, indice delle spec | Prima di scegliere su cosa lavorare |
 | `SPEC-platform.md` | Spec del modulo `platform` (approvata) | Prima di lavorare su scheletro, CI, deploy, UI base |
+| `SPEC-identity.md` | Spec del modulo `identity` (approvata) | Prima di lavorare su accesso, ruoli, operatori |
 | `PRODUCT.md` | Contesto di prodotto per Impeccable (utenti, ambiente, tono "tu", vincoli di marchio) | Prima di ogni lavoro di UI |
 | `design/tokens.json` | Copia dei token del design system "Enjoy Bar" (fonte di `src/styles/tokens.css`) | Quando cambiano colori, testo o misure |
 | `tasks/plan.md`, `tasks/todo.md` | Piano e task del modulo in corso | Prima di implementare |
