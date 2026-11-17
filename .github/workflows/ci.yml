@@ -35,6 +35,8 @@ jobs:
         run: >-
           npx supabase start
           -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta
+      - name: Reload Auth email templates (Auth can start before the gateway serves them)
+        run: ./scripts/reload-auth-templates.sh
       - name: Integration (Vitest against the local stack)
         run: npm run test:integration
       - name: E2E (builds the app and serves it with production headers)

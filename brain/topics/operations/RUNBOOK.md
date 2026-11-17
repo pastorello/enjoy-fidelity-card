@@ -17,6 +17,7 @@ npm run db:start / db:stop                  # Supabase locale (Docker)
 npm run db:reset                            # riapplica migrazioni + seed
 npm run db:test                             # test pgTAP in supabase/tests/
 npm run test:integration                    # Vitest contro lo stack locale (tests/integration/), Supabase acceso
+./scripts/reload-auth-templates.sh          # se arriva l'email "Reset your password" (trappola 28)
 npx supabase migration new <nome> </dev/null   # nuova migrazione (vedi trappola 5)
 npm run tokens                              # rigenera src/styles/tokens.css da design/tokens.json
 npm run icons                               # rigenera le icone PWA da design/enjoy-badge-solo-negative.png
@@ -154,3 +155,8 @@ staging poi produzione, mai `supabase config push`.
 27. Il token del link si consuma solo con "Salva e accedi" (`verifyOtp` con `token_hash`), mai all'apertura:
     le anteprime e gli antivirus delle caselle email non lo bruciano. Con il template predefinito di
     Supabase (`{{ .ConfirmationURL }}`) succederebbe: il template va sempre incollato nei progetti online.
+28. `supabase start` può avviare Auth prima che il gateway (Kong, porta 8088) serva i template delle email:
+    Auth registra `templatemailer_template_body_http_error … connection refused` e manda l'email
+    predefinita "Reset your password" finché non viene riavviato. Succede in CI (2026-11-17), raramente in
+    locale. Rimedio: `scripts/reload-auth-templates.sh` dopo `supabase start` (la CI lo esegue); fallisce se
+    il template non si carica.
