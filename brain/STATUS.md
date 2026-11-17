@@ -24,7 +24,8 @@ del modulo `identity`.
    più avanti). Mancano: scelta del piano di hosting (Hobby vieta l'uso commerciale), account Supabase
    (`docs/setup-accounts.md`) con `db push` su staging e verifica dell'event trigger, installazione su
    Android.
-2. Spec del modulo `identity` (`SPEC-identity.md`), poi gli altri nell'ordine di `CAPABILITY-MAP.md`
+2. `SPEC-identity.md` scritta (bozza, 2026-11-17), in attesa di approvazione e risposte alle Open
+   Questions (SMTP, nomi visibili, riattivazione, reinvio, cambio ruolo); poi gli altri nell'ordine di `CAPABILITY-MAP.md`
    (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
