@@ -5,7 +5,7 @@ import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { StatusView } from '../../shared/ui/StatusView';
 import { TextField } from '../../shared/ui/TextField';
-import { useCurrentOperator } from '../identity/AuthProvider';
+import { useAuth, useCurrentOperator } from '../identity/AuthProvider';
 import {
   CENTS_PER_POINT_LIMIT,
   CONFIRM_THRESHOLD_LIMIT,
@@ -47,6 +47,14 @@ function AdminPointsSection() {
 
 type Field = 'ratio' | 'threshold';
 type FieldErrors = { [field in Field]?: string | undefined };
+type SaveFailure = Exclude<UpdateSettingsResult['status'], 'ok'>;
+
+const failureMessages: Record<SaveFailure, string> = {
+  network: 'Impostazioni non salvate: controlla la connessione e riprova.',
+  forbidden: 'Solo un amministratore può cambiare queste impostazioni.',
+  invalid: 'Impostazioni non salvate. Ricarica la pagina e riprova.',
+  unknown: 'Impostazioni non salvate. Ricarica la pagina e riprova.',
+};
 
 function PointsAndControlsForm({
   settings,
@@ -62,6 +70,21 @@ function PointsAndControlsForm({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [failure, setFailure] = useState<SaveFailure>();
+  const { reportNotEnabled } = useAuth();
+
+  // A reload (page visible again, another admin saved) refreshes the fields still showing the
+  // last values received, and never overwrites one edited and not saved (SPEC-settings, point 7).
+  const [shown, setShown] = useState(settings);
+  if (settings !== shown) {
+    setShown(settings);
+    if (ratio === centsToEuroInput(shown.centsPerPoint)) {
+      setRatio(centsToEuroInput(settings.centsPerPoint));
+    }
+    if (threshold === centsToEuroInput(shown.confirmThresholdCents)) {
+      setThreshold(centsToEuroInput(settings.confirmThresholdCents));
+    }
+  }
   // A double tap reaches the handler twice before the busy state renders.
   const saving = useRef(false);
 
@@ -84,7 +107,8 @@ function PointsAndControlsForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving.current) return;
+    // After a refusal Salva stays disabled; Invio in a field must not send either.
+    if (saving.current || failure === 'forbidden') return;
     const parsedRatio = parseEuroInput(ratio, CENTS_PER_POINT_LIMIT);
     const parsedThreshold = parseEuroInput(threshold, CONFIRM_THRESHOLD_LIMIT);
     setErrors({
@@ -92,6 +116,7 @@ function PointsAndControlsForm({
       threshold: parsedThreshold.ok ? undefined : parsedThreshold.error,
     });
     setSaved(false);
+    setFailure(undefined);
     if (!parsedRatio.ok || !parsedThreshold.ok) {
       setFocusRequest({ field: parsedRatio.ok ? 'threshold' : 'ratio' });
       return;
@@ -116,8 +141,13 @@ function PointsAndControlsForm({
       setRatio(centsToEuroInput(result.settings.centsPerPoint));
       setThreshold(centsToEuroInput(result.settings.confirmThresholdCents));
       setSaved(true);
+      return;
     }
-    // Failed saves keep the typed values; their messages come with task 9 of tasks/settings.
+    // The typed values stay in the fields, so Salva can simply be pressed again.
+    setFailure(result.status);
+    // The role may have changed or the profile gone: AuthProvider checks again and either
+    // switches this section to the operator view or goes back to /accedi.
+    if (result.status === 'forbidden') void reportNotEnabled();
   }
 
   return (
@@ -151,7 +181,13 @@ function PointsAndControlsForm({
           Il rapporto vale per le spese registrate da ora in poi. La conferma evita errori di
           battitura, come 1250 al posto di 12,50.
         </p>
-        <Button type="submit" block busy={busy}>
+        {failure && (
+          <p role="alert" className={styles.failure}>
+            <Icon name={failure === 'network' ? 'wifi-off' : 'circle-alert'} size={20} />
+            {failureMessages[failure]}
+          </p>
+        )}
+        <Button type="submit" block busy={busy} disabled={failure === 'forbidden'}>
           Salva
         </Button>
       </form>

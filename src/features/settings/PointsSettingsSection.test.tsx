@@ -1,6 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { fakeOperator } from '../../test/fakeAuthService';
 import { createFakeSettingsService, defaultSettings } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 import type { UpdateSettingsResult } from './types';
@@ -104,8 +105,8 @@ describe('points section for operators', () => {
 const helpText =
   'Il rapporto vale per le spese registrate da ora in poi. La conferma evita errori di battitura, come 1250 al posto di 12,50.';
 
-async function openAdminSection(settings = createFakeSettingsService()) {
-  const rendered = renderApp('/impostazioni', signedInFake(), settings);
+async function openAdminSection(settings = createFakeSettingsService(), auth = signedInFake()) {
+  const rendered = renderApp('/impostazioni', auth, settings);
   const section = await screen.findByRole('region', { name: 'PUNTI E CONTROLLI' });
   const ratio = await within(section).findByRole('textbox', { name: '1 punto ogni' });
   const threshold = within(section).getByRole('textbox', { name: 'Chiedi conferma sopra' });
@@ -302,5 +303,148 @@ describe('points and controls section for administrators', () => {
     expect(await within(section).findByRole('textbox', { name: '1 punto ogni' })).toHaveValue(
       '1,00',
     );
+  });
+});
+
+const networkMessage = 'Impostazioni non salvate: controlla la connessione e riprova.';
+const forbiddenMessage = 'Solo un amministratore può cambiare queste impostazioni.';
+const reloadMessage = 'Impostazioni non salvate. Ricarica la pagina e riprova.';
+
+describe('save errors and reloads for administrators', () => {
+  it('keeps the typed values when the network fails, and a new Salva then succeeds', async () => {
+    const settings = createFakeSettingsService({ updateResults: ['network', 'ok'] });
+    const { section, ratio, threshold, save } = await openAdminSection(settings);
+    await replace(ratio, '2');
+    await replace(threshold, '200');
+    await userEvent.click(save);
+
+    expect(await within(section).findByRole('alert')).toHaveTextContent(networkMessage);
+    expect(ratio).toHaveValue('2');
+    expect(threshold).toHaveValue('200');
+    expect(within(section).queryByText('Impostazioni salvate.')).not.toBeInTheDocument();
+    expect(save).toBeEnabled();
+
+    await userEvent.click(save);
+    expect(settings.service.update).toHaveBeenCalledTimes(2);
+    expect(settings.service.update).toHaveBeenLastCalledWith({
+      centsPerPoint: 200,
+      confirmThresholdCents: 20000,
+    });
+    expect(await within(section).findByText('Impostazioni salvate.')).toBeInTheDocument();
+    expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
+    expect(ratio).toHaveValue('2,00');
+    expect(threshold).toHaveValue('200,00');
+  });
+
+  it.each([['invalid' as const], ['unknown' as const]])(
+    '"%s" asks to reload the page and keeps the typed values',
+    async (status) => {
+      const settings = createFakeSettingsService({ updateResults: [status] });
+      const { section, ratio, threshold, save } = await openAdminSection(settings);
+      await replace(ratio, '2');
+      await replace(threshold, '200');
+      await userEvent.click(save);
+
+      expect(await within(section).findByRole('alert')).toHaveTextContent(reloadMessage);
+      expect(ratio).toHaveValue('2');
+      expect(threshold).toHaveValue('200');
+      expect(within(section).queryByText('Impostazioni salvate.')).not.toBeInTheDocument();
+    },
+  );
+
+  it('treats a save that throws like an unexpected error', async () => {
+    const settings = createFakeSettingsService();
+    settings.service.update.mockRejectedValueOnce(new Error('boom'));
+    const { section, ratio, save } = await openAdminSection(settings);
+    await replace(ratio, '2');
+    await userEvent.click(save);
+    expect(await within(section).findByRole('alert')).toHaveTextContent(reloadMessage);
+    expect(ratio).toHaveValue('2');
+  });
+
+  it('forbidden: shows the message, disables Salva and reports it to AuthProvider', async () => {
+    const auth = signedInFake();
+    const settings = createFakeSettingsService({ updateResults: ['forbidden', 'ok'] });
+    const { section, ratio, save } = await openAdminSection(settings, auth);
+    const checksBefore = auth.service.loadOperator.mock.calls.length;
+    await replace(ratio, '2');
+    await userEvent.click(save);
+
+    expect(await within(section).findByRole('alert')).toHaveTextContent(forbiddenMessage);
+    expect(save).toBeDisabled();
+    expect(ratio).toHaveValue('2');
+    await waitFor(() => expect(auth.service.loadOperator.mock.calls.length).toBe(checksBefore + 1));
+
+    // Still disabled after the re-check confirms the admin role, and after editing again.
+    await userEvent.type(ratio, '5');
+    expect(save).toBeDisabled();
+    fireEvent.submit(save.closest('form')!);
+    expect(settings.service.update).toHaveBeenCalledTimes(1);
+    expect(within(section).getByRole('alert')).toHaveTextContent(forbiddenMessage);
+  });
+
+  it('forbidden after the role became operator: the section switches to "PUNTI"', async () => {
+    const auth = signedInFake();
+    const settings = createFakeSettingsService({ updateResults: ['forbidden'] });
+    const { ratio, save } = await openAdminSection(settings, auth);
+    auth.setProfile({ ...fakeOperator, role: 'operator' });
+    await replace(ratio, '2');
+    await userEvent.click(save);
+
+    const section = await screen.findByRole('region', { name: 'PUNTI' });
+    expect(normalized(within(section).getByText(/1 punto ogni/))).toBe(
+      '1 punto ogni 1,00 € di spesa',
+    );
+    expect(screen.queryByRole('region', { name: 'PUNTI E CONTROLLI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('forbidden after the profile was removed: back to /accedi', async () => {
+    const auth = signedInFake();
+    const settings = createFakeSettingsService({ updateResults: ['forbidden'] });
+    const { router, save } = await openAdminSection(settings, auth);
+    auth.removeProfile();
+    await userEvent.click(save);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+  });
+
+  it('a reload keeps the edited field and refreshes the untouched one', async () => {
+    const { ratio, threshold, settings } = await openAdminSection();
+    await replace(ratio, '2');
+    settings.changeElsewhere({ centsPerPoint: 300, confirmThresholdCents: 25000 });
+
+    act(() => {
+      fireEvent(document, new Event('visibilitychange'));
+    });
+
+    await waitFor(() => expect(threshold).toHaveValue('250,00'));
+    expect(settings.service.load).toHaveBeenCalledTimes(2);
+    expect(ratio).toHaveValue('2');
+  });
+
+  it('a reload refreshes both fields when neither was edited', async () => {
+    const { ratio, threshold, settings } = await openAdminSection();
+    settings.changeElsewhere({ centsPerPoint: 300, confirmThresholdCents: 25000 });
+    act(() => {
+      fireEvent(document, new Event('visibilitychange'));
+    });
+    await waitFor(() => expect(ratio).toHaveValue('3,00'));
+    expect(threshold).toHaveValue('250,00');
+  });
+
+  it('a reload after a failed save keeps the typed values', async () => {
+    const settings = createFakeSettingsService({ updateResults: ['network'] });
+    const { section, ratio, threshold, save } = await openAdminSection(settings);
+    await replace(ratio, '2');
+    await userEvent.click(save);
+    await within(section).findByRole('alert');
+    settings.changeElsewhere({ centsPerPoint: 300, confirmThresholdCents: 25000 });
+
+    act(() => {
+      fireEvent(document, new Event('visibilitychange'));
+    });
+
+    await waitFor(() => expect(threshold).toHaveValue('250,00'));
+    expect(ratio).toHaveValue('2');
   });
 });
