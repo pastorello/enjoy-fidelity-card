@@ -151,8 +151,8 @@ dashboard (Site URL e Redirect URLs della tabella della spec con `<team>`, templ
 mai `supabase config push`; la sezione V1 "reimpostare una password" rimanda al nuovo flusso. Rimandi in
 `SPEC-identity.md` e `CAPABILITY-MAP.md`; RUNBOOK (Mailpit, limiti locali, trappole trovate); `brain/MAP.md`.
 **Accettazione:**
-- [ ] Ogni passo indica la schermata esatta della dashboard; lo staging non riceve mai l'URL di produzione
-- [ ] Nessun segreto, dominio di team reale o dato personale nei documenti
+- [x] Ogni passo indica la schermata esatta della dashboard; lo staging non riceve mai l'URL di produzione
+- [x] Nessun segreto, dominio di team reale o dato personale nei documenti
 **Verifica:** rilettura; `npm run format:check`
 **Dipendenze:** 8 · **File:** docs/setup-accounts.md, SPEC-identity.md, CAPABILITY-MAP.md,
 brain/topics/operations/RUNBOOK.md, brain/MAP.md · **Dimensione:** S
