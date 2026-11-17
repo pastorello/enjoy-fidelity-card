@@ -173,13 +173,13 @@ src/test/fakeSettingsService.ts · **Dimensione:** M
 `phone-settings`), `brain/STATUS.md`, RUNBOOK (trappole trovate), CLAUDE.md se cambiano comandi o struttura;
 verifica in review del criterio 7 e spunta dei criteri di successo.
 **Accettazione:**
-- [ ] `grep -rn "settings'" src` trova solo `supabaseSettingsService.ts`; i componenti usano solo `useSettings()`
-- [ ] Nessun segreto né dato reale nei documenti
+- [x] `grep -rn "settings'" src` trova solo `supabaseSettingsService.ts`; i componenti usano solo `useSettings()`
+- [x] Nessun segreto né dato reale nei documenti
 **Verifica:** rilettura; quality bar completa verde
 **Dipendenze:** 10 · **File:** brain/MAP.md, brain/STATUS.md, brain/topics/operations/RUNBOOK.md, CLAUDE.md ·
 **Dimensione:** S
 
 ## Checkpoint D
-- [ ] Gli 8 criteri di successo di SPEC-settings verificati (tabella in [plan.md](plan.md))
+- [x] Gli 8 criteri di successo di SPEC-settings verificati (tabella in [plan.md](plan.md))
 - [ ] `typecheck`, `lint`, `format:check`, `test`, `db:test`, `test:integration`, `e2e` verdi; CI verde
 - [ ] PR pronta per `code-review-and-quality` (pubblicazione remota a cura dell'orchestratore)

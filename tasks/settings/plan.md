@@ -76,7 +76,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 4: E2E e chiusura
 - [x] Task 10: Progetto Playwright `phone-settings` ed `e2e/settings.spec.ts`
-- [ ] Task 11: Documentazione e memoria di progetto; verifica finale dei criteri di successo
+- [x] Task 11: Documentazione e memoria di progetto; verifica finale dei criteri di successo
 
 ### Checkpoint D: gli 8 criteri di successo verificati; quality bar completa verde; PR pronta per `code-review-and-quality`
 
