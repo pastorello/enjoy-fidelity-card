@@ -351,3 +351,115 @@ $$;
 
 revoke execute on function app.anonymize_customer(uuid) from public, anon;
 grant execute on function app.anonymize_customer(uuid) to authenticated;
+
+-- Reads ------------------------------------------------------------------------------
+-- security definer like the writes (the RLS would hide nothing from an operator
+-- anyway), so each one checks the caller first. ledger replaces their bodies
+-- with the real balance and the customers served today, keeping the signatures.
+
+-- search_customers: by phone when the text is only digits (spaces, +, - and .
+-- ignored) and has at least 3 of them, otherwise by name from 2 characters: every
+-- word, through the name key, is contained in the customer's key. At most 21
+-- rows (the 21st says there are more), never anonymized customers. Mirrored by
+-- classifyQuery in src/features/customers/phone.ts.
+create function app.search_customers(p_query text)
+returns setof app.customer_summary
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_text text := private.clean_name(left(coalesce(p_query, ''), 80));
+  v_digits text := regexp_replace(v_text, '[[:space:]+.-]', '', 'g');
+  v_patterns text[];
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  if v_digits ~ '^[0-9]+$' then
+    if length(v_digits) < 3 then
+      return;
+    end if;
+    -- A leading 00 stands for +, and the + is not among the digits searched.
+    if v_digits like '00%' then
+      v_digits := substr(v_digits, 3);
+    end if;
+    return query
+      select c.id, c.name, c.phone, c.notes, c.anonymized_at, 0, null::timestamptz
+      from app.customers c
+      where c.anonymized_at is null
+        and c.phone like '%' || v_digits || '%'
+      order by c.name_key, c.id
+      limit 21;
+    return;
+  end if;
+
+  if length(v_text) < 2 then
+    return;
+  end if;
+  -- One pattern per word; \, % and _ are escaped so they are searched literally.
+  select array_agg(
+    '%' || replace(replace(replace(private.customer_name_key(w), '\', '\\'), '%', '\%'), '_', '\_') || '%'
+  )
+  into v_patterns
+  from unnest(string_to_array(v_text, ' ')) as w;
+
+  return query
+    select c.id, c.name, c.phone, c.notes, c.anonymized_at, 0, null::timestamptz
+    from app.customers c
+    where c.anonymized_at is null
+      and c.name_key like all (v_patterns)
+    order by c.name_key, c.id
+    limit 21;
+end;
+$$;
+
+revoke execute on function app.search_customers(text) from public, anon;
+grant execute on function app.search_customers(text) to authenticated;
+
+-- get_customer: anonymized customers too; no row when the id does not exist.
+create function app.get_customer(p_customer_id uuid)
+returns setof app.customer_summary
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  return query
+    select c.id, c.name, c.phone, c.notes, c.anonymized_at, 0, null::timestamptz
+    from app.customers c
+    where c.id = p_customer_id;
+end;
+$$;
+
+revoke execute on function app.get_customer(uuid) from public, anon;
+grant execute on function app.get_customer(uuid) to authenticated;
+
+-- customers_served_today: empty, because there are no movements yet. ledger
+-- replaces the body (create or replace, same signature) with the customers who
+-- had a purchase or a redemption today in Europe/Rome.
+create function app.customers_served_today()
+returns setof app.customer_summary
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  return;
+end;
+$$;
+
+revoke execute on function app.customers_served_today() from public, anon;
+grant execute on function app.customers_served_today() to authenticated;

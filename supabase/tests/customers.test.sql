@@ -1,8 +1,8 @@
--- customers: the customers table, its name key, access rules and create_customer
--- (SPEC-customers.md, "Modello dati e regole di accesso"). Fake data only.
+-- customers: the customers table, its name key, access rules, the write RPCs and the
+-- reads (SPEC-customers.md, "Modello dati e regole di accesso"). Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(72);
+select plan(105);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -109,10 +109,16 @@ select throws_ok(
 reset role;
 
 -- Signed-in operator ------------------------------------------------------------------
+-- Every row, the seed's included: the count postgres sees.
+select set_config('customers_test.total', (select count(*) from app.customers)::text, true);
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000002","role":"authenticated"}', true);
 
-select is((select count(*) from app.customers), 1::bigint, 'an active operator reads the customers');
+select is(
+  (select count(*) from app.customers),
+  current_setting('customers_test.total')::bigint,
+  'an active operator reads every customer'
+);
 select throws_ok(
   $$insert into app.customers (name, privacy_consent_at, created_by, create_operation_id)
     values ('Diretto', now(), (select id from app.operators limit 1), gen_random_uuid())$$,
@@ -443,6 +449,217 @@ select is(
   (select name from app.anonymize_customer('b1b2c3d4-0000-4000-c200-000000000005')),
   'Cliente cancellato b1b2c3d4-0000-4000-c200-000000000005',
   'a taken technical name falls back to the full id'
+);
+reset role;
+
+-- Reads: search_customers, get_customer, customers_served_today -----------------------
+-- The reads must see only the rows inserted here: the rows above and the seed are
+-- set aside (renamed and anonymized) inside this rolled-back transaction.
+update app.customers
+set name = 'Da parte ' || id::text, phone = null, anonymized_at = coalesce(anonymized_at, now());
+
+insert into app.customers (id, name, phone, privacy_consent_at, notes, created_by, create_operation_id)
+select r.id::uuid, r.name, r.phone, now(), r.notes,
+       (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()
+from (values
+  ('00000000-0000-4000-c300-000000000001', 'Maria Rossi', '+393331234521', 'Cappuccino'),
+  ('00000000-0000-4000-c300-000000000002', 'Nicolò Bianco', null, null),
+  ('00000000-0000-4000-c300-000000000003', 'D’Angelo Lettura', null, null),
+  ('00000000-0000-4000-c300-000000000004', 'Telefono Estero', '+447700900123', null),
+  ('00000000-0000-4000-c300-000000000005', 'Sconto 50% Bar', null, null),
+  ('00000000-0000-4000-c300-000000000006', 'Sconto 500 Bar', null, null),
+  ('00000000-0000-4000-c300-000000000007', 'Caso a_b', null, null),
+  ('00000000-0000-4000-c300-000000000008', 'Caso axb', null, null),
+  ('00000000-0000-4000-c300-000000000009', 'Uno\Due', null, null),
+  ('00000000-0000-4000-c300-000000000010', 'Unodue', null, null),
+  ('00000000-0000-4000-c300-000000000011', 'Mario Rossi Anonimo', '+393339994521', null)
+) as r (id, name, phone, notes);
+update app.customers set anonymized_at = now()
+where id = '00000000-0000-4000-c300-000000000011';
+-- 25 customers sharing a word, inserted in reverse order.
+insert into app.customers (name, privacy_consent_at, created_by, create_operation_id)
+select 'Elenco ' || lpad(n::text, 2, '0'), now(),
+       (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()
+from generate_series(25, 1, -1) as n;
+
+select ok(
+  has_function_privilege('authenticated', 'app.search_customers(text)', 'execute')
+    and has_function_privilege('authenticated', 'app.get_customer(uuid)', 'execute')
+    and has_function_privilege('authenticated', 'app.customers_served_today()', 'execute'),
+  'authenticated can execute the three reads'
+);
+select ok(
+  not has_function_privilege('anon', 'app.search_customers(text)', 'execute')
+    and not has_function_privilege('anon', 'app.get_customer(uuid)', 'execute')
+    and not has_function_privilege('anon', 'app.customers_served_today()', 'execute'),
+  'anon cannot execute the reads'
+);
+select is(
+  array(
+    select p.proname || ':' || p.provolatile::text || ':' || p.prosecdef::text
+    from pg_proc p
+    where p.oid in (
+      'app.search_customers(text)'::regprocedure,
+      'app.get_customer(uuid)'::regprocedure,
+      'app.customers_served_today()'::regprocedure
+    )
+    order by 1
+  ),
+  array['customers_served_today:s:true', 'get_customer:s:true', 'search_customers:s:true'],
+  'the reads are stable and security definer'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000003","role":"authenticated"}', true);
+select throws_ok(
+  $$select * from app.search_customers('rossi')$$,
+  'P0001', 'not_operator', 'a user without a profile cannot search customers'
+);
+select throws_ok(
+  $$select * from app.get_customer('00000000-0000-4000-c300-000000000001')$$,
+  'P0001', 'not_operator', 'a user without a profile cannot read a customer'
+);
+select throws_ok(
+  $$select * from app.customers_served_today()$$,
+  'P0001', 'not_operator', 'a user without a profile cannot list the customers served today'
+);
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000002","role":"authenticated"}', true);
+
+-- search_customers by name
+select results_eq(
+  $$select id, name, phone, notes, anonymized_at, balance, last_served_at
+    from app.search_customers('rossi mari')$$,
+  $$values ('00000000-0000-4000-c300-000000000001'::uuid, 'Maria Rossi'::text, '+393331234521'::text,
+            'Cappuccino'::text, null::timestamptz, 0, null::timestamptz)$$,
+  'words in any order find Maria Rossi, never the anonymized Mario Rossi'
+);
+select results_eq(
+  $$select name from app.search_customers('nicolo')$$,
+  $$values ('Nicolò Bianco'::text)$$,
+  'a search without the accent finds the accented name'
+);
+select results_eq(
+  $$select name from app.search_customers('NICOLÒ')$$,
+  $$values ('Nicolò Bianco'::text)$$,
+  'case and accents in the search do not count'
+);
+select results_eq(
+  $$select name from app.search_customers('d''angelo')$$,
+  $$values ('D’Angelo Lettura'::text)$$,
+  'the straight apostrophe finds the typographic one'
+);
+select results_eq(
+  $$select name from app.search_customers('d’ang')$$,
+  $$values ('D’Angelo Lettura'::text)$$,
+  'the typographic apostrophe finds it too'
+);
+select results_eq(
+  $$select name from app.search_customers('50%')$$,
+  $$values ('Sconto 50% Bar'::text)$$,
+  '% is searched literally'
+);
+select results_eq(
+  $$select name from app.search_customers('a_b')$$,
+  $$values ('Caso a_b'::text)$$,
+  '_ is searched literally'
+);
+select results_eq(
+  $$select name from app.search_customers('o\d')$$,
+  $$values ('Uno\Due'::text)$$,
+  'a backslash is searched literally'
+);
+select is_empty(
+  $$select * from app.search_customers('anonimo')$$,
+  'anonymized customers never appear in a search'
+);
+select results_eq(
+  $$select name from app.search_customers('rossi' || repeat(' ', 80) || 'assente')$$,
+  $$values ('Maria Rossi'::text)$$,
+  'the text past 80 characters is cut'
+);
+
+-- search_customers by phone
+select results_eq(
+  $$select name from app.search_customers('4521')$$,
+  $$values ('Maria Rossi'::text)$$,
+  'the last 4 digits find the phone, never the anonymized one'
+);
+select results_eq(
+  $$select name from app.search_customers('333 123')$$,
+  $$values ('Maria Rossi'::text)$$,
+  'digits with spaces find the phone'
+);
+select results_eq(
+  $$select name from app.search_customers('+39 333-123')$$,
+  $$values ('Maria Rossi'::text)$$,
+  'the prefix with + and dashes finds the phone'
+);
+select results_eq(
+  $$select name from app.search_customers('0039 333.123')$$,
+  $$values ('Maria Rossi'::text)$$,
+  'a leading 00 means +'
+);
+select results_eq(
+  $$select name from app.search_customers('+44 7700')$$,
+  $$values ('Telefono Estero'::text)$$,
+  'a foreign number is found by its digits'
+);
+
+-- order, limit and short text
+select results_eq(
+  $$select name from app.search_customers('elenco')$$,
+  $$select 'Elenco ' || lpad(n::text, 2, '0') from generate_series(1, 21) as n$$,
+  '25 matches: the first 21 in alphabetical order'
+);
+select is_empty($$select * from app.search_customers('r')$$, 'one character searches nothing');
+select is_empty($$select * from app.search_customers('  r  ')$$, 'spaces do not count as characters');
+select is_empty($$select * from app.search_customers('45')$$, 'two digits search nothing');
+select is_empty($$select * from app.search_customers('')$$, 'an empty text searches nothing');
+select is_empty($$select * from app.search_customers(null)$$, 'a null text searches nothing');
+
+-- get_customer
+select results_eq(
+  $$select id, name, phone, notes, anonymized_at, balance, last_served_at
+    from app.get_customer('00000000-0000-4000-c300-000000000001')$$,
+  $$values ('00000000-0000-4000-c300-000000000001'::uuid, 'Maria Rossi'::text, '+393331234521'::text,
+            'Cappuccino'::text, null::timestamptz, 0, null::timestamptz)$$,
+  'get_customer returns the customer'
+);
+select results_eq(
+  $$select id, anonymized_at is not null from app.get_customer('00000000-0000-4000-c300-000000000011')$$,
+  $$values ('00000000-0000-4000-c300-000000000011'::uuid, true)$$,
+  'get_customer returns an anonymized customer too'
+);
+select is_empty(
+  $$select * from app.get_customer('00000000-0000-4000-c300-0000000000ff')$$,
+  'get_customer returns no row for an unknown id'
+);
+
+-- customers_served_today: empty until ledger replaces its body
+select is_empty($$select * from app.customers_served_today()$$, 'nobody has been served today yet');
+reset role;
+
+-- Performance: 1 000 more customers, with phones
+insert into app.customers (name, phone, privacy_consent_at, created_by, create_operation_id)
+select 'Generato ' || lpad(n::text, 4, '0'), '+39333100' || lpad(n::text, 4, '0'), now(),
+       (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()
+from generate_series(1, 1000) as n;
+analyze app.customers;
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000002","role":"authenticated"}', true);
+select performs_within(
+  $$select * from app.search_customers('generato 09')$$,
+  25, 25, 10,
+  'a search by name on 1 000 customers takes under 50 ms on average'
+);
+select performs_within(
+  $$select * from app.search_customers('1009')$$,
+  25, 25, 10,
+  'a search by phone on 1 000 customers takes under 50 ms on average'
 );
 reset role;
 
