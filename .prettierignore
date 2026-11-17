@@ -7,3 +7,4 @@ brain
 *.md
 .impeccable
 src/styles/tokens.css
+design/tokens.json
