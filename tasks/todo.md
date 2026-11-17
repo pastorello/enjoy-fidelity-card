@@ -49,8 +49,8 @@ in woff2 (OFL) con `@font-face`; `base.css` con focus ring.
 ## Task 5: Controlli di base
 **Descrizione:** `Button` (primary, secondary, danger; 56 px), `TextField` (label, errore), `SearchField`.
 **Accettazione:**
-- [ ] Ruoli e nomi accessibili corretti; errore collegato con `aria-describedby`
-- [ ] Target di tocco ≥ 48 px; solo variabili dei token nei CSS
+- [x] Ruoli e nomi accessibili corretti; errore collegato con `aria-describedby`
+- [x] Target di tocco ≥ 48 px; solo variabili dei token nei CSS
 **Verifica:** `npm test -- shared/ui`; detector Impeccable pulito
 **Dipendenze:** 4 · **File:** src/shared/ui/{Button,TextField,SearchField}.{tsx,module.css,test.tsx} · **Dimensione:** M
 
