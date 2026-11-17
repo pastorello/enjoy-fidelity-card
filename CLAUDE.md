@@ -97,7 +97,7 @@ Skill di progetto in `.claude/skills/` (versioni in `skills-lock.json`).
 
 ### Ingegneria — [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
 1. `interview-me` → chiudere i punti aperti.
-2. `spec-driven-development` → specifica nel repo (`docs/specs/`), derivata dalle fonti di verità.
+2. `spec-driven-development` → una specifica per modulo (`SPEC-<id>.md` nella root), indice in `CAPABILITY-MAP.md`.
 3. `planning-and-task-breakdown` → task piccoli e verificabili.
 4. `incremental-implementation` + `test-driven-development` → piccoli passi, test prima.
 5. `code-review-and-quality` → review prima del merge.
@@ -127,8 +127,23 @@ Altre quando pertinenti: `frontend-ui-engineering`, `api-and-interface-design`, 
 - Segreti solo in `.env` (ignorato); mantenere aggiornato `.env.example`.
 - Aggiornare questo file quando cambiano decisioni, architettura o comandi.
 
-## Comandi — TBD
-Da compilare quando il progetto applicativo esiste (install, dev, test, lint, build, deploy).
+## Comandi
+```bash
+npm install                 # dipendenze (Node 24, vedi .nvmrc)
+npm run dev                 # app in sviluppo; vetrina componenti su /dev/ui
+npm run dev:https           # HTTPS sulla rete locale, per il telefono
+npm run typecheck && npm run lint && npm test   # controlli prima di ogni commit
+npm run format              # Prettier
+npm run e2e                 # Playwright sulla build (390×844)
+npm run build               # build di produzione
+npm run db:start / db:stop  # Supabase locale (Docker)
+npm run db:reset            # riapplica migrazioni e seed
+npm run db:test             # test pgTAP
+npm run tokens              # rigenera i token CSS da design/tokens.json
+npm run icons               # rigenera le icone PWA
+```
+Deploy: Vercel da GitHub (anteprime = Supabase staging, `main` = produzione); migrazioni remote a mano con
+`npx supabase db push` (vedi `docs/setup-accounts.md` e RUNBOOK). Trappole operative: RUNBOOK §4.
 
 ## Struttura del repository
 ```
@@ -137,7 +152,15 @@ Da compilare quando il progetto applicativo esiste (install, dev, test, lint, bu
   agents/        # subagent Impeccable
   settings.json  # hook Impeccable + plugin project-brain
 brain/           # memoria di progetto (stato, decisioni, passaggi tra sessioni)
-docs/            # (da creare) specs/ e adr/
+CAPABILITY-MAP.md # moduli, dipendenze, ordine di costruzione
+SPEC-<id>.md     # specifica di ogni modulo
+docs/            # setup-accounts.md (Supabase, Vercel); adr/ da creare
+design/          # token e loghi del design system "Enjoy Bar"
+src/             # app (app/, shared/ui/, lib/, styles/)
+supabase/        # migrazioni, test pgTAP, config locale
+e2e/             # test Playwright
+scripts/         # generazione token e icone
+tasks/           # piano e task del modulo in corso
 skills-lock.json # versioni delle skill installate
 ```
 

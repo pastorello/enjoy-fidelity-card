@@ -10,6 +10,33 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-17 — Oxlint al posto di ESLint, TypeScript 7
+
+- **Decisione**: linting con Oxlint (regole TypeScript, React, react-hooks, jsx-a11y) e controllo basato sui
+  tipi con `oxlint-tsgolint`, costruito su TypeScript 7; si resta su TypeScript 7. Prettier per la formattazione.
+- **Perché**: typescript-eslint supporta TypeScript solo fino a 6.0 e eslint-plugin-jsx-a11y solo ESLint fino
+  a 9; Oxlint copre le stesse regole in un solo strumento compatibile con TS 7.
+- **Alternative scartate (Rejected alternatives)**:
+  - TypeScript 6.0 + ESLint 9: tutto compatibile, ma rinuncia a TS 7.
+  - TS 7 + ESLint 10 forzando le dipendenze: plugin fuori dal range supportato, errori silenziosi possibili.
+  - Due versioni di TypeScript (7 per compilare, 6 per il lint): più complesso da mantenere.
+  - Biome: controllo con i tipi più limitato.
+- **Ambito**: modulo `platform`, strumenti di qualità del codice.
+- **Contesto**: task 1 del piano `platform`, verifica delle dipendenze.
+
+### 2026-11-16 — Staging separato e account creati dall'utente
+
+- **Decisione**: due progetti Supabase gratuiti in UE, produzione e staging; le anteprime Vercel usano
+  staging. Gli account Supabase e Vercel li crea l'utente con il proprio account; l'agente prepara
+  configurazione e istruzioni.
+- **Perché**: le prove sulle anteprime non devono mai toccare i dati veri dei clienti; gli account e la
+  fatturazione restano in mano al titolare del progetto.
+- **Alternative scartate (Rejected alternatives)**:
+  - Un solo progetto Supabase: le anteprime scriverebbero sul database di produzione.
+  - Account creati dall'agente: l'agente non gestisce credenziali né accetta termini di servizio.
+- **Ambito**: modulo `platform` (deploy, ambienti).
+- **Contesto**: approvazione di `SPEC-platform.md`.
+
 ### 2026-11-16 — Configurazione iniziale dai valori di esempio delle specifiche
 
 - **Decisione**: al primo avvio rapporto 1 punto ogni 1 € (100 centesimi per punto); catalogo premi,

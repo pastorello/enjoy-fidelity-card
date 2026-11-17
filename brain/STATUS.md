@@ -7,19 +7,23 @@
 
 ## Cosa stiamo facendo
 
-Fase di definizione chiusa: intento confermato con `interview-me` e `brain/` creato. Nessun codice
-applicativo ancora. Prossimo: portare la specifica nel repo.
+Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano `platform`
+approvato; task 1-11 fatti (PR #2-#6 unite nei rami impilati, non in `main`: vedi RUNBOOK trappola 14);
+PR `release/platform` → `main` porta tutto. Poi Checkpoint C: account Supabase/hosting, anteprima,
+Lighthouse e prova su Android. Nessun codice applicativo ancora.
 
 ## Come verificarlo
 
-- Nulla di automatico: nessun codice né test ancora.
+- `npm run typecheck && npm run lint && npm test && npm run build`; `npm run db:start && npm run db:test`.
 - `git log --oneline` e `git status -sb` per lo stato del repo.
 
 ## Prossimi passi
 
-1. `spec-driven-development`: unire specifiche (doc), wireframe e `DECISIONS.md` in `docs/specs/`,
-   includendo le aggiunte al modello dati (DECISIONS 2026-11-16).
-2. `planning-and-task-breakdown`: piano dei task per le tre fasi.
+1. ~~Approvazione di `SPEC-platform.md`~~ fatto. Logo e icona: PNG ufficiali nel design system
+   (`enjoy-lettering-negative.png` per la barra, `enjoy-badge-solo-negative.png` per l'icona), da usare
+   nei task 7-8. Ancora aperto: monitoraggio errori prima del lancio.
+2. `planning-and-task-breakdown` per `platform`, poi implementazione; poi spec dei moduli successivi
+   nell'ordine della mappa (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
 3. `/impeccable init` partendo dal design system "Enjoy Bar" prima del primo lavoro di UI.
 4. Setup progetto: Supabase (regione UE), Vercel, struttura app PWA; compilare i comandi in
    `CLAUDE.md` e `brain/topics/operations/RUNBOOK.md`.
@@ -30,11 +34,12 @@ applicativo ancora. Prossimo: portare la specifica nel repo.
   lancio, non lo sviluppo).
 - **Lettore NFC USB**: da scegliere e acquistare (blocca la fase tablet); verificare il formato dell'uid.
 - **Amministratori iniziali** (nomi/email): servono al primo deploy.
+- **Account Supabase (prod + staging, UE) e Vercel**: li crea l'utente seguendo `docs/setup-accounts.md`.
+- **Vercel Hobby vieta l'uso commerciale**: decidere tra Vercel Pro o un altro hosting prima del deploy.
 
 ## Modifiche non pubblicate
 
-- Branch `docs/claude-md-from-spec` (CLAUDE.md + brain/) non ancora su GitHub.
-- 2 commit locali su `main` non pubblicati (skill webapp-testing, plugin project-brain).
+- Nessuna: tutto su GitHub. Da unire in `main`: PR `release/platform`.
 
 ## Ultima sessione
 

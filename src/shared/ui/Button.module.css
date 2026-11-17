@@ -1,0 +1,74 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  min-width: var(--touch-target);
+  padding: 0 var(--space-3);
+  border: 2px solid transparent;
+  border-radius: var(--radius-none);
+  font-family: var(--type-label-lg-family);
+  font-size: var(--type-label-lg-size);
+  line-height: var(--type-label-lg-line-height);
+  font-weight: var(--type-label-lg-weight);
+  letter-spacing: var(--type-label-lg-letter-spacing);
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.block {
+  display: flex;
+  width: 100%;
+}
+
+.button[data-variant='primary'] {
+  background: var(--color-enjoy-green);
+  color: var(--color-on-green);
+}
+
+.button[data-variant='secondary'] {
+  background: var(--color-surface);
+  border-color: var(--color-accent-text);
+  color: var(--color-accent-text);
+}
+
+.button[data-variant='danger'] {
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+}
+
+.button[data-variant='danger-secondary'] {
+  background: var(--color-surface);
+  border-color: var(--color-danger-text);
+  color: var(--color-danger-text);
+}
+
+.button:active:not(:disabled, [aria-disabled='true']) {
+  transform: translateY(1px);
+}
+
+/* Not available: no fill, muted text (design system "Non disponibile"). */
+.button:disabled {
+  background: var(--color-surface-raised);
+  border-color: transparent;
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
+.button[aria-busy='true'] {
+  cursor: progress;
+}
+
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
