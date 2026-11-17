@@ -56,9 +56,9 @@ primo piano: profilo assente → sessione chiusa e `/accedi` con il motivo `not-
 operatore e ruolo aggiornati nello stato (anche il ricontrollo al focus aggiorna ora un ruolo cambiato).
 Errore di rete: sessione mantenuta. Lo useranno `settings`, `customers`, `cards`, `ledger`, `rewards`, `export`.
 **Accettazione:**
-- [ ] Test con `fakeAuthService`: profilo tolto → stato `signed-out` con `not-enabled`; ruolo da admin a
+- [x] Test con `fakeAuthService`: profilo tolto → stato `signed-out` con `not-enabled`; ruolo da admin a
       operator → `useCurrentOperator().role === 'operator'`; rete assente → stato invariato
-- [ ] Test esistenti di `AuthProvider` e `RequireAuth` verdi senza modifiche al loro significato
+- [x] Test esistenti di `AuthProvider` e `RequireAuth` verdi senza modifiche al loro significato
 **Verifica:** `npm test -- identity`
 **Dipendenze:** nessuna · **File:** src/features/identity/AuthProvider.tsx, AuthProvider.test.tsx,
 src/test/fakeAuthService.ts · **Dimensione:** S
