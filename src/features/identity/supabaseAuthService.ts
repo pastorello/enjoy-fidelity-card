@@ -1,7 +1,14 @@
 import { isAuthApiError, isAuthRetryableFetchError } from '@supabase/supabase-js';
 import type { AuthError } from '@supabase/supabase-js';
 import { getSupabase } from '../../lib/supabase';
-import type { AuthService, Operator, SignInResult } from './types';
+import type {
+  AuthService,
+  Operator,
+  ResetRequestResult,
+  SignInResult,
+  UpdatePasswordResult,
+  VerifyRecoveryResult,
+} from './types';
 
 /** Maps a Supabase sign-in error to what the sign-in page needs to say. */
 export function signInResultFor(error: AuthError | null): SignInResult {
@@ -13,6 +20,39 @@ export function signInResultFor(error: AuthError | null): SignInResult {
   }
   return 'unknown';
 }
+
+/**
+ * True only when no HTTP answer arrived (failed fetch: status 0). Not the same as
+ * `isAuthRetryableFetchError`, which is also true for 5xx answers.
+ */
+function isNoResponse(error: AuthError): boolean {
+  return isAuthRetryableFetchError(error) && error.status === 0;
+}
+
+/**
+ * Any HTTP answer, 429 and 5xx included, is 'sent': a 504 from a slow email send happens only
+ * for real accounts, so telling it apart would reveal which emails have an account.
+ */
+export function resetRequestResultFor(error: AuthError | null): ResetRequestResult {
+  return error && isNoResponse(error) ? 'network' : 'sent';
+}
+
+export function verifyRecoveryResultFor(error: AuthError | null): VerifyRecoveryResult {
+  if (!error) return 'ok';
+  if (isNoResponse(error)) return 'network';
+  if (error.code === 'otp_expired' || error.status === 403) return 'invalid-link';
+  return 'unknown';
+}
+
+export function updatePasswordResultFor(error: AuthError | null): UpdatePasswordResult {
+  if (!error) return 'ok';
+  if (isNoResponse(error)) return 'network';
+  if (error.code === 'same_password') return 'same-password';
+  if (error.code === 'weak_password') return 'weak';
+  return 'unknown';
+}
+
+// No method below logs: email, password and link token must never reach a log.
 
 function isRole(value: unknown): value is Operator['role'] {
   return value === 'admin' || value === 'operator';
@@ -67,5 +107,52 @@ export const supabaseAuthService: AuthService = {
       if (userId !== undefined) setTimeout(() => listener(userId), 0);
     });
     return () => data.subscription.unsubscribe();
+  },
+
+  async currentEmail() {
+    // Only prefills a form: a session that cannot be refreshed means "no email", not an error.
+    const { data, error } = await getSupabase().auth.getSession();
+    if (error) return null;
+    return data.session?.user.email ?? null;
+  },
+
+  async requestPasswordReset(email, redirectTo) {
+    try {
+      const { error } = await getSupabase().auth.resetPasswordForEmail(email, { redirectTo });
+      return resetRequestResultFor(error);
+    } catch {
+      return 'network';
+    }
+  },
+
+  async verifyRecovery(tokenHash) {
+    try {
+      const { error } = await getSupabase().auth.verifyOtp({
+        type: 'recovery',
+        token_hash: tokenHash,
+      });
+      return verifyRecoveryResultFor(error);
+    } catch {
+      return 'network';
+    }
+  },
+
+  async updatePassword(password) {
+    try {
+      const { error } = await getSupabase().auth.updateUser({ password });
+      return updatePasswordResultFor(error);
+    } catch {
+      return 'network';
+    }
+  },
+
+  async signOutOtherDevices() {
+    // Other devices leave at their next token refresh; failing here must not block the user,
+    // whose new password is already saved.
+    try {
+      await getSupabase().auth.signOut({ scope: 'others' });
+    } catch {
+      // Ignored on purpose (see above).
+    }
   },
 };
