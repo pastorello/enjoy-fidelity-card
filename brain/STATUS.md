@@ -24,9 +24,10 @@ del modulo `identity`.
    più avanti). Mancano: scelta del piano di hosting (Hobby vieta l'uso commerciale), account Supabase
    (`docs/setup-accounts.md`) con `db push` su staging e verifica dell'event trigger, installazione su
    Android.
-2. `SPEC-identity.md` approvata (2026-11-17): solo accesso, account creati a mano in Supabase, niente
-   email; prossimo passo il piano dei task in `tasks/`; poi gli altri nell'ordine di `CAPABILITY-MAP.md`
-   (le aggiunte al modello dati vanno nelle spec di settings/ledger/tablet-kiosk).
+2. **Modulo `identity`** (piano in `tasks/identity/`, PR #13 bozza su `feat/identity`): task 1-2 fatti
+   (database con `operators`/`add_operator`/seed; E2E e CI contro Supabase locale). Checkpoint A raggiunto,
+   in attesa di revisione dell'utente; poi task 3-5 (sessione, `/accedi`, Impostazioni). Dopo `identity`,
+   gli altri moduli nell'ordine di `CAPABILITY-MAP.md`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare

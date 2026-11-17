@@ -33,7 +33,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Fondamenta
 - [x] Task 1: Migrazione `operators`, funzioni di accesso, `add_operator`, schema `app` esposto, seed, pgTAP
-- [ ] Task 2: E2E e CI contro Supabase locale (variabili, CSP di preview, CI con Docker)
+- [x] Task 2: E2E e CI contro Supabase locale (variabili, CSP di preview, CI con Docker)
 
 ### Checkpoint A: db:test e la suite E2E esistente verdi in locale e in CI
 

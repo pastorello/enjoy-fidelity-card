@@ -27,13 +27,13 @@ per `vite preview`; il job `app` della CI avvia Supabase (solo i servizi necessa
 **Accettazione:**
 - [x] La suite E2E esistente passa con lo stack locale avviato, anche se `.env` punta allo staging
 - [x] Ogni test E2E fallisce se l'app chiama un progetto `*.supabase.co` (fixture automatica `onlyLocalSupabase`)
-- [ ] `vercel.json` invariato; CI verde sulla PR
+- [x] `vercel.json` invariato; CI verde sulla PR
 **Verifica:** `npm run db:start && npm run e2e`; CI su GitHub
 **Dipendenze:** 1 · **File:** playwright.config.ts, vite.config.ts, .github/workflows/ci.yml, e2e/smoke.spec.ts
 · **Dimensione:** S
 
 ## Checkpoint A
-- [ ] `db:test`, `test`, `e2e` verdi in locale e in CI
+- [x] `db:test`, `test`, `e2e` verdi in locale e in CI
 - [ ] Revisione con l'utente prima della UI
 
 ## Task 3: Sessione e operatore corrente
