@@ -69,9 +69,9 @@ servizio, seguito da ricarica). Il servizio si inietta come `AuthService` (`main
 Supabase, `renderApp` con il finto); il caricamento parte una volta per sessione dentro `RequireAuth`
 (che avvolge l'`Outlet` con il provider) e si ripete su `visibilitychange` quando la pagina torna visibile.
 **Accettazione:**
-- [ ] Test: caricamento → pronto; errore → `retry` richiama `load`; `save` ok aggiorna i valori;
+- [x] Test: caricamento → pronto; errore → `retry` richiama `load`; `save` ok aggiorna i valori;
       `visibilitychange` visibile ricarica; nessun caricamento senza operatore collegato
-- [ ] `renderApp` monta il provider con `fakeSettingsService`; test esistenti verdi
+- [x] `renderApp` monta il provider con `fakeSettingsService`; test esistenti verdi
 **Verifica:** `npm test`
 **Dipendenze:** 2 · **File:** src/features/settings/SettingsProvider.tsx (+ .test.tsx),
 src/features/identity/RequireAuth.tsx, src/main.tsx, src/test/renderApp.tsx · **Dimensione:** M

@@ -61,7 +61,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 2: Infrastruttura condivisa del frontend
 - [x] Task 3: `reportNotEnabled()` in `AuthProvider` (profilo assente → `/accedi`, presente → ruolo aggiornato)
-- [ ] Task 4: `SettingsProvider` e `useSettings()` dentro `RequireAuth`, iniettati in `main.tsx` e `renderApp`
+- [x] Task 4: `SettingsProvider` e `useSettings()` dentro `RequireAuth`, iniettati in `main.tsx` e `renderApp`
 - [ ] Task 5: `parseEuroInput` e `centsToEuroInput` (funzioni pure, messaggi italiani)
 - [ ] Task 6: `TextField` con `layout="inline"` e `suffix`
 
