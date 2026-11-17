@@ -18,15 +18,34 @@ npm run db:reset                            # riapplica migrazioni + seed
 npm run db:test                             # test pgTAP in supabase/tests/
 npx supabase migration new <nome> </dev/null   # nuova migrazione (vedi trappola 5)
 npm run tokens                              # rigenera src/styles/tokens.css da design/tokens.json
+npm run icons                               # rigenera le icone PWA da design/enjoy-badge-solo-negative.png
+npm run e2e                                 # Playwright sulla build, 390×844, con le intestazioni di vercel.json
+npm run dev:https                           # HTTPS sulla rete locale (certificato autofirmato), per il telefono
 npx impeccable detect src/                  # scansione design (anche su URL del dev server)
 npx skills add <owner>/<repo> --skill <nome> --agent claude-code   # aggiungere una skill di progetto
 bash ~/.claude/plugins/cache/sprout-labs/project-brain/*/scripts/doctor.sh .   # controllo di brain/
 ```
 
+### Pubblicazione
+
+- Vercel pubblica da solo: anteprima per ogni PR (Supabase di staging), produzione da `main`.
+- Database: `npx supabase link --project-ref <ref>` e `npx supabase db push`, **a mano**, prima su staging
+  e poi su produzione. Procedura completa in `docs/setup-accounts.md`.
+- CI: `.github/workflows/ci.yml` (job App ed E2E, job Database con il solo Postgres).
+
+### Provare sul telefono Android
+
+1. **Consigliato**: telefono collegato via USB con il debug USB attivo, `npm run dev`, poi in Chrome sul
+   computer `chrome://inspect` → *Port forwarding* `5173 → localhost:5173`. Sul telefono si apre
+   `http://localhost:5173`: localhost è un contesto sicuro, quindi Web NFC funziona senza certificati.
+2. In alternativa: `npm run dev:https` e sul telefono l'indirizzo `https://<ip>:<porta>` stampato in console,
+   accettando l'avviso del certificato autofirmato.
+3. Oppure l'anteprima Vercel della PR, già in HTTPS.
+
 ## 2. Controllo di salute
 
-`npm run typecheck && npm run lint && npm test && npm run build` e, con Supabase acceso, `npm run db:test`:
-tutto verde = sano.
+`npm run typecheck && npm run lint && npm test && npm run e2e` e, con Supabase acceso, `npm run db:test`:
+tutto verde = sano. In CI: i due job di `CI` verdi sulla PR (`gh pr checks <n>`).
 
 ## 3. Quando qualcosa non va, guarda qui
 
@@ -57,3 +76,9 @@ tutto verde = sano.
    simula con l'evento `cancel` sul dialog, non con il tasto.
 10. Testing Library normalizza gli spazi: lo spazio indivisibile di `formatCents`/`formatPoints` nei test
     va cercato con una regex (`/12,50\s+€/`).
+11. Le intercettazioni di rete di Playwright (`route`) scavalcano il service worker: per verificare cosa
+    mette in cache si controlla `sw.js` generato, non una richiesta simulata.
+12. La porta 5173 può essere occupata da altri progetti (un container Docker): Vite passa alla successiva,
+    leggere l'indirizzo stampato in console.
+13. `glob` e `minimatch` sono forzati con `overrides` in `package.json` (vulnerabilità in workbox-build):
+    toglierli quando workbox-build li aggiorna.

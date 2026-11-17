@@ -97,18 +97,18 @@ worker con cache solo per l'app shell e `NetworkOnly` per `*.supabase.co`; Playw
 **Descrizione:** GitHub Actions su PR e `main`: job app (typecheck, lint, test, build, e2e) e job database
 (`supabase start` ridotto + `db:test`).
 **Accettazione:**
-- [ ] Tutti i job verdi su una PR
+- [x] Tutti i job verdi su una PR
 **Verifica:** `gh pr checks`
 **Dipendenze:** 3, 8 · **File:** .github/workflows/ci.yml · **Dimensione:** S
 
 ## Task 11: Deploy e documentazione
 **Descrizione:** `vercel.json` (rewrite SPA, CSP verso il solo dominio Supabase, Referrer-Policy,
-X-Content-Type-Options, Permissions-Policy con `nfc` consentito); istruzioni passo passo per l'utente
+X-Content-Type-Options, Permissions-Policy restrittiva); istruzioni passo passo per l'utente
 (account Supabase prod + staging in Francoforte, Vercel collegato al repo, variabili d'ambiente);
 comandi reali in RUNBOOK e CLAUDE.md.
 **Accettazione:**
 - [ ] Anteprima Vercel della PR: segnaposto visibile, console pulita (dopo il collegamento fatto dall'utente)
-- [ ] RUNBOOK documenta `supabase db push` in produzione
+- [x] RUNBOOK documenta `supabase db push` in produzione
 **Verifica:** anteprima Vercel; Lighthouse (PWA, Accessibilità ≥ 95, Best Practices ≥ 95)
 **Dipendenze:** 8, 10 · **File:** vercel.json, brain/topics/operations/RUNBOOK.md, CLAUDE.md, docs/setup-accounts.md · **Dimensione:** M
 

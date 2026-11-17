@@ -44,7 +44,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 3: PWA, automazione, pubblicazione
 - [x] Task 8: PWA (manifest, icone provvisorie, service worker solo app shell) + E2E Playwright
 - [x] Task 9: `npm run dev:https` per provare sul telefono
-- [ ] Task 10: CI GitHub Actions (typecheck, lint, test, build, db:test, e2e)
+- [x] Task 10: CI GitHub Actions (typecheck, lint, test, build, db:test, e2e)
 - [ ] Task 11: Vercel (`vercel.json`, CSP, intestazioni), istruzioni per gli account, RUNBOOK e CLAUDE.md
 
 ### Checkpoint C (completo): i 9 criteri di successo della spec verificati, PR pronta per la review

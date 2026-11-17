@@ -77,8 +77,10 @@ Stile: CSS con custom properties generate dai token, niente framework CSS; font 
 10. **CI (GitHub Actions)** su ogni PR e su `main`: typecheck, lint, test unitari, build, test database
     (`supabase start` + `supabase test db`), test E2E Playwright sulla build (viewport 390×844).
 11. **Deploy**: integrazione Git di Vercel (anteprima per ogni PR, produzione da `main`); `vercel.json` con
-    rewrite SPA e intestazioni di sicurezza (CSP restrittiva verso il solo dominio Supabase,
-    `Referrer-Policy`, `X-Content-Type-Options`, `Permissions-Policy`). Le migrazioni in produzione si
+    rewrite SPA e intestazioni di sicurezza (CSP restrittiva: solo l'origine dell'app e `*.supabase.co`,
+    che copre i progetti di produzione e staging; `Referrer-Policy`, `X-Content-Type-Options`,
+    `Permissions-Policy` che nega camera, microfono, posizione e pagamenti; Web NFC non ha una voce di
+    Permissions-Policy e resta consentito alla stessa origine). `vite preview` applica le stesse intestazioni. Le migrazioni in produzione si
     applicano a mano con `supabase db push`, documentato nel RUNBOOK.
 
 ## Commands
