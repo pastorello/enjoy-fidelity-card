@@ -62,7 +62,7 @@ card e movimenti arrivano con `card-input`, `cards` e `ledger`: qui `balance` = 
 Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Database (rischio più alto)
-- [ ] Task 1: Tabella `customers`, chiave del nome, RLS e `create_customer` idempotente; pgTAP
+- [x] Task 1: Tabella `customers`, chiave del nome, RLS e `create_customer` idempotente; pgTAP
 - [ ] Task 2: `update_customer` e `anonymize_customer`; pgTAP
 - [ ] Task 3: Letture `search_customers`, `get_customer`, `customers_served_today`; prestazioni; seed
 

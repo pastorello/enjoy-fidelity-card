@@ -19,13 +19,13 @@ revocati; tipo `app.customer_summary`; normalizzazione SQL del telefono; `app.cr
 `phone_invalid`, `consent_required`, `notes_too_long`, `customer_name_taken` (con `detail` = id esistente),
 idempotente su `create_operation_id`, `unique_violation` intercettati per vincolo; `balance` 0.
 **Accettazione:**
-- [ ] pgTAP: `anon` e utente senza profilo non leggono la tabella; `authenticated` non scrive direttamente;
+- [x] pgTAP: `anon` e utente senza profilo non leggono la tabella; `authenticated` non scrive direttamente;
       utente senza profilo riceve `not_operator` da `create_customer`; `clean_name`/`customer_name_key` e
       `acting_operator_id` senza `execute` per `authenticated` e `anon`
-- [ ] pgTAP: solo nome + consenso crea il cliente con `created_by` = operatore chiamante e
+- [x] pgTAP: solo nome + consenso crea il cliente con `created_by` = operatore chiamante e
       `privacy_consent_at` = ora del server; consenso falso, nome vuoto o di 81 caratteri, telefono non valido,
       note di 501 caratteri → codice giusto; telefono e note di soli spazi → null
-- [ ] pgTAP: "Nicolò Rossi" poi "nicolo  rossi" → `customer_name_taken` con `detail` = id; "D'Angelo" =
+- [x] pgTAP: "Nicolò Rossi" poi "nicolo  rossi" → `customer_name_taken` con `detail` = id; "D'Angelo" =
       "D’Angelo"; stesso `operation_id` due volte → una riga, stesso id; normalizzazione `333 123 4521` →
       `+393331234521`, `0039…`, `+44…`, `0771 123456` → `+390771123456`
 **Verifica:** `npm run db:reset && npm run db:test`
