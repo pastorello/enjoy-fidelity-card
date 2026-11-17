@@ -46,9 +46,19 @@ type AuthContextValue = {
   completeRecovery: (tokenHash: string, password: string) => Promise<RecoveryOutcome>;
   /** Leaving the recovery page: a verified link whose password was not saved signs out. */
   abandonRecovery: () => Promise<void>;
+  /**
+   * For permission refusals from the server: re-checks the profile. Gone → signed out with
+   * 'not-enabled' (RequireAuth sends to /accedi); present → operator and role updated; network
+   * error → nothing changes. Resolves when the check is over; does nothing when signed out.
+   */
+  reportNotEnabled: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function sameOperator(a: Operator, b: Operator): boolean {
+  return a.id === b.id && a.name === b.name && a.role === b.role;
+}
 
 /** Holds who is signed in on this device. Only this feature talks to Supabase Auth. */
 export function AuthProvider({ service, children }: { service: AuthService; children: ReactNode }) {
@@ -120,29 +130,51 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     };
   }, [service, restore, retry]);
 
-  // An administrator can remove the account while the app is open: its token keeps working
-  // until it expires, but the profile is gone. Re-check it (one small query) whenever the app
-  // comes back to the foreground.
+  // The latest profile check started; an older one that answers later is ignored.
+  const lastCheck = useRef(0);
+  // A foreground check still waiting for its answer: further foreground events do not add another.
+  const checking = useRef(false);
+
+  // An administrator can remove the account or change its role while the app is open: its token
+  // keeps working until it expires, but the profile is gone or different. Re-check it (one small
+  // query): gone → signed out as not enabled; present → operator and role updated; offline → the
+  // session is kept and the next check tries again.
+  const recheckProfile = useCallback(async () => {
+    const userId = checkedUser.current;
+    if (userId === null || signingOut.current) return;
+    const check = ++lastCheck.current;
+    let operator: Operator | null;
+    try {
+      operator = await service.loadOperator(userId);
+    } catch {
+      return;
+    }
+    // A newer check started, or signed out or switched user, while this one was running.
+    if (check !== lastCheck.current || checkedUser.current !== userId) return;
+    if (operator) {
+      const fresh = operator;
+      setState((current) =>
+        current.status === 'signed-in' && sameOperator(current.operator, fresh)
+          ? current
+          : { status: 'signed-in', operator: fresh },
+      );
+      return;
+    }
+    checkedUser.current = null;
+    await endSession();
+    setState({ status: 'signed-out', reason: 'not-enabled' });
+  }, [service, endSession]);
+
+  // Checked whenever the app comes back to the foreground.
   useEffect(() => {
-    let checking = false;
     const recheck = async () => {
-      const userId = checkedUser.current;
-      if (checking || userId === null || signingOut.current) return;
-      checking = true;
-      let operator: Operator | null;
+      if (checking.current) return;
+      checking.current = true;
       try {
-        operator = await service.loadOperator(userId);
-      } catch {
-        return; // Offline: keep the session, the next foreground event checks again.
+        await recheckProfile();
       } finally {
-        checking = false;
+        checking.current = false;
       }
-      // Signed out, or switched to another user, while the check was running.
-      if (checkedUser.current !== userId) return;
-      if (operator) return;
-      checkedUser.current = null;
-      await endSession();
-      setState({ status: 'signed-out', reason: 'not-enabled' });
     };
     const onFocus = () => void recheck();
     const onVisibilityChange = () => {
@@ -154,7 +186,11 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [service, endSession]);
+  }, [recheckProfile]);
+
+  // A server refused an action for lack of permission (42501, not_operator): the profile may be
+  // gone or its role changed. Always checks again, even while a foreground check is running.
+  const reportNotEnabled = useCallback(() => recheckProfile(), [recheckProfile]);
 
   const signIn = useCallback(
     async (email: string, password: string): Promise<SignInOutcome> => {
@@ -275,6 +311,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       requestPasswordReset,
       completeRecovery,
       abandonRecovery,
+      reportNotEnabled,
     }),
     [
       state,
@@ -285,6 +322,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       requestPasswordReset,
       completeRecovery,
       abandonRecovery,
+      reportNotEnabled,
     ],
   );
   return <AuthContext value={value}>{children}</AuthContext>;
