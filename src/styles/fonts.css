@@ -7,7 +7,9 @@
 @font-face {
   font-family: 'Enjoy Display';
   src: url('/fonts/EnjoyDisplay-Regular.woff2') format('woff2');
-  font-weight: 400;
+  /* The one face serves every weight the tokens ask for (600, 700): no faux bold, even
+     where font-synthesis is reset. Matches design/tokens.json. */
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
