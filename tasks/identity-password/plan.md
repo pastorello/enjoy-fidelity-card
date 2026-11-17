@@ -57,7 +57,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: componenti verdi; schermate conformi ai wireframe; detector Impeccable pulito; revisione di sicurezza
 
 ### Fase 3: Percorso completo e consegna
-- [ ] Task 8: Seed `recupero@example.com` ed E2E del percorso completo con Mailpit
+- [x] Task 8: Seed `recupero@example.com` ed E2E del percorso completo con Mailpit
 - [ ] Task 9: Documentazione: procedura remota, rimandi in SPEC-identity e CAPABILITY-MAP, RUNBOOK, MAP
 
 ### Checkpoint C: criteri di successo 1-7 e 9 verificati; procedura remota pronta (criterio 8); PR pronta per `code-review-and-quality`

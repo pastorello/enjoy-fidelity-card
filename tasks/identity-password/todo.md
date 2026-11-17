@@ -139,8 +139,8 @@ la nuova; vecchia password rifiutata; link riaperto → "Chiedi un nuovo link";
 (c) Impostazioni come `operatore@example.com` → "Cambia password" → email precompilata → conferma, senza
 aprire il link.
 **Accettazione:**
-- [ ] I tre scenari verdi; una seconda esecuzione senza `db:reset` resta verde
-- [ ] `db:test` verde con il seed esteso; nessun altro test accede con `recupero@example.com`
+- [x] I tre scenari verdi; una seconda esecuzione senza `db:reset` resta verde
+- [x] `db:test` verde con il seed esteso; nessun altro test accede con `recupero@example.com`
 **Verifica:** `npm run db:reset && npm run db:test && npm run e2e && npm run e2e`
 **Dipendenze:** 1, 6, 7 · **File:** supabase/seed.sql, e2e/auth.ts, e2e/password.spec.ts · **Dimensione:** S
 
