@@ -43,7 +43,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Fondamenta (alto rischio)
 - [x] Task 1: Config di Auth locale, template `recovery`, helper Mailpit, test di integrazione e Mailpit in CI
-- [ ] Task 2: `AuthService` esteso: tipi, mappatura degli errori in `supabaseAuthService`, fake esteso
+- [x] Task 2: `AuthService` esteso: tipi, mappatura degli errori in `supabaseAuthService`, fake esteso
 - [ ] Task 3: `AuthProvider`: `completeRecovery`, `abandonRecovery`, `currentEmail`
 
 ### Checkpoint A: integrazione con Mailpit verde in locale e in CI; mappatura degli errori coperta

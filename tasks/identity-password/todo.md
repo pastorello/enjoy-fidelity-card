@@ -36,11 +36,11 @@ metodi `currentEmail`, `requestPasswordReset`, `verifyRecovery`, `updatePassword
 email, password o token. `createFakeAuthService` esteso con risultati programmabili e contatori delle
 chiamate.
 **Accettazione:**
-- [ ] Unità: `requestPasswordReset` → `sent` per 200, 429, 400, 500, 502, 503 **e 504**; `network` solo per
+- [x] Unità: `requestPasswordReset` → `sent` per 200, 429, 400, 500, 502, 503 **e 504**; `network` solo per
       `fetch` fallita o `status` 0
-- [ ] Unità: `verifyRecovery` → `invalid-link` per `otp_expired` e 403, `network` senza risposta, `unknown`
+- [x] Unità: `verifyRecovery` → `invalid-link` per `otp_expired` e 403, `network` senza risposta, `unknown`
       per 429 e altro; `updatePassword` → `same-password`, `weak`, `network`, `unknown`
-- [ ] Il fake rispetta il tipo `AuthService` e conta `requestPasswordReset`, `verifyRecovery`, `updatePassword`
+- [x] Il fake rispetta il tipo `AuthService` e conta `requestPasswordReset`, `verifyRecovery`, `updatePassword`
 **Verifica:** `npm test -- identity`
 **Dipendenze:** nessuna · **File:** src/features/identity/types.ts, supabaseAuthService.ts,
 supabaseAuthService.test.ts, src/test/fakeAuthService.ts · **Dimensione:** M
