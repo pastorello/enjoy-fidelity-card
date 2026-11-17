@@ -83,6 +83,42 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     };
   }, [service, restore, retry]);
 
+  // An administrator can remove the account while the app is open: its token keeps working
+  // until it expires, but the profile is gone. Re-check it (one small query) whenever the app
+  // comes back to the foreground.
+  useEffect(() => {
+    let checking = false;
+    const recheck = async () => {
+      const userId = checkedUser.current;
+      if (checking || userId === null || signingOut.current) return;
+      checking = true;
+      let operator: Operator | null;
+      try {
+        operator = await service.loadOperator(userId);
+      } catch {
+        return; // Offline: keep the session, the next foreground event checks again.
+      } finally {
+        checking = false;
+      }
+      // Signed out, or switched to another user, while the check was running.
+      if (checkedUser.current !== userId) return;
+      if (operator) return;
+      checkedUser.current = null;
+      await endSession();
+      setState({ status: 'signed-out', reason: 'not-enabled' });
+    };
+    const onFocus = () => void recheck();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void recheck();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [service, endSession]);
+
   const signIn = useCallback(
     async (email: string, password: string): Promise<SignInOutcome> => {
       const result = await service.signIn(email, password);

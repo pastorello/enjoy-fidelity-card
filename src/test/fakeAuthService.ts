@@ -12,7 +12,8 @@ type FakeOptions = {
 
 /**
  * In-memory AuthService for component tests. `endSession()` simulates an expired session,
- * `switchUser()` another tab or a link saving a different user's session.
+ * `switchUser()` another tab or a link saving a different user's session, `removeProfile()`
+ * an administrator removing the account while the app is open.
  */
 export function createFakeAuthService({
   userId = null,
@@ -58,6 +59,9 @@ export function createFakeAuthService({
       currentUser = nextUserId;
       profile = nextOperator;
       notify(nextUserId);
+    },
+    removeProfile() {
+      profile = null;
     },
   };
 }

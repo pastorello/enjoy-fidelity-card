@@ -1,6 +1,6 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { createFakeAuthService, fakeOperator } from '../../test/fakeAuthService';
 import type { Operator } from './types';
 import { AuthProvider, useAuth } from './AuthProvider';
@@ -38,6 +38,10 @@ function renderWith(fake: ReturnType<typeof createFakeAuthService>) {
 }
 
 const state = () => screen.getByTestId('state');
+
+function setVisibility(value: DocumentVisibilityState) {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, value });
+}
 
 describe('AuthProvider', () => {
   it('starts loading, then signed out when no session is saved', async () => {
@@ -171,5 +175,97 @@ describe('AuthProvider', () => {
     act(() => fake.switchUser('user-1', fakeOperator));
     expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
     expect(fake.service.loadOperator).toHaveBeenCalledOnce();
+  });
+
+  describe('re-checks the profile when the app comes back to the foreground', () => {
+    afterEach(() => {
+      // Back to jsdom's own getter.
+      Reflect.deleteProperty(document, 'visibilityState');
+    });
+
+    it('ends the session when the profile is gone on window focus', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('in:'));
+      fake.removeProfile();
+      act(() => {
+        fireEvent.focus(window);
+      });
+      await waitFor(() => expect(state()).toHaveTextContent('out:not-enabled'));
+      expect(fake.service.signOut).toHaveBeenCalledOnce();
+    });
+
+    it('ends the session when the profile is gone and the page becomes visible', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('in:'));
+      fake.removeProfile();
+      setVisibility('visible');
+      act(() => {
+        fireEvent(document, new Event('visibilitychange'));
+      });
+      await waitFor(() => expect(state()).toHaveTextContent('out:not-enabled'));
+    });
+
+    it('does not check while the page is hidden', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('in:'));
+      setVisibility('hidden');
+      act(() => {
+        fireEvent(document, new Event('visibilitychange'));
+      });
+      expect(fake.service.loadOperator).toHaveBeenCalledOnce();
+    });
+
+    it('stays signed in when the profile is still there', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('in:'));
+      act(() => {
+        fireEvent.focus(window);
+      });
+      await waitFor(() => expect(fake.service.loadOperator).toHaveBeenCalledTimes(2));
+      expect(fake.service.loadOperator).toHaveBeenLastCalledWith('user-1');
+      expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
+      expect(fake.service.signOut).not.toHaveBeenCalled();
+    });
+
+    it('stays signed in when the check fails offline', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('in:'));
+      fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+      act(() => {
+        fireEvent.focus(window);
+      });
+      await waitFor(() => expect(fake.service.loadOperator).toHaveBeenCalledTimes(2));
+      await act(() => Promise.resolve());
+      expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
+      expect(fake.service.signOut).not.toHaveBeenCalled();
+    });
+
+    it('does not check when signed out', async () => {
+      const fake = createFakeAuthService();
+      renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('out:-'));
+      act(() => {
+        fireEvent.focus(window);
+      });
+      expect(fake.service.loadOperator).not.toHaveBeenCalled();
+    });
+
+    it('stops listening after unmount', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      const { unmount } = render(
+        <AuthProvider service={fake.service}>
+          <Probe />
+        </AuthProvider>,
+      );
+      await waitFor(() => expect(state()).toHaveTextContent('in:'));
+      unmount();
+      fireEvent.focus(window);
+      expect(fake.service.loadOperator).toHaveBeenCalledOnce();
+    });
   });
 });
