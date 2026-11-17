@@ -4,6 +4,8 @@ import { expect, type Page } from '@playwright/test';
 export const seedAccounts = {
   admin: { email: 'admin@example.com', name: 'Admin Prova' },
   operator: { email: 'operatore@example.com', name: 'Operatore Prova' },
+  /** Reserved to e2e/password.spec.ts, which changes its password: no other test signs in with it. */
+  recovery: { email: 'recupero@example.com', name: 'Recupero Prova' },
 } as const;
 export const SEED_PASSWORD = 'password-di-prova';
 

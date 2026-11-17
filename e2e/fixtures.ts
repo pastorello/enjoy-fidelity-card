@@ -6,11 +6,13 @@ export const test = base.extend<{ consoleErrors: string[]; onlyLocalSupabase: vo
     async ({ page }, use) => {
       const errors: string[] = [];
       page.on('console', (message) => {
-        // Rejected sign-in attempts are an expected 400 from Auth, logged by the browser.
-        const rejectedSignIn =
-          message.text().startsWith('Failed to load resource') &&
-          message.location().url.includes('/auth/v1/token');
-        if (rejectedSignIn) return;
+        // Rejected sign-in attempts (400 on /token) and used or expired recovery links (403 on
+        // /verify) are expected answers from Auth, logged by the browser.
+        const failedLoad = message.text().startsWith('Failed to load resource');
+        const url = message.location().url;
+        const rejectedByAuth =
+          failedLoad && (url.includes('/auth/v1/token') || url.includes('/auth/v1/verify'));
+        if (rejectedByAuth) return;
         if (message.type() === 'error' || message.type() === 'warning') {
           errors.push(`${message.type()}: ${message.text()}`);
         }

@@ -2,7 +2,8 @@
 -- customer data here.
 
 -- Fake accounts for local development, E2E and integration tests.
--- Password for both: password-di-prova
+-- Password for all: password-di-prova. recupero@example.com is reserved to e2e/password.spec.ts,
+-- which changes its password: no other test signs in with it.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
@@ -14,7 +15,8 @@ select
   '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', ''
 from (values
   ('11111111-1111-4111-8111-111111111111'::uuid, 'admin@example.com'),
-  ('22222222-2222-4222-8222-222222222222'::uuid, 'operatore@example.com')
+  ('22222222-2222-4222-8222-222222222222'::uuid, 'operatore@example.com'),
+  ('33333333-3333-4333-8333-333333333333'::uuid, 'recupero@example.com')
 ) as fake (id, email);
 
 insert into auth.identities (
@@ -25,7 +27,8 @@ select
   jsonb_build_object('sub', id::text, 'email', email, 'email_verified', true),
   now(), now(), now()
 from auth.users
-where email in ('admin@example.com', 'operatore@example.com');
+where email in ('admin@example.com', 'operatore@example.com', 'recupero@example.com');
 
 select private.add_operator('admin@example.com', 'Admin Prova', 'admin');
 select private.add_operator('operatore@example.com', 'Operatore Prova', 'operator');
+select private.add_operator('recupero@example.com', 'Recupero Prova', 'operator');
