@@ -36,11 +36,11 @@ p_confirm_threshold_cents, p_usb_uid_format default null)` `security definer`, `
 `update_settings` senza formato USB e mappa gli errori; `src/test/fakeSettingsService.ts` in memoria con
 risultati programmabili e conteggio delle chiamate; test di integrazione con le credenziali del seed.
 **Accettazione:**
-- [ ] Unità: 42501 → `forbidden`, 22023 → `invalid`, fetch fallita → `network`, altro → `unknown`; nessuna
+- [x] Unità: 42501 → `forbidden`, 22023 → `invalid`, fetch fallita → `network`, altro → `unknown`; nessuna
       riga → `SettingsLoadError('not-found')`, distinto da `network`; mappatura della riga
-- [ ] Integrazione: l'operatore legge `app.settings`, riceve 42501 da `update_settings`, un `update`
+- [x] Integrazione: l'operatore legge `app.settings`, riceve 42501 da `update_settings`, un `update`
       diretto non cambia nulla; l'admin salva, rilegge e ripristina 100 / 15000
-- [ ] Solo questo file chiama `getSupabase()` per `settings` (`grep -rn "settings'" src`)
+- [x] Solo questo file chiama `getSupabase()` per `settings` (`grep -rn "settings'" src`)
 **Verifica:** `npm test -- settings && npm run test:integration`
 **Dipendenze:** 1 · **File:** src/features/settings/types.ts, supabaseSettingsService.ts (+ .test.ts),
 src/test/fakeSettingsService.ts, tests/integration/settings.test.ts · **Dimensione:** M
