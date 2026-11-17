@@ -98,7 +98,31 @@ describe('TextField', () => {
       expect(screen.getByRole('textbox', { name: 'Chiedi conferma sopra' })).toBeInTheDocument();
     });
 
-    it('links an error to the input and marks it invalid', () => {
+    it('describes the input with its unit, so screen readers hear it', () => {
+      render(
+        <TextField
+          label="Chiedi conferma sopra"
+          value="150,00"
+          onChange={() => {}}
+          layout="inline"
+          suffix="€"
+        />,
+      );
+      expect(
+        screen.getByRole('textbox', { name: 'Chiedi conferma sopra' }),
+      ).toHaveAccessibleDescription('€');
+    });
+
+    it('describes a stacked input with its unit too', () => {
+      render(
+        <TextField label="Importo" value="" onChange={() => {}} suffix="€" hint="Facoltativo" />,
+      );
+      expect(screen.getByRole('textbox', { name: 'Importo' })).toHaveAccessibleDescription(
+        '€ Facoltativo',
+      );
+    });
+
+    it('links the unit and an error to the input and marks it invalid', () => {
       render(
         <TextField
           label="1 punto ogni"
@@ -112,7 +136,7 @@ describe('TextField', () => {
       const input = screen.getByRole('textbox', { name: '1 punto ogni' });
       expect(input).toHaveAttribute('aria-invalid', 'true');
       expect(input).toHaveAccessibleDescription(
-        'Scrivi solo cifre e la virgola, per esempio 1,50.',
+        '€ Scrivi solo cifre e la virgola, per esempio 1,50.',
       );
     });
 

@@ -162,6 +162,8 @@ describe('points and controls section for administrators', () => {
       expect(input).not.toHaveAttribute('readonly');
     }
     expect(within(section).getAllByText('€')).toHaveLength(2);
+    expect(ratio).toHaveAccessibleDescription('€');
+    expect(threshold).toHaveAccessibleDescription('€');
     expect(within(section).getByText(helpText)).toBeInTheDocument();
     expect(within(section).queryByRole('alert')).not.toBeInTheDocument();
   });
@@ -255,7 +257,7 @@ describe('points and controls section for administrators', () => {
     await userEvent.click(save);
 
     expect(ratio).toHaveAttribute('aria-invalid', 'true');
-    expect(ratio).toHaveAccessibleDescription(message);
+    expect(ratio).toHaveAccessibleDescription(`€ ${message}`);
     expect(ratio).toHaveFocus();
     expect(threshold).not.toHaveAttribute('aria-invalid');
     expect(settings.service.update).not.toHaveBeenCalled();
@@ -274,7 +276,7 @@ describe('points and controls section for administrators', () => {
     await userEvent.click(save);
 
     expect(threshold).toHaveAttribute('aria-invalid', 'true');
-    expect(threshold).toHaveAccessibleDescription(message);
+    expect(threshold).toHaveAccessibleDescription(`€ ${message}`);
     expect(threshold).toHaveFocus();
     expect(ratio).not.toHaveAttribute('aria-invalid');
     expect(settings.service.update).not.toHaveBeenCalled();
@@ -296,9 +298,9 @@ describe('points and controls section for administrators', () => {
     await replace(ratio, '0');
     await replace(threshold, 'abc');
     await userEvent.click(save);
-    expect(ratio).toHaveAccessibleDescription('Deve essere maggiore di 0,00 €.');
+    expect(ratio).toHaveAccessibleDescription('€ Deve essere maggiore di 0,00 €.');
     expect(threshold).toHaveAccessibleDescription(
-      'Scrivi solo cifre e la virgola, per esempio 1,50.',
+      '€ Scrivi solo cifre e la virgola, per esempio 1,50.',
     );
     expect(ratio).toHaveFocus();
     expect(settings.service.update).not.toHaveBeenCalled();

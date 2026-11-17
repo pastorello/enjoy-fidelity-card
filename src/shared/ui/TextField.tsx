@@ -34,7 +34,11 @@ export function TextField({
 }: TextFieldProps) {
   const id = useId();
   const messageId = `${id}-message`;
+  const suffixId = `${id}-suffix`;
   const message = error ?? hint;
+  // The unit is only visible text after the input: screen readers hear it with the description.
+  const describedBy =
+    [suffix && suffixId, message && messageId].filter(Boolean).join(' ') || undefined;
 
   const inline = layout === 'inline';
   const labelElement = (
@@ -53,9 +57,13 @@ export function TextField({
         onChange={(event) => onChange(event.target.value)}
         className={styles.input}
         aria-invalid={error ? true : undefined}
-        aria-describedby={message ? messageId : undefined}
+        aria-describedby={describedBy}
       />
-      {suffix && <span className={styles.suffix}>{suffix}</span>}
+      {suffix && (
+        <span id={suffixId} className={styles.suffix}>
+          {suffix}
+        </span>
+      )}
     </>
   );
 
