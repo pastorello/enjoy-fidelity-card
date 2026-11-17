@@ -118,6 +118,14 @@ describe('loadOperator', () => {
   it.each([
     ['PGRST106', 'Invalid schema: app', 406, 'misconfigured'],
     ['42501', 'permission denied for schema app', 403, 'misconfigured'],
+    ['42501', 'permission denied for table operators', 403, 'misconfigured'],
+    [
+      'PGRST205',
+      "Could not find the table 'app.operators' in the schema cache",
+      404,
+      'misconfigured',
+    ],
+    ['XX000', 'internal error', 500, 'misconfigured'],
     ['PGRST002', 'Could not query the database for the schema cache', 503, 'unavailable'],
   ] as const)('a server fault (%s, HTTP %i) says which', async (code, message, status, kind) => {
     db.maybeSingle.mockResolvedValue(answer(code, message, status));

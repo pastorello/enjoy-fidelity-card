@@ -91,9 +91,12 @@ export const supabaseAuthService: AuthService = {
       .select('id, name, role')
       .eq('user_id', userId)
       .maybeSingle();
-    const fault = serverFaultFor(error, status);
-    if (fault) throw new ServerFaultError(fault);
-    if (error) throw new Error(`Cannot load the operator profile: ${error.message}`);
+    if (error) {
+      // Status 0: no answer arrived (network). Any answer with an error means the server
+      // could not serve a plain read of the own profile: a fault, not a missing connection.
+      if (status === 0) throw new Error(`Cannot load the operator profile: ${error.message}`);
+      throw new ServerFaultError(serverFaultFor(error, status) ?? 'misconfigured');
+    }
     if (!data) return null;
     const row: { id: unknown; name: unknown; role: unknown } = data;
     if (typeof row.id !== 'string' || typeof row.name !== 'string' || !isRole(row.role)) {

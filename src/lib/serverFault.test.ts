@@ -8,11 +8,20 @@ describe('serverFaultFor', () => {
     expect(serverFaultFor(error('PGRST106', 'Invalid schema: app'), 406)).toBe('misconfigured');
   });
 
-  it('missing privileges on the schema are misconfigured', () => {
-    expect(serverFaultFor(error('42501', 'permission denied for schema app'), 403)).toBe(
-      'misconfigured',
-    );
+  it.each([
+    'permission denied for schema app',
+    'permission denied for table operators',
+    'permission denied for function update_settings',
+  ])('a missing grant is misconfigured (%s)', (message) => {
+    expect(serverFaultFor(error('42501', message), 403)).toBe('misconfigured');
   });
+
+  it.each(['PGRST205', 'PGRST202'])(
+    'a table or function missing from the schema cache is misconfigured (%s)',
+    (code) => {
+      expect(serverFaultFor(error(code), 404)).toBe('misconfigured');
+    },
+  );
 
   it('a refusal raised by the app (42501 without schema) is not a server fault', () => {
     expect(serverFaultFor(error('42501', 'Only an admin can change the settings'), 403)).toBeNull();
