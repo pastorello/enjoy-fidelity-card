@@ -126,11 +126,11 @@ d'aiuto della spec, pulsante primario **Salva** (≥ 48 px) che invia i due valo
 salvataggio Salva `busy` e campi in sola lettura; a salvataggio riuscito "Impostazioni salvate." in una
 regione `aria-live="polite"` e campi riformattati con i valori del server.
 **Accettazione:**
-- [ ] Componente: campi precompilati "1,00" e "150,00"; "2" e "200" → `update` con 200 / 20000, messaggio,
+- [x] Componente: campi precompilati "1,00" e "150,00"; "2" e "200" → `update` con 200 / 20000, messaggio,
       campi "2,00" e "200,00"; doppio tocco su Salva → una sola chiamata
-- [ ] Componente: "0", "", "abc", "1,555", "1.250", "100,01" (rapporto), "10000,01" (soglia) → messaggio
+- [x] Componente: "0", "", "abc", "1,555", "1.250", "100,01" (rapporto), "10000,01" (soglia) → messaggio
       previsto, focus sul campo, `update` mai chiamato; "1.50" e "1,5" → 150
-- [ ] Target touch ≥ 48 px; detector Impeccable pulito; screenshot 390×844 confrontato con il wireframe
+- [x] Target touch ≥ 48 px; detector Impeccable pulito; screenshot 390×844 confrontato con il wireframe
 **Verifica:** `npm test -- settings`
 **Dipendenze:** 5, 6, 7 · **File:** src/features/settings/PointsSettingsSection.tsx (+ .module.css,
 .test.tsx) · **Dimensione:** M
