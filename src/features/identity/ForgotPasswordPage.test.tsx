@@ -79,6 +79,13 @@ describe('forgot password page', () => {
     },
   );
 
+  it('moves focus to the confirmation, so a screen reader reads it after the send', async () => {
+    renderApp('/password-dimenticata');
+    await send('giulia@example.com');
+    const confirmation = await screen.findByText(CONFIRMATION);
+    await waitFor(() => expect(confirmation).toHaveFocus());
+  });
+
   it('never builds the return page from what was typed', async () => {
     const { fake } = renderApp('/password-dimenticata');
     await send('a@evil.example/imposta-password');

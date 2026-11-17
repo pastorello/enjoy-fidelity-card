@@ -31,6 +31,13 @@ export function ForgotPasswordPage() {
   const [sent, setSent] = useState(false);
   // A double tap reaches the handler twice before the busy state renders.
   const sending = useRef(false);
+  // The form, focused button included, leaves the page: focus moves to the confirmation so a
+  // screen reader reads it (a live region mounted with its text is not reliably announced).
+  const confirmation = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (sent) confirmation.current?.focus();
+  }, [sent]);
 
   useEffect(() => {
     let active = true;
@@ -77,11 +84,11 @@ export function ForgotPasswordPage() {
   return (
     <AppShell title="Password dimenticata" backTo={backTo}>
       {sent ? (
-        <section aria-live="polite" className={styles.sent}>
+        <section className={styles.sent}>
           <span aria-hidden="true" className={styles.sentIcon}>
             <Icon name="check" size={32} />
           </span>
-          <p className={styles.text}>
+          <p ref={confirmation} tabIndex={-1} className={styles.text}>
             Se l’email è di un account dell’Enjoy Card, ti abbiamo mandato un link. Il link vale
             un’ora: se non arriva, controlla lo spam o chiedi a un amministratore.
           </p>
