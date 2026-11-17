@@ -75,8 +75,9 @@ src/app/routes.tsx, src/app/HomePage.tsx, e2e/identity.spec.ts · **Dimensione:*
 
 ## Checkpoint B
 - [x] Flusso accesso → home → Impostazioni → Esci verde in E2E
-- [ ] Accessibilità Lighthouse ≥ 95 su `/accedi`
-- [ ] Revisione `security-and-hardening` su auth e RLS, problemi risolti
+- [x] Accessibilità Lighthouse ≥ 95 su `/accedi` (mobile, build sullo stack locale: accessibilità 100,
+      best practices 100)
+- [x] Revisione `security-and-hardening` su auth e RLS, problemi risolti (4 risolti con test)
 - [ ] Revisione con l'utente
 
 ## Task 6: Account tolto o senza profilo
@@ -86,10 +87,12 @@ con il messaggio previsto: "La sessione è scaduta: accedi di nuovo" (sessione n
 "Account non abilitato: chiedi a un amministratore." (utente senza profilo collegato). Test di integrazione (Vitest) contro lo stack locale, con lo script
 `test:integration` e il passo in CI.
 **Accettazione:**
-- [ ] Integrazione: accesso con l'utente del seed; dopo la cancellazione dell'utente (API admin, chiave
-      locale solo nei test) il vecchio token non legge `operators`
-- [ ] E2E o componente: profilo assente → `/accedi` con il messaggio
-- [ ] La chiave segreta locale compare solo nel codice di test, mai in `src/`
+- [x] Integrazione: accesso con un operatore di prova (creato e tolto dal test, così il seed usato
+      dagli E2E resta intatto); dopo la cancellazione dell'utente (API admin, chiave locale solo nei
+      test) il vecchio token non legge `operators` e la sessione non si rinnova
+- [x] E2E o componente: profilo assente → `/accedi` con il messaggio (anche quando l'app torna in
+      primo piano: il profilo si ricontrolla al focus e al ritorno visibile)
+- [x] La chiave segreta locale compare solo nel codice di test, mai in `src/`
 **Verifica:** `npm run db:start && npm run test:integration`
 **Dipendenze:** 5 · **File:** vitest.integration.config.ts, tests/integration/identity.test.ts,
 src/features/identity/RequireAuth.tsx, package.json, .github/workflows/ci.yml · **Dimensione:** M

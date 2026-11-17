@@ -45,7 +45,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: flusso completo in E2E; detector Impeccable pulito; revisione di sicurezza
 
 ### Fase 3: Account tolto e consegna
-- [ ] Task 6: Account tolto o senza profilo → `/accedi` con messaggio; test di integrazione contro lo stack locale
+- [x] Task 6: Account tolto o senza profilo → `/accedi` con messaggio; test di integrazione contro lo stack locale
 - [ ] Task 7: Procedura in `docs/setup-accounts.md`, RUNBOOK, CLAUDE.md
 - [ ] Task 8: Pubblicazione su staging e produzione (con l'utente)
 
