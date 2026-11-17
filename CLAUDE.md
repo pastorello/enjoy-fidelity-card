@@ -124,6 +124,8 @@ Altre quando pertinenti: `frontend-ui-engineering`, `api-and-interface-design`, 
 ### Test E2E — [webapp-testing](https://github.com/anthropics/skills/tree/main/skills/webapp-testing)
 - Viewport principale: **telefono 390×844**; tablet **1280×800** solo per la fase tablet.
 - Web NFC non è disponibile in Playwright: simulare la lettura card con un adattatore finto.
+- Le spec che cambiano la configurazione condivisa (`app.settings`) stanno nel progetto `phone-settings`
+  (`SHARED_STATE_SPECS` in `playwright.config.ts`): in serie, dopo gli altri, e ripristinano i valori iniziali.
 
 ## Regole di lavoro
 - Branch dedicato per ogni modifica; mai commit diretti su `main` senza richiesta esplicita.

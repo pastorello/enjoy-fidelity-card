@@ -160,3 +160,18 @@ staging poi produzione, mai `supabase config push`.
     predefinita "Reset your password" finché non viene riavviato. Succede in CI (2026-11-17), raramente in
     locale. Rimedio: `scripts/reload-auth-templates.sh` dopo `supabase start` (la CI lo esegue); fallisce se
     il template non si carica.
+29. `app.settings` è **una riga sola, condivisa** da tutti i test che girano sullo stesso stack. I test pgTAP
+    controllano la riga iniziale (100 / 15000 / `'hex'`, `updated_by` null): integrazione ed E2E che la
+    cambiano rimettono valori, `updated_at` e `updated_by` come li hanno trovati. Se un'esecuzione si
+    interrompe a metà e `db:test` fallisce sulla riga, `npm run db:reset`.
+30. Le spec E2E che cambiano la configurazione condivisa (oggi `settings.spec.ts`; domani `ledger.spec.ts`,
+    che cambia il rapporto) vanno aggiunte a `SHARED_STATE_SPECS` in `playwright.config.ts`: girano nel
+    progetto `phone-settings`, in serie, dopo tutto il progetto `phone` (che è `fullyParallel`). Lasciate
+    in `phone` renderebbero instabili gli altri test che leggono il rapporto.
+31. Le migrazioni nuove vanno con un timestamp successivo a `20261117230000_function_privileges.sql`, che
+    toglie a `public` (e quindi ad `anon`) l'`execute` predefinito sulle funzioni create da lì in poi: la
+    migrazione di `settings` è stata spostata a `20261117230100` per questo. Ogni funzione nuova ha i suoi
+    `revoke`/`grant` espliciti e un controllo pgTAP sui privilegi di `anon` e `authenticated`.
+32. Senza sessione (`anon`) la lettura di `app.settings` dà un errore di privilegio, non un risultato vuoto:
+    il servizio lo riporta come `unknown`, non `not-found`. L'app carica la configurazione solo dentro
+    `RequireAuth`, con un operatore collegato.
