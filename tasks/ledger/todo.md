@@ -404,10 +404,10 @@ src/features/ledger/CancelMovementDialog.tsx · **Dimensione:** M
 ## Task 26: E2E dello storico
 **Descrizione:** in `e2e/ledger.spec.ts` con gli account del seed e un cliente creato dal test.
 **Accettazione:**
-- [ ] Admin: annulla una spesa dallo storico con il dialogo, vede la correzione e il saldo aggiornato
+- [x] Admin: annulla una spesa dallo storico con il dialogo, vede la correzione e il saldo aggiornato
       (criterio 6)
-- [ ] Operatore: nessun Annulla nello storico; annulla la propria spesa dalla conferma entro 10 s (criterio 8)
-- [ ] Target ≥ 48 px; nessun errore in console
+- [x] Operatore: nessun Annulla nello storico; annulla la propria spesa dalla conferma entro 10 s (criterio 8)
+- [x] Target ≥ 48 px; nessun errore in console
 **Verifica:** `npm run e2e -- ledger`
 **Dipendenze:** 25 · **File:** e2e/ledger.spec.ts · **Dimensione:** S
 

@@ -144,7 +144,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 23: `CustomerLedgerSection` nella Scheda cliente: pulsanti e ULTIMI MOVIMENTI
 - [x] Task 24: Movimenti (`/clienti/:id/movimenti`): gruppi per giorno, 50 per volta, correzioni e annullati
 - [x] Task 25: Annullo dell'amministratore dallo storico: «Punti già spesi», dialogo di conferma, rifiuti
-- [ ] Task 26: E2E dello storico: admin annulla una spesa e vede la correzione; operatore senza Annulla
+- [x] Task 26: E2E dello storico: admin annulla una spesa e vede la correzione; operatore senza Annulla
 
 ### Checkpoint E: Impeccable pulito; confronto con Cliente e Movimenti; revisione `security-and-hardening` della UI
 
