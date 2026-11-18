@@ -124,7 +124,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 12: `AmountKeypad`: tastierino POS a centesimi
 - [x] Task 13: `PurchasePage` sulla rotta del segnaposto: riga cliente, IMPORTO, anteprima, Conferma, stati comuni
 - [x] Task 14: Importo insolito (strettamente sopra la soglia): avviso, Correggi, Conferma con l'importo
-- [ ] Task 15: `LedgerDoneView` per Spesa registrata: nuovo saldo, vibrazione, conto alla rovescia, ritorno a `/`
+- [x] Task 15: `LedgerDoneView` per Spesa registrata: nuovo saldo, vibrazione, conto alla rovescia, ritorno a `/`
 - [ ] Task 16: Annulla la spesa entro 10 s dalla conferma
 - [ ] Task 17: Spesa non salvata: rete, timeout, errori del server, Riprova con lo stesso id, rifiuti definitivi
 

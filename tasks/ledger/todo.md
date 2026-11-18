@@ -240,10 +240,10 @@ di cronologia: spunta, titolo "Spesa registrata" con il fuoco, "+12 punti a Mari
 delle card tra N secondi" (`role="timer"`); allo scadere `navigate('/', { replace: true })`; "Leggi
 un'altra card" (→ `/` subito) e "Apri la scheda di <nome proprio>".
 **Accettazione:**
-- [ ] Componente (timer finti): testi del wireframe Spesa-ok, punti e saldo restituiti dal server,
+- [x] Componente (timer finti): testi del wireframe Spesa-ok, punti e saldo restituiti dal server,
       vibrazione chiamata (mock), ritorno a `/` dopo 10 s (criterio 3)
-- [ ] Componente: Indietro dalla conferma non torna al tastierino; "Leggi un'altra card" e il link alla scheda
-- [ ] Impeccable pulito; confronto con Spesa-ok
+- [x] Componente: Indietro dalla conferma non torna al tastierino; "Leggi un'altra card" e il link alla scheda
+- [x] Impeccable pulito; confronto con Spesa-ok
 **Verifica:** `npm test -- LedgerDoneView PurchasePage`
 **Dipendenze:** 13 · **File:** src/features/ledger/LedgerDoneView.tsx (+ .module.css, .test.tsx),
 src/features/ledger/PurchasePage.tsx · **Dimensione:** M
