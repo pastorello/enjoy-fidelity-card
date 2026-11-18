@@ -135,7 +135,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: `db:test` e `test:integration` verdi; pgTAP esistenti invariati; revisione `security-and-hardening` (forza bruta, corsa, privilegi del dispositivo)
 
 ### Fase 2: Servizi e identità
-- [ ] Task 7: `KioskService`, `supabaseKioskService` e guardia del confine
+- [x] Task 7: `KioskService`, `supabaseKioskService` e guardia del confine
 - [ ] Task 8: `fakeKioskService`, `KioskServiceProvider`, `main.tsx` e `renderApp`
 - [ ] Task 9: `AuthService.loadIdentity` su `get_session_identity` (servizio Supabase e finto)
 - [ ] Task 10: `AuthProvider` con lo stato "device": cassiere come operatore corrente, `reportNotEnabled` sul dispositivo

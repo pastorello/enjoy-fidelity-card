@@ -133,8 +133,8 @@ per primo → `ServerFaultError`; `42501` dell'app → `forbidden`; `22023` → 
 RPC e usa `getSupabase()`; solo `main.tsx` lo importa; nessun `console.*`, `localStorage`, `sessionStorage`
 nel modulo; ogni `errcode` sollevato da `*_tablet_kiosk.sql` ha una traduzione.
 **Accettazione:**
-- [ ] Unità con client finto: ogni esito di `unlock` mappato; i secondi del blocco passati come arrivano
-- [ ] La guardia fallisce se un componente chiama Supabase o se il modulo logga o salva in storage
+- [x] Unità con client finto: ogni esito di `unlock` mappato; i secondi del blocco passati come arrivano
+- [x] La guardia fallisce se un componente chiama Supabase o se il modulo logga o salva in storage
 **Verifica:** `npm test -- tablet-kiosk kioskBoundary`
 **Dipendenze:** 5 · **File:** src/features/tablet-kiosk/types.ts, supabaseKioskService.ts (+ .test.ts),
 scripts/kioskBoundary.test.ts · **Dimensione:** M
