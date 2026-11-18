@@ -133,7 +133,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 18: E2E della spesa: card → Spesa registrata in meno di 10 s, ritorno a `/` e Serviti oggi, rete giù → Riprova → un solo movimento
 
 ### Fase 4: Riscatti
-- [ ] Task 19: Riscatta premio dal catalogo: premi raggiungibili e non, saldo dopo, rifiuti che ricaricano
+- [x] Task 19: Riscatta premio dal catalogo: premi raggiungibili e non, saldo dopo, rifiuti che ricaricano
 - [ ] Task 20: Premio libero (`?libero`): descrizione, PUNTI DA SCALARE, saldo insufficiente
 - [ ] Task 21: Premio riscattato, Annulla il riscatto, Riscatto non salvato
 - [ ] Task 22: E2E dei riscatti: catalogo, premio libero insufficiente, premio inattivo assente

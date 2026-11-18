@@ -306,9 +306,9 @@ catalogo vuoto "Nessun premio nel catalogo"; errore con "Riprova" e premio liber
 `reward-unavailable` → "Premio non più disponibile" + ricarica, `insufficient-balance` → "Saldo
 insufficiente: il saldo è cambiato, controlla e riprova." + saldo ricaricato; stati comuni del task 13.
 **Accettazione:**
-- [ ] Componente: premi raggiungibili e non, "Mancano N punti", saldo dopo, Riscatta disabilitato senza scelta
-- [ ] Componente: vuoto, errore, i due rifiuti che ricaricano e scartano l'id; cliente cancellato
-- [ ] Impeccable pulito; confronto con Premi
+- [x] Componente: premi raggiungibili e non, "Mancano N punti", saldo dopo, Riscatta disabilitato senza scelta
+- [x] Componente: vuoto, errore, i due rifiuti che ricaricano e scartano l'id; cliente cancellato
+- [x] Impeccable pulito; confronto con Premi
 **Verifica:** `npm test -- RedeemPage`
 **Dipendenze:** 11, 13 · **File:** src/features/ledger/RedeemPage.tsx (+ .module.css, .test.tsx),
 src/app/routes.tsx · **Dimensione:** M
