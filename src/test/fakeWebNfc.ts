@@ -160,13 +160,28 @@ export function createFakeWebNfc(options: FakeWebNfcOptions = {}) {
       for (const listener of visibilityListeners) listener();
     },
     visibilityListenerCount: () => visibilityListeners.size,
-    /** A card held to the phone: every active scan reports it, like Chrome does. */
-    read(serialNumber: string) {
+    /**
+     * A card held to the phone: every active scan reports it, like Chrome does. `urls` become `url`
+     * records (UTF-8 bytes, as Chrome hands them), `texts` become `text` records.
+     */
+    read(
+      serialNumber: string,
+      content: { urls?: readonly string[]; texts?: readonly string[] } = {},
+    ) {
+      const encoder = new TextEncoder();
+      const record = (recordType: string, value: string): NDEFRecord => ({
+        recordType,
+        data: new DataView(encoder.encode(value).buffer),
+      });
+      const records = [
+        ...(content.texts ?? []).map((text) => record('text', text)),
+        ...(content.urls ?? []).map((url) => record('url', url)),
+      ];
       for (const scan of scans) {
         if (!scan.active) continue;
         const event = Object.assign(new Event('reading'), {
           serialNumber,
-          message: { records: [] },
+          message: { records },
         }) as NDEFReadingEvent;
         scan.reader.onreading?.(event);
       }

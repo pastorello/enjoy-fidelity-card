@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createFakeWebNfc, type FakeScanOutcome } from '../../test/fakeWebNfc';
-import { createCardReader, type CardConsumer } from './cardReader';
+import { createCardReader, type CardConsumer, type CardRead } from './cardReader';
 import {
   createBrowserWebNfcApi,
   createWebNfcAdapter,
@@ -336,6 +336,71 @@ describe('createWebNfcAdapter: reads', () => {
     await settle();
 
     expect(seen).toEqual(['starting', 'active']);
+  });
+});
+
+describe('createWebNfcAdapter: links and unreadable tags go only to the writer (SPEC point 9)', () => {
+  const URL = 'https://example.test/p/invented-token';
+
+  it('hands the url records, decoded, to an open write session; other records are left out', async () => {
+    const { nfc, reader } = await activated({ permission: 'granted' });
+    const onRead = vi.fn<(read: CardRead, urls: readonly string[]) => void>();
+    const session = reader.openWriteSession(onRead);
+
+    nfc.read('04:a1:b2:c3:d4:e5:f6', { urls: [URL], texts: ['invented text'] });
+
+    expect(onRead).toHaveBeenCalledWith({ uid: UID, source: 'web-nfc', at: 1_000_000 }, [URL]);
+    session.close();
+  });
+
+  it('decodes non-ASCII links as UTF-8', async () => {
+    const { nfc, reader } = await activated({ permission: 'granted' });
+    const onRead = vi.fn<(read: CardRead, urls: readonly string[]) => void>();
+    const session = reader.openWriteSession(onRead);
+    const accented = 'https://example.test/p/caffè';
+
+    nfc.read(UID, { urls: [accented] });
+
+    expect(onRead).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }), [accented]);
+    session.close();
+  });
+
+  it('a card with no url record reaches the writer with no urls', async () => {
+    const { nfc, reader } = await activated({ permission: 'granted' });
+    const onRead = vi.fn<(read: CardRead, urls: readonly string[]) => void>();
+    const session = reader.openWriteSession(onRead);
+
+    nfc.read(UID, { texts: ['invented text'] });
+
+    expect(onRead).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }), []);
+    session.close();
+  });
+
+  it('hands readingerror to an open write session', async () => {
+    const { nfc, reader } = await activated({ permission: 'granted' });
+    const onUnreadable = vi.fn<() => void>();
+    const session = reader.openWriteSession(() => {}, { onUnreadable });
+
+    nfc.readError();
+
+    expect(onUnreadable).toHaveBeenCalledTimes(1);
+    session.close();
+    nfc.readError();
+    expect(onUnreadable).toHaveBeenCalledTimes(1);
+  });
+
+  it('outside a write, consumers get the uid only: never the links, never readingerror', async () => {
+    const { nfc, reader } = await activated({ permission: 'granted' });
+    const consumer = vi.fn<CardConsumer>();
+    reader.pushConsumer(consumer);
+
+    nfc.readError();
+    nfc.read(UID, { urls: [URL] });
+
+    expect(consumer).toHaveBeenCalledTimes(1);
+    const call = consumer.mock.calls[0];
+    expect(call).toHaveLength(1);
+    expect(call?.[0]).toStrictEqual({ uid: UID, source: 'web-nfc', at: 1_000_000 });
   });
 });
 

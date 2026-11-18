@@ -1,4 +1,4 @@
-import type { DeliverRaw, NfcInputAdapter, NfcStatus } from './cardReader';
+import type { NfcInputAdapter, NfcStatus } from './cardReader';
 
 export type NfcPermission = 'granted' | 'prompt' | 'denied';
 
@@ -88,6 +88,22 @@ function errorName(error: unknown): string {
   return typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
 }
 
+/**
+ * The links of the `url` records, decoded as UTF-8 (SPEC-card-input, point 3). Only a running write
+ * gets them, to verify what it wrote: they hold a customer's token, so they are never logged.
+ */
+function urlsOf(message: NDEFMessage | undefined): string[] {
+  const urls: string[] = [];
+  const decoder = new TextDecoder();
+  for (const record of message?.records ?? []) {
+    // Not fatal: broken bytes decode to U+FFFD, which never matches the link that was written.
+    if (record.recordType === 'url' && record.data !== undefined) {
+      urls.push(decoder.decode(record.data));
+    }
+  }
+  return urls;
+}
+
 /** What a failed `scan()` means for the panel (SPEC-card-input, point 3). */
 function statusForScanError(error: unknown): NfcStatus {
   switch (errorName(error)) {
@@ -108,7 +124,7 @@ function statusForScanError(error: unknown): NfcStatus {
  * is granted. Never logs: a serial number identifies a customer's card.
  */
 export function createWebNfcAdapter(api: WebNfcApi): NfcInputAdapter {
-  type Ports = { deliver: DeliverRaw; setStatus: (status: NfcStatus) => void };
+  type Ports = Parameters<NfcInputAdapter['start']>[0];
   let ports: Ports | null = null;
   let status: NfcStatus = 'checking';
   let scan: AbortController | null = null;
@@ -141,11 +157,16 @@ export function createWebNfcAdapter(api: WebNfcApi): NfcInputAdapter {
     try {
       const reader = api.createReader();
       reader.onreading = (event) => {
-        if (scan === controller) ports?.deliver(event.serialNumber, 'hex', 'web-nfc');
+        if (scan === controller) {
+          ports?.deliver(event.serialNumber, 'hex', 'web-nfc', urlsOf(event.message));
+        }
       };
-      // An unreadable tag (damaged NDEF message, no uid) is ignored outside a write: the operator
-      // holds the card again or searches the customer by name.
-      reader.onreadingerror = () => {};
+      // An unreadable tag (damaged NDEF message, no uid) matters only to a running write, which the
+      // service tells; outside a write it is dropped: the operator holds the card again or searches
+      // the customer by name.
+      reader.onreadingerror = () => {
+        if (scan === controller) ports?.unreadable();
+      };
       await reader.scan({ signal: controller.signal });
       if (scan === controller) setStatus('active');
     } catch (error) {
@@ -177,7 +198,11 @@ export function createWebNfcAdapter(api: WebNfcApi): NfcInputAdapter {
   return {
     start(given) {
       if (ports !== null) return;
-      const owner: Ports = { deliver: given.deliver, setStatus: given.setStatus };
+      const owner: Ports = {
+        deliver: given.deliver,
+        setStatus: given.setStatus,
+        unreadable: given.unreadable,
+      };
       ports = owner;
       if (!api.isSupported()) {
         setStatus('unsupported');

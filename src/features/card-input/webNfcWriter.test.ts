@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFakeWebNfc, type FakeWriteOutcome } from '../../test/fakeWebNfc';
 import {
   REPEAT_WINDOW_MS,
@@ -10,6 +10,8 @@ import { createWebNfcAdapter } from './webNfcAdapter';
 import {
   IN_FIELD_MS,
   MAX_URL_LENGTH,
+  VERIFY_TIMEOUT_MS,
+  WRITE_TIMEOUT_MS,
   createWebNfcWriter,
   type CardWriteResult,
   type CardWriteStep,
@@ -54,6 +56,7 @@ async function setup(options: { canWrite?: boolean; writeOutcomes?: FakeWriteOut
     reader,
     now: () => time,
     canWrite: () => canWrite,
+    vibrate,
   });
   return {
     nfc,
@@ -357,5 +360,307 @@ describe('createWebNfcWriter: exclusive session', () => {
     nfc.read(OTHER_UID);
 
     expect(consumer).toHaveBeenCalledTimes(1);
+  });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+/** A write whose card was read a moment ago: write() runs at once and resolves (step `verifying`). */
+async function writtenAndVerifying(options: Parameters<typeof setup>[0] = {}) {
+  const context = await setup(options);
+  context.nfc.read(UID);
+  const steps: CardWriteStep[] = [];
+  const outcome = track(
+    context.writer.writeUrl(URL, { expectedUid: UID, onStep: (step) => steps.push(step) }),
+  );
+  await settle();
+  context.vibrate.mockClear(); // the read above reached no consumer, but stay explicit
+  return { ...context, steps, outcome };
+}
+
+describe('createWebNfcWriter: verification by reading the card back (criterion 10)', () => {
+  it('ok only once a read of the expected card reports exactly the url; then it vibrates', async () => {
+    const { nfc, steps, outcome, vibrate } = await writtenAndVerifying();
+    expect(steps).toEqual(['waiting-card', 'writing', 'verifying']);
+    expect(outcome.result).toBeNull(); // write() resolved: not yet a success
+
+    nfc.read(UID, { texts: ['invented text'], urls: [URL] });
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: true });
+    expect(vibrate).toHaveBeenCalledTimes(1);
+    expect(vibrate).toHaveBeenCalledWith(80);
+    expect(nfc.makeReadOnlyCalls()).toBe(0);
+  });
+
+  it('the expected card with another url → verify-failed, no vibration', async () => {
+    const { nfc, outcome, vibrate } = await writtenAndVerifying();
+
+    nfc.read(UID, { urls: ['https://example.test/p/another-invented-token'] });
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'verify-failed' });
+    expect(vibrate).not.toHaveBeenCalled();
+  });
+
+  it('the expected card with no url, or a url that only starts like it → verify-failed', async () => {
+    const empty = await writtenAndVerifying();
+    empty.nfc.read(UID);
+    await settle();
+    expect(empty.outcome.result).toEqual({ ok: false, reason: 'verify-failed' });
+
+    const longer = await writtenAndVerifying();
+    longer.nfc.read(UID, { urls: [`${URL}x`] });
+    await settle();
+    expect(longer.outcome.result).toEqual({ ok: false, reason: 'verify-failed' });
+  });
+
+  it('another card with the url during the verification → wrong-card with its uid', async () => {
+    const { nfc, outcome } = await writtenAndVerifying();
+
+    nfc.read(OTHER_UID, { urls: [URL] });
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'wrong-card', otherUid: OTHER_UID });
+  });
+
+  it('another card without the url during the verification is ignored', async () => {
+    const { nfc, outcome } = await writtenAndVerifying();
+
+    nfc.read(OTHER_UID, { urls: ['https://example.test/p/another-invented-token'] });
+    nfc.read(OTHER_UID);
+    await settle();
+    expect(outcome.result).toBeNull();
+
+    nfc.read(UID, { urls: [URL] });
+    await settle();
+    expect(outcome.result).toEqual({ ok: true });
+  });
+
+  it('readingerror during the verification is ignored', async () => {
+    const { nfc, outcome } = await writtenAndVerifying();
+
+    nfc.readError();
+    await settle();
+    expect(outcome.result).toBeNull();
+
+    nfc.read(UID, { urls: [URL] });
+    await settle();
+    expect(outcome.result).toEqual({ ok: true });
+  });
+
+  it('a read of the expected card while write() is still running is not the verification', async () => {
+    const { nfc, writer } = await setup({ writeOutcomes: ['pending'] });
+    nfc.read(UID);
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await settle();
+
+    nfc.read(UID, { urls: [URL] });
+    await settle();
+
+    expect(outcome.result).toBeNull();
+    expect(nfc.writes[0]?.options.signal.aborted).toBe(false);
+  });
+});
+
+describe('createWebNfcWriter: card swapped during write()', () => {
+  it('another uid while write() runs → abort() and wrong-card with its uid', async () => {
+    const { nfc, writer } = await setup({ writeOutcomes: ['pending'] });
+    nfc.read(UID);
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await settle();
+
+    nfc.read(OTHER_UID);
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'wrong-card', otherUid: OTHER_UID });
+    expect(nfc.writes[0]?.options.signal.aborted).toBe(true);
+  });
+});
+
+describe('createWebNfcWriter: unreadable card (readingerror)', () => {
+  it('readingerror while waiting → unreadable, nothing written', async () => {
+    const { nfc, writer } = await setup();
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await settle();
+
+    nfc.readError();
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'unreadable' });
+    expect(nfc.writes).toHaveLength(0);
+  });
+
+  it('with allowUnreadable, readingerror counts as the expected card: written, then verified', async () => {
+    const { nfc, writer } = await setup();
+    const steps: CardWriteStep[] = [];
+    const outcome = track(
+      writer.writeUrl(URL, {
+        expectedUid: UID,
+        allowUnreadable: true,
+        onStep: (step) => steps.push(step),
+      }),
+    );
+    await settle();
+
+    nfc.readError();
+    await settle();
+
+    expect(nfc.writes).toHaveLength(1);
+    expect(nfc.writes[0]?.message).toEqual({ records: [{ recordType: 'url', data: URL }] });
+    expect(steps).toEqual(['waiting-card', 'writing', 'verifying']);
+    nfc.read(UID, { urls: [URL] });
+    await settle();
+    expect(outcome.result).toEqual({ ok: true });
+  });
+
+  it('with allowUnreadable another uid while waiting is still wrong-card', async () => {
+    const { nfc, writer } = await setup();
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID, allowUnreadable: true }));
+    await settle();
+
+    nfc.read(OTHER_UID);
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'wrong-card', otherUid: OTHER_UID });
+    expect(nfc.writes).toHaveLength(0);
+  });
+
+  it('readingerror while write() runs is ignored', async () => {
+    const { nfc, writer } = await setup({ writeOutcomes: ['pending'] });
+    nfc.read(UID);
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await settle();
+
+    nfc.readError();
+    await settle();
+
+    expect(outcome.result).toBeNull();
+    expect(nfc.writes[0]?.options.signal.aborted).toBe(false);
+  });
+});
+
+describe('createWebNfcWriter: time limits (criterion 10)', () => {
+  it(`no card for ${WRITE_TIMEOUT_MS} ms → timeout, nothing written`, async () => {
+    const { nfc, writer } = await setup();
+    vi.useFakeTimers();
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+
+    await vi.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS - 1);
+    expect(outcome.result).toBeNull();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'timeout' });
+    expect(nfc.writes).toHaveLength(0);
+  });
+
+  it(`write() still running after ${WRITE_TIMEOUT_MS} ms in all → abort() and timeout`, async () => {
+    const { nfc, writer } = await setup({ writeOutcomes: ['pending'] });
+    vi.useFakeTimers();
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await vi.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS - 100);
+    nfc.read(UID); // the card arrives late: write() starts, the clock keeps running
+    await vi.advanceTimersByTimeAsync(0);
+    expect(nfc.writes).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(100);
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'timeout' });
+    expect(nfc.writes[0]?.options.signal.aborted).toBe(true);
+  });
+
+  it(`no verification in ${VERIFY_TIMEOUT_MS} ms → timeout and abort()`, async () => {
+    const { nfc, writer, vibrate } = await setup();
+    nfc.read(UID);
+    vi.useFakeTimers();
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await vi.advanceTimersByTimeAsync(VERIFY_TIMEOUT_MS - 1);
+    expect(outcome.result).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'timeout' });
+    expect(nfc.writes[0]?.options.signal.aborted).toBe(true);
+    expect(vibrate).not.toHaveBeenCalled();
+  });
+
+  it('the verification gets its own full time, counted from write() resolving', async () => {
+    const { nfc, writer } = await setup();
+    vi.useFakeTimers();
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await vi.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS - 100);
+    nfc.read(UID);
+    await vi.advanceTimersByTimeAsync(VERIFY_TIMEOUT_MS - 1);
+    expect(outcome.result).toBeNull();
+
+    nfc.read(UID, { urls: [URL] });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(outcome.result).toEqual({ ok: true });
+  });
+
+  it('after an outcome no timer is left running', async () => {
+    const { nfc, writer } = await setup();
+    vi.useFakeTimers();
+    const result = writer.writeUrl(URL, { expectedUid: UID });
+    nfc.read(OTHER_UID);
+    await expect(result).resolves.toMatchObject({ reason: 'wrong-card' });
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('createWebNfcWriter: start() during a write', () => {
+  it.each([
+    ['waiting for the card', [] as FakeWriteOutcome[], false],
+    ['during write()', ['pending'] as FakeWriteOutcome[], true],
+    ['during the verification', [] as FakeWriteOutcome[], true],
+  ])('%s → aborted, and the scan starts again', async (_case, writeOutcomes, cardOnPhone) => {
+    const { nfc, reader, writer } = await setup({ writeOutcomes });
+    if (cardOnPhone) nfc.read(UID);
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await settle();
+    const scans = nfc.scanCount();
+
+    await reader.start();
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'aborted' });
+    expect(nfc.scanCount()).toBe(scans + 1);
+    for (const write of nfc.writes) expect(write.options.signal.aborted).toBe(true);
+  });
+});
+
+describe('createWebNfcWriter: the links stay with the writer', () => {
+  it('no link in a consumer read and nothing in the console, through a whole write', async () => {
+    const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => {}),
+    );
+    const { nfc, reader, writer, advance } = await setup();
+    const consumer = vi.fn<CardConsumer>();
+    reader.pushConsumer(consumer);
+    nfc.read(UID, { urls: [URL] }); // before: a card that already holds the link
+    advance(100);
+
+    const result = writer.writeUrl(URL, { expectedUid: UID });
+    await settle();
+    nfc.readError();
+    nfc.read(OTHER_UID, { urls: ['https://example.test/p/another-invented-token'] });
+    nfc.read(UID, { urls: [URL] });
+    await expect(result).resolves.toEqual({ ok: true });
+    advance(REPEAT_WINDOW_MS + 1);
+    nfc.readError();
+    nfc.read(UID, { urls: [URL] }); // after: back to the consumer, uid only
+
+    expect(consumer).toHaveBeenCalledTimes(2);
+    for (const call of consumer.mock.calls) {
+      expect(call).toHaveLength(1);
+      expect(Object.keys(call[0]).toSorted()).toEqual(['at', 'source', 'uid']);
+      expect(JSON.stringify(call[0])).not.toContain('example.test');
+    }
+    for (const spy of spies) expect(spy).not.toHaveBeenCalled();
   });
 });

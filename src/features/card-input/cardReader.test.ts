@@ -638,7 +638,8 @@ describe('createCardReader: exclusive write session (SPEC point 9)', () => {
     card.read(UID); // same uid at once: still delivered to the writer
 
     expect(onRead).toHaveBeenCalledTimes(2);
-    expect(onRead).toHaveBeenLastCalledWith({ uid: UID, source: 'web-nfc', at: time() });
+    // An adapter that reports no links (USB, E2E fake) hands the writer an empty list.
+    expect(onRead).toHaveBeenLastCalledWith({ uid: UID, source: 'web-nfc', at: time() }, []);
     expect(consumer).not.toHaveBeenCalled();
     expect(vibrate).not.toHaveBeenCalled();
   });
@@ -726,5 +727,37 @@ describe('createCardReader: exclusive write session (SPEC point 9)', () => {
 
     expect(onRead).toHaveBeenCalledTimes(1);
     second.close();
+  });
+
+  it('start() during a session interrupts the writer before scanning again (SPEC point 9)', async () => {
+    const { reader, restart } = nfcSetup();
+    reader.activate({ usbFormat: null });
+    const order: string[] = [];
+    restart.mockImplementation(() => {
+      order.push('restart');
+      return Promise.resolve();
+    });
+    const session = reader.openWriteSession(() => {}, {
+      onInterrupt: () => {
+        order.push('interrupt');
+        session.close();
+      },
+    });
+
+    await reader.start();
+
+    expect(order).toEqual(['interrupt', 'restart']);
+  });
+
+  it('start() with no session open interrupts nothing', async () => {
+    const { reader, restart } = nfcSetup();
+    reader.activate({ usbFormat: null });
+    const onInterrupt = vi.fn<() => void>();
+    reader.openWriteSession(() => {}, { onInterrupt }).close();
+
+    await reader.start();
+
+    expect(onInterrupt).not.toHaveBeenCalled();
+    expect(restart).toHaveBeenCalledTimes(1);
   });
 });

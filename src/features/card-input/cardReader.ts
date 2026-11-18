@@ -27,6 +27,20 @@ export type CardReaderState = {
 export type CardConsumer = (read: CardRead) => void;
 
 /**
+ * What the writer gets for each read during a write: the read and the links (`url` records) the card
+ * holds, needed only to verify the write. Links never reach a `CardConsumer`.
+ */
+export type WriteSessionConsumer = (read: CardRead, urls: readonly string[]) => void;
+
+/** The other events of a write session (SPEC-card-input, point 9). */
+export type WriteSessionEvents = {
+  /** A tag Chrome could not read (`readingerror`: no uid, e.g. a damaged NDEF message). */
+  onUnreadable?: (() => void) | undefined;
+  /** `start()` was called: the scan restarts, so the write cannot go on. */
+  onInterrupt?: (() => void) | undefined;
+};
+
+/**
  * A write in progress (SPEC-card-input, point 9): until `close()` every valid read goes only to the
  * writer, without the repeat window. `lastRead` is the latest valid read before the session opened,
  * delivered or not, so the writer can tell whether the card is still on the phone.
@@ -35,12 +49,14 @@ export type WriteSession = { readonly lastRead: CardRead | null; close(): void }
 
 /**
  * How an adapter hands a raw uid to the service. `format` is a plain string at run time (it can come
- * from the saved settings): anything `normalizeUid` rejects is discarded.
+ * from the saved settings): anything `normalizeUid` rejects is discarded. `urls` are the links the
+ * card holds (Web NFC only): they go to a running write and nowhere else.
  */
 export type DeliverRaw = (
   raw: string,
   format: UsbUidFormat | (string & {}),
   source: CardSource,
+  urls?: readonly string[],
 ) => void;
 
 /** An input (Web NFC, USB keyboard wedge, E2E fake): runs only between `start` and `stop`. */
@@ -59,11 +75,16 @@ export interface UsbInputAdapter {
 }
 
 /**
- * The Web NFC reader (`createWebNfcAdapter`): besides reads it reports its status, and `restart()`
- * starts the scan again from an operator's tap ("Attiva la lettura", "Riprova la lettura").
+ * The Web NFC reader (`createWebNfcAdapter`): besides reads it reports its status and unreadable tags
+ * (`unreadable`, used only by a running write), and `restart()` starts the scan again from an
+ * operator's tap ("Attiva la lettura", "Riprova la lettura").
  */
 export interface NfcInputAdapter {
-  start(ports: { deliver: DeliverRaw; setStatus: (status: NfcStatus) => void }): void;
+  start(ports: {
+    deliver: DeliverRaw;
+    setStatus: (status: NfcStatus) => void;
+    unreadable: () => void;
+  }): void;
   stop(): void;
   restart(): Promise<void>;
 }
@@ -88,8 +109,11 @@ export type CardReader = {
   /** Puts the consumer on top of the stack; the returned function removes exactly that entry. */
   pushConsumer(consumer: CardConsumer): () => void;
   /** Opens the exclusive write session; one at a time (a second one is a programming error). */
-  openWriteSession(onRead: CardConsumer): WriteSession;
-  /** Starts the Web NFC scan again from a tap; does nothing while the service is not active. */
+  openWriteSession(onRead: WriteSessionConsumer, events?: WriteSessionEvents): WriteSession;
+  /**
+   * Starts the Web NFC scan again from a tap; does nothing while the service is not active. A write
+   * in progress is interrupted first (`onInterrupt`): its verification needs the scan running.
+   */
   start(): Promise<void>;
   getState(): CardReaderState;
   subscribe(listener: () => void): () => void;
@@ -112,7 +136,7 @@ export function createCardReader({
   const lastSeen = new Map<string, number>();
   const listeners = new Set<() => void>();
   let lastRead: CardRead | null = null;
-  let session: { onRead: CardConsumer } | null = null;
+  let session: ({ onRead: WriteSessionConsumer } & WriteSessionEvents) | null = null;
   let active = false;
   let usbFormat: UsbUidFormat | null = null;
   let state: CardReaderState = {
@@ -141,6 +165,11 @@ export function createCardReader({
     if (active) setNfcStatus(status);
   };
 
+  // An unreadable tag matters only to a running write; otherwise it is dropped in silence.
+  const reportUnreadable = () => {
+    if (active) session?.onUnreadable?.();
+  };
+
   function updateUsb() {
     const enabled = active && usbFormat !== null;
     const wasEnabled = state.usb.enabled;
@@ -158,7 +187,7 @@ export function createCardReader({
     }
   }
 
-  const deliver: DeliverRaw = (raw, format, source) => {
+  const deliver: DeliverRaw = (raw, format, source, urls = []) => {
     if (!active) return;
     const uid = normalizeUid(raw, format);
     const at = now();
@@ -174,7 +203,7 @@ export function createCardReader({
     lastSeen.set(uid, at);
     lastRead = read;
     if (session !== null) {
-      session.onRead(read);
+      session.onRead(read, [...urls]);
       return;
     }
     if (previous !== undefined && at - previous <= REPEAT_WINDOW_MS) return;
@@ -191,7 +220,7 @@ export function createCardReader({
       if (!active) {
         active = true;
         for (const adapter of adapters) adapter.start({ deliver });
-        nfc?.start({ deliver, setStatus: reportNfcStatus });
+        nfc?.start({ deliver, setStatus: reportNfcStatus, unreadable: reportUnreadable });
       }
       updateUsb();
     },
@@ -217,9 +246,9 @@ export function createCardReader({
         if (index !== -1) stack.splice(index, 1);
       };
     },
-    openWriteSession(onRead) {
+    openWriteSession(onRead, events = {}) {
       if (session !== null) throw new Error('A card write session is already open.');
-      const entry = { onRead };
+      const entry = { onRead, ...events };
       session = entry;
       return {
         lastRead,
@@ -229,6 +258,7 @@ export function createCardReader({
       };
     },
     async start() {
+      session?.onInterrupt?.();
       if (active) await nfc?.restart();
     },
     getState: () => state,

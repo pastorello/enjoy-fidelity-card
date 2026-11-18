@@ -6,6 +6,12 @@ import type { WebNfcApi } from './webNfcAdapter';
 export const IN_FIELD_MS = 1500;
 /** Longest link written: about 210 bytes of NDEF on an NTAG215 with 504 usable bytes. */
 export const MAX_URL_LENGTH = 200;
+/** Time for the card to be recognized and written (steps 1 and 2). */
+export const WRITE_TIMEOUT_MS = 15_000;
+/** Time for the card to be read back with the link (step 3), from `write()` resolving. */
+export const VERIFY_TIMEOUT_MS = 15_000;
+/** Length of the vibration on success, the same as a read delivered to a consumer. */
+const VIBRATION_MS = 80;
 
 export type CardWriteStep = 'waiting-card' | 'writing' | 'verifying';
 export type CardWriteFailure =
@@ -36,6 +42,8 @@ export type WebNfcWriterOptions = {
   now: () => number;
   /** False where writing is impossible (no Web NFC write, scan not active, USB reader only). */
   canWrite: () => boolean;
+  /** `navigator.vibrate` bound to navigator, when the browser has it. */
+  vibrate?: ((ms: number) => unknown) | undefined;
 };
 
 export type WebNfcWriter = { writeUrl: WriteUrl };
@@ -88,20 +96,30 @@ export function createWebNfcWriter({
   reader,
   now,
   canWrite,
+  vibrate,
 }: WebNfcWriterOptions): WebNfcWriter {
   let busy = false;
 
   function run(url: string, expectedUid: string, options: WriteUrlOptions) {
     return new Promise<CardWriteResult>((resolve) => {
-      const { signal, onStep } = options;
+      const { signal, onStep, allowUnreadable = false } = options;
       // Aborts the running write() when the write ends for any other reason.
       const writeControl = new AbortController();
       let step: CardWriteStep | null = null;
       let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      function startTimer(ms: number) {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          finish({ ok: false, reason: 'timeout' });
+        }, ms);
+      }
 
       function finish(result: CardWriteResult) {
         if (settled) return;
         settled = true;
+        clearTimeout(timer);
         writeControl.abort();
         session.close();
         signal?.removeEventListener('abort', onAbort);
@@ -141,8 +159,11 @@ export function createWebNfcWriter({
         }
         written.then(
           () => {
-            // The link counts as written only once it is read back the same (verification).
-            if (!settled) enter('verifying');
+            if (settled) return;
+            // The link counts as written only once it is read back the same (verification),
+            // which gets its own time.
+            startTimer(VERIFY_TIMEOUT_MS);
+            enter('verifying');
           },
           (error: unknown) => {
             finish({ ok: false, reason: failureForWriteError(error) });
@@ -150,15 +171,53 @@ export function createWebNfcWriter({
         );
       }
 
-      function onRead(read: CardRead) {
-        if (settled || !onPhone(read)) return;
-        if (step !== 'waiting-card') return;
-        if (read.uid === expectedUid) startWrite();
-        else finish({ ok: false, reason: 'wrong-card', otherUid: read.uid });
+      function succeed() {
+        try {
+          vibrate?.(VIBRATION_MS);
+        } catch {
+          // The browser may refuse to vibrate: the link is written all the same.
+        }
+        finish({ ok: true });
       }
 
-      const session = reader.openWriteSession(onRead);
+      function onRead(read: CardRead, urls: readonly string[]) {
+        if (settled || !onPhone(read)) return;
+        const expected = read.uid === expectedUid;
+        switch (step) {
+          case 'waiting-card':
+            if (expected) startWrite();
+            else finish({ ok: false, reason: 'wrong-card', otherUid: read.uid });
+            return;
+          case 'writing':
+            // write() writes the first tag in the field, whichever it is: another card read now may
+            // already hold the link. The expected card read now is not a verification yet.
+            if (!expected) finish({ ok: false, reason: 'wrong-card', otherUid: read.uid });
+            return;
+          case 'verifying':
+            if (expected) {
+              if (urls.includes(url)) succeed();
+              else finish({ ok: false, reason: 'verify-failed' });
+            } else if (urls.includes(url)) {
+              // The link ended up on another card.
+              finish({ ok: false, reason: 'wrong-card', otherUid: read.uid });
+            }
+            return;
+          default:
+            return;
+        }
+      }
+
+      // A damaged tag gives no uid: while waiting it is `unreadable`, unless the operator confirmed
+      // it is the right card (`allowUnreadable`), the only way to repair one. Later it is ignored.
+      function onUnreadable() {
+        if (settled || step !== 'waiting-card') return;
+        if (allowUnreadable) startWrite();
+        else finish({ ok: false, reason: 'unreadable' });
+      }
+
+      const session = reader.openWriteSession(onRead, { onUnreadable, onInterrupt: onAbort });
       signal?.addEventListener('abort', onAbort);
+      startTimer(WRITE_TIMEOUT_MS);
       enter('waiting-card');
       if (settled) return; // the caller aborted from onStep
 
