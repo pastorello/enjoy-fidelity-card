@@ -244,8 +244,8 @@ admin crea "Nicolò Prova E2E <suffisso>" con "333 123 4521" → lo trova con "n
 cifre → scheda ("333 ••• 4521") → modifica telefono → rinomina su un nome già usato rifiutata → cancella i
 dati → non si trova più; operatore crea un cliente con solo nome e consenso e non vede "Dati del cliente".
 **Accettazione:**
-- [ ] E2E verde a 390×844 contro Supabase locale, anche ripetuto senza `db:reset`
-- [ ] Nessuna chiamata a `*.supabase.co` (fixture `onlyLocalSupabase`)
+- [x] E2E verde a 390×844 contro Supabase locale, anche ripetuto senza `db:reset`
+- [x] Nessuna chiamata a `*.supabase.co` (fixture `onlyLocalSupabase`)
 **Verifica:** `npm run db:start && scripts/reload-auth-templates.sh && npm run e2e`
 **Dipendenze:** 14 · **File:** e2e/customers.spec.ts, e2e/fixtures.ts · **Dimensione:** S
 
