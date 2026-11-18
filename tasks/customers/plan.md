@@ -76,7 +76,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: unità e integrazione verdi; test esistenti invariati
 
 ### Fase 3: Home "Cerca cliente"
-- [ ] Task 7: Ricerca con attesa, `?q=`, risultati, limite 20, risposte fuori ordine; rotta indice
+- [x] Task 7: Ricerca con attesa, `?q=`, risultati, limite 20, risposte fuori ordine; rotta indice
 - [ ] Task 8: Nessun risultato, errore con Riprova, `not_operator` → `/accedi`
 - [ ] Task 9: SERVITI OGGI (vuota, errore, ricarica su `visibilitychange`) e messaggio di stato della home
 

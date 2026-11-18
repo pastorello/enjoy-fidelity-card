@@ -122,10 +122,10 @@ indice aggiornata): `AppShell` con logo e account, posto in cima per il `CardRea
 nome, "••• 4521" o "Senza telefono", `PointsBadge`; massimo 20 + riga "Mostro i primi 20: scrivi qualcosa
 in più"; tocco → scheda; caricamento `StatusView` "Ricerca…"; "Cancella la ricerca" torna a SERVITI OGGI.
 **Accettazione:**
-- [ ] Componenti (timer finti): una sola chiamata dopo 250 ms; risposta vecchia arrivata dopo la nuova
+- [x] Componenti (timer finti): una sola chiamata dopo 250 ms; risposta vecchia arrivata dopo la nuova
       ignorata; 21 risultati → 20 righe + riga finale; testo corto → nessuna chiamata
-- [ ] `/?q=rossi` apre con la ricerca; Indietro dalla scheda la ritrova
-- [ ] Test esistenti di rotte e identity aggiornati al nuovo contenuto della home, nessuno tolto
+- [x] `/?q=rossi` apre con la ricerca; Indietro dalla scheda la ritrova
+- [x] Test esistenti di rotte e identity aggiornati al nuovo contenuto della home, nessuno tolto
 **Verifica:** `npm test` (suite completa nel commit)
 **Dipendenze:** 4, 6 · **File:** src/features/customers/HomePage.tsx (+ .module.css, .test.tsx),
 useCustomerSearch.ts, src/app/routes.tsx, src/app/HomePage.tsx · **Dimensione:** M
