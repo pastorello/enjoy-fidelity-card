@@ -72,7 +72,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 1: Logica pura (rischio più alto)
 - [x] Task 1: `normalizeUid` esaustivo e `USB_UID_FORMATS` allineato alla CHECK di `settings`
 - [x] Task 2: Servizio di lettura: pila dei consumatori, anti-ripetizione, vibrazione, attivazione
-- [ ] Task 3: Lettore USB a emulazione tastiera (`keyboardWedge`) collegato al servizio
+- [x] Task 3: Lettore USB a emulazione tastiera (`keyboardWedge`) collegato al servizio
 - [ ] Task 4: Adattatore Web NFC: stati, permesso, "torna qui", riavvio
 
 ### Checkpoint A: unità verdi con timer finti; revisione `security-and-hardening` (nessun uid nei log, niente lettura senza operatore)

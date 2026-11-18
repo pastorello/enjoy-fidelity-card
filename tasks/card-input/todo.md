@@ -50,11 +50,11 @@ azzerare. `Enter` con ≥ 4 caratteri entro 50 ms → al servizio con il formato
 `stopPropagation`. Bersaglio modificabile → nulla. Il servizio lo accende solo con un formato non `null` e
 aggiorna `usb.lastReadAt` / `usb.lastInvalidAt`.
 **Accettazione:**
-- [ ] Unità con timer finti (criterio 6): raffica + Invio → lettura e Invio fermato; lettere maiuscole con
+- [x] Unità con timer finti (criterio 6): raffica + Invio → lettura e Invio fermato; lettere maiuscole con
       `Shift` fra i caratteri → lettura; intervallo > 50 ms → niente; Ctrl e ripetizione azzerano
-- [ ] Unità: bersaglio `input`/`textarea`/`select`/`contenteditable` → niente e Invio non fermato; `dec`
+- [x] Unità: bersaglio `input`/`textarea`/`select`/`contenteditable` → niente e Invio non fermato; `dec`
       rifiuta le lettere; lettura non valida → `lastInvalidAt`, nessuna consegna
-- [ ] Unità: formato `null` → listener assente; arriva il formato → acceso; cambio di formato vale dalla
+- [x] Unità: formato `null` → listener assente; arriva il formato → acceso; cambio di formato vale dalla
       lettura successiva; `deactivate()` toglie il listener
 **Verifica:** `npm test -- keyboardWedge cardReader`
 **Dipendenze:** 2 · **File:** src/features/card-input/keyboardWedge.ts (+ .test.ts),
