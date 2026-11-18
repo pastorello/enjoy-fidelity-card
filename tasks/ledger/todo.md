@@ -107,10 +107,10 @@ riduttore del tastierino a centesimi (cifre a destra, "00", cancella, zeri inizi
 9.999.999), riduttore dei punti del premio libero (5 cifre, niente "00"), `isUnusualAmount` (strettamente
 sopra la soglia), `formatConfirmAmount` ("1.250 €", "150,01 €").
 **Accettazione:**
-- [ ] Unità: 1-2-5-0 = 1250 c e 12 punti con 100, 5 con 250; cancella su 0; cifre oltre il limite ignorate
+- [x] Unità: 1-2-5-0 = 1250 c e 12 punti con 100, 5 con 250; cancella su 0; cifre oltre il limite ignorate
       (criterio 1)
-- [ ] Unità: soglia 15000 → 15000 no, 15001 sì; "Conferma 1.250 €" e "Conferma 150,01 €" (criterio 2)
-- [ ] Unità: riduttore dei punti del premio libero (1..99999, niente "00")
+- [x] Unità: soglia 15000 → 15000 no, 15001 sì; "Conferma 1.250 €" e "Conferma 150,01 €" (criterio 2)
+- [x] Unità: riduttore dei punti del premio libero (1..99999, niente "00")
 **Verifica:** `npm test -- points`
 **Dipendenze:** nessuna · **File:** src/features/ledger/types.ts, src/features/ledger/points.ts,
 src/features/ledger/points.test.ts · **Dimensione:** S

@@ -111,7 +111,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: `db:test` verde; revisione `security-and-hardening` su RLS, privilegi, trigger, lock, idempotenza e ruoli
 
 ### Fase 2: Logica e servizio
-- [ ] Task 6: Tipi, `pointsFor`, riduttori dei tastierini, soglia strettamente sopra, importo del pulsante
+- [x] Task 6: Tipi, `pointsFor`, riduttori dei tastierini, soglia strettamente sopra, importo del pulsante
 - [ ] Task 7: `formatMovement`: etichette, date relative, gruppi per giorno, testo della correzione in `Europe/Rome`
 - [ ] Task 8: `supabaseLedgerService`: RPC, vista, traduzione errori, timeout 8 s, guardia dei codici
 - [ ] Task 9: `fakeLedgerService`, `LedgerServiceProvider`, `main.tsx` e `renderApp`
