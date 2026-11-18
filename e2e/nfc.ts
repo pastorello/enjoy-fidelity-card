@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /** One link written by the fake writer (src/features/card-input/fakeCardAdapter.ts). */
 export type FakeCardWrite = { uid: string; url: string; at: number };
@@ -90,4 +90,78 @@ export async function stubWebNfc(page: Page, options: StubWebNfcOptions = {}): P
       scan: options.scan ?? 'ok',
     },
   );
+}
+
+/** A 7-byte uid nobody has used yet (a uid belongs to one customer forever), canonical. */
+export function freshUid(): string {
+  const bytes = Array.from(crypto.getRandomValues(new Uint8Array(6)), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  );
+  return `04${bytes.join('')}`.toUpperCase();
+}
+
+/** The uid as Web NFC gives it: lower case, colon-separated. */
+export function asWebNfc(uid: string): string {
+  return (uid.toLowerCase().match(/../g) ?? []).join(':');
+}
+
+export function uniqueName(prefix: string): string {
+  return `${prefix} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
+/**
+ * After «Salva cliente» with a card, the link is written on it (SPEC-cards, point 8), then `next`
+ * opens. The fake writer writes at once only on a card tapped less than 1.5 s before (IN_FIELD_MS):
+ * when the form took longer, the write asks for the card («Avvicina la card …») and it is tapped
+ * again, as the operator would. Returns when the card was last tapped (null: not tapped here).
+ */
+export async function writeAfterSave(page: Page, uid: string, next: string | RegExp) {
+  const again = page
+    .getByRole('region', { name: 'Scrittura del link' })
+    .getByText(`Avvicina la card …${uid.slice(-4)}`);
+  let lastTap: number | null = null;
+  await expect(async () => {
+    if (await again.isVisible()) {
+      lastTap = Date.now();
+      await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+    }
+    await expect(page).toHaveURL(next, { timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  return lastTap;
+}
+
+/** Registers a customer with a new card from the home, as at the till; returns its id. */
+export async function customerWithCard(page: Page, prefix: string, uid: string) {
+  await page.goto('/');
+  await expect(page.getByRole('region', { name: 'Lettura card' })).toContainText(
+    'Avvicina la card',
+  );
+  await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+  await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
+  const name = uniqueName(prefix);
+  await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
+  await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
+  await page.getByRole('button', { name: 'Salva cliente' }).click();
+  await writeAfterSave(page, uid, /\/clienti\/[0-9a-f-]{36}\/spesa$/);
+  const id = /\/clienti\/([0-9a-f-]{36})\/spesa$/.exec(page.url())?.[1];
+  if (id === undefined) throw new Error('No customer id in the URL');
+  return { id, name };
+}
+
+/**
+ * Puts `uid` on the phone in Associa card and waits for `customerPath`. The fake writer writes at
+ * once only on a card tapped less than 1.5 s before (IN_FIELD_MS): when the association took
+ * longer, the write asks for the card again («Avvicina la card …») and it is tapped again.
+ */
+export async function tapUntilWritten(page: Page, uid: string, customerPath: string) {
+  await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+  const again = page
+    .getByRole('region', { name: 'Scrittura del link' })
+    .getByText(`Avvicina la card …${uid.slice(-4)}`);
+  await expect(async () => {
+    if (await again.isVisible()) {
+      await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+    }
+    await expect(page).toHaveURL(customerPath, { timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
 }
