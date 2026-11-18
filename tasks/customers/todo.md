@@ -91,11 +91,11 @@ update, anonymize; errori tipizzati); `errorCodes.ts` (elenco unico codici → t
 `customer_name_taken` con id dal `detail`, fetch fallita → `network`, `serverFaultFor` →
 `ServerFaultError`; guardia `scripts/customersBoundary.test.ts`; integrazione con le credenziali del seed.
 **Accettazione:**
-- [ ] Unità con `getSupabase` finto: ogni codice di `errorCodes.ts` → errore tipizzato; rete → `network`;
+- [x] Unità con `getSupabase` finto: ogni codice di `errorCodes.ts` → errore tipizzato; rete → `network`;
       PGRST202 → `misconfigured`
-- [ ] Integrazione: l'operatore crea, ritrova con la ricerca, riceve `forbidden` dall'anonimizzazione; il
+- [x] Integrazione: l'operatore crea, ritrova con la ricerca, riceve `forbidden` dall'anonimizzazione; il
       reinvio con lo stesso `operation_id` restituisce lo stesso id; l'admin anonimizza (nomi con suffisso unico)
-- [ ] Solo `supabaseCustomerService.ts` chiama le RPC dei clienti (guardia verde)
+- [x] Solo `supabaseCustomerService.ts` chiama le RPC dei clienti (guardia verde)
 **Verifica:** `npm test -- customers && npm run test:integration`
 **Dipendenze:** 3 · **File:** src/features/customers/types.ts, errorCodes.ts, supabaseCustomerService.ts
 (+ .test.ts), tests/integration/customers.test.ts, scripts/customersBoundary.test.ts · **Dimensione:** M
