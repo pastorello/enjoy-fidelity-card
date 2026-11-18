@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { formatCents, formatInteger } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
+import { Icon } from '../../shared/ui/Icon';
 import { StatusView } from '../../shared/ui/StatusView';
 import { CustomerRowLink } from '../cards/CustomerRowLink';
 import { loadErrorText } from '../customers/loadErrorText';
@@ -14,7 +15,7 @@ import type { Settings } from '../settings/types';
 import { AmountKeypad } from './AmountKeypad';
 import { useLedgerService } from './LedgerServiceProvider';
 import styles from './PurchasePage.module.css';
-import { pointsFor } from './points';
+import { formatConfirmAmount, isUnusualAmount, pointsFor } from './points';
 import { LedgerError } from './types';
 import { useOperation } from './useOperation';
 
@@ -45,6 +46,28 @@ function PointsPreview({
         1 punto ogni {formatCents(settings.centsPerPoint)}, per difetto · nuovo saldo{' '}
         {formatInteger(newBalance)} {pointsWord(newBalance)}
       </p>
+    </div>
+  );
+}
+
+/**
+ * «Importo insolito: +1.250 punti» / «Sopra 150,00 € l’app chiede conferma. …» (wireframe
+ * "Importo insolito"): takes the place of the preview while the amount is strictly above the
+ * threshold in force.
+ */
+function UnusualAmountWarning({ points, settings }: { points: number; settings: Settings }) {
+  return (
+    <div role="alert" className={styles.unusual}>
+      <Icon name="triangle-alert" size={24} className={styles.unusualIcon} />
+      <div>
+        <p className={styles.unusualTitle}>
+          Importo insolito: +{formatInteger(points)} {pointsWord(points)}
+        </p>
+        <p className={styles.unusualText}>
+          Sopra {formatCents(settings.confirmThresholdCents)} l’app chiede conferma. Controlla di
+          non aver digitato una cifra in più.
+        </p>
+      </div>
     </div>
   );
 }
@@ -81,17 +104,34 @@ function usePurchase(customerId: string) {
 
   const points =
     settings.status === 'ready' ? pointsFor(amountCents, settings.settings.centsPerPoint) : 0;
-  return { amountCents, setAmountCents, settings, operation, forbidden, points };
+  const unusual =
+    settings.status === 'ready' &&
+    isUnusualAmount(amountCents, settings.settings.confirmThresholdCents);
+  return { amountCents, setAmountCents, settings, operation, forbidden, points, unusual };
 }
 
 type Purchase = ReturnType<typeof usePurchase>;
 
 /**
  * "Riscatta premio" and "Conferma +N". Without the settings there is no "Conferma": the server's
- * ratio and threshold are needed to confirm.
+ * ratio and threshold are needed to confirm. Above the threshold, "Correggi" (clears the amount)
+ * and "Conferma 1.250 €", which records at once: no second dialog.
  */
 function PurchaseActions({ customerId, purchase }: { customerId: string; purchase: Purchase }) {
-  const { settings, amountCents, operation, points } = purchase;
+  const { settings, amountCents, setAmountCents, operation, points, unusual } = purchase;
+  const busy = operation.status === 'busy';
+  if (unusual) {
+    return (
+      <div className={styles.actions}>
+        <Button variant="secondary" block disabled={busy} onClick={() => setAmountCents(0)}>
+          Correggi
+        </Button>
+        <Button block busy={busy} onClick={() => void operation.submit()}>
+          Conferma {formatConfirmAmount(amountCents)}
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className={styles.actions}>
       <ButtonLink to={`/clienti/${customerId}/premi`} variant="secondary" block>
@@ -101,7 +141,7 @@ function PurchaseActions({ customerId, purchase }: { customerId: string; purchas
         <Button
           block
           disabled={amountCents === 0}
-          busy={operation.status === 'busy'}
+          busy={busy}
           onClick={() => void operation.submit()}
         >
           Conferma +{formatInteger(points)}
@@ -121,7 +161,7 @@ function PurchaseBody({
   purchase: Purchase;
   onSettingsRetry: () => void;
 }) {
-  const { settings, amountCents, setAmountCents, operation, forbidden, points } = purchase;
+  const { settings, amountCents, setAmountCents, operation, forbidden, points, unusual } = purchase;
   return (
     <>
       <CustomerRowLink customer={customer} />
@@ -131,7 +171,10 @@ function PurchaseBody({
           {formatCents(amountCents)}
         </output>
       </section>
-      {settings.status === 'ready' && (
+      {settings.status === 'ready' && unusual && (
+        <UnusualAmountWarning points={points} settings={settings.settings} />
+      )}
+      {settings.status === 'ready' && !unusual && (
         <PointsPreview points={points} balance={customer.balance} settings={settings.settings} />
       )}
       {settings.status === 'loading' && <StatusView kind="loading" />}

@@ -74,3 +74,32 @@
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: var(--space-2);
 }
+
+/* Importo insolito: the warning tone of the design system, black on ochre (5,6:1). */
+.unusual {
+  display: flex;
+  align-items: flex-start;
+  /* 12px 16px as in the wireframe */
+  gap: calc(var(--space-2) + var(--space-1));
+  padding: calc(var(--space-2) + var(--space-1)) var(--space-3);
+  background: var(--color-ochre);
+  color: var(--color-ink);
+}
+
+.unusualIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.unusualTitle {
+  margin: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: var(--type-title-weight);
+}
+
+.unusualText {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+}

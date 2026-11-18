@@ -185,6 +185,79 @@ describe('PurchasePage: Registra spesa', () => {
   });
 });
 
+describe('PurchasePage: Importo insolito', () => {
+  it('threshold 150,00 €: 150,01 € shows the warning and "Conferma 150,01 €"; 150,00 € does not (criterion 2)', async () => {
+    renderPurchase();
+    await ready();
+    await press('1', '5', '0', '0', '0');
+    expect(amount()).toHaveTextContent('150,00 €');
+    expect(screen.queryByText(/Importo insolito/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conferma +150' })).toBeEnabled();
+    expect(screen.getByRole('link', { name: 'Riscatta premio' })).toBeInTheDocument();
+
+    await press('Cancella ultima cifra', '1');
+    expect(amount()).toHaveTextContent('150,01 €');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Importo insolito: +150 punti');
+    expect(alert).toHaveTextContent(
+      'Sopra 150,00 € l’app chiede conferma. Controlla di non aver digitato una cifra in più.',
+    );
+    expect(screen.queryByText('Punti da aggiungere')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conferma 150,01\u00a0€' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Correggi' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Riscatta premio' })).not.toBeInTheDocument();
+    expect(keypad()).toBeInTheDocument();
+  });
+
+  it('the threshold in force, and points grouped: 1.250 € → "+1.250 punti", "Conferma 1.250 €"', async () => {
+    const settings = createFakeSettingsService({
+      settings: { ...defaultSettings, confirmThresholdCents: 50_000 },
+    });
+    renderPurchase({ settings });
+    await ready();
+    await press('1', '2', '5', '0', 'Doppio zero');
+    expect(amount()).toHaveTextContent('1.250,00 €');
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Importo insolito: +1.250 punti');
+    expect(alert).toHaveTextContent('Sopra 500,00 € l’app chiede conferma.');
+    expect(screen.getByRole('button', { name: 'Conferma 1.250\u00a0€' })).toBeEnabled();
+  });
+
+  it('"Correggi" clears the amount and brings back the normal state', async () => {
+    const { ledger } = renderPurchase();
+    await ready();
+    await press('1', '2', '5', '0', 'Doppio zero');
+    await userEvent.click(screen.getByRole('button', { name: 'Correggi' }));
+
+    expect(amount()).toHaveTextContent('0,00 €');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conferma +0' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Riscatta premio' })).toBeInTheDocument();
+    expect(ledger.service.recordPurchase).not.toHaveBeenCalled();
+  });
+
+  it('"Conferma 1.250 €" records at once, with no second dialog, once even on a double tap', async () => {
+    const { ledger } = renderPurchase();
+    await ready();
+    await press('1', '2', '5', '0', 'Doppio zero');
+    const held = ledger.holdNext('recordPurchase');
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Conferma 1.250\u00a0€' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await act(async () => {
+      held.release();
+    });
+
+    await waitFor(() => expect(ledger.movements()).toHaveLength(1));
+    expect(ledger.service.recordPurchase).toHaveBeenCalledTimes(1);
+    expect(ledger.movements()[0]).toMatchObject({
+      customerId: MARIA.id,
+      kind: 'purchase',
+      amountCents: 125_000,
+      points: 1250,
+    });
+  });
+});
+
 describe('PurchasePage: settings not loaded', () => {
   it('while the settings load: the keypad, a loading state, no preview and no "Conferma"', async () => {
     const settings = createFakeSettingsService();
