@@ -194,9 +194,9 @@ su `/clienti/nuovo`: card sconosciuta → riquadro «Card letta» (vale l'ultima
 → avviso «Card già associata» con i testi del caso, dati intatti; lettura non disponibile → stati di
 `CardReadPanel`, il cliente si salva senza card.
 **Accettazione:**
-- [ ] Componente: sconosciuta → riquadro e salvataggio con card; seconda card sostituisce la prima
-- [ ] Componente: nota → avviso senza perdere i dati; anonimizzata senza nome (criterio 5)
-- [ ] Componente: NFC spento / iPhone → salvataggio senza card
+- [x] Componente: sconosciuta → riquadro e salvataggio con card; seconda card sostituisce la prima
+- [x] Componente: nota → avviso senza perdere i dati; anonimizzata senza nome (criterio 5)
+- [x] Componente: NFC spento / iPhone → salvataggio senza card
 **Verifica:** `npm test -- NewCustomer`
 **Dipendenze:** 10 · **File:** src/features/cards/NewCustomerCardSection.tsx (+ .test.tsx),
 src/features/cards/CardTakenNotice.tsx, src/features/customers/NewCustomerPage.tsx · **Dimensione:** M

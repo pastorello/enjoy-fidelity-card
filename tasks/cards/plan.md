@@ -128,7 +128,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 3: Letture
 - [x] Task 9: Home: card attiva → segnaposto Registra spesa, sconosciuta → Nuovo cliente, avvisi
 - [x] Task 10: Nuovo cliente da card nuova (`?card=`): riquadro «Card letta», salvataggio con card, `card_taken`
-- [ ] Task 11: Sezione «Card (facoltativa)» in Nuovo cliente senza card
+- [x] Task 11: Sezione «Card (facoltativa)» in Nuovo cliente senza card
 
 ### Fase 4: Associa, Modifica, Scheda
 - [ ] Task 12: Associa o sostituisci card (`/clienti/:id/card`): tutti gli esiti dell'associazione
