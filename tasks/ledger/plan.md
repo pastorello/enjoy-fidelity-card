@@ -149,7 +149,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint E: Impeccable pulito; confronto con Cliente e Movimenti; revisione `security-and-hardening` della UI
 
 ### Fase 6: Chiusura
-- [ ] Task 27: Guardia del confine, glifi di Enjoy Display, RUNBOOK, memoria di progetto
+- [x] Task 27: Guardia del confine, glifi di Enjoy Display, RUNBOOK, memoria di progetto
 - [ ] Task 28: Verifica dei criteri di successo e PR
 
 ### Checkpoint F: i 10 criteri verificati; quality bar completa verde; PR su `main` pronta per `code-review-and-quality`, da unire dopo #18, #19 e #20

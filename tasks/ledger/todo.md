@@ -424,9 +424,9 @@ nel modulo. `scripts/displayGlyphs.test.ts` include i componenti e i titoli di `
 manuale alla cassa sull'anteprima (card → conferma in meno di 10 s su Android, vibrazione). Aggiornati
 `brain/STATUS.md` e `CAPABILITY-MAP.md` se cambia qualcosa.
 **Accettazione:**
-- [ ] La guardia fallisce se un componente chiama Supabase o scrive l'`operation_id` in uno storage
-- [ ] `displayGlyphs.test.ts` verde con i testi di `ledger` (criterio 9)
-- [ ] Nessun segreto né dato reale nei documenti
+- [x] La guardia fallisce se un componente chiama Supabase o scrive l'`operation_id` in uno storage
+- [x] `displayGlyphs.test.ts` verde con i testi di `ledger` (criterio 9)
+- [x] Nessun segreto né dato reale nei documenti
 **Verifica:** `npm test -- ledgerBoundary displayGlyphs`
 **Dipendenze:** 26 · **File:** scripts/ledgerBoundary.test.ts, scripts/displayGlyphs.test.ts,
 brain/topics/operations/RUNBOOK.md, brain/STATUS.md · **Dimensione:** M
