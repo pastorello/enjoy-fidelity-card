@@ -184,9 +184,9 @@ con questo nome." + "Apri la scheda" + suggerimento «Maria Rossi Serapo» al po
 "Cliente non salvato: controlla la connessione e riprova." con "Riprova"; errori del server mostrati sul
 campo; `?nome=` ripulito e tagliato a 80.
 **Accettazione:**
-- [ ] Componenti: doppio tocco = una chiamata; Riprova dopo rete usa lo **stesso** `operation_id`; risposta
+- [x] Componenti: doppio tocco = una chiamata; Riprova dopo rete usa lo **stesso** `operation_id`; risposta
       persa e Riprova → scheda del cliente salvato davvero; dopo un rifiuto nuovo `operation_id`
-- [ ] Nome già usato → link alla scheda esistente; `?nome=` precompila
+- [x] Nome già usato → link alla scheda esistente; `?nome=` precompila
 **Verifica:** `npm test`
 **Dipendenze:** 10 · **File:** src/features/customers/NewCustomerPage.tsx (+ .test.tsx), CustomerForm.tsx,
 useSaveCustomer.ts · **Dimensione:** M

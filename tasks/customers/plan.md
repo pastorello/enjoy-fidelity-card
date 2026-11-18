@@ -84,7 +84,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 4: Nuovo, scheda, modifica, cancellazione
 - [x] Task 10: Modulo Nuovo cliente: campi, validazione, privacy con dialogo segnaposto
-- [ ] Task 11: Salvataggio: nome già usato, rete + Riprova con lo stesso `operation_id`, doppio tocco, `?nome=`
+- [x] Task 11: Salvataggio: nome già usato, rete + Riprova con lo stesso `operation_id`, doppio tocco, `?nome=`
 - [ ] Task 12: `AppShell` `headerAction` e scheda cliente (stati, telefono, note, SALDO, cliente cancellato)
 - [ ] Task 13: Modifica cliente (precompilata, errori, Riprova, cliente cancellato → scheda)
 - [ ] Task 14: Cancellazione dei dati: sezione solo admin, `ConfirmDialog`, errori, messaggio sulla home
