@@ -289,11 +289,11 @@ src/features/ledger/LedgerFailure.tsx (+ .module.css) · **Dimensione:** M
 **Descrizione:** `e2e/ledger.spec.ts` (progetto `phone`): l'operatore crea nel test un cliente finto con
 card finta e nome unico (`customerWithCard`), `window.__enjoyFakeCard(uid)` dalla home.
 **Accettazione:**
-- [ ] Card → Registra spesa → 1-2-5-0 → Conferma → "Spesa registrata" +12 e saldo corretto **in meno di
+- [x] Card → Registra spesa → 1-2-5-0 → Conferma → "Spesa registrata" +12 e saldo corretto **in meno di
       10 s** misurati dal test; dopo 10 s si torna a `/` e il cliente è in "Serviti oggi" (criterio 3)
-- [ ] `context.setOffline(true)` → "Spesa non salvata" → rete ripristinata → Riprova → un solo movimento
+- [x] `context.setOffline(true)` → "Spesa non salvata" → rete ripristinata → Riprova → un solo movimento
       nello storico (criterio 4)
-- [ ] Target ≥ 48 px; nessun errore in console; nessuna chiamata a `*.supabase.co`
+- [x] Target ≥ 48 px; nessun errore in console; nessuna chiamata a `*.supabase.co`
 **Verifica:** `npm run e2e -- ledger`
 **Dipendenze:** 17 · **File:** e2e/ledger.spec.ts, e2e/nfc.ts · **Dimensione:** S
 

@@ -130,7 +130,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Checkpoint C: Impeccable pulito; confronto a 390×844 con Importo, Importo-alto, Spesa-ok, Errore-rete
 
-- [ ] Task 18: E2E della spesa: card → Spesa registrata in meno di 10 s, ritorno a `/` e Serviti oggi, rete giù → Riprova → un solo movimento
+- [x] Task 18: E2E della spesa: card → Spesa registrata in meno di 10 s, ritorno a `/` e Serviti oggi, rete giù → Riprova → un solo movimento
 
 ### Fase 4: Riscatti
 - [ ] Task 19: Riscatta premio dal catalogo: premi raggiungibili e non, saldo dopo, rifiuti che ricaricano
