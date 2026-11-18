@@ -203,10 +203,13 @@ disattivabile; 4 pallini `role="img"` con "N cifre su 4 inserite") riusabile da 
 `/impostazioni/pin`; `useTabletLayout()` su `matchMedia('(min-width: 1024px) and (min-height: 600px)')`.
 Solo componenti e token del design system; il PIN vive solo nello stato React.
 **Accettazione:**
-- [ ] Componente: tocchi e cancellazione, pallini con l'etichetta giusta, `onComplete` alla 4ª cifra una
+- [x] Componente: tocchi e cancellazione, pallini con l'etichetta giusta, `onComplete` alla 4ª cifra una
       sola volta, disattivato non accetta tocchi
-- [ ] `useTabletLayout` con `matchMedia` finto, aggiornato al cambio; test CSS: tasti ≥ 88 px
-- [ ] Detector Impeccable pulito; glifi Display verificati
+- [x] `useTabletLayout` con `matchMedia` finto, aggiornato al cambio; test CSS: tasti ≥ 88 px
+- [x] Detector Impeccable pulito; glifi Display verificati
+**Nota:** i pallini sono un `<svg role="img">` (lint `prefer-tag-over-role`); con una cifra l'etichetta è
+"1 cifra su 4 inserita". `PinPad` è controllato (`value`/`onChange`/`onComplete`/`disabled`): chi lo usa
+svuota il PIN rimettendo `value` a `''`.
 **Verifica:** `npm test -- PinPad useTabletLayout`
 **Dipendenze:** 11 · **File:** src/features/tablet-kiosk/PinPad.tsx (+ .module.css, .test.tsx),
 useTabletLayout.ts (+ .test.ts) · **Dimensione:** M

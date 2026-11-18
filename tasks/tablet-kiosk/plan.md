@@ -144,7 +144,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: quality bar completa verde; test di identity invariati nel comportamento; revisione con l'utente prima della UI
 
 ### Fase 3: Cassa
-- [ ] Task 12: `PinPad` (tasti da 88 px) e `useTabletLayout`
+- [x] Task 12: `PinPad` (tasti da 88 px) e `useTabletLayout`
 - [ ] Task 13: `/cassa` "Chi è alla cassa?": selezione, invio alla 4ª cifra, tasti fisici fermati, stati
 - [ ] Task 14: `CashierChip` nell'intestazione: "Alla cassa: <nome> · Cambia" → `end_cashier_turn` → `/cassa`
 - [ ] Task 15: Accesso sul tablet: nota del layout tablet, dispositivo → `/cassa`
