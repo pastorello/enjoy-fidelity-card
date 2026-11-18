@@ -19,11 +19,11 @@ unique, `kind`, `amount_cents`, `points`, `cents_per_point`, `reward_id` senza c
 `operator_name`, `cancelled_by_id`/`cancelled_at`, `corrected_kind`/`corrected_created_at`; `grant select`
 solo ad `authenticated`); tipo `app.ledger_result`.
 **Accettazione:**
-- [ ] pgTAP: operatore attivo legge movimenti e vista; utente senza profilo e `anon` no; insert, update,
+- [x] pgTAP: operatore attivo legge movimenti e vista; utente senza profilo e `anon` no; insert, update,
       delete, truncate diretti negati ad `authenticated` (criterio 6)
-- [ ] pgTAP: update e delete falliscono anche come `postgres` (movimenti inseriti dal test come `postgres`);
+- [x] pgTAP: update e delete falliscono anche come `postgres` (movimenti inseriti dal test come `postgres`);
       i `check` per tipo rifiutano righe incoerenti (criterio 6)
-- [ ] pgTAP: `customer_balance` 0 senza movimenti, somma con correzioni; la vista riporta chi e quando ha
+- [x] pgTAP: `customer_balance` 0 senza movimenti, somma con correzioni; la vista riporta chi e quando ha
       annullato
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** nessuna · **File:** supabase/migrations/*_ledger.sql, supabase/tests/ledger.test.sql

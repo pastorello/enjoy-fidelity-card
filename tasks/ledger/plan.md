@@ -102,7 +102,7 @@ migrazione ledger (task 1-5: movements, trigger, vista, saldo, RPC, letture di c
 Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Database (rischio più alto)
-- [ ] Task 1: `app.movements`, vincoli per tipo, indici, RLS, trigger che bloccano update/delete/truncate, `customer_balance`, vista `movement_history`, `ledger_result`
+- [x] Task 1: `app.movements`, vincoli per tipo, indici, RLS, trigger che bloccano update/delete/truncate, `customer_balance`, vista `movement_history`, `ledger_result`
 - [ ] Task 2: `record_purchase`: lock, idempotenza, punti per difetto col rapporto in vigore salvato
 - [ ] Task 3: `redeem_reward` e `redeem_free_reward`: premio sul server, saldo mai sotto zero
 - [ ] Task 4: `cancel_movement`: correzione di segno opposto, finestra di 10 s dell'operatore, punti già spesi
