@@ -383,3 +383,202 @@ describe('CardLinkWriter: the token never reaches the page (criterion 10)', () =
     expect(fixture.cards.tokens(fixture.card.id).written).toBe(tokens[1]);
   });
 });
+
+// Task 16: the hard cases of SPEC-cards, point 8.4.
+
+const RETRY = 'Riprova';
+const WRITE_ANYWAY = 'Scrivi comunque';
+
+describe('CardLinkWriter: no answer to the confirmation (criterion 15)', () => {
+  it('«Riprova» confirms the same token again, without a new issue nor a new write', async () => {
+    const fixture = await setup({ program: (cards) => cards.failNext('confirmLink', 'network') });
+    const write = await currentWrite(fixture);
+    const token = await tokenOf(fixture);
+    await act(async () => write.finish({ ok: true }));
+    await settle();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Link scritto ma non registrato: controlla la connessione.',
+    );
+    expect(screen.getByRole('button', { name: RETRY })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: LATER })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: WRITE_AGAIN })).toBeNull();
+    expect(fixture.onWritten).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: RETRY }));
+    await settle();
+
+    expect(fixture.cards.service.issueLink).toHaveBeenCalledOnce();
+    expect(fixture.writeUrl).toHaveBeenCalledOnce();
+    expect(fixture.cards.service.confirmLink).toHaveBeenCalledTimes(2);
+    expect(fixture.cards.service.confirmLink).toHaveBeenLastCalledWith(fixture.card.id, token);
+    expect(fixture.onWritten).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).toHaveTextContent(WRITTEN_TEXT);
+    expect(fixture.cards.tokens(fixture.card.id).written).toBe(token);
+    expect(html()).not.toContain(token);
+  });
+
+  it('an answer lost after the confirmation applied: «Riprova» is idempotent', async () => {
+    const fixture = await setup({ program: (cards) => cards.failNext('confirmLink', 'lost') });
+    const write = await currentWrite(fixture);
+    await act(async () => write.finish({ ok: true }));
+    await settle();
+
+    await userEvent.click(screen.getByRole('button', { name: RETRY }));
+    await settle();
+    expect(fixture.onWritten).toHaveBeenCalledOnce();
+    expect(fixture.cards.service.issueLink).toHaveBeenCalledOnce();
+  });
+
+  it('«Riprova» that fails again keeps offering «Riprova» with the same token', async () => {
+    const fixture = await setup({
+      program: (cards) => {
+        cards.failNext('confirmLink', 'network');
+        cards.failNext('confirmLink', 'network');
+      },
+    });
+    const write = await currentWrite(fixture);
+    const token = await tokenOf(fixture);
+    await act(async () => write.finish({ ok: true }));
+    await settle();
+    await userEvent.click(screen.getByRole('button', { name: RETRY }));
+    await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent('Link scritto ma non registrato');
+
+    await userEvent.click(screen.getByRole('button', { name: RETRY }));
+    await settle();
+    expect(fixture.cards.service.confirmLink).toHaveBeenCalledTimes(3);
+    for (const call of fixture.cards.service.confirmLink.mock.calls) expect(call[1]).toBe(token);
+    expect(fixture.onWritten).toHaveBeenCalledOnce();
+    expect(fixture.writeUrl).toHaveBeenCalledOnce();
+  });
+
+  it('«Più tardi» leaves the token pending: the link is not registered', async () => {
+    const fixture = await setup({ program: (cards) => cards.failNext('confirmLink', 'network') });
+    const write = await currentWrite(fixture);
+    const token = await tokenOf(fixture);
+    await act(async () => write.finish({ ok: true }));
+    await settle();
+
+    await userEvent.click(screen.getByRole('button', { name: LATER }));
+    await settle();
+    expect(fixture.onLater).toHaveBeenCalledOnce();
+    expect(fixture.cards.service.confirmLink).toHaveBeenCalledOnce();
+    expect(fixture.cards.tokens(fixture.card.id)).toEqual({ written: null, pending: token });
+    expect(fixture.onWritten).not.toHaveBeenCalled();
+  });
+});
+
+describe('CardLinkWriter: another card, an unreadable card (SPEC-cards, point 8.4)', () => {
+  it('wrong-card with otherUid names both cards; «Scrivi di nuovo il link» stays', async () => {
+    const fixture = await setup();
+    const write = await currentWrite(fixture);
+    await act(async () =>
+      write.finish({ ok: false, reason: 'wrong-card', otherUid: '04FFEEDDCCABCD' }),
+    );
+    await settle();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Il link potrebbe essere finito sulla card …ABCD. Avvicina la card …E5F6 e riprova; poi riscrivi il link della card …ABCD dalla scheda del suo cliente.',
+    );
+    expect(screen.getByRole('button', { name: WRITE_AGAIN })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: LATER })).toBeInTheDocument();
+    expect(fixture.cards.service.confirmLink).not.toHaveBeenCalled();
+  });
+
+  it('wrong-card without otherUid: the short text', async () => {
+    const fixture = await setup();
+    const write = await currentWrite(fixture);
+    await act(async () => write.finish({ ok: false, reason: 'wrong-card' }));
+    await settle();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Questa non è la card …E5F6: il link non è stato scritto.',
+    );
+    expect(screen.getByRole('alert')).not.toHaveTextContent('potrebbe');
+  });
+
+  it('unreadable: «Scrivi comunque» writes again with allowUnreadable on the same card', async () => {
+    const fixture = await setup();
+    const write = await currentWrite(fixture);
+    expect(write.options.allowUnreadable).not.toBe(true);
+    await act(async () => write.finish({ ok: false, reason: 'unreadable' }));
+    await settle();
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'La card non si legge. È la card …E5F6? Puoi riscriverla.',
+    );
+    expect(screen.queryByRole('button', { name: WRITE_AGAIN })).toBeNull();
+    expect(screen.getByRole('button', { name: LATER })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: WRITE_ANYWAY }));
+    await waitFor(() => expect(fixture.writes).toHaveLength(2));
+    const again = fixture.writes[1];
+    expect(again?.options.allowUnreadable).toBe(true);
+    expect(again?.options.expectedUid).toBe(UID);
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    await act(async () => again?.finish({ ok: true }));
+    await settle();
+    expect(fixture.onWritten).toHaveBeenCalledOnce();
+    const token = await tokenOf(fixture, 1);
+    expect(fixture.cards.service.confirmLink).toHaveBeenCalledExactlyOnceWith(
+      fixture.card.id,
+      token,
+    );
+  });
+
+  it('unreadable: «Più tardi» leaves', async () => {
+    const fixture = await setup();
+    const write = await currentWrite(fixture);
+    await act(async () => write.finish({ ok: false, reason: 'unreadable' }));
+    await settle();
+    await userEvent.click(screen.getByRole('button', { name: LATER }));
+    expect(fixture.onLater).toHaveBeenCalledOnce();
+    expect(fixture.writes).toHaveLength(1);
+  });
+});
+
+describe('CardLinkWriter: a card deactivated meanwhile (SPEC-cards, point 8.4)', () => {
+  it.each(['issueLink', 'confirmLink'] as const)(
+    'card_inactive on %s: «Questa card non è più attiva.», only «Più tardi»',
+    async (method) => {
+      const fixture = await setup({ program: (cards) => cards.failNext(method, 'card_inactive') });
+      if (method === 'confirmLink') {
+        const write = await currentWrite(fixture);
+        await act(async () => write.finish({ ok: true }));
+        await settle();
+      }
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Questa card non è più attiva.');
+      expect(screen.queryByRole('button', { name: WRITE_AGAIN })).toBeNull();
+      expect(screen.queryByRole('button', { name: RETRY })).toBeNull();
+      expect(screen.queryByRole('button', { name: WRITE_ANYWAY })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: LATER }));
+      expect(fixture.onLater).toHaveBeenCalledOnce();
+      expect(fixture.onWritten).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('CardLinkWriter: the token never reaches the logs (criterion 10)', () => {
+  it('no console call carries the token, in success and in failures', async () => {
+    const methods = ['log', 'info', 'warn', 'error', 'debug'] as const;
+    const spies = methods.map((method) =>
+      vi.spyOn(console, method).mockImplementation(() => undefined),
+    );
+    const fixture = await setup({ program: (cards) => cards.failNext('confirmLink', 'network') });
+    const first = await currentWrite(fixture);
+    await act(async () => first.finish({ ok: true }));
+    await settle();
+    await userEvent.click(screen.getByRole('button', { name: RETRY }));
+    await settle();
+    expect(fixture.onWritten).toHaveBeenCalledOnce();
+
+    const token = await tokenOf(fixture);
+    for (const spy of spies) {
+      for (const args of spy.mock.calls) {
+        expect(args.map((arg) => String(arg)).join(' ')).not.toContain(token);
+      }
+    }
+  });
+});

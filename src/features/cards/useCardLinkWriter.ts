@@ -4,7 +4,16 @@ import type { CardWriteFailure, CardWriteStep } from '../card-input/webNfcWriter
 import { useAuth } from '../identity/AuthProvider';
 import { cardLinkUrl } from './cardLinkUrl';
 import { useCardsService } from './CardsServiceProvider';
-import { CardsError, type CardSummary } from './types';
+import { ServerFaultError } from '../../lib/serverFault';
+import { CardsError, NetworkError, type CardSummary } from './types';
+
+/**
+ * A confirmation that may not have arrived (no answer, a server fault): sending the same token again
+ * is safe, the server confirms it once.
+ */
+export function isConfirmRetryable(error: unknown): boolean {
+  return error instanceof NetworkError || error instanceof ServerFaultError;
+}
 
 /** Why the link is not on the card: the write's own outcome, or no (good) answer from the server. */
 export type CardLinkFailure =
@@ -39,6 +48,17 @@ export type CardLinkWriting = {
   canWrite: boolean;
   /** «Scrivi di nuovo il link»: from the start, with a new token (the pending one stops counting). */
   writeAgain: () => void;
+  /**
+   * «Scrivi comunque» after `unreadable`: from the start, writing even on a card whose content does
+   * not read (`allowUnreadable`); the verification still needs the right uid.
+   */
+  writeAnyway: () => void;
+  /**
+   * «Riprova» after a confirmation without answer: `confirmLink` again with the same token, still in
+   * memory, without a new issue nor a new write (the card already holds the link). Does nothing
+   * when no confirmation is waiting.
+   */
+  retryConfirm: () => void;
   /** «Salta, lo scrivo più tardi» / «Più tardi»: aborts the write in progress through its signal. */
   stop: () => void;
 };
@@ -69,6 +89,9 @@ export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLink
     written.current = onWritten;
   }, [onWritten]);
 
+  // The confirmation to send again after no answer: a closure over the token, never state.
+  const pendingConfirm = useRef<(() => void) | null>(null);
+
   // Set once the first attempt has started (by itself, see below).
   const started = useRef(false);
   useEffect(
@@ -90,8 +113,29 @@ export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLink
     [reportNotEnabled],
   );
 
+  const confirm = useCallback(
+    async function confirmToken(signal: AbortSignal, token: string) {
+      pendingConfirm.current = null;
+      setState({ status: 'confirming' });
+      try {
+        const card = await service.confirmLink(cardId, token);
+        if (signal.aborted) return;
+        setState({ status: 'written', card });
+        written.current?.(card);
+      } catch (error) {
+        if (signal.aborted) return;
+        // Idempotent on the server: the same token can be confirmed again (SPEC-cards, point 8.4).
+        if (isConfirmRetryable(error)) {
+          pendingConfirm.current = () => void confirmToken(signal, token);
+        }
+        fail({ kind: 'confirm', error });
+      }
+    },
+    [service, cardId, fail],
+  );
+
   const run = useCallback(
-    async (signal: AbortSignal) => {
+    async (signal: AbortSignal, allowUnreadable: boolean) => {
       let token: string;
       try {
         token = await service.issueLink(cardId);
@@ -103,6 +147,7 @@ export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLink
       const result = await writeUrl(cardLinkUrl(token), {
         expectedUid: uid,
         signal,
+        allowUnreadable,
         onStep: (step) => {
           if (!signal.aborted) setState({ status: 'writing', step });
         },
@@ -118,25 +163,21 @@ export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLink
         return;
       }
       // The card holds the link and it was read back: the confirmation goes on even after «Salta».
-      setState({ status: 'confirming' });
-      try {
-        const card = await service.confirmLink(cardId, token);
-        if (signal.aborted) return;
-        setState({ status: 'written', card });
-        written.current?.(card);
-      } catch (error) {
-        if (!signal.aborted) fail({ kind: 'confirm', error });
-      }
+      await confirm(signal, token);
     },
-    [service, cardId, uid, writeUrl, fail],
+    [service, cardId, uid, writeUrl, fail, confirm],
   );
 
-  const begin = useCallback(() => {
-    attempt.current?.abort();
-    const controller = new AbortController();
-    attempt.current = controller;
-    void run(controller.signal);
-  }, [run]);
+  const begin = useCallback(
+    (allowUnreadable = false) => {
+      attempt.current?.abort();
+      pendingConfirm.current = null;
+      const controller = new AbortController();
+      attempt.current = controller;
+      void run(controller.signal, allowUnreadable);
+    },
+    [run],
+  );
 
   // The first attempt starts as soon as the phone can write; until its first answer the state stays
   // `idle`, which the section shows like `issuing`.
@@ -152,11 +193,23 @@ export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLink
     begin();
   }, [begin]);
 
+  const writeAnyway = useCallback(() => {
+    started.current = true;
+    setState({ status: 'issuing' });
+    begin(true);
+  }, [begin]);
+
+  const retryConfirm = useCallback(() => {
+    pendingConfirm.current?.();
+  }, []);
+
   const stop = useCallback(() => {
     attempt.current?.abort();
     attempt.current = null;
+    // «Più tardi» after a confirmation without answer: the token is dropped, the link stays pending.
+    pendingConfirm.current = null;
     setState({ status: 'stopped' });
   }, []);
 
-  return { state, canWrite, writeAgain, stop };
+  return { state, canWrite, writeAgain, writeAnyway, retryConfirm, stop };
 }

@@ -6,8 +6,12 @@ import { loadErrorText } from '../customers/loadErrorText';
 import styles from './CardLinkWriter.module.css';
 import { firstName } from './customerName';
 import { formatCardLabel } from './formatCard';
-import { NetworkError } from './types';
-import type { CardLinkFailure, CardLinkWriting } from './useCardLinkWriter';
+import { CardInactiveError, NetworkError } from './types';
+import {
+  isConfirmRetryable,
+  type CardLinkFailure,
+  type CardLinkWriting,
+} from './useCardLinkWriter';
 
 const WRITING_TITLE = 'Tieni la card appoggiata';
 const WRITING_TEXT = 'Scrivo il link per vedere i punti…';
@@ -20,7 +24,25 @@ const LATER_HINT = 'Puoi scriverlo anche dopo, da Modifica cliente.';
 /** The alert of an outcome that left the card without the link (SPEC-cards, point 8.4). */
 type FailureText = { title?: string; text: string; hint?: boolean };
 
+/**
+ * What can be done after a failure: write again from a new token; confirm the same token again;
+ * write even on a card that does not read; only leave (the card was deactivated meanwhile).
+ */
+type FailureAction = 'write-again' | 'retry-confirm' | 'write-anyway' | 'none';
+
+function failureAction(failure: CardLinkFailure): FailureAction {
+  if (failure.kind === 'write')
+    return failure.reason === 'unreadable' ? 'write-anyway' : 'write-again';
+  if (failure.error instanceof CardInactiveError) return 'none';
+  if (failure.kind === 'confirm' && isConfirmRetryable(failure.error)) return 'retry-confirm';
+  return 'write-again';
+}
+
 function failureText(failure: CardLinkFailure, uid: string, name: string): FailureText {
+  if (failure.kind !== 'write' && failure.error instanceof CardInactiveError) {
+    // Deactivated meanwhile by another operator: nothing to write any more.
+    return { text: 'Questa card non è più attiva.' };
+  }
   if (failure.kind === 'issue') {
     if (failure.error instanceof NetworkError) {
       return { text: 'Link non scritto: controlla la connessione.' };
@@ -31,8 +53,21 @@ function failureText(failure: CardLinkFailure, uid: string, name: string): Failu
     return { text: 'Link non scritto: riprova.' };
   }
   if (failure.kind === 'confirm') {
-    // The wording of a confirmation without answer comes with task 16.
+    // The card holds the verified link: only its registration is missing.
+    if (failure.error instanceof NetworkError) {
+      return { text: 'Link scritto ma non registrato: controlla la connessione.' };
+    }
+    if (failure.error instanceof ServerFaultError) {
+      return { text: `Link scritto ma non registrato. ${loadErrorText(failure.error)}` };
+    }
+    // A newer token issued meanwhile (`link_token_mismatch`) or anything else: write again.
     return { text: 'Link non scritto: riprova.' };
+  }
+  if (failure.reason === 'wrong-card' && failure.otherUid !== undefined) {
+    const other = formatCardLabel(failure.otherUid);
+    return {
+      text: `Il link potrebbe essere finito sulla card ${other}. Avvicina la card ${formatCardLabel(uid)} e riprova; poi riscrivi il link della card ${other} dalla scheda del suo cliente.`,
+    };
   }
   return WRITE_FAILURES[failure.reason](formatCardLabel(uid), name);
 }
@@ -52,9 +87,9 @@ const WRITE_FAILURES: Record<
   'not-allowed': () => ({
     text: 'Il telefono non permette di scrivere la card: controlla il permesso NFC di Chrome.',
   }),
-  // Another write still running, or a card whose content cannot be read (task 16).
+  // Another write still running.
   busy: () => ({ text: 'Link non scritto: riprova.' }),
-  unreadable: () => ({ text: 'Link non scritto: riprova.' }),
+  unreadable: (label) => ({ text: `La card non si legge. È la card ${label}? Puoi riscriverla.` }),
 };
 
 function detachedText(name: string): FailureText {
@@ -157,7 +192,11 @@ type CardLinkWriterActionsProps = {
   onLater: () => void;
 };
 
-/** The footer buttons of the write: «Salta…» while it runs; «Scrivi di nuovo il link» and «Più tardi» after a failure. */
+/**
+ * The footer buttons of the write: «Salta…» while it runs; after a failure «Più tardi» under
+ * «Scrivi di nuovo il link», «Riprova» (confirmation without answer) or «Scrivi comunque» (card that
+ * does not read), alone when the card was deactivated meanwhile.
+ */
 export function CardLinkWriterActions({ writing, onLater }: CardLinkWriterActionsProps) {
   const { state, canWrite } = writing;
 
@@ -168,11 +207,24 @@ export function CardLinkWriterActions({ writing, onLater }: CardLinkWriterAction
 
   if (state.status === 'written' || state.status === 'stopped') return null;
   if (state.status === 'failed') {
+    const action = failureAction(state.failure);
     return (
       <>
-        <Button block onClick={writing.writeAgain}>
-          Scrivi di nuovo il link
-        </Button>
+        {action === 'write-again' && (
+          <Button block onClick={writing.writeAgain}>
+            Scrivi di nuovo il link
+          </Button>
+        )}
+        {action === 'retry-confirm' && (
+          <Button block onClick={writing.retryConfirm}>
+            Riprova
+          </Button>
+        )}
+        {action === 'write-anyway' && (
+          <Button block onClick={writing.writeAnyway}>
+            Scrivi comunque
+          </Button>
+        )}
         <Button variant="secondary" block onClick={later}>
           Più tardi
         </Button>
