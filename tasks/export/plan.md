@@ -106,7 +106,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 2: Logica pura
 - [x] Task 3: `csv.ts`: BOM, `;`, CRLF, virgolette, difesa dalle formule, `excelText`
-- [ ] Task 4: `formatExport.ts`: euro da centesimi, date e nome file all'ora di Roma, etichette del tipo
+- [x] Task 4: `formatExport.ts`: euro da centesimi, date e nome file all'ora di Roma, etichette del tipo
 - [ ] Task 5: Tipi, `buildCustomersCsv` e `buildMovementsCsv`: colonne, ordinamento, anonimizzati vuoti
 - [ ] Task 6: `fetchAllPages`: paginazione a chiave tutto-o-niente
 

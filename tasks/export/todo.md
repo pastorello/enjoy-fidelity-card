@@ -72,10 +72,10 @@ CR o LF, virgolette interne raddoppiate), `guardFormula` (apostrofo iniziale su 
 `Europe/Rome`, `hourCycle: 'h23'`, `formatToParts`; assente → vuoto), `romeDateStamp(date)` (`AAAA-MM-GG`
 di Roma), `exportFileName(kind, now)`, `kindLabel` (`Spesa` | `Riscatto` | `Correzione`).
 **Accettazione:**
-- [ ] Unità: `centsToEuroCell` con 0, 5, 1250, -1250, 123456; `1.5` → `RangeError`
-- [ ] Unità (criterio 4): `2026-07-01T10:05:00Z` → `01/07/2026 12:05:00`; `2026-01-15T10:05:00Z` →
+- [x] Unità: `centsToEuroCell` con 0, 5, 1250, -1250, 123456; `1.5` → `RangeError`
+- [x] Unità (criterio 4): `2026-07-01T10:05:00Z` → `01/07/2026 12:05:00`; `2026-01-15T10:05:00Z` →
       `15/01/2026 11:05:00`; mezzanotte → `00:…`, mai `24:…`; con un fuso del processo diverso da Roma
-- [ ] Unità (criterio 8): alle 23:30 UTC del 17 novembre → `enjoy-movimenti-2026-11-18.csv`
+- [x] Unità (criterio 8): alle 23:30 UTC del 17 novembre → `enjoy-movimenti-2026-11-18.csv`
 **Verifica:** `npm test -- formatExport`
 **Dipendenze:** nessuna · **File:** src/features/export/formatExport.ts (+ .test.ts) · **Dimensione:** S
 
