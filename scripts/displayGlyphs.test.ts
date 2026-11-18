@@ -15,13 +15,21 @@ const DISPLAY_PROPS: Record<string, string[]> = {
   ConfirmDialog: ['title', 'confirmLabel', 'cancelLabel'],
   CardReadPanel: ['title'],
   CardReadPanelView: ['title'],
+  CardLinkScreen: ['title'],
 };
+
+/**
+ * Titles kept out of the JSX: `const …TITLE = '…'` constants (screen and panel titles) and the
+ * `title: '…'` of notice and status objects (CardReadNotice, failure texts, StatusView errors).
+ */
+const TITLE_CONSTANT = /\bconst\s+\w*TITLE\s*=\s*(['`"])([^'`"]*)\1/g;
+const TITLE_KEY = /[{,]\s*title:\s*(['`"])([^'`"]*)\1/g;
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) return sourceFiles(path);
-    if (!entry.name.endsWith('.tsx') || entry.name.endsWith('.test.tsx')) return [];
+    if (!/\.(ts|tsx)$/.test(entry.name) || /\.test\.(ts|tsx)$/.test(entry.name)) return [];
     return [relative('.', path).split('\\').join('/')];
   });
 }
@@ -48,6 +56,9 @@ function displayStrings(text: string): string[] {
     const name = match[1] ?? '';
     if (tag && DISPLAY_PROPS[tag]?.includes(name)) found.push(match[2] ?? match[4] ?? '');
   }
+  for (const match of [...text.matchAll(TITLE_CONSTANT), ...text.matchAll(TITLE_KEY)]) {
+    found.push(match[2] ?? '');
+  }
   return found;
 }
 
@@ -66,6 +77,15 @@ describe('Enjoy Display glyph coverage', () => {
     expect(displayStrings('<CardReadPanel title="Avvicina la card…" description="x" />')).toEqual([
       'Avvicina la card…',
     ]);
+  });
+
+  it('catches a missing glyph in the cards screens, title constants and notice titles', () => {
+    expect(displayStrings('<CardLinkScreen title="Associa → card" backTo="/" />')).toEqual([
+      'Associa → card',
+    ]);
+    expect(displayStrings("const WRITING_TITLE = 'Tieni la card…';")).toEqual(['Tieni la card…']);
+    expect(displayStrings("return { title: 'Card #2', text: 'x' };")).toEqual(['Card #2']);
+    expect(displayStrings("const subtitle = 'a → b';")).toEqual([]);
   });
 
   it('uses only characters Enjoy Display has in display text', () => {

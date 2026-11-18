@@ -58,6 +58,15 @@ staging poi produzione, mai `supabase config push`.
 - Database: `npx supabase link --project-ref <ref>` e `npx supabase db push`, **a mano**, prima su staging
   e poi su produzione. Procedura completa in `docs/setup-accounts.md`.
 - CI: `.github/workflows/ci.yml` (job App ed E2E, job Database con il solo Postgres).
+- **Link sulle card** (`cards`): `VITE_CARD_LINK_ORIGIN` si imposta su Vercel **solo** per l'ambiente
+  Production, con l'origine definitiva dell'app (`https://…`, senza percorso né `/` finale; default
+  `https://enjoy-fidelity-card.vercel.app`, `brain/DECISIONS.md` 2026-11-17). Senza, la build di produzione
+  fallisce (`VERCEL_ENV=production`, `vite.config.ts`). In locale e nelle anteprime resta vuota (l'app usa
+  il proprio indirizzo). Dopo il lancio **non si cambia**: i link già scritti sulle card smetterebbero di
+  funzionare (SPEC-cards, "Ask first").
+- Le card dei clienti si scrivono **solo dall'app di produzione**: una card scritta da un'anteprima o in
+  locale porta un link al database di staging, che in produzione è un link morto. Per le prove si usano
+  solo card di prova, poi riscritte dall'app di produzione se vanno consegnate.
 
 ### Provare sul telefono Android
 
@@ -137,6 +146,47 @@ nella tabella dei criteri di `tasks/card-input/plan.md`.
 | Data | Telefono / Chrome | Criterio.passo | Esito | Note |
 |---|---|---|---|---|
 | — | — | — | — | nessuna prova ancora eseguita |
+
+### Prova manuale del link ai punti (`cards`, criteri 10 e 14)
+
+Stesse condizioni della prova di `card-input` (sopra): anteprima HTTPS della PR, card di prova (mai una
+card consegnata), nessun uid, token o link scritto nelle note. Gli E2E provano tutto il resto con la card
+finta; qui si prova solo ciò che dipende dal telefono vero.
+
+**Criterio 10 — link scritto e verificato, pagina dei punti (SPEC-cards, punti 8 e 9)**
+
+1. Android, app in home: appoggiare un NTAG215 di prova nuovo → Nuovo cliente con la card (riquadro
+   "Card nuova letta") → nome di prova → "Salva cliente" → "Card associata a …" → tenere la card
+   appoggiata (o riavvicinarla una volta quando l'app lo chiede): "Link ai punti scritto", nessun altro
+   tocco. Poi si apre Registra spesa del nuovo cliente (card letta dalla home); "Indietro" non torna al
+   form. Da Associa card (Modifica cliente → card) si torna invece alla scheda (`/clienti/:id`).
+2. Da Modifica cliente dello stesso cliente: la card mostra "Link ai punti scritto".
+3. Da un **telefono senza accesso all'app** (un secondo Android): avvicinare la card → si apre il browser
+   su `/s/…` con "ENJOY YOUR POINTS" e il saldo (`0` per un cliente nuovo); nessun nome, nessun premio,
+   nessun movimento.
+4. Da un **iPhone XS o successivo** (schermo sbloccato, nessuna app): la notifica apre la stessa pagina.
+5. Associa card su un iPhone: l'associazione va a buon fine con "Link non scritto" (criterio 13); da
+   Modifica cliente su Android "Scrivi il link" → "Link ai punti scritto".
+6. Sostituisci card (card di prova B): il link della card A ora mostra "Card non attiva", quello della B il
+   saldo.
+
+**Criterio 14 e domanda aperta 21 — card con il link letta dal telefono del personale**
+
+1. App aperta in home, lettura attiva ("Avvicina la card"), in primo piano: appoggiare la card con il link
+   scritto → si apre **Registra spesa** del cliente, **non** il browser; nessuna nuova scrittura sulla card.
+2. App in background, schermo sbloccato (o app su `/accedi`): appoggiare la stessa card → Android apre la
+   pagina dei punti. Esito accettato (domanda aperta 21: nessun pulsante "Torna all'app"); annotare se si
+   apre nel browser o nell'app installata.
+
+**Intestazioni della pagina pubblica sull'anteprima** (`vercel.json` vale solo su Vercel; in locale le
+controlla `scripts/vercelHeaders.test.ts`). Con un token inventato di 22 caratteri, mai quello di una card:
+
+```bash
+curl -sI https://<anteprima>.vercel.app/s/AAAAAAAAAAAAAAAAAAAAAA | grep -iE 'cache-control|x-robots-tag'
+```
+
+Esito atteso: `cache-control: no-store` e `x-robots-tag: noindex, nofollow` (o il valore di `vercel.json`).
+Annotare l'esito nella tabella sopra (criterio "cards.10", "cards.14", "cards.curl").
 
 ## 2. Controllo di salute
 
@@ -289,3 +339,9 @@ nella tabella dei criteri di `tasks/card-input/plan.md`.
     del browser per le card (`NDEFReader`, `navigator.vibrate`, `permissions.query`, `keydown` su
     `document`) restano nel modulo: lo controlla `scripts/cardInputBoundary.test.ts`, che controlla anche
     che `fakeCardAdapter` sia importato solo da `main.tsx` dentro `if (import.meta.env.VITE_E2E === '1')`.
+44. Il modulo `cards` non chiama Supabase dai componenti (`getSupabase()` solo in `supabaseCardsService.ts`
+    e `public/cardPointsService.ts`), non registra uid, token o link (`console.*`, `localStorage`,
+    `sessionStorage`, `location.href` vietati in `src/features/cards/`), non chiama mai `makeReadOnly` e
+    chiama `card_points` solo in `POST` (mai `{ get: true }`, che metterebbe il token nell'URL della
+    richiesta): lo controlla `scripts/cardsBoundary.test.ts`. I titoli nuovi in Enjoy Display (costanti
+    `…TITLE`, `title:` degli avvisi, `CardLinkScreen`) li controlla `scripts/displayGlyphs.test.ts`.
