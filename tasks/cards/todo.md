@@ -334,11 +334,11 @@ chiamata), «Carico i tuoi punti…», logo con `alt` «Bar Enjoy Gaeta», «ENJ
 `null` → «Card non attiva»; rete → «Riprova»; `meta robots` noindex. Rotta `/s/:token` con `lazy` fuori da
 `RequireAuth` e `AppShell`.
 **Accettazione:**
-- [ ] Componente: numero formattato, «punto» con 1, `null` neutro, malformato senza chiamata, timeout 8 s →
+- [x] Componente: numero formattato, «punto» con 1, `null` neutro, malformato senza chiamata, timeout 8 s →
       «Riprova», nessun nome (criterio 10)
-- [ ] Componente: `meta robots` presente; nessuna scrittura in `localStorage`; nessuna attesa di
+- [x] Componente: `meta robots` presente; nessuna scrittura in `localStorage`; nessuna attesa di
       `AuthProvider`; il titolo della pagina non contiene il token
-- [ ] Contrasto AA e leggibile a 320 px; detector Impeccable pulito
+- [x] Contrasto AA e leggibile a 320 px; detector Impeccable pulito
 **Verifica:** `npm test -- CardPointsPage cardPointsService`
 **Dipendenze:** 4, 6 · **File:** src/features/cards/public/cardPointsService.ts,
 src/features/cards/public/CardPointsPage.tsx (+ .module.css, .test.tsx), src/app/routes.tsx

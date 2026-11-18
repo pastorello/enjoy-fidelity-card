@@ -147,7 +147,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint D: tutti gli esiti del punto 8 con test di componente; E2E del link verdi; token mai nel DOM
 
 ### Fase 6: Pagina pubblica
-- [ ] Task 20: `CardPointsPage` su `/s/:token` (tavole Saldo-punti e Saldo-card-non-attiva), rotta lazy fuori da `RequireAuth`
+- [x] Task 20: `CardPointsPage` su `/s/:token` (tavole Saldo-punti e Saldo-card-non-attiva), rotta lazy fuori da `RequireAuth`
 - [ ] Task 21: Niente PWA su `/s/`: service worker saltato, installazione annullata
 - [ ] Task 22: E2E della pagina pubblica (link scritto → saldo senza accesso; vecchio link → «Card non attiva») e intestazioni di `/s/(.*)` in `vercel.json`
 
