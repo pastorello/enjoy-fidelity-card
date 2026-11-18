@@ -292,9 +292,12 @@ della cassa" con "Impostato" / "Da impostare" (da `hasPin` dell'identità) → `
 "PIN salvato" e ritorno a Impostazioni (identità riletta); rete → "Connessione assente. Riprova." con il PIN
 da reinserire. In una sessione di dispositivo `/impostazioni/pin` → `/`.
 **Accettazione:**
-- [ ] Componente: ripetizione diversa, salvato, rete, assente su dispositivo (criterio 4)
-- [ ] Ordine delle sezioni di `SettingsPage.test.tsx` invariato (cross-review §1)
-- [ ] Detector Impeccable pulito; confronto a 390×844 con lo stile di Impostazioni
+- [x] Componente: ripetizione diversa, salvato, rete, assente su dispositivo (criterio 4)
+- [x] Ordine delle sezioni di `SettingsPage.test.tsx` invariato (cross-review §1)
+- [x] Detector Impeccable pulito; confronto a 390×844 con lo stile di Impostazioni
+**Nota:** `hasPin` arriva nello stato `signed-in` di `AuthProvider`; "PIN salvato." è un avviso di
+navigazione (`NavigationNotice`) dentro la sezione ACCOUNT, così l'ordine dei figli di `main` non cambia; la
+riga compare solo con un account operatore (sul dispositivo la toglie già questo task, il Task 18 lo prova).
 **Verifica:** `npm test -- PinSettingsPage SettingsPage`
 **Dipendenze:** 12 · **File:** src/features/tablet-kiosk/PinSettingsPage.tsx (+ .module.css, .test.tsx),
 src/features/identity/SettingsPage.tsx, src/app/routes.tsx · **Dimensione:** M
