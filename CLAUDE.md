@@ -142,6 +142,7 @@ npm run typecheck && npm run lint && npm run format:check && npm test   # contro
 npm run format              # Prettier
 npm run e2e                 # Playwright sulla build (390×844), contro Supabase locale
 npm run build               # build di produzione
+npm run check:bundle        # dopo build: fallisce se dist/ contiene la card finta degli E2E (__enjoyFakeCard)
 npm run db:start / db:stop  # Supabase locale (Docker)
 npm run db:reset            # riapplica migrazioni e seed
 npm run db:test             # test pgTAP
