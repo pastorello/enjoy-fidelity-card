@@ -20,6 +20,8 @@ import { AuthProvider } from './features/identity/AuthProvider';
 import { supabaseAuthService } from './features/identity/supabaseAuthService';
 import { SettingsServiceProvider } from './features/settings/SettingsProvider';
 import { supabaseSettingsService } from './features/settings/supabaseSettingsService';
+import { KioskServiceProvider } from './features/tablet-kiosk/KioskServiceProvider';
+import { supabaseKioskService } from './features/tablet-kiosk/supabaseKioskService';
 import './styles/tokens.css';
 import './styles/fonts.css';
 import './styles/base.css';
@@ -56,9 +58,11 @@ createRoot(container).render(
             <CardsServiceProvider service={supabaseCardsService}>
               <LedgerServiceProvider service={supabaseLedgerService}>
                 <ExportServiceProvider service={supabaseExportService}>
-                  <CardReaderProvider reader={cardReader}>
-                    <RouterProvider router={router} />
-                  </CardReaderProvider>
+                  <KioskServiceProvider service={supabaseKioskService}>
+                    <CardReaderProvider reader={cardReader}>
+                      <RouterProvider router={router} />
+                    </CardReaderProvider>
+                  </KioskServiceProvider>
                 </ExportServiceProvider>
               </LedgerServiceProvider>
             </CardsServiceProvider>
