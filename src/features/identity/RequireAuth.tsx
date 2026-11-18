@@ -15,7 +15,8 @@ const errorDescriptions = {
 export type SignInLocationState = { from?: string };
 
 /**
- * Layout route: its pages need a signed-in operator, otherwise /accedi. It also mounts
+ * Layout route: its pages need a signed-in operator (on a device, its cashier), otherwise /accedi
+ * (or /cassa on a device without a cashier). It also mounts
  * <SettingsProvider>, so the configuration loads once per session and never without an operator,
  * and <CardReaderSession>, so cards are read only with an operator (SPEC-card-input, point 2).
  */
@@ -46,9 +47,14 @@ export function RequireAuth() {
     const from = `${location.pathname}${location.search}`;
     return <Navigate to="/accedi" replace state={{ from } satisfies SignInLocationState} />;
   }
-  // Keyed by operator: another user signing in on this device loads the configuration again.
+  // A device shows the pages only to its cashier (SPEC-tablet-kiosk, point 3): without one, nothing
+  // here loads, the settings and the card reader included. /cassa is where the cashier is chosen.
+  const operator = state.status === 'device' ? state.cashier : state.operator;
+  if (!operator) return <Navigate to="/cassa" replace />;
+  // Keyed by operator (on a device, its cashier): another user signing in on this device, or the
+  // next cashier at the till, loads the configuration again.
   return (
-    <SettingsProvider key={state.operator.id}>
+    <SettingsProvider key={operator.id}>
       <CardReaderSession />
       <Outlet />
     </SettingsProvider>
