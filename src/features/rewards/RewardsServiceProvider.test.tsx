@@ -88,6 +88,44 @@ describe('useRewards', () => {
     expect(fake.calls).toHaveLength(2);
   });
 
+  it('apply() puts a saved reward in its sorted place at once, and drops answers sent before', async () => {
+    const fake = createFakeRewardsService({ rewards: [coffee, aperitif, dessert] });
+    const { result } = renderRewards(fake);
+    await waitFor(() => expect(result.current.status).toBe('done'));
+
+    // A reload asked before the write: its answer still has Caffè active.
+    const stale = fake.holdNext('listAll');
+    act(() => result.current.reload());
+    act(() => result.current.apply({ ...coffee, active: false }));
+    expect(result.current.status === 'done' && result.current.rewards).toEqual([
+      aperitif,
+      { ...coffee, active: false },
+      dessert,
+    ]);
+    await act(async () => {
+      stale.release();
+      await Promise.resolve();
+    });
+    expect(result.current.status === 'done' && result.current.rewards).toEqual([
+      aperitif,
+      { ...coffee, active: false },
+      dessert,
+    ]);
+  });
+
+  it('apply() of a reward not in the list adds it in its sorted place', async () => {
+    const fake = createFakeRewardsService({ rewards: [coffee, aperitif] });
+    const { result } = renderRewards(fake);
+    await waitFor(() => expect(result.current.status).toBe('done'));
+    const juice = fakeReward({ name: 'Spremuta', points: 80 });
+    act(() => result.current.apply(juice));
+    expect(result.current.status === 'done' && result.current.rewards).toEqual([
+      coffee,
+      juice,
+      aperitif,
+    ]);
+  });
+
   it('drops an answer superseded by a newer reload', async () => {
     const fake = createFakeRewardsService({ rewards: [coffee] });
     const { result } = renderRewards(fake);

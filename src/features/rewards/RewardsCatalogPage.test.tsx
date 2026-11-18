@@ -1,8 +1,9 @@
-import { act, screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
 import { createFakeRewardsService, fakeReward } from '../../test/fakeRewardsService';
+import { fakeOperator } from '../../test/fakeAuthService';
 import { createFakeCustomerService } from '../../test/fakeCustomerService';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
@@ -186,5 +187,202 @@ describe('Catalogo premi list', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Catalogo non caricato');
     expect(alert).toHaveTextContent(text);
+  });
+});
+
+async function openList(rewards = createFakeRewardsService({ rewards: WIREFRAME })) {
+  const rendered = renderCatalog(rewards);
+  const list = await screen.findByRole('list', { name: 'Premi del catalogo' });
+  return { ...rendered, list };
+}
+
+function rowOf(list: HTMLElement, name: string): HTMLElement {
+  const row = within(list)
+    .getAllByRole('listitem')
+    .find((item) => item.querySelector('[data-reward-name]')?.textContent === name);
+  if (!row) throw new Error(`no row ${name}`);
+  return row;
+}
+
+describe('Catalogo premi: the Attivo box of a row', () => {
+  it('deactivating saves at once: the row goes grey at the bottom with the focus on its box', async () => {
+    const { list, rewards } = await openList();
+    const coffee = WIREFRAME.find((reward) => reward.name === 'Caffè')!;
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Caffè attivo' }));
+
+    await waitFor(() =>
+      expect(rowNames(list)).toEqual([
+        'Cornetto e cappuccino',
+        'Colazione per due',
+        'Aperitivo',
+        'Caffè',
+        'Dolce del giorno',
+      ]),
+    );
+    const row = rowOf(list, 'Caffè');
+    expect(row).toHaveAttribute('data-inactive', 'true');
+    expect(
+      within(row).getByText('50 punti · non visibile alla cassa né al cliente'),
+    ).toBeInTheDocument();
+    const box = within(row).getByRole('checkbox', { name: 'Caffè attivo' });
+    expect(box).not.toBeChecked();
+    expect(box).toBeEnabled();
+    expect(box).toHaveFocus();
+    expect(rewards.calls.filter((call) => call.method === 'setActive')).toEqual([
+      { method: 'setActive', args: [coffee.id, false] },
+    ]);
+    expect(rewards.rewards().find((reward) => reward.id === coffee.id)?.active).toBe(false);
+    // The list is loaded again from the server after the write.
+    await waitFor(() =>
+      expect(rewards.calls.filter((call) => call.method === 'listAll')).toHaveLength(2),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('reactivating brings the row back among the active ones, the focus still on its box', async () => {
+    const { list } = await openList();
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Dolce del giorno attivo' }));
+
+    await waitFor(() =>
+      expect(rowNames(list)).toEqual([
+        'Caffè',
+        'Cornetto e cappuccino',
+        'Dolce del giorno',
+        'Colazione per due',
+        'Aperitivo',
+      ]),
+    );
+    const row = rowOf(list, 'Dolce del giorno');
+    expect(row).not.toHaveAttribute('data-inactive');
+    expect(within(row).getByText('120 punti')).toBeInTheDocument();
+    const box = within(row).getByRole('checkbox', { name: 'Dolce del giorno attivo' });
+    expect(box).toBeChecked();
+    expect(box).toHaveFocus();
+  });
+
+  it('the box is disabled while the call is on its way, showing the new state', async () => {
+    const { list, rewards } = await openList();
+    const held = rewards.holdNext('setActive');
+    const box = screen.getByRole('checkbox', { name: 'Caffè attivo' });
+    await userEvent.click(box);
+
+    expect(box).toBeDisabled();
+    expect(box).not.toBeChecked();
+    // A second tap while disabled sends nothing.
+    await userEvent.click(box);
+    expect(rewards.calls.filter((call) => call.method === 'setActive')).toHaveLength(1);
+    // The row does not move before the answer.
+    expect(rowNames(list)[0]).toBe('Caffè');
+
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    const saved = await within(rowOf(list, 'Caffè')).findByRole('checkbox', {
+      name: 'Caffè attivo',
+    });
+    await waitFor(() => expect(saved).toBeEnabled());
+    expect(saved).not.toBeChecked();
+  });
+
+  it('a network error restores the box and says so under the row; a new tap resends', async () => {
+    const { list, rewards } = await openList();
+    rewards.failNext('setActive', 'network');
+    const box = screen.getByRole('checkbox', { name: 'Caffè attivo' });
+    await userEvent.click(box);
+
+    const row = rowOf(list, 'Caffè');
+    const alert = await within(row).findByRole('alert');
+    expect(alert).toHaveTextContent('Premio non salvato: controlla la connessione e riprova.');
+    expect(box).toBeChecked();
+    expect(box).toBeEnabled();
+    expect(box).toHaveFocus();
+    expect(box).toHaveAccessibleDescription(
+      'Premio non salvato: controlla la connessione e riprova.',
+    );
+    expect(rowNames(list)[0]).toBe('Caffè');
+    expect(row).not.toHaveAttribute('data-inactive');
+    // No reload after a network error: nothing changed.
+    expect(rewards.calls.filter((call) => call.method === 'listAll')).toHaveLength(1);
+
+    // Setting a value is safe to resend: the next tap saves and clears the message.
+    await userEvent.click(box);
+    await waitFor(() => expect(rowNames(list).at(-2)).toBe('Caffè'));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it.each(['not-found', 'unknown'] as const)(
+    '%s: restores the box, says "Premio non salvato: riprova." and reloads the list',
+    async (error) => {
+      const { list, rewards } = await openList();
+      rewards.failNext('setActive', error);
+      const box = screen.getByRole('checkbox', { name: 'Caffè attivo' });
+      await userEvent.click(box);
+
+      const alert = await within(rowOf(list, 'Caffè')).findByRole('alert');
+      expect(alert).toHaveTextContent('Premio non salvato: riprova.');
+      expect(box).toBeChecked();
+      await waitFor(() =>
+        expect(rewards.calls.filter((call) => call.method === 'listAll')).toHaveLength(2),
+      );
+    },
+  );
+
+  it.each([
+    ['misconfigured', 'Servizio non configurato: chiedi a un amministratore.'],
+    ['unavailable', 'Servizio momentaneamente non disponibile: riprova tra poco.'],
+  ] as const)('a %s server fault restores the box with its own words', async (kind, text) => {
+    const { list, rewards } = await openList();
+    rewards.failNext('setActive', new ServerFaultError(kind));
+    const box = screen.getByRole('checkbox', { name: 'Caffè attivo' });
+    await userEvent.click(box);
+
+    const alert = await within(rowOf(list, 'Caffè')).findByRole('alert');
+    expect(alert).toHaveTextContent(text);
+    expect(box).toBeChecked();
+    expect(box).toBeEnabled();
+  });
+
+  it('forbidden: says "Solo per gli amministratori" and reports it to AuthProvider', async () => {
+    const auth = signedInFake();
+    const rewards = createFakeRewardsService({ rewards: WIREFRAME });
+    renderApp(
+      '/impostazioni/premi',
+      auth,
+      createFakeSettingsService(),
+      createFakeCustomerService(),
+      rewards,
+    );
+    const list = await screen.findByRole('list', { name: 'Premi del catalogo' });
+    const checksBefore = auth.service.loadOperator.mock.calls.length;
+    rewards.failNext('setActive', 'forbidden');
+    const box = screen.getByRole('checkbox', { name: 'Caffè attivo' });
+    await userEvent.click(box);
+
+    const alert = await within(rowOf(list, 'Caffè')).findByRole('alert');
+    expect(alert).toHaveTextContent('Solo per gli amministratori');
+    expect(box).toBeChecked();
+    await waitFor(() => expect(auth.service.loadOperator.mock.calls.length).toBe(checksBefore + 1));
+  });
+
+  it('forbidden after the role became operator: the page shows the permission message', async () => {
+    const auth = signedInFake();
+    const rewards = createFakeRewardsService({ rewards: WIREFRAME });
+    renderApp(
+      '/impostazioni/premi',
+      auth,
+      createFakeSettingsService(),
+      createFakeCustomerService(),
+      rewards,
+    );
+    await screen.findByRole('list', { name: 'Premi del catalogo' });
+    auth.setProfile({ ...fakeOperator, role: 'operator' });
+    rewards.failNext('setActive', 'forbidden');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Caffè attivo' }));
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Solo per gli amministratori' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Premi del catalogo' })).not.toBeInTheDocument();
   });
 });

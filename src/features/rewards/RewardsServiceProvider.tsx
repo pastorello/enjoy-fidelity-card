@@ -30,8 +30,11 @@ export type RewardsState =
   | { status: 'done'; rewards: Reward[] }
   | { status: 'error'; error: unknown };
 
-/** The state, and `reload` to ask the server again (after an error, or after a write). */
-export type RewardsLoad = RewardsState & { reload: () => void };
+/**
+ * The state, `reload` to ask the server again (after an error, or after a write), and `apply` to
+ * show at once a reward a write returned, in its sorted place.
+ */
+export type RewardsLoad = RewardsState & { reload: () => void; apply: (reward: Reward) => void };
 
 /**
  * The whole catalogue (`listAll()`), loaded when the screen opens, in `sortRewards()` order.
@@ -71,5 +74,15 @@ export function useRewards(): RewardsLoad {
     load();
   }, [load]);
 
-  return { ...state, reload };
+  // The answers still on their way were asked before the write: they would show the old row.
+  const apply = useCallback((saved: Reward) => {
+    latest.current += 1;
+    setState((shown) => {
+      if (shown.status !== 'done') return shown;
+      const others = shown.rewards.filter((reward) => reward.id !== saved.id);
+      return { status: 'done', rewards: sortRewards([...others, saved]) };
+    });
+  }, []);
+
+  return { ...state, reload, apply };
 }

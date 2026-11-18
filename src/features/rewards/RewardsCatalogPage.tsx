@@ -2,12 +2,11 @@ import { useRef } from 'react';
 import { AppShell } from '../../app/AppShell';
 import { ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
-import { formatInteger } from '../../shared/format';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useCurrentOperator } from '../identity/AuthProvider';
+import { RewardRow } from './RewardRow';
 import styles from './RewardsCatalogPage.module.css';
 import { useRewards } from './RewardsServiceProvider';
-import type { Reward } from './types';
 
 const TITLE = 'Catalogo premi';
 const BACK_TO = '/impostazioni';
@@ -34,41 +33,6 @@ function AdminsOnly() {
         description="Il catalogo premi lo gestiscono gli amministratori."
       />
     </AppShell>
-  );
-}
-
-function pointsText(points: number): string {
-  return `${formatInteger(points)} ${points === 1 ? 'punto' : 'punti'}`;
-}
-
-/**
- * One reward of the catalogue (wireframe "Catalogo premi"): its own row, not a `ListRow`, so the
- * Attivo box is not nested inside a link or a button. The box only shows the state for now.
- */
-function RewardItem({ reward }: { reward: Reward }) {
-  return (
-    <li className={styles.item} data-inactive={reward.active ? undefined : 'true'}>
-      <span className={styles.text}>
-        <span className={styles.name} data-reward-name>
-          {reward.name}
-        </span>
-        <span className={styles.points}>
-          {reward.active
-            ? pointsText(reward.points)
-            : `${pointsText(reward.points)} · non visibile alla cassa né al cliente`}
-        </span>
-      </span>
-      <label className={styles.active}>
-        <input
-          type="checkbox"
-          className={styles.checkbox}
-          checked={reward.active}
-          readOnly
-          aria-label={`${reward.name} attivo`}
-        />
-        Attivo
-      </label>
-    </li>
   );
 }
 
@@ -109,7 +73,7 @@ function Catalog() {
     content = (
       <ul className={styles.list} aria-label="Premi del catalogo">
         {load.rewards.map((reward) => (
-          <RewardItem key={reward.id} reward={reward} />
+          <RewardRow key={reward.id} reward={reward} onSaved={load.apply} onReload={load.reload} />
         ))}
       </ul>
     );
