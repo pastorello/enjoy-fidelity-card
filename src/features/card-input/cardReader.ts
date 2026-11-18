@@ -127,7 +127,10 @@ export type CardReaderOptions = {
 export type CardReader = {
   /** Starts the adapters (an operator is signed in). Calling it again only updates the format. */
   activate(options: { usbFormat: UsbUidFormat | null }): void;
-  /** Stops the adapters; nothing is read until the next `activate`. */
+  /**
+   * Stops the adapters; nothing is read until the next `activate`. A write in progress is interrupted
+   * first (`onInterrupt`).
+   */
   deactivate(): void;
   setUsbFormat(format: UsbUidFormat | null): void;
   /** Puts the consumer on top of the stack; the returned function removes exactly that entry. */
@@ -286,6 +289,9 @@ export function createCardReader({
     },
     deactivate() {
       if (!active) return;
+      // A write cannot outlive the signed-in operator: it ends as `aborted`, its write() is aborted
+      // and the session is closed, so the next card on the phone cannot get the link.
+      session?.onInterrupt?.();
       active = false;
       lastSeen.clear();
       lastRead = null;

@@ -657,6 +657,55 @@ describe('createWebNfcWriter: start() during a write', () => {
   });
 });
 
+describe('createWebNfcWriter: deactivate() during a write (the operator signs out)', () => {
+  it('during write() → aborted, the write is aborted, and after activate() reads reach the consumers', async () => {
+    const { nfc, reader, writer, advance } = await setup({ writeOutcomes: ['pending'] });
+    const consumer = vi.fn<CardConsumer>();
+    reader.pushConsumer(consumer);
+    nfc.read(UID); // the card just associated, still on the phone
+    consumer.mockClear();
+    const steps: CardWriteStep[] = [];
+    const outcome = track(
+      writer.writeUrl(URL, { expectedUid: UID, onStep: (step) => steps.push(step) }),
+    );
+    await settle();
+    expect(steps.at(-1)).toBe('writing');
+
+    reader.deactivate();
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'aborted' });
+    expect(nfc.writes[0]?.options.signal.aborted).toBe(true);
+
+    reader.activate({ usbFormat: null });
+    await settle();
+    advance(REPEAT_WINDOW_MS + 1);
+    nfc.read(OTHER_UID);
+
+    expect(consumer).toHaveBeenCalledTimes(1);
+    expect(consumer.mock.calls[0]?.[0].uid).toBe(OTHER_UID);
+  });
+
+  it('waiting for the card → aborted, and a new write can start after activate()', async () => {
+    const { nfc, reader, writer } = await setup();
+    const outcome = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await settle();
+
+    reader.deactivate();
+    await settle();
+
+    expect(outcome.result).toEqual({ ok: false, reason: 'aborted' });
+    reader.activate({ usbFormat: null });
+    await settle();
+    const next = track(writer.writeUrl(URL, { expectedUid: UID }));
+    await settle();
+    nfc.read(UID);
+    await settle();
+    expect(next.result).toBeNull();
+    expect(nfc.writes).toHaveLength(1);
+  });
+});
+
 describe('createWebNfcWriter: the links stay with the writer', () => {
   it('no link in a consumer read and nothing in the console, through a whole write', async () => {
     const spies = (['log', 'info', 'warn', 'error', 'debug'] as const).map((method) =>
