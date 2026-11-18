@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { createFakeWebNfc, type FakeScanOutcome } from '../../test/fakeWebNfc';
-import { CardReadPanel } from './CardReadPanel';
-import { createCardReader, type CardReader } from './cardReader';
+import { CardReadPanel, CardReadPanelView } from './CardReadPanel';
+import { createCardReader, type CardReader, type NfcStatus } from './cardReader';
 import { CardReaderProvider } from './CardReaderProvider';
 import { createWebNfcAdapter, type NfcPermission } from './webNfcAdapter';
 
@@ -61,7 +61,22 @@ async function tap(name: string) {
   });
 }
 
+const noop = () => {};
+
 const panel = () => screen.getByRole('region', { name: 'Lettura card' });
+
+/** Focuses the button, as TalkBack or a keyboard does, then presses it. */
+async function focusAndTap(name: string) {
+  act(() => {
+    screen.getByRole('button', { name }).focus();
+  });
+  await tap(name);
+}
+
+/** The panel as a pure view of a status. */
+const view = (status: NfcStatus) => (
+  <CardReadPanelView title={HOME_TITLE} description={HOME_TEXT} status={status} onStart={noop} />
+);
 
 describe('CardReadPanel', () => {
   it('shows the start-up text before the reader is known', () => {
@@ -157,6 +172,62 @@ describe('CardReadPanel', () => {
     expect(container.querySelector('[aria-live="polite"]')).toBe(live);
     expect(live).toHaveTextContent(HOME_TITLE);
     expect(live).not.toHaveTextContent('Lettura delle card');
+  });
+
+  it('"Attiva la lettura": once the button is gone, focus stays in the panel, on the new state', async () => {
+    const { reader } = setup({ permission: 'prompt' });
+    const { container } = renderPanel(reader);
+    await activate(reader);
+
+    await focusAndTap('Attiva la lettura');
+
+    expect(within(panel()).queryByRole('button')).not.toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(container.querySelector('[aria-live="polite"]'));
+    expect(document.activeElement).toHaveTextContent(HOME_TEXT);
+  });
+
+  it('"Riprova la lettura" with NFC still off: focus goes back to the button', async () => {
+    const { reader } = setup({
+      permission: 'granted',
+      scanOutcomes: ['NotReadableError', 'NotReadableError'],
+    });
+    renderPanel(reader);
+    await activate(reader);
+
+    await focusAndTap('Riprova la lettura');
+
+    expect(within(panel()).getByText(OFF_TEXT)).toBeInTheDocument();
+    expect(document.activeElement).toBe(
+      within(panel()).getByRole('button', { name: 'Riprova la lettura' }),
+    );
+  });
+
+  it('"Riprova la lettura": off → starting → off keeps the focus in the panel, then on the button', () => {
+    const { container, rerender } = render(view('off'));
+    act(() => {
+      screen.getByRole('button', { name: 'Riprova la lettura' }).focus();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova la lettura' }));
+
+    rerender(view('starting'));
+    expect(within(panel()).queryByRole('button')).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(container.querySelector('[aria-live="polite"]'));
+
+    rerender(view('off'));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Riprova la lettura' }));
+  });
+
+  it('a state change without a tap does not move the focus', async () => {
+    const { nfc, reader } = setup({ permission: 'granted', scanOutcomes: ['NotReadableError'] });
+    renderPanel(reader);
+    await activate(reader);
+    await act(async () => {
+      nfc.returnToPage();
+      await settle();
+    });
+    expect(within(panel()).getByText(HOME_TEXT)).toBeInTheDocument();
+    expect(document.activeElement).toBe(document.body);
   });
 
   type Options = Parameters<typeof setup>[0];

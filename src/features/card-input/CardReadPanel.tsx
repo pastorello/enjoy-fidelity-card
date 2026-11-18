@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import type { NfcStatus } from './cardReader';
@@ -19,6 +20,9 @@ type Content = {
 };
 
 const RETRY = { label: 'Riprova la lettura', primary: false };
+
+/** The reader is still starting: the tap has no outcome yet. */
+const PENDING: ReadonlySet<NfcStatus> = new Set(['checking', 'starting']);
 
 /** What the panel says in each state (SPEC-card-input, point 6). */
 function contentFor(status: NfcStatus, title: string, description: string): Content {
@@ -70,6 +74,30 @@ export function CardReadPanelView({
 }: CardReadPanelViewProps) {
   // The tablet has no NFC: its USB reader has no state of its own to show.
   const effective: NfcStatus = mode === 'usb' ? 'active' : status;
+  const texts = useRef<HTMLDivElement>(null);
+  const action = useRef<HTMLButtonElement>(null);
+  // Set when the button is pressed while focused, until the tap has an outcome: the button unmounts
+  // with the state change, so focus must not fall to the page (SPEC-card-input, point 6).
+  const keepFocus = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!keepFocus.current) return;
+    const focused = document.activeElement;
+    // The operator has moved on meanwhile: leave the focus where it is.
+    if (focused !== null && focused !== document.body && focused !== texts.current) {
+      keepFocus.current = false;
+      return;
+    }
+    // The retry ended where it started (NFC still off): back on the button; otherwise on the
+    // live text, which says the new state.
+    (action.current ?? texts.current)?.focus();
+    if (!PENDING.has(effective)) keepFocus.current = false;
+  }, [effective]);
+
+  function press() {
+    keepFocus.current = document.activeElement === action.current;
+    onStart();
+  }
 
   if (variant === 'compact') {
     // The live region stays mounted, so the line is announced when reading becomes active.
@@ -89,7 +117,7 @@ export function CardReadPanelView({
   return (
     <section aria-label="Lettura card" className={styles.panel} data-off={content.off || undefined}>
       <Icon name={content.off ? 'nfc-off' : 'nfc'} size={48} className={styles.icon} />
-      <div aria-live="polite" className={styles.texts}>
+      <div ref={texts} tabIndex={-1} aria-live="polite" className={styles.texts}>
         <p className={styles.title}>{content.title}</p>
         <p className={styles.description}>{content.description}</p>
       </div>
@@ -98,8 +126,9 @@ export function CardReadPanelView({
           variant={content.action.primary ? 'primary' : 'secondary'}
           {...(content.action.primary ? { icon: 'nfc' as const } : {})}
           block
+          ref={action}
           className={styles.action}
-          onClick={onStart}
+          onClick={press}
         >
           {content.action.label}
         </Button>
