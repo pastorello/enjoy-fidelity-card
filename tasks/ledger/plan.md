@@ -121,7 +121,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 3: Registra spesa
 - [x] Task 11: `useOperation`: `operation_id` stabile, Riprova con lo stesso id, doppio tocco
-- [ ] Task 12: `AmountKeypad`: tastierino POS a centesimi
+- [x] Task 12: `AmountKeypad`: tastierino POS a centesimi
 - [ ] Task 13: `PurchasePage` sulla rotta del segnaposto: riga cliente, IMPORTO, anteprima, Conferma, stati comuni
 - [ ] Task 14: Importo insolito (strettamente sopra la soglia): avviso, Correggi, Conferma con l'importo
 - [ ] Task 15: `LedgerDoneView` per Spesa registrata: nuovo saldo, vibrazione, conto alla rovescia, ritorno a `/`

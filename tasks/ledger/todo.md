@@ -194,9 +194,9 @@ ignorate mentre è `busy`; `reset()` per "Annulla"/"Correggi".
 64 px (56 px nel premio libero), nessuna tastiera di sistema; usa i riduttori del task 6. Solo token e
 componenti del design system.
 **Accettazione:**
-- [ ] Componente: 1-2-5-0 produce 1250; "00", cancella, limite; variante senza "00"
-- [ ] Componente: nomi accessibili; nessun `input` che apra la tastiera di sistema; tasti ≥ 48 px
-- [ ] Detector Impeccable pulito
+- [x] Componente: 1-2-5-0 produce 1250; "00", cancella, limite; variante senza "00"
+- [x] Componente: nomi accessibili; nessun `input` che apra la tastiera di sistema; tasti ≥ 48 px
+- [x] Detector Impeccable pulito
 **Verifica:** `npm test -- AmountKeypad`
 **Dipendenze:** 6 · **File:** src/features/ledger/AmountKeypad.tsx (+ .module.css, .test.tsx)
 · **Dimensione:** S
