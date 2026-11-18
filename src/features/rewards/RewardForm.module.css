@@ -1,0 +1,113 @@
+/* The "Nuovo premio" box (wireframe "Catalogo premi"): the screen's footer, on the raised surface. */
+.box {
+  display: flex;
+  flex-direction: column;
+}
+
+/* "Nuovo premio" while "Modifica premio" takes its place: kept in the page with its draft. */
+.box[hidden] {
+  display: none;
+}
+
+.title {
+  margin: 0 0 calc(var(--space-2) + var(--space-1));
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+  color: var(--color-ink);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Points and the Attivo box side by side; an error under the points does not move the box. */
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.points {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Level with the input under the field's label; the whole label is the box's touch target. */
+.active {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  margin-top: calc(var(--type-body-sm-size) * var(--type-body-sm-line-height) + var(--space-1));
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  color: var(--color-ink);
+}
+
+.checkbox {
+  flex-shrink: 0;
+  width: var(--icon);
+  height: var(--icon);
+  margin: 0;
+  accent-color: var(--color-enjoy-green);
+}
+
+/* "Premio aggiunto", like "Impostazioni salvate." of the settings. */
+.added {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-accent-text);
+}
+
+.added:not(:empty) {
+  margin-top: var(--space-2);
+}
+
+.added svg {
+  flex-shrink: 0;
+}
+
+/* "Premio non salvato…" above the button, like the failure under a row of the catalogue. */
+.failure {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-danger-text);
+}
+
+.failure svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* The note on the history, like the hint on the points ratio in the settings. */
+.note {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* "Salva modifiche" then "Annulla", full width like ConfirmDialog: side by side the label wraps. */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

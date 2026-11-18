@@ -14,6 +14,8 @@ type AppShellProps = {
   account?: { name: string; to: string };
   /** Main actions of the screen, in the footer. */
   actions?: ReactNode;
+  /** `raised`: the footer is a box on the raised surface, e.g. a form fixed at the bottom. */
+  actionsTone?: 'raised' | undefined;
   /**
    * When the title does not fit in the header's two lines, repeat it in full as the first line of
    * the content (a customer's name, whose last words may tell namesakes apart).
@@ -62,6 +64,7 @@ export function AppShell({
   headerAction,
   account,
   actions,
+  actionsTone,
   repeatCutTitle = false,
   headingRef,
 }: AppShellProps) {
@@ -118,7 +121,11 @@ export function AppShell({
         )}
         {children}
       </main>
-      {actions && <footer className={styles.footer}>{actions}</footer>}
+      {actions && (
+        <footer className={styles.footer} data-tone={actionsTone}>
+          {actions}
+        </footer>
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { LoginPage } from '../features/identity/LoginPage';
 import { RequireAuth } from '../features/identity/RequireAuth';
 import { ResetPasswordPage } from '../features/identity/ResetPasswordPage';
 import { SettingsPage } from '../features/identity/SettingsPage';
+import { RewardsCatalogPage } from '../features/rewards/RewardsCatalogPage';
 import { NotFoundPage } from './NotFoundPage';
 import { RootLayout } from './RootLayout';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
@@ -35,6 +36,7 @@ export const routes: RouteObject[] = [
           { path: 'clienti/:id', Component: CustomerPage },
           { path: 'clienti/:id/modifica', Component: EditCustomerPage },
           { path: 'impostazioni', Component: SettingsPage },
+          { path: 'impostazioni/premi', Component: RewardsCatalogPage },
         ],
       },
       // Component showcase, development builds only.

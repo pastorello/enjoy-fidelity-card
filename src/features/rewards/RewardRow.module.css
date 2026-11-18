@@ -1,0 +1,104 @@
+/* One reward of the catalogue (wireframe "Catalogo premi"): its own row with the tokens of ListRow. */
+.item {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-ink);
+}
+
+.main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+}
+
+/* An inactive reward is grey: not shown at the till nor to the customer. */
+.item[data-inactive='true'] {
+  color: var(--color-ink-muted);
+}
+
+/* Name and points: the button that opens "Modifica premio", the whole text area, ≥ 48 px. */
+.text {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-target);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-self: stretch;
+  margin: 0;
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.text:active:not(:disabled) {
+  background: var(--color-surface-raised);
+}
+
+/* Another row is being changed: this one does not open, but reads as usual. */
+.text:disabled {
+  cursor: default;
+}
+
+/* The row in the "Modifica premio" box, on the surface of the box itself. */
+.item[data-editing='true'] {
+  background: var(--color-surface-raised);
+  box-shadow:
+    calc(-1 * var(--space-2)) 0 0 var(--color-surface-raised),
+    var(--space-2) 0 0 var(--color-surface-raised);
+}
+
+.name {
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  overflow-wrap: anywhere;
+}
+
+.points {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* The whole label is the touch target of the box: at least 48 px tall. */
+.active {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+.checkbox {
+  flex-shrink: 0;
+  width: var(--icon);
+  height: var(--icon);
+  margin: 0;
+  accent-color: var(--color-enjoy-green);
+}
+
+/* Why the last tap on the box was not saved, under the row. */
+.failure {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding-block-end: var(--space-3);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-danger-text);
+}
+
+.failure svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

@@ -80,6 +80,20 @@ describe('AppShell', () => {
     expect(within(footer).getByRole('button', { name: 'Conferma' })).toBeInTheDocument();
   });
 
+  it('actionsTone="raised": the footer is the raised surface (a form box fixed at the bottom)', () => {
+    renderShell(
+      <AppShell actions={<Button>Aggiungi</Button>} actionsTone="raised">
+        x
+      </AppShell>,
+    );
+    expect(screen.getByRole('contentinfo')).toHaveAttribute('data-tone', 'raised');
+  });
+
+  it('the footer has no tone by default', () => {
+    renderShell(<AppShell actions={<Button>Conferma</Button>}>x</AppShell>);
+    expect(screen.getByRole('contentinfo')).not.toHaveAttribute('data-tone');
+  });
+
   it('has no footer without actions', () => {
     renderShell(<AppShell>x</AppShell>);
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();

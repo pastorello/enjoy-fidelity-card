@@ -68,11 +68,14 @@ describe('settings page', () => {
     const account = await screen.findByRole('region', { name: 'Account' });
     const points = screen.getByRole('region', { name: 'PUNTI E CONTROLLI' });
     const accountSection = screen.getByRole('region', { name: 'ACCOUNT' });
-    // account box · PUNTI E CONTROLLI (settings) · ACCOUNT (identity-password); no final note
+    const management = screen.getByRole('region', { name: 'GESTIONE' });
+    // account box · PUNTI E CONTROLLI (settings) · ACCOUNT (identity-password) · GESTIONE
+    // (rewards); no final note
     expect(Array.from(screen.getByRole('main').children)).toEqual([
       account,
       points,
       accountSection,
+      management,
     ]);
   });
 

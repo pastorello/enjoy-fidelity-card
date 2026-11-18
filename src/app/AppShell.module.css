@@ -109,3 +109,8 @@
   border-top: 1px solid var(--color-divider);
   background: var(--color-surface);
 }
+
+/* A box fixed at the bottom (the "Nuovo premio" form of the catalogue), on the raised surface. */
+.footer[data-tone='raised'] {
+  background: var(--color-surface-raised);
+}

@@ -50,3 +50,17 @@ from (values
   ('c0000000-0000-4000-8000-000000000005'::uuid, 'Sara Colombo', '+393330000005', 'Senza lattosio',
    'c1000000-0000-4000-8000-000000000005'::uuid)
 ) as fake (id, name, phone, notes, operation_id);
+
+-- Fake rewards (rewards module): the catalogue of the "Catalogo premi" wireframe.
+-- The ledger E2E relies on them: tests never modify these rows.
+insert into app.rewards (id, name, points, active, created_by, updated_by)
+select
+  fake.id, fake.name, fake.points, fake.active, admin.id, admin.id
+from (values
+  ('e0000000-0000-4000-8000-000000000001'::uuid, 'Caffè', 50, true),
+  ('e0000000-0000-4000-8000-000000000002'::uuid, 'Cornetto e cappuccino', 100, true),
+  ('e0000000-0000-4000-8000-000000000003'::uuid, 'Dolce del giorno', 120, false),
+  ('e0000000-0000-4000-8000-000000000004'::uuid, 'Colazione per due', 180, true),
+  ('e0000000-0000-4000-8000-000000000005'::uuid, 'Aperitivo', 200, true)
+) as fake (id, name, points, active)
+cross join (select id from app.operators where name = 'Admin Prova') as admin;

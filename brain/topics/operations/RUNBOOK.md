@@ -192,3 +192,12 @@ staging poi produzione, mai `supabase config push`.
 36. `impeccable detect` su file `.ts`/`.tsx`/`.css` usa solo le regole a espressioni regolari; contrasto e
     testo minuscolo richiedono una pagina disegnata, e le schermate dei clienti stanno dietro
     l'accesso. Le misure (≥ 48 px) si provano quindi negli E2E (`e2e/customers.spec.ts`), non col detector.
+37. I premi non si cancellano mai, nemmeno nei test: l'E2E di `rewards` aggiunge un premio con suffisso unico
+    (`Spremuta E2E <suffisso>`) e lo lascia **disattivato** alla fine, così gli avanzi non compaiono alla cassa;
+    lo stack locale ne accumula, innocui (`npm run db:reset` riparte dai 5 del seed). L'integrazione invece
+    toglie la propria riga come proprietario del database. I 5 premi del seed non si toccano: li usano
+    l'E2E del catalogo (ordine del wireframe) e `ledger`.
+38. Un `23505` dalle RPC dei premi è "nome già usato" solo se nomina `rewards_name_key`: un altro vincolo
+    (la chiave primaria) è `unknown`. E un `42501` con `permission denied for …` è un privilegio mancante
+    (`misconfigured`, `src/lib/serverFault.ts`), non un operatore senza ruolo di amministratore: va
+    controllato prima della traduzione in `forbidden`.
