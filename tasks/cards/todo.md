@@ -18,15 +18,15 @@ rifiutato; RPC `app.lookup_card`, `app.associate_card` (blocca il cliente `for u
 riattivazione, idempotenza, `unique_violation` → `card_taken`), `app.deactivate_card`. Seed: una card finta
 su un cliente del seed, link non scritto.
 **Accettazione:**
-- [ ] pgTAP: `anon` e utente senza profilo non leggono `cards` e ricevono `not_operator`/permesso negato
+- [x] pgTAP: `anon` e utente senza profilo non leggono `cards` e ricevono `not_operator`/permesso negato
       dalle tre RPC; `authenticated` non scrive direttamente; vincolo uid (minuscolo, separatori, dispari,
       7 e 11 byte); trigger su uid, cliente, `associated_by` fuori dalla riattivazione e delete (criterio 8)
-- [ ] pgTAP: `associate_card` per operatore e admin con `associated_by` = chiamante; sostituzione (vecchia
+- [x] pgTAP: `associate_card` per operatore e admin con `associated_by` = chiamante; sostituzione (vecchia
       `active=false`, `deactivated_at`, `replaced_card_id`) senza modificare righe fuori da `app.cards`;
       `card_taken` (attiva, disattivata, anonimizzata → `owner_name` null); ripetizione idempotente;
       riattivazione; `customer_not_found`, `customer_anonymized`, `invalid_uid`; due attive impossibili
       (criteri 3, 4, 5, 7)
-- [ ] pgTAP: `lookup_card` sconosciuta/attiva/disattivata/anonimizzata (nome null), `invalid_uid`;
+- [x] pgTAP: `lookup_card` sconosciuta/attiva/disattivata/anonimizzata (nome null), `invalid_uid`;
       `deactivate_card` idempotente e `card_not_found`; `function_privileges.test.sql` verde
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** nessuna · **File:** supabase/migrations/*_cards.sql, supabase/tests/cards.test.sql,

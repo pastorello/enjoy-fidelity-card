@@ -110,7 +110,7 @@ migrazione cards (task 1-4: tabella, RPC, link, card_points)
 Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Database (rischio più alto)
-- [ ] Task 1: `app.cards`, trigger, policy, `lookup_card`, `associate_card`, `deactivate_card`, card del seed, pgTAP
+- [x] Task 1: `app.cards`, trigger, policy, `lookup_card`, `associate_card`, `deactivate_card`, card del seed, pgTAP
 - [ ] Task 2: `create_customer_with_card` tutto-o-niente e idempotente; anonimizzazione disattiva la card
 - [ ] Task 3: Link ai punti: `private.card_links`, `issue_card_link`, `confirm_card_link`, disattivazione = link morto
 - [ ] Task 4: `public.card_points` e allowlist delle funzioni eseguibili da `anon`
