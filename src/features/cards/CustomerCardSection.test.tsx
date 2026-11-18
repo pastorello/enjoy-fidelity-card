@@ -1,6 +1,6 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
 import { createTestCardReader } from '../../test/fakeCardReader';
 import { createFakeCardsService, fakeCard } from '../../test/fakeCardsService';
@@ -8,6 +8,8 @@ import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomer
 import { createFakeRewardsService } from '../../test/fakeRewardsService';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
+import type { CardWriteResult, WriteUrlOptions } from '../card-input/webNfcWriter';
+import type { CardSummary, LinkState } from './types';
 
 const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393331234521' });
 const GIULIA = fakeCustomer({ name: 'Giulia Bianchi' });
@@ -163,5 +165,190 @@ describe('CustomerCardSection: CARD of Modifica cliente (SPEC-cards, point 5)', 
 
     await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
     expect(await within(section).findByText(/Card attiva …E5F6/)).toBeInTheDocument();
+  });
+});
+
+/** One `writeUrl` call, ended by the test with `finish`. */
+type WriteCall = {
+  url: string;
+  options: WriteUrlOptions;
+  finish: (result: CardWriteResult) => Promise<void>;
+};
+
+const WRITTEN = 'Link ai punti scritto';
+const NOT_WRITTEN = 'Link non scritto: il cliente non può ancora vedere i suoi punti con la card.';
+const UNVERIFIED =
+  'Link da controllare: l’ultima scrittura non è stata verificata, la card potrebbe non mostrare i punti.';
+const DEVICE = 'Per scrivere il link serve un telefono Android con l’NFC attivo.';
+const WRITE = 'Scrivi il link';
+const WRITE_AGAIN = 'Scrivi di nuovo il link';
+
+/** Maria's card with the link in `state`, and a card reader whose writes the test ends. */
+function setupLink(state: LinkState, { writable = true } = {}) {
+  const customers = createFakeCustomerService({ customers: [MARIA] });
+  const instants: Record<LinkState, Pick<CardSummary, 'linkWrittenAt' | 'linkPendingAt'>> = {
+    'not-written': { linkWrittenAt: null, linkPendingAt: null },
+    written: { linkWrittenAt: '2026-11-17T10:01:00.000Z', linkPendingAt: null },
+    unverified: {
+      linkWrittenAt: '2026-11-17T10:01:00.000Z',
+      linkPendingAt: '2026-11-17T11:00:00.000Z',
+    },
+  };
+  const cards = createFakeCardsService({
+    customers,
+    cards: [fakeCard({ uid: UID, customerId: MARIA.id, associatedAt: SINCE, ...instants[state] })],
+  });
+  const card = createTestCardReader({ writable });
+  const writes: WriteCall[] = [];
+  vi.spyOn(card.reader, 'writeUrl').mockImplementation(
+    (url, options) =>
+      new Promise<CardWriteResult>((resolve) => {
+        writes.push({
+          url,
+          options,
+          finish: (result) =>
+            act(async () => {
+              resolve(result);
+              await Promise.resolve();
+            }),
+        });
+        options.signal?.addEventListener('abort', () => resolve({ ok: false, reason: 'aborted' }));
+      }),
+  );
+  return { customers, cards, card, writes };
+}
+
+type LinkFixture = ReturnType<typeof setupLink>;
+
+function renderLink(fixture: LinkFixture) {
+  return renderApp(
+    `/clienti/${MARIA.id}/modifica`,
+    signedInFake(),
+    createFakeSettingsService(),
+    fixture.customers,
+    createFakeRewardsService(),
+    fixture.card,
+    fixture.cards,
+  );
+}
+
+async function currentWrite(fixture: LinkFixture): Promise<WriteCall> {
+  await waitFor(() => expect(fixture.writes.length).toBeGreaterThan(0));
+  const write = fixture.writes.at(-1);
+  if (!write) throw new Error('no write');
+  return write;
+}
+
+describe('CustomerCardSection: the link to the points (SPEC-cards, point 5; criteria 13, 15)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('written: «Link ai punti scritto» and the secondary "Scrivi di nuovo il link"', async () => {
+    renderLink(setupLink('written'));
+    const section = await cardSection();
+    expect(await within(section).findByText(WRITTEN)).toBeInTheDocument();
+    expect(within(section).getByRole('button', { name: WRITE_AGAIN })).toHaveAttribute(
+      'data-variant',
+      'secondary',
+    );
+    expect(within(section).queryByRole('button', { name: WRITE })).toBeNull();
+    expect(section).not.toHaveTextContent(NOT_WRITTEN);
+  });
+
+  it('not written: the warning and "Scrivi il link"', async () => {
+    renderLink(setupLink('not-written'));
+    const section = await cardSection();
+    expect(await within(section).findByText(NOT_WRITTEN)).toBeInTheDocument();
+    expect(within(section).getByRole('button', { name: WRITE })).toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: WRITE_AGAIN })).toBeNull();
+    expect(section).not.toHaveTextContent(WRITTEN);
+  });
+
+  it('unverified: «Link da controllare…» and "Scrivi di nuovo il link"', async () => {
+    renderLink(setupLink('unverified'));
+    const section = await cardSection();
+    expect(await within(section).findByText(UNVERIFIED)).toBeInTheDocument();
+    expect(within(section).getByRole('button', { name: WRITE_AGAIN })).toBeInTheDocument();
+    expect(section).not.toHaveTextContent(WRITTEN);
+  });
+
+  it.each<LinkState>(['written', 'not-written', 'unverified'])(
+    'a phone that does not write (%s): no button, the device text in its place (criterion 13)',
+    async (state) => {
+      renderLink(setupLink(state, { writable: false }));
+      const section = await cardSection();
+      expect(await within(section).findByText(DEVICE)).toBeInTheDocument();
+      expect(within(section).queryByRole('button', { name: WRITE })).toBeNull();
+      expect(within(section).queryByRole('button', { name: WRITE_AGAIN })).toBeNull();
+      // The card buttons stay.
+      expect(within(section).getByRole('button', { name: 'Disattiva card' })).toBeInTheDocument();
+    },
+  );
+
+  it('nothing is written until "Scrivi il link" is tapped', async () => {
+    const fixture = setupLink('not-written');
+    renderLink(fixture);
+    const section = await cardSection();
+    await within(section).findByText(NOT_WRITTEN);
+    expect(fixture.writes).toHaveLength(0);
+    expect(fixture.cards.calls.some((call) => call.method === 'issueLink')).toBe(false);
+  });
+
+  it('"Scrivi il link": the write opens in the section on the card, then the section reloads as written (criterion 13)', async () => {
+    const fixture = setupLink('not-written');
+    renderLink(fixture);
+    const section = await cardSection();
+    await userEvent.click(await within(section).findByRole('button', { name: WRITE }));
+
+    const write = await currentWrite(fixture);
+    expect(write.options.expectedUid).toBe(UID);
+    expect(write.url).toMatch(/^https?:\/\/[^/]+\/s\/[A-Za-z0-9_-]{22}$/);
+    act(() => write.options.onStep?.('waiting-card'));
+    const writer = within(section).getByRole('region', { name: 'Scrittura del link' });
+    expect(writer).toHaveTextContent('Avvicina la card …E5F6');
+    expect(
+      within(section).getByRole('button', { name: 'Salta, lo scrivo più tardi' }),
+    ).toBeInTheDocument();
+
+    await write.finish({ ok: true });
+    expect(await within(section).findByText(WRITTEN)).toBeInTheDocument();
+    expect(within(section).getByRole('button', { name: WRITE_AGAIN })).toBeInTheDocument();
+    expect(within(section).queryByRole('region', { name: 'Scrittura del link' })).toBeNull();
+    expect(fixture.cards.cards()[0]?.linkState).toBe('written');
+    // The token is never on screen.
+    const token = write.url.split('/s/')[1] ?? '';
+    expect(document.body).not.toHaveTextContent(token);
+  });
+
+  it('a write that fails, then «Più tardi», leaves the link unverified, never written (criterion 15)', async () => {
+    const fixture = setupLink('written');
+    renderLink(fixture);
+    const section = await cardSection();
+    await userEvent.click(await within(section).findByRole('button', { name: WRITE_AGAIN }));
+    const write = await currentWrite(fixture);
+    await write.finish({ ok: false, reason: 'verify-failed' });
+
+    expect(await within(section).findByRole('alert')).toHaveTextContent(
+      'Il link sulla card non risulta giusto. Riprova.',
+    );
+    await userEvent.click(within(section).getByRole('button', { name: 'Più tardi' }));
+    expect(await within(section).findByText(UNVERIFIED)).toBeInTheDocument();
+    expect(within(section).getByRole('button', { name: WRITE_AGAIN })).toBeInTheDocument();
+    expect(fixture.cards.calls.some((call) => call.method === 'confirmLink')).toBe(false);
+  });
+
+  it('«Salta, lo scrivo più tardi» stops the write and reloads the section', async () => {
+    const fixture = setupLink('not-written');
+    renderLink(fixture);
+    const section = await cardSection();
+    await userEvent.click(await within(section).findByRole('button', { name: WRITE }));
+    const write = await currentWrite(fixture);
+    await userEvent.click(
+      within(section).getByRole('button', { name: 'Salta, lo scrivo più tardi' }),
+    );
+    expect(write.options.signal?.aborted).toBe(true);
+    expect(await within(section).findByText(NOT_WRITTEN)).toBeInTheDocument();
+    expect(within(section).queryByRole('region', { name: 'Scrittura del link' })).toBeNull();
   });
 });

@@ -300,3 +300,58 @@ test('Modifica cliente: «Disattiva card» asks first, then the section says «N
   await expect(panel).toContainText('Card disattivata');
   await expect(page).toHaveURL('/');
 });
+
+test('a link not written at the till is written later from Modifica cliente (criterion 13)', async ({
+  page,
+}) => {
+  await stubWebNfc(page);
+  await signIn(page);
+  const uid = freshUid();
+  const label = `…${uid.slice(-4)}`;
+  await expect(page.getByRole('region', { name: 'Lettura card' })).toContainText(
+    'Avvicina la card',
+  );
+  await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+  await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
+  await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(uniqueName('Maria Dopo E2E'));
+  await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
+  // The card moves away while the link is written.
+  await page.evaluate(() => window.__enjoyFakeCardControl?.failNextWrite('io'));
+  await page.getByRole('button', { name: 'Salva cliente' }).click();
+
+  // When the form took longer than the card stays in the field, the write asks for it again.
+  const writer = page.getByRole('region', { name: 'Scrittura del link' });
+  const failure = page.getByRole('alert').filter({ hasText: 'Link non scritto' });
+  await expect(async () => {
+    if (await writer.getByText(`Avvicina la card ${label}`).isVisible()) {
+      await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+    }
+    await expect(failure).toBeVisible({ timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  await page.getByRole('button', { name: 'Più tardi' }).click();
+  await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}\/spesa$/);
+  const id = /\/clienti\/([0-9a-f-]{36})\/spesa$/.exec(page.url())?.[1] ?? '';
+  expect((await fakeCardWrites(page)).filter((entry) => entry.uid === uid)).toEqual([]);
+
+  await page.goto(`/clienti/${id}/modifica`);
+  const section = page.getByRole('region', { name: 'CARD' });
+  await expect(section).toContainText(
+    'Link non scritto: il cliente non può ancora vedere i suoi punti con la card.',
+  );
+  const write = section.getByRole('button', { name: 'Scrivi il link' });
+  expect((await write.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+  await write.click();
+  await expect(section.getByRole('region', { name: 'Scrittura del link' })).toContainText(
+    `Avvicina la card ${label}`,
+  );
+
+  // The card is put back on the phone: the link is written, verified and confirmed.
+  await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+  await expect(section).toContainText('Link ai punti scritto');
+  await expect(section.getByRole('region', { name: 'Scrittura del link' })).toBeHidden();
+  await expect(section.getByRole('button', { name: 'Scrivi di nuovo il link' })).toBeVisible();
+
+  const written = (await fakeCardWrites(page)).filter((entry) => entry.uid === uid);
+  expect(written).toHaveLength(1);
+  expect(written[0]?.url).toMatch(/^https?:\/\/[^/]+\/s\/[A-Za-z0-9_-]{22}$/);
+});

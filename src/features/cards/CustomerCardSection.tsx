@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { ServerFaultError } from '../../lib/serverFault';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
@@ -6,12 +6,15 @@ import { Icon } from '../../shared/ui/Icon';
 import { StatusView } from '../../shared/ui/StatusView';
 import { loadErrorText } from '../customers/loadErrorText';
 import type { CustomerSummary } from '../customers/types';
+import { useCardWriter } from '../card-input/useCardWriter';
 import { useAuth } from '../identity/AuthProvider';
+import { CardLinkWriter, CardLinkWriterActions } from './CardLinkWriter';
 import { useCardsService } from './CardsServiceProvider';
 import styles from './CustomerCardSection.module.css';
 import { formatCardLabel, formatCardSince, shortName } from './formatCard';
-import { CardsError, NetworkError, type CardSummary } from './types';
+import { CardsError, NetworkError, type CardSummary, type LinkState } from './types';
 import { useActiveCard } from './useActiveCard';
+import { useCardLinkWriter } from './useCardLinkWriter';
 
 /** Why the deactivation got no answer, or an unexpected one: the dialog stays open with «Riprova». */
 function deactivateErrorText(error: unknown): string {
@@ -29,13 +32,20 @@ function isUncertain(error: unknown): boolean {
  * CARD of Modifica cliente (SPEC-cards, point 5; wireframe "Modifica cliente"), before DATI DEL
  * CLIENTE: the active card with «Sostituisci card» and «Disattiva card», or «Nessuna card attiva»
  * with «Associa card». The card is saved on its own, never with the form; a card that cannot be
- * loaded leaves the rest of the form usable. The state of the link comes with task 19.
+ * loaded leaves the rest of the form usable. Under the card, the state of its link to the points.
  */
 export function CustomerCardSection({ customer }: { customer: CustomerSummary }) {
   const load = useActiveCard(customer.id);
   const headingId = useId();
   // The card deactivated from here: the section shows no card without loading again.
   const [deactivatedId, setDeactivatedId] = useState<string | null>(null);
+  // Once a write of the link ends, the section loads the card again and focuses its link state.
+  const [linkReloaded, setLinkReloaded] = useState(false);
+  const { retry } = load;
+  const reloadLink = useCallback(() => {
+    setLinkReloaded(true);
+    retry();
+  }, [retry]);
 
   let body;
   if (load.status === 'loading') {
@@ -61,6 +71,8 @@ export function CustomerCardSection({ customer }: { customer: CustomerSummary })
         card={load.card}
         customer={customer}
         onDeactivated={() => setDeactivatedId(load.card?.id ?? null)}
+        onLinkDone={reloadLink}
+        focusLink={linkReloaded}
       />
     );
   }
@@ -98,10 +110,15 @@ function ActiveCard({
   card,
   customer,
   onDeactivated,
+  onLinkDone,
+  focusLink,
 }: {
   card: CardSummary;
   customer: CustomerSummary;
   onDeactivated: () => void;
+  /** A write of the link ended (written, «Più tardi», «Salta»): the section loads the card again. */
+  onLinkDone: () => void;
+  focusLink: boolean;
 }) {
   const service = useCardsService();
   const { reportNotEnabled } = useAuth();
@@ -149,6 +166,7 @@ function ActiveCard({
           <span className={styles.since}>· {formatCardSince(card.associatedAt)}</span>
         </span>
       </p>
+      <CardLink card={card} customer={customer} onDone={onLinkDone} focus={focusLink} />
       <div className={styles.actions}>
         <ButtonLink to={`/clienti/${customer.id}/card`} variant="secondary">
           Sostituisci card
@@ -182,6 +200,97 @@ function ActiveCard({
           setError(null);
         }}
       />
+    </>
+  );
+}
+
+/** What each `LinkState` says under the card (SPEC-cards, point 5), and its button. */
+const LINK_STATES: Record<LinkState, { text: string; button: string; warning: boolean }> = {
+  written: { text: 'Link ai punti scritto', button: 'Scrivi di nuovo il link', warning: false },
+  'not-written': {
+    text: 'Link non scritto: il cliente non può ancora vedere i suoi punti con la card.',
+    button: 'Scrivi il link',
+    warning: true,
+  },
+  unverified: {
+    text: 'Link da controllare: l’ultima scrittura non è stata verificata, la card potrebbe non mostrare i punti.',
+    button: 'Scrivi di nuovo il link',
+    warning: true,
+  },
+};
+
+const DEVICE_TEXT = 'Per scrivere il link serve un telefono Android con l’NFC attivo.';
+
+/**
+ * The state of the card's link and the button that writes it again; the write itself (SPEC-cards,
+ * point 8) opens here, in the section, only once the button is tapped. A phone that does not write
+ * shows why in place of the button.
+ */
+function CardLink({
+  card,
+  customer,
+  onDone,
+  focus,
+}: {
+  card: CardSummary;
+  customer: CustomerSummary;
+  onDone: () => void;
+  focus: boolean;
+}) {
+  const { canWrite } = useCardWriter();
+  const [writing, setWriting] = useState(false);
+  const text = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (focus && !writing) text.current?.focus();
+  }, [focus, writing]);
+
+  if (writing) {
+    return <CardLinkWrite card={card} customer={customer} onDone={onDone} />;
+  }
+
+  const link = LINK_STATES[card.linkState];
+  return (
+    <>
+      <p
+        ref={text}
+        tabIndex={-1}
+        className={`${styles.link} ${link.warning ? styles.linkWarning : ''}`}
+      >
+        <Icon
+          name={link.warning ? 'triangle-alert' : 'link'}
+          size={20}
+          className={link.warning ? styles.warningIcon : undefined}
+        />
+        <span>{link.text}</span>
+      </p>
+      {canWrite ? (
+        <Button variant="secondary" block onClick={() => setWriting(true)}>
+          {link.button}
+        </Button>
+      ) : (
+        <p className={styles.help}>{DEVICE_TEXT}</p>
+      )}
+    </>
+  );
+}
+
+/** The write of the link, started at once on the card: «Avvicina la card …E5F6» first. */
+function CardLinkWrite({
+  card,
+  customer,
+  onDone,
+}: {
+  card: CardSummary;
+  customer: CustomerSummary;
+  onDone: () => void;
+}) {
+  const writing = useCardLinkWriter({ cardId: card.id, uid: card.uid, onWritten: onDone });
+  return (
+    <>
+      <CardLinkWriter writing={writing} uid={card.uid} customerName={customer.name} />
+      <div className={styles.writeActions}>
+        <CardLinkWriterActions writing={writing} onLater={onDone} />
+      </div>
     </>
   );
 }
