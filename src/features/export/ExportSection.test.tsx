@@ -207,7 +207,7 @@ describe('ESPORTA DATI states (SPEC-export, point 2)', () => {
     const auth = signedInFake();
     const fake = createFakeExportService({ role: 'operator' });
     const { status, customersButton } = await openSection(fake, auth);
-    const checksBefore = auth.service.loadOperator.mock.calls.length;
+    const checksBefore = auth.service.loadIdentity.mock.calls.length;
 
     // A double tap is one export and one report.
     const hold = fake.holdNext('fetchCustomers');
@@ -215,7 +215,7 @@ describe('ESPORTA DATI states (SPEC-export, point 2)', () => {
     hold.release();
     await waitFor(() => expect(status).toHaveTextContent(forbiddenMessage));
     expect(fake.download).not.toHaveBeenCalled();
-    await waitFor(() => expect(auth.service.loadOperator.mock.calls.length).toBe(checksBefore + 1));
+    await waitFor(() => expect(auth.service.loadIdentity.mock.calls.length).toBe(checksBefore + 1));
     expect(fake.service.fetchCustomers).toHaveBeenCalledTimes(1);
     // The re-check still says administrator: the section and its message stay.
     expect(status).toHaveTextContent(forbiddenMessage);

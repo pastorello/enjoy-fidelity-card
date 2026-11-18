@@ -64,7 +64,7 @@ describe('sign-in page', () => {
 
   it('reports a network failure and stops waiting when the profile cannot be loaded', async () => {
     const fake = createFakeAuthService();
-    fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+    fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
     renderApp('/accedi', fake);
     await fillAndSubmit('giulia@example.com', 'password-di-prova');
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -79,7 +79,7 @@ describe('sign-in page', () => {
     ['unavailable', 'Servizio momentaneamente non disponibile: riprova tra poco.'],
   ] as const)('tells a %s server apart from a missing connection', async (kind, message) => {
     const fake = createFakeAuthService();
-    fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+    fake.service.loadIdentity.mockRejectedValueOnce(new ServerFaultError(kind));
     renderApp('/accedi', fake);
     await fillAndSubmit('giulia@example.com', 'password-di-prova');
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
@@ -151,7 +151,7 @@ describe('protected pages', () => {
     'word a %s server when the saved profile cannot be loaded for that',
     async (kind, message) => {
       const fake = signedInFake();
-      fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+      fake.service.loadIdentity.mockRejectedValueOnce(new ServerFaultError(kind));
       renderApp('/', fake);
       expect(await screen.findByText(message)).toBeInTheDocument();
       expect(screen.queryByText('Controlla la connessione e riprova.')).not.toBeInTheDocument();
@@ -160,7 +160,7 @@ describe('protected pages', () => {
 
   it('keep the fault message when "Riprova" fails again with a fault', async () => {
     const fake = signedInFake();
-    fake.service.loadOperator
+    fake.service.loadIdentity
       .mockRejectedValueOnce(new Error('offline'))
       .mockRejectedValueOnce(new ServerFaultError('misconfigured'));
     renderApp('/', fake);
@@ -168,12 +168,12 @@ describe('protected pages', () => {
     expect(
       await screen.findByText('Servizio non configurato: chiedi a un amministratore.'),
     ).toBeInTheDocument();
-    expect(fake.service.loadOperator).toHaveBeenCalledTimes(2);
+    expect(fake.service.loadIdentity).toHaveBeenCalledTimes(2);
   });
 
   it('offer "Riprova" when the profile cannot be loaded', async () => {
     const fake = signedInFake();
-    fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+    fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
     renderApp('/', fake);
     await userEvent.click(await screen.findByRole('button', { name: 'Riprova' }));
     expect(

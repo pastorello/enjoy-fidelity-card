@@ -7,6 +7,29 @@ export type Operator = {
   role: Role;
 };
 
+/** A shared cash-desk tablet (`app.devices`): its own account, never an operator. */
+export type Device = {
+  id: string;
+  name: string;
+};
+
+/**
+ * Who the saved session is, as `app.get_session_identity()` says (SPEC-tablet-kiosk): an operator
+ * account (its profile, and whether it has set a PIN for the till), or a device account with its
+ * cashier while the turn lasts (null when there is none or it has ended), the end of that turn by the
+ * server's clock, and how many seconds the PIN lock still lasts (0 when not locked). The server
+ * decides all of it; the app only carries it.
+ */
+export type SessionIdentity =
+  | { kind: 'operator'; operator: Operator; hasPin: boolean }
+  | {
+      kind: 'device';
+      device: Device;
+      cashier: Operator | null;
+      turnExpiresAt: Date | null;
+      lockSecondsLeft: number;
+    };
+
 export function roleLabel(role: Role): string {
   return role === 'admin' ? 'Amministratore' : 'Operatore';
 }
@@ -32,11 +55,11 @@ export type AuthService = {
   /** Ends the session on this device only. */
   signOut(): Promise<void>;
   /**
-   * The profile linked to this user, or null when there is none (removed or never linked).
-   * Rejects with a `ServerFaultError` when the server is misconfigured or unavailable, with
-   * any other error when there is no answer.
+   * Who the saved session is (operator or device account), or null when it is neither (profile
+   * removed or never linked). Rejects with a `ServerFaultError` when the server is misconfigured or
+   * unavailable, with any other error when there is no answer or the answer is malformed.
    */
-  loadOperator(userId: string): Promise<Operator | null>;
+  loadIdentity(): Promise<SessionIdentity | null>;
   /**
    * Called when the saved session changes outside the app's own calls: with its user id
    * (signed in or refreshed, here or in another tab) or null (expired, revoked, other tab).

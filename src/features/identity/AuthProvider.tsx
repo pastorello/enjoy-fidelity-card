@@ -6,6 +6,7 @@ import type {
   AuthService,
   Operator,
   ResetRequestResult,
+  SessionIdentity,
   SignedOutReason,
   SignInResult,
 } from './types';
@@ -65,6 +66,15 @@ type AuthContextValue = {
   reportNotEnabled: () => Promise<void>;
 };
 
+/**
+ * The operator of an operator account. A device account has no operator of its own: until the
+ * tablet state exists (SPEC-tablet-kiosk, AuthState "device") it is not enabled here, as when
+ * its profile was read from `app.operators`.
+ */
+function operatorOf(identity: SessionIdentity | null): Operator | null {
+  return identity?.kind === 'operator' ? identity.operator : null;
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function sameOperator(a: Operator, b: Operator): boolean {
@@ -99,7 +109,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     checkedUser.current = null;
     const userId = await service.currentUserId();
     if (!userId) return { status: 'signed-out' };
-    const operator = await service.loadOperator(userId);
+    const operator = operatorOf(await service.loadIdentity());
     if (operator) {
       checkedUser.current = userId;
       return { status: 'signed-in', operator };
@@ -156,7 +166,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     const check = ++lastCheck.current;
     let operator: Operator | null;
     try {
-      operator = await service.loadOperator(userId);
+      operator = operatorOf(await service.loadIdentity());
     } catch {
       return;
     }
@@ -211,7 +221,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       let operator: Operator | null;
       try {
         userId = await service.currentUserId();
-        operator = userId ? await service.loadOperator(userId) : null;
+        operator = userId ? operatorOf(await service.loadIdentity()) : null;
       } catch (error) {
         // The session is saved but its profile was never checked: do not keep it.
         await endSession();
@@ -284,7 +294,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       let operator: Operator | null;
       try {
         userId = await service.currentUserId();
-        operator = userId ? await service.loadOperator(userId) : null;
+        operator = userId ? operatorOf(await service.loadIdentity()) : null;
       } catch (error) {
         // The password is saved and the session kept: "Riprova" loads the profile, as on restore.
         setState(errorState(error));

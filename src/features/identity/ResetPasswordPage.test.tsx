@@ -257,7 +257,7 @@ describe('reset password page', () => {
 
   it('says the service is not configured when the profile read after saving hits a fault', async () => {
     const fake = createFakeAuthService({ recoveryUser: linkUser });
-    fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError('misconfigured'));
+    fake.service.loadIdentity.mockRejectedValueOnce(new ServerFaultError('misconfigured'));
     renderApp(LINK, fake);
     await fill('nuova-password');
     expect(

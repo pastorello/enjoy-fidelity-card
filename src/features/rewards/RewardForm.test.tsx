@@ -390,14 +390,14 @@ describe('Nuovo premio box: write errors', () => {
       rewards,
     );
     await screen.findByRole('list', { name: 'Premi del catalogo' });
-    const checksBefore = auth.service.loadOperator.mock.calls.length;
+    const checksBefore = auth.service.loadIdentity.mock.calls.length;
     rewards.failNext('create', 'forbidden');
     await fill('Spremuta', '80');
     await userEvent.click(box().add);
 
     const alert = await within(box().region).findByRole('alert');
     expect(alert).toHaveTextContent('Solo per gli amministratori');
-    await waitFor(() => expect(auth.service.loadOperator.mock.calls.length).toBe(checksBefore + 1));
+    await waitFor(() => expect(auth.service.loadIdentity.mock.calls.length).toBe(checksBefore + 1));
     expect(rowNames()).not.toContain('Spremuta');
   });
 
@@ -744,14 +744,14 @@ describe('Modifica premio box: write errors', () => {
       rewards,
     );
     await screen.findByRole('list', { name: 'Premi del catalogo' });
-    const checksBefore = auth.service.loadOperator.mock.calls.length;
+    const checksBefore = auth.service.loadIdentity.mock.calls.length;
     await userEvent.click(editButton('Caffè 50 punti'));
     rewards.failNext('update', 'forbidden');
     await userEvent.click(editBox().save);
 
     const alert = await within(editBox().region).findByRole('alert');
     expect(alert).toHaveTextContent('Solo per gli amministratori');
-    await waitFor(() => expect(auth.service.loadOperator.mock.calls.length).toBe(checksBefore + 1));
+    await waitFor(() => expect(auth.service.loadIdentity.mock.calls.length).toBe(checksBefore + 1));
   });
 
   it('a server fault: its own words and "Riprova"', async () => {

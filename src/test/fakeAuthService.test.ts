@@ -1,8 +1,119 @@
-import { describe, expect, it } from 'vitest';
-import { createFakeAuthService, fakeOperator } from './fakeAuthService';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createFakeAuthService, fakeDevice, fakeOperator } from './fakeAuthService';
+import { createFakeKioskService } from './fakeKioskService';
 import type { Operator } from '../features/identity/types';
 
 const linkOperator: Operator = { id: 'op-2', name: 'Marco Prova', role: 'operator' };
+const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+
+describe('createFakeAuthService: session identity', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('an operator account by default, without a PIN until set', async () => {
+    const fake = createFakeAuthService({ userId: 'user-1' });
+    await expect(fake.service.loadIdentity()).resolves.toEqual({
+      kind: 'operator',
+      operator: fakeOperator,
+      hasPin: false,
+    });
+    fake.setHasPin(true);
+    await expect(fake.service.loadIdentity()).resolves.toEqual({
+      kind: 'operator',
+      operator: fakeOperator,
+      hasPin: true,
+    });
+  });
+
+  it('no profile: null, as for a removed account', async () => {
+    const fake = createFakeAuthService({ userId: 'user-1', operator: null });
+    await expect(fake.service.loadIdentity()).resolves.toBeNull();
+    fake.setProfile(linkOperator);
+    fake.removeProfile();
+    await expect(fake.service.loadIdentity()).resolves.toBeNull();
+  });
+
+  it('a device without a cashier', async () => {
+    const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice });
+    await expect(fake.service.loadIdentity()).resolves.toEqual({
+      kind: 'device',
+      device: fakeDevice,
+      cashier: null,
+      turnExpiresAt: null,
+      lockSecondsLeft: 0,
+    });
+  });
+
+  it('a device with a cashier: a 12-hour turn by default, the lock as set', async () => {
+    vi.useFakeTimers({ now: new Date('2026-11-18T10:00:00Z') });
+    const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice });
+    fake.setCashier(linkOperator);
+    fake.setLock(42);
+    await expect(fake.service.loadIdentity()).resolves.toEqual({
+      kind: 'device',
+      device: fakeDevice,
+      cashier: linkOperator,
+      turnExpiresAt: new Date('2026-11-18T22:00:00Z'),
+      lockSecondsLeft: 42,
+    });
+  });
+
+  it('an expired turn has no cashier, whether by the clock or by hand', async () => {
+    vi.useFakeTimers({ now: new Date('2026-11-18T10:00:00Z') });
+    const fake = createFakeAuthService({
+      userId: 'user-1',
+      device: fakeDevice,
+      cashier: linkOperator,
+    });
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({ cashier: linkOperator });
+
+    vi.advanceTimersByTime(TWELVE_HOURS);
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({
+      kind: 'device',
+      cashier: null,
+      turnExpiresAt: null,
+    });
+
+    fake.setCashier(linkOperator);
+    fake.expireTurn();
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({
+      cashier: null,
+      turnExpiresAt: null,
+    });
+  });
+
+  it('a device can follow the fake kiosk, as the server shares one cashier', async () => {
+    const kiosk = createFakeKioskService();
+    const fake = createFakeAuthService({ userId: 'user-1' });
+    fake.setDevice(fakeDevice, () => kiosk.device());
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({ cashier: null });
+
+    const [giulia] = await kiosk.service.listCashiers();
+    if (!giulia) throw new Error('precondition: the fake kiosk has cashiers');
+    const unlocked = await kiosk.service.unlock(giulia.id, '1234');
+    if (unlocked.status !== 'ok') throw new Error('precondition: the unlock succeeds');
+    await expect(fake.service.loadIdentity()).resolves.toEqual({
+      kind: 'device',
+      device: fakeDevice,
+      cashier: unlocked.cashier,
+      turnExpiresAt: unlocked.turnExpiresAt,
+      lockSecondsLeft: 0,
+    });
+
+    kiosk.expireTurn();
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({ cashier: null });
+  });
+
+  it('switching to an operator account leaves the device', async () => {
+    const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice });
+    fake.switchUser('user-2', linkOperator);
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({
+      kind: 'operator',
+      operator: linkOperator,
+    });
+  });
+});
 
 describe('createFakeAuthService: password recovery', () => {
   it('answers "sent" and "ok" by default and counts every call', async () => {
@@ -48,14 +159,14 @@ describe('createFakeAuthService: password recovery', () => {
     });
     const seen: (string | null)[] = [];
     fake.service.onAuthChange((id) => seen.push(id));
-    expect(await fake.service.loadOperator('user-1')).toEqual(fakeOperator);
+    expect(await fake.service.loadIdentity()).toMatchObject({ operator: fakeOperator });
 
     await fake.service.verifyRecovery('hash');
 
     expect(seen).toEqual(['user-2']);
     await expect(fake.service.currentUserId()).resolves.toBe('user-2');
     await expect(fake.service.currentEmail()).resolves.toBe('marco@example.com');
-    await expect(fake.service.loadOperator('user-2')).resolves.toEqual(linkOperator);
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({ operator: linkOperator });
   });
 
   it('a failed verification leaves the session as it was', async () => {

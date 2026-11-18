@@ -18,12 +18,18 @@ const auth = vi.hoisted(() => ({
   signOut: vi.fn<(options: unknown) => Promise<unknown>>(),
 }));
 const db = vi.hoisted(() => ({
-  maybeSingle: vi.fn<() => Promise<unknown>>(),
+  schema: vi.fn<(name: string) => void>(),
+  rpc: vi.fn<(fn: string) => Promise<unknown>>(),
 }));
-vi.mock('../../lib/supabase', () => {
-  const query = { select: () => query, eq: () => query, maybeSingle: db.maybeSingle };
-  return { getSupabase: () => ({ auth, schema: () => ({ from: () => query }) }) };
-});
+vi.mock('../../lib/supabase', () => ({
+  getSupabase: () => ({
+    auth,
+    schema: (name: string) => {
+      db.schema(name);
+      return { rpc: db.rpc };
+    },
+  }),
+}));
 
 describe('signInResultFor', () => {
   it('no error means signed in', () => {
@@ -97,50 +103,169 @@ const answer = (code: string, message: string, status: number) => ({
   status,
 });
 
-describe('loadOperator', () => {
+/** A Data API answer with data. */
+const ok = (data: unknown) => ({ data, error: null, status: 200 });
+
+describe('loadIdentity', () => {
   beforeEach(() => {
-    db.maybeSingle.mockReset();
+    db.schema.mockReset();
+    db.rpc.mockReset();
   });
 
-  it('returns the profile of the user', async () => {
-    db.maybeSingle.mockResolvedValue({
-      data: { id: 'op-1', name: 'Giulia Prova', role: 'admin' },
-      error: null,
-      status: 200,
+  it('asks app.get_session_identity, the only read of who is signed in', async () => {
+    db.rpc.mockResolvedValue(ok(null));
+    await supabaseAuthService.loadIdentity();
+    expect(db.schema).toHaveBeenCalledWith('app');
+    expect(db.rpc).toHaveBeenCalledExactlyOnceWith('get_session_identity');
+  });
+
+  it('an operator account, with whether it has a PIN', async () => {
+    db.rpc.mockResolvedValue(
+      ok({
+        kind: 'operator',
+        operator: { id: 'op-1', name: 'Giulia Prova', role: 'admin', has_pin: true },
+      }),
+    );
+    await expect(supabaseAuthService.loadIdentity()).resolves.toEqual({
+      kind: 'operator',
+      operator: { id: 'op-1', name: 'Giulia Prova', role: 'admin' },
+      hasPin: true,
     });
-    await expect(supabaseAuthService.loadOperator('user-1')).resolves.toEqual({
-      id: 'op-1',
-      name: 'Giulia Prova',
-      role: 'admin',
+  });
+
+  it('a device account without a cashier', async () => {
+    db.rpc.mockResolvedValue(
+      ok({
+        kind: 'device',
+        device: { id: 'dev-1', name: 'Tablet cassa' },
+        cashier: null,
+        turn_expires_at: null,
+        lock_seconds_left: 0,
+      }),
+    );
+    await expect(supabaseAuthService.loadIdentity()).resolves.toEqual({
+      kind: 'device',
+      device: { id: 'dev-1', name: 'Tablet cassa' },
+      cashier: null,
+      turnExpiresAt: null,
+      lockSecondsLeft: 0,
     });
+  });
+
+  it('a device account with its cashier, the end of the turn and the lock as the server says', async () => {
+    db.rpc.mockResolvedValue(
+      ok({
+        kind: 'device',
+        device: { id: 'dev-1', name: 'Tablet cassa' },
+        cashier: { id: 'op-2', name: 'Marco Prova', role: 'operator' },
+        turn_expires_at: '2026-11-18T22:15:30.123456+00:00',
+        lock_seconds_left: 42,
+      }),
+    );
+    await expect(supabaseAuthService.loadIdentity()).resolves.toEqual({
+      kind: 'device',
+      device: { id: 'dev-1', name: 'Tablet cassa' },
+      cashier: { id: 'op-2', name: 'Marco Prova', role: 'operator' },
+      turnExpiresAt: new Date('2026-11-18T22:15:30.123Z'),
+      lockSecondsLeft: 42,
+    });
+  });
+
+  it('nobody: no profile and no device (removed, never linked)', async () => {
+    db.rpc.mockResolvedValue(ok(null));
+    await expect(supabaseAuthService.loadIdentity()).resolves.toBeNull();
+  });
+
+  it.each([
+    ['an unknown kind', { kind: 'kiosk' }],
+    [
+      'an operator without has_pin',
+      { kind: 'operator', operator: { id: 'op-1', name: 'G', role: 'admin' } },
+    ],
+    [
+      'an operator with an unknown role',
+      { kind: 'operator', operator: { id: 'op-1', name: 'G', role: 'owner', has_pin: false } },
+    ],
+    [
+      'a device without its name',
+      {
+        kind: 'device',
+        device: { id: 'dev-1' },
+        cashier: null,
+        turn_expires_at: null,
+        lock_seconds_left: 0,
+      },
+    ],
+    [
+      'a cashier without the end of the turn',
+      {
+        kind: 'device',
+        device: { id: 'dev-1', name: 'T' },
+        cashier: { id: 'op-2', name: 'M', role: 'operator' },
+        turn_expires_at: null,
+        lock_seconds_left: 0,
+      },
+    ],
+    [
+      'an end of the turn that is not a timestamp',
+      {
+        kind: 'device',
+        device: { id: 'dev-1', name: 'T' },
+        cashier: { id: 'op-2', name: 'M', role: 'operator' },
+        turn_expires_at: 'domani',
+        lock_seconds_left: 0,
+      },
+    ],
+    [
+      'a lock that is not a whole number of seconds',
+      {
+        kind: 'device',
+        device: { id: 'dev-1', name: 'T' },
+        cashier: null,
+        turn_expires_at: null,
+        lock_seconds_left: 1.5,
+      },
+    ],
+    [
+      'a negative lock',
+      {
+        kind: 'device',
+        device: { id: 'dev-1', name: 'T' },
+        cashier: null,
+        turn_expires_at: null,
+        lock_seconds_left: -1,
+      },
+    ],
+    ['a list', []],
+  ])('an unexpected answer (%s) rejects, never guessed', async (_label, data) => {
+    db.rpc.mockResolvedValue(ok(data));
+    const error: unknown = await supabaseAuthService.loadIdentity().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(ServerFaultError);
   });
 
   it.each([
     ['PGRST106', 'Invalid schema: app', 406, 'misconfigured'],
     ['42501', 'permission denied for schema app', 403, 'misconfigured'],
-    ['42501', 'permission denied for table operators', 403, 'misconfigured'],
+    ['42501', 'permission denied for function get_session_identity', 403, 'misconfigured'],
     [
-      'PGRST205',
-      "Could not find the table 'app.operators' in the schema cache",
+      'PGRST202',
+      'Could not find the function app.get_session_identity without parameters in the schema cache',
       404,
       'misconfigured',
     ],
     ['XX000', 'internal error', 500, 'misconfigured'],
     ['PGRST002', 'Could not query the database for the schema cache', 503, 'unavailable'],
   ] as const)('a server fault (%s, HTTP %i) says which', async (code, message, status, kind) => {
-    db.maybeSingle.mockResolvedValue(answer(code, message, status));
-    const error: unknown = await supabaseAuthService
-      .loadOperator('user-1')
-      .catch((e: unknown) => e);
+    db.rpc.mockResolvedValue(answer(code, message, status));
+    const error: unknown = await supabaseAuthService.loadIdentity().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ServerFaultError);
     expect(error).toHaveProperty('kind', kind);
   });
 
   it('a failed fetch is a plain error (network)', async () => {
-    db.maybeSingle.mockResolvedValue(answer('', 'TypeError: Failed to fetch', 0));
-    const error: unknown = await supabaseAuthService
-      .loadOperator('user-1')
-      .catch((e: unknown) => e);
+    db.rpc.mockResolvedValue(answer('', 'TypeError: Failed to fetch', 0));
+    const error: unknown = await supabaseAuthService.loadIdentity().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     expect(error).not.toBeInstanceOf(ServerFaultError);
   });
