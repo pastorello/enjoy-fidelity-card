@@ -505,7 +505,7 @@ describe('HomePage: SERVITI OGGI', () => {
 
   it('ignores an older answer that arrives after a newer one', async () => {
     const customers = servedFake();
-    const [antonio] = customers.customers();
+    const [antonio, lucia] = customers.customers();
     const first = customers.holdNext('servedToday');
     await renderHome('/', customers);
 
@@ -514,11 +514,16 @@ describe('HomePage: SERVITI OGGI', () => {
     const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
     expect(within(section).getAllByRole('link')).toHaveLength(1);
 
+    // The fake computes a held answer when it is released: make the old answer differ from the
+    // new one, so showing it would add Lucia's row.
+    customers.setServedToday([antonio?.id ?? '', lucia?.id ?? '']);
     await act(async () => {
       first.release();
       await Promise.resolve();
     });
+    expect(servedCalls(customers)).toHaveLength(2);
     expect(within(section).getAllByRole('link')).toHaveLength(1);
+    expect(within(section).queryByRole('link', { name: /Lucia De Meo/ })).not.toBeInTheDocument();
   });
 
   it('is hidden while a search is shown, and back when the search is cleared', async () => {
