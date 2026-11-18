@@ -138,7 +138,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint C: Impeccable pulito; confronto a 390×844 con Cerca cliente, Card sconosciuta, Nuovo cliente senza card, Associa card, Card già associata, Modifica cliente, Scheda cliente
 
 ### Fase 5: Scrittura del link
-- [ ] Task 15: `CardLinkWriter`: emissione, scrittura, conferma, esiti principali, «Salta, lo scrivo più tardi»
+- [x] Task 15: `CardLinkWriter`: emissione, scrittura, conferma, esiti principali, «Salta, lo scrivo più tardi»
 - [ ] Task 16: `CardLinkWriter`: rete su conferma con lo stesso token, card scambiata, card illeggibile, card non attiva
 - [ ] Task 17: Scrittura in Associa card (tavole Associa-link e Associa-link-errore) ed E2E
 - [ ] Task 18: Scrittura dopo il salvataggio in Nuovo cliente (con e senza `?card`) ed E2E

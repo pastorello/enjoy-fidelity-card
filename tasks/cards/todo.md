@@ -256,10 +256,10 @@ il `signal`; esito riuscito; esiti `timeout`/`io` (tavola Associa-link-errore), 
 `not-allowed`, `cannot-write`, rete su `issue` con «Scrivi di nuovo il link» (token nuovo) e «Più tardi»;
 `canWrite` falso → niente pulsante e testo del dispositivo. Il token solo in una variabile del componente.
 **Accettazione:**
-- [ ] Componente con scrittore finto: passi e testi; riuscita → `confirmLink` una volta con lo stesso token
-- [ ] Componente: ogni esito non riuscito con i suoi testi; «Scrivi di nuovo il link» → nuova `issueLink`;
+- [x] Componente con scrittore finto: passi e testi; riuscita → `confirmLink` una volta con lo stesso token
+- [x] Componente: ogni esito non riuscito con i suoi testi; «Scrivi di nuovo il link» → nuova `issueLink`;
       «Salta» interrompe la scrittura
-- [ ] Componente: il token non compare nel DOM in nessun passo (criterio 10)
+- [x] Componente: il token non compare nel DOM in nessun passo (criterio 10)
 **Verifica:** `npm test -- CardLinkWriter`
 **Dipendenze:** 8, 6 · **File:** src/features/cards/CardLinkWriter.tsx (+ .module.css, .test.tsx),
 src/features/cards/useCardLinkWriter.ts · **Dimensione:** M
