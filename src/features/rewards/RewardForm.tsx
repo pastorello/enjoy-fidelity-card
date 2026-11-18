@@ -1,13 +1,22 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
+import { ServerFaultError } from '../../lib/serverFault';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { TextField } from '../../shared/ui/TextField';
+import { useAuth } from '../identity/AuthProvider';
 import styles from './RewardForm.module.css';
 import { useRewardsService } from './RewardsServiceProvider';
-import type { Reward } from './types';
+import type { Reward, RewardWriteResult } from './types';
 import { validateReward, type RewardFormErrors, type RewardFormValues } from './validateReward';
+import { writeErrorText } from './writeErrorText';
 
 const EMPTY: RewardFormValues = { name: '', points: '' };
+
+/**
+ * What went wrong outside the fields. `uncertain`: no answer (network, server fault), so the
+ * reward may be saved already; the button says "Riprova" and resends the same id.
+ */
+type Failure = { text: string; uncertain: boolean; network: boolean };
 
 /**
  * The "Nuovo premio" box fixed at the bottom of the catalogue (wireframe "Catalogo premi";
@@ -16,16 +25,29 @@ const EMPTY: RewardFormValues = { name: '', points: '' };
  * go under the fields and the focus to the first wrong one. The id of the new reward is made
  * when the box opens and changes only after a successful save, so a resend creates nothing twice.
  * On success the saved row goes to `onAdded`, the fields empty and "Premio aggiunto" is announced.
+ * The button is busy until the answer (a double tap sends once). A failure (§4) keeps the fields:
+ * a name already used goes under the name; no answer says so and offers "Riprova" with the same
+ * id, and if the first request had arrived the server's row is listed, not the form's values;
+ * `not-found`/`unknown` ask the list again; `invalid`, unexpected after the app's check, is told as
+ * unknown; `forbidden` is reported to AuthProvider.
  */
 export function RewardForm({
   disabled,
   onAdded,
+  onReload,
 }: {
   /** While the catalogue loads. */
   disabled: boolean;
   onAdded: (reward: Reward) => void;
+  /** Asks the list again after a refusal that means it is not what the server has. */
+  onReload: () => void;
 }) {
   const service = useRewardsService();
+  const { reportNotEnabled } = useAuth();
+  const [busy, setBusy] = useState(false);
+  // Set synchronously, so a second tap in the same frame is ignored before `busy` renders.
+  const sending = useRef(false);
+  const [failure, setFailure] = useState<Failure>();
   const [id, setId] = useState(() => crypto.randomUUID());
   const [values, setValues] = useState<RewardFormValues>(EMPTY);
   const [active, setActive] = useState(true);
@@ -42,6 +64,7 @@ export function RewardForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (sending.current) return;
     setAdded(false);
     const checked = validateReward(values);
     if (!checked.ok) {
@@ -50,15 +73,35 @@ export function RewardForm({
       return;
     }
     setErrors({});
-    let result;
+    setFailure(undefined);
+    sending.current = true;
+    setBusy(true);
+    let result: RewardWriteResult | { ok: false; error: unknown };
     try {
       result = await service.create({ id, ...checked.reward, active });
-    } catch {
-      // Write failures are told by the next task of the plan (tasks/rewards/todo.md, task 11):
-      // until then the fields stay as typed and the same id is resent.
+    } catch (error) {
+      result = { ok: false, error };
+    }
+    sending.current = false;
+    setBusy(false);
+
+    if (!result.ok) {
+      // The id stays: nothing was created, or a resend returns what was.
+      const { error } = result;
+      if (error === 'name-taken') {
+        setErrors({ name: writeErrorText(error) });
+        nameRef.current?.focus();
+        return;
+      }
+      const uncertain = error === 'network' || error instanceof ServerFaultError;
+      setFailure({ text: writeErrorText(error), uncertain, network: error === 'network' });
+      // The role may have changed or the profile gone: AuthProvider checks again.
+      if (error === 'forbidden') void reportNotEnabled();
+      // This list is not what the server has.
+      else if (error === 'not-found' || error === 'unknown') onReload();
       return;
     }
-    if (!result.ok) return;
+    // A resent id returns the row saved by the first request, whatever the form says now.
     onAdded(result.reward);
     setValues(EMPTY);
     setActive(true);
@@ -105,8 +148,14 @@ export function RewardForm({
               Attivo
             </label>
           </div>
-          <Button type="submit" block>
-            Aggiungi premio
+          {failure && (
+            <p role="alert" className={styles.failure}>
+              <Icon name={failure.network ? 'wifi-off' : 'circle-alert'} size={20} />
+              {failure.text}
+            </p>
+          )}
+          <Button type="submit" block busy={busy}>
+            {failure?.uncertain ? 'Riprova' : 'Aggiungi premio'}
           </Button>
         </fieldset>
       </form>

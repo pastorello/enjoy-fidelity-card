@@ -95,7 +95,9 @@ function Catalog() {
       title={TITLE}
       backTo={BACK_TO}
       headingRef={heading}
-      actions={<RewardForm disabled={load.status === 'loading'} onAdded={added} />}
+      actions={
+        <RewardForm disabled={load.status === 'loading'} onAdded={added} onReload={load.reload} />
+      }
       actionsTone="raised"
     >
       {content}
