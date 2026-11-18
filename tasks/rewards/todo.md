@@ -124,9 +124,9 @@ src/features/identity/SettingsPage.tsx, src/features/identity/SettingsPage.test.
 amministratori." e `ButtonLink` secondario "Torna alle impostazioni"; nessuna chiamata al servizio e nessun
 riquadro Nuovo premio.
 **Accettazione:**
-- [ ] Componenti (`renderApp`): operatore sull'URL diretto → messaggio, link alle Impostazioni, **zero**
+- [x] Componenti (`renderApp`): operatore sull'URL diretto → messaggio, link alle Impostazioni, **zero**
       chiamate al finto; admin → titolo e Indietro
-- [ ] `displayGlyphs.test.ts` verde
+- [x] `displayGlyphs.test.ts` verde
 **Verifica:** `npm test`
 **Dipendenze:** 6 · **File:** src/features/rewards/RewardsCatalogPage.tsx (+ .test.tsx), src/app/routes.tsx,
 src/shared/ui/Icon.tsx · **Dimensione:** S
