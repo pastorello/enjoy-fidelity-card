@@ -115,7 +115,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 3: Servizio
 - [x] Task 7: `supabaseExportService` e guardia del confine
 - [x] Task 8: Integrazione contro lo stack locale: operatore rifiutato, admin legge, anonimizzato senza nome nella risposta
-- [ ] Task 9: `fakeExportService`, `ExportServiceProvider`, `main.tsx` e `renderApp`
+- [x] Task 9: `fakeExportService`, `ExportServiceProvider`, `main.tsx` e `renderApp`
 - [ ] Task 10: `useExport` e `downloadFile`: percorso completo, niente doppio avvio, nessun file parziale
 
 ### Checkpoint C: quality bar completa verde; revisione con l'utente prima della UI

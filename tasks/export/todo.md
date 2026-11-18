@@ -149,8 +149,10 @@ rete giù alla prima o alla seconda pagina, registro delle chiamate); `ExportSer
 `useExportService()` e la funzione di download (default `downloadFile`); `main.tsx` monta il servizio vero;
 `renderApp` riceve il finto come nuovo parametro facoltativo in coda.
 **Accettazione:**
-- [ ] Unità del finto: operatore → forbidden; rete giù su una pagina → rifiuta; registro delle chiamate
-- [ ] Senza provider `useExportService()` lancia un errore chiaro; test esistenti di `renderApp` invariati
+- [x] Unità del finto: operatore → forbidden; rete giù su una pagina → rifiuta; registro delle chiamate
+- [x] Senza provider `useExportService()` lancia un errore chiaro; test esistenti di `renderApp` invariati
+- Nota: `downloadFile.ts` (+ `.test.ts`) è stato anticipato qui, perché è il valore predefinito del provider;
+  i suoi test coprono già tipo del `Blob`, attributo `download` e revoca dopo il clic.
 **Verifica:** `npm test`
 **Dipendenze:** 7 · **File:** src/test/fakeExportService.ts (+ .test.ts),
 src/features/export/ExportServiceProvider.tsx, src/main.tsx, src/test/renderApp.tsx · **Dimensione:** M
