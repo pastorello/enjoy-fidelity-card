@@ -224,8 +224,8 @@ riprova lo stesso nome in maiuscolo e vede "Esiste già un premio con questo nom
 "Catalogo premi"; l'URL diretto mostra "Solo per gli amministratori". Target ≥ 48 px, caselle comprese. I
 premi del seed non si modificano.
 **Accettazione:**
-- [ ] E2E verde a 390×844 contro Supabase locale, anche ripetuto senza `db:reset`
-- [ ] Nessuna chiamata a `*.supabase.co` (fixture `onlyLocalSupabase`)
+- [x] E2E verde a 390×844 contro Supabase locale, anche ripetuto senza `db:reset`
+- [x] Nessuna chiamata a `*.supabase.co` (fixture `onlyLocalSupabase`)
 **Verifica:** `npm run db:start && scripts/reload-auth-templates.sh && npm run e2e`
 **Dipendenze:** 12 · **File:** e2e/rewards.spec.ts · **Dimensione:** S
 

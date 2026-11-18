@@ -94,7 +94,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint D: tutti gli stati con test di componente; Impeccable pulito; confronto con il wireframe a 390×844
 
 ### Fase 5: E2E e chiusura
-- [ ] Task 13: `e2e/rewards.spec.ts` (admin e operatore, Supabase locale)
+- [x] Task 13: `e2e/rewards.spec.ts` (admin e operatore, Supabase locale)
 - [ ] Task 14: Documentazione, memoria di progetto e verifica dei criteri di successo
 
 ### Checkpoint E: i 9 criteri di successo verificati; quality bar completa verde; PR pronta per `code-review-and-quality`
