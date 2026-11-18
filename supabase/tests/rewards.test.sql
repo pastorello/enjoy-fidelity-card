@@ -2,15 +2,17 @@
 -- (SPEC-rewards.md, "Modello dati e regole di accesso"). Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(57);
+select plan(110);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
   ('00000000-0000-4000-d000-000000000001', 'rewards.admin@example.com'),
   ('00000000-0000-4000-d000-000000000002', 'rewards.operator@example.com'),
-  ('00000000-0000-4000-d000-000000000003', 'rewards.nobody@example.com');
+  ('00000000-0000-4000-d000-000000000003', 'rewards.nobody@example.com'),
+  ('00000000-0000-4000-d000-000000000004', 'rewards.admin2@example.com');
 select private.add_operator('rewards.admin@example.com', 'Admin Premi', 'admin');
 select private.add_operator('rewards.operator@example.com', 'Operatore Premi', 'operator');
+select private.add_operator('rewards.admin2@example.com', 'Admin Premi Due', 'admin');
 
 -- Returns the constraint name of the error a statement raises, or null when it
 -- raises none. Lives only inside this rolled-back transaction.
@@ -29,6 +31,27 @@ exception when others then
 end;
 $$;
 grant execute on function public.rewards_test_error_constraint(text) to authenticated;
+
+-- Row counts of every table in app except rewards, to prove the rewards RPCs
+-- write nothing else (success criterion 3).
+create function public.rewards_test_other_row_counts()
+returns jsonb
+language plpgsql
+as $$
+declare
+  v_counts jsonb := '{}';
+  v_table name;
+  v_count bigint;
+begin
+  for v_table in
+    select tablename from pg_tables where schemaname = 'app' and tablename <> 'rewards' order by 1
+  loop
+    execute format('select count(*) from app.%I', v_table) into v_count;
+    v_counts := v_counts || jsonb_build_object(v_table, v_count);
+  end loop;
+  return v_counts;
+end;
+$$;
 
 -- Structure and privileges ------------------------------------------------------------
 select has_table('app', 'rewards', 'app.rewards exists');
@@ -83,6 +106,71 @@ select is(
   E'\n  select private.current_operator_id();\n',
   'acting_operator_id keeps the common body'
 );
+select ok(
+  has_function_privilege('authenticated', 'app.update_reward(uuid, text, int)', 'execute'),
+  'authenticated can execute update_reward'
+);
+select ok(
+  not has_function_privilege('anon', 'app.update_reward(uuid, text, int)', 'execute'),
+  'anon cannot execute update_reward'
+);
+select ok(
+  (select prosecdef from pg_proc where oid = 'app.update_reward(uuid, text, int)'::regprocedure),
+  'update_reward is security definer'
+);
+select is(
+  (select proconfig from pg_proc where oid = 'app.update_reward(uuid, text, int)'::regprocedure),
+  array['search_path=""'],
+  'update_reward pins an empty search_path'
+);
+select ok(
+  has_function_privilege('authenticated', 'app.set_reward_active(uuid, boolean)', 'execute'),
+  'authenticated can execute set_reward_active'
+);
+select ok(
+  not has_function_privilege('anon', 'app.set_reward_active(uuid, boolean)', 'execute'),
+  'anon cannot execute set_reward_active'
+);
+select ok(
+  (select prosecdef from pg_proc where oid = 'app.set_reward_active(uuid, boolean)'::regprocedure),
+  'set_reward_active is security definer'
+);
+select is(
+  (select proconfig from pg_proc where oid = 'app.set_reward_active(uuid, boolean)'::regprocedure),
+  array['search_path=""'],
+  'set_reward_active pins an empty search_path'
+);
+
+-- Rewards are never deleted (success criterion 3) ------------------------------------------
+select triggers_are('app', 'rewards', array[]::name[], 'app.rewards has no triggers');
+select is(
+  array(
+    select p.oid::regprocedure::text
+    from pg_proc p
+    where p.pronamespace in ('app'::regnamespace, 'private'::regnamespace)
+      and p.prosrc ~* '(delete\s+from|truncate(\s+table)?)\s+(only\s+)?app\.rewards\M'
+    order by 1
+  ),
+  array[]::text[],
+  'no function in app or private deletes from app.rewards'
+);
+select is(
+  array(
+    select r.rolname::text
+    from pg_roles r
+    where r.rolname in ('anon', 'authenticated', 'service_role')
+      and (has_table_privilege(r.oid, 'app.rewards', 'delete')
+        or has_table_privilege(r.oid, 'app.rewards', 'truncate'))
+    order by 1
+  ),
+  array[]::text[],
+  'no API role (anon, authenticated, service_role) can delete or truncate app.rewards'
+);
+select is(
+  (select count(*) from pg_roles where rolname in ('anon', 'authenticated', 'service_role')),
+  3::bigint,
+  'the three API roles exist, so the check above is not vacuous'
+);
 
 -- A reward to read, written as the table owner.
 insert into app.rewards (id, name, points, created_by, updated_by)
@@ -98,6 +186,18 @@ select throws_ok(
   null,
   'anon cannot call create_reward'
 );
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000001', 'Anon', 10)$$,
+  '42501',
+  null,
+  'anon cannot call update_reward'
+);
+select throws_ok(
+  $$select app.set_reward_active('00000000-0000-4000-d100-000000000001', false)$$,
+  '42501',
+  null,
+  'anon cannot call set_reward_active'
+);
 reset role;
 
 -- Signed-in operator ----------------------------------------------------------------------
@@ -105,7 +205,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000002","role":"authenticated"}', true);
 
 select results_eq(
-  $$select name, points, active from app.rewards$$,
+  $$select name, points, active from app.rewards where id::text like '00000000-0000-4000-d100-%'$$,
   $$values ('Caffè Premi'::text, 50, true)$$,
   'an active operator reads the rewards'
 );
@@ -120,6 +220,30 @@ select throws_ok(
   '42501',
   null,
   'an operator resending an existing id still gets 42501'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000001', 'Caffè Operatore', 40)$$,
+  '42501',
+  null,
+  'an operator cannot call update_reward'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-0000000000ff', 'Inesistente', 40)$$,
+  '42501',
+  null,
+  'an operator gets 42501 from update_reward even for a missing id'
+);
+select throws_ok(
+  $$select app.set_reward_active('00000000-0000-4000-d100-000000000001', false)$$,
+  '42501',
+  null,
+  'an operator cannot call set_reward_active'
+);
+select throws_ok(
+  $$select app.set_reward_active('00000000-0000-4000-d100-0000000000ff', false)$$,
+  '42501',
+  null,
+  'an operator gets 42501 from set_reward_active even for a missing id'
 );
 select throws_ok(
   $$insert into app.rewards (id, name, points, created_by, updated_by)
@@ -146,11 +270,29 @@ select throws_ok(
   null,
   'a user without a profile resending an existing id still gets 42501'
 );
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000001', 'Caffè Nessuno', 40)$$,
+  '42501',
+  null,
+  'a user without a profile cannot call update_reward'
+);
+select throws_ok(
+  $$select app.set_reward_active('00000000-0000-4000-d100-000000000001', false)$$,
+  '42501',
+  null,
+  'a user without a profile cannot call set_reward_active'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-0000000000ff', 'Inesistente', 40)$$,
+  '42501',
+  null,
+  'a user without a profile gets 42501 from update_reward even for a missing id'
+);
 
 -- Signed-in admin: direct writes ----------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000001","role":"authenticated"}', true);
 select results_eq(
-  $$select name from app.rewards$$,
+  $$select name from app.rewards where id::text like '00000000-0000-4000-d100-%'$$,
   $$values ('Caffè Premi'::text)$$,
   'an admin reads the rewards'
 );
@@ -166,9 +308,13 @@ select throws_ok($$delete from app.rewards$$, '42501', null, 'an admin cannot de
 select throws_ok($$truncate app.rewards$$, '42501', null, 'an admin cannot truncate');
 
 reset role;
-select is((select count(*) from app.rewards), 1::bigint, 'refused calls add no reward');
+select is(
+  (select count(*) from app.rewards where id::text like '00000000-0000-4000-d100-%'),
+  1::bigint,
+  'refused calls add no reward'
+);
 select results_eq(
-  $$select name, points, active from app.rewards$$,
+  $$select name, points, active from app.rewards where id::text like '00000000-0000-4000-d100-%'$$,
   $$values ('Caffè Premi'::text, 50, true)$$,
   'refused calls leave the reward unchanged'
 );
@@ -302,6 +448,165 @@ select ok(
   'created_at and updated_at are set at creation'
 );
 
+-- update_reward and set_reward_active -------------------------------------------------------
+-- Snapshot of the other tables, and timestamps moved to the past so a change is visible.
+create temp table rewards_test_counts_before as
+  select public.rewards_test_other_row_counts() as counts;
+select ok(
+  (select counts ? 'operators' and counts ? 'customers' from rewards_test_counts_before),
+  'the row count snapshot covers the other tables of app'
+);
+update app.rewards
+set updated_at = now() - interval '1 day'
+where id in ('00000000-0000-4000-d100-000000000010', '00000000-0000-4000-d100-000000000011');
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000004","role":"authenticated"}', true);
+
+select results_eq(
+  $$select id, name, points, active
+    from app.update_reward('00000000-0000-4000-d100-000000000010', ' Spremuta grande ', 90)$$,
+  $$values ('00000000-0000-4000-d100-000000000010'::uuid, 'Spremuta grande'::text, 90, true)$$,
+  'an admin renames a reward and changes its points, the name saved without outer spaces'
+);
+select results_eq(
+  $$select name, points, active
+    from app.update_reward('00000000-0000-4000-d100-000000000011', 'Dolce Premi', 130)$$,
+  $$values ('Dolce Premi'::text, 130, false)$$,
+  'update_reward does not change active'
+);
+select results_eq(
+  $$select name from app.update_reward('00000000-0000-4000-d100-000000000010', 'SPREMUTA GRANDE', 90)$$,
+  $$values ('SPREMUTA GRANDE'::text)$$,
+  'a reward can be renamed to its own name in a different case'
+);
+
+-- Refused updates
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', 'caffè premi', 90)$$,
+  '23505', null, 'renaming to a name already used, in different case, is refused'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', '  Dolce Premi  ', 90)$$,
+  '23505', null, 'renaming to a name already used, with outer spaces, is refused'
+);
+select is(
+  public.rewards_test_error_constraint(
+    $$select app.update_reward('00000000-0000-4000-d100-000000000010', 'Caffè Premi', 90)$$
+  ),
+  'rewards_name_key',
+  'a rename to a used name reports the rewards_name_key constraint'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', 'Spremuta', 0)$$,
+  '23514', null, 'update_reward refuses 0 points'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', 'Spremuta', -1)$$,
+  '23514', null, 'update_reward refuses negative points'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', 'Spremuta', 100000)$$,
+  '23514', null, 'update_reward refuses 100 000 points'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', 'Spremuta', null)$$,
+  '23514', null, 'update_reward refuses null points'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', '', 90)$$,
+  '23514', null, 'update_reward refuses an empty name'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', '   ', 90)$$,
+  '23514', null, 'update_reward refuses a name of only spaces'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', repeat('c', 61), 90)$$,
+  '23514', null, 'update_reward refuses a name of 61 characters'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', null, 90)$$,
+  '23514', null, 'update_reward refuses a null name'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-0000000000ff', 'Inesistente', 90)$$,
+  'P0002', null, 'update_reward on a missing id raises P0002'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-0000000000ff', '', 0)$$,
+  'P0002', null, 'update_reward checks the id before the values'
+);
+select throws_ok(
+  $$select app.update_reward(null, 'Senza id', 90)$$,
+  'P0002', null, 'update_reward with a null id raises P0002'
+);
+select results_eq(
+  $$select name, points, active from app.rewards where id = '00000000-0000-4000-d100-000000000010'$$,
+  $$values ('SPREMUTA GRANDE'::text, 90, true)$$,
+  'refused updates leave the reward unchanged'
+);
+
+-- set_reward_active
+select results_eq(
+  $$select id, name, points, active
+    from app.set_reward_active('00000000-0000-4000-d100-000000000010', false)$$,
+  $$values ('00000000-0000-4000-d100-000000000010'::uuid, 'SPREMUTA GRANDE'::text, 90, false)$$,
+  'an admin deactivates a reward, name and points unchanged'
+);
+select results_eq(
+  $$select active from app.set_reward_active('00000000-0000-4000-d100-000000000010', false)$$,
+  $$values (false)$$,
+  'deactivating an inactive reward is harmless'
+);
+select results_eq(
+  $$select active from app.set_reward_active('00000000-0000-4000-d100-000000000010', true)$$,
+  $$values (true)$$,
+  'an admin reactivates a reward'
+);
+select results_eq(
+  $$select active from app.set_reward_active('00000000-0000-4000-d100-000000000011', true)$$,
+  $$values (true)$$,
+  'an admin activates a reward created inactive'
+);
+select throws_ok(
+  $$select app.set_reward_active('00000000-0000-4000-d100-000000000010', null)$$,
+  '23514', null, 'set_reward_active refuses a null flag'
+);
+select throws_ok(
+  $$select app.set_reward_active('00000000-0000-4000-d100-0000000000ff', false)$$,
+  'P0002', null, 'set_reward_active on a missing id raises P0002'
+);
+select throws_ok(
+  $$select app.set_reward_active('00000000-0000-4000-d100-0000000000ff', null)$$,
+  'P0002', null, 'set_reward_active checks the id before the values'
+);
+reset role;
+
+select results_eq(
+  $$select r.id, r.updated_by, r.created_by
+    from app.rewards r
+    where r.id in ('00000000-0000-4000-d100-000000000010', '00000000-0000-4000-d100-000000000011')
+    order by r.id$$,
+  $$select v.id, due.id, premi.id
+    from (values ('00000000-0000-4000-d100-000000000010'::uuid), ('00000000-0000-4000-d100-000000000011'::uuid)) as v (id)
+    cross join (select id from app.operators where name = 'Admin Premi Due') as due
+    cross join (select id from app.operators where name = 'Admin Premi') as premi
+    order by v.id$$,
+  'updated_by is the acting operator, created_by is unchanged'
+);
+select ok(
+  (select bool_and(updated_at = now())
+   from app.rewards
+   where id in ('00000000-0000-4000-d100-000000000010', '00000000-0000-4000-d100-000000000011')),
+  'updated_at is set to now() by update_reward and set_reward_active'
+);
+select is(
+  public.rewards_test_other_row_counts(),
+  (select counts from rewards_test_counts_before),
+  'the rewards RPCs change no other table in app'
+);
+
 -- A missing author is refused: pretend acting_operator_id() returns null
 -- (tablet-kiosk redefines it; a reward never exists without an author).
 create or replace function private.acting_operator_id()
@@ -321,11 +626,28 @@ select throws_ok(
   null,
   'an admin without an acting operator gets 42501'
 );
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000010', 'Senza autore', 10)$$,
+  '42501',
+  null,
+  'update_reward without an acting operator gets 42501'
+);
+select throws_ok(
+  $$select app.set_reward_active('00000000-0000-4000-d100-000000000010', false)$$,
+  '42501',
+  null,
+  'set_reward_active without an acting operator gets 42501'
+);
 reset role;
 select is(
   (select count(*) from app.rewards where id = '00000000-0000-4000-d100-000000000040'),
   0::bigint,
   'no reward is created without an author'
+);
+select results_eq(
+  $$select name, active from app.rewards where id = '00000000-0000-4000-d100-000000000010'$$,
+  $$values ('SPREMUTA GRANDE'::text, true)$$,
+  'nothing changes without an author'
 );
 
 select * from finish();

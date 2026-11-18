@@ -103,3 +103,93 @@ $$;
 -- Explicit grants: never rely on the default privileges.
 revoke execute on function app.create_reward(uuid, text, int, boolean) from public, anon;
 grant execute on function app.create_reward(uuid, text, int, boolean) to authenticated;
+
+-- update_reward ----------------------------------------------------------------------------
+-- Changes name and points, never active. Resending it is safe by itself (same values).
+-- Checks run in this order: role, existence (P0002), values.
+create function app.update_reward(p_id uuid, p_name text, p_points int)
+returns app.rewards
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_author uuid;
+  v_name text := btrim(p_name);
+  v_row app.rewards;
+begin
+  if not private.is_admin() then
+    raise exception 'Only an admin can change the rewards' using errcode = '42501';
+  end if;
+  v_author := private.acting_operator_id();
+  if v_author is null then
+    raise exception 'No acting operator for this write' using errcode = '42501';
+  end if;
+
+  perform 1 from app.rewards where id = p_id for update;
+  if not found then
+    raise exception 'Reward % not found', p_id using errcode = 'P0002';
+  end if;
+
+  if v_name is null or length(v_name) not between 1 and 60 then
+    raise exception 'name must be 1 to 60 characters' using errcode = '23514';
+  end if;
+  if p_points is null or p_points not between 1 and 99999 then
+    raise exception 'points must be between 1 and 99999, got %', p_points using errcode = '23514';
+  end if;
+
+  -- A taken name raises 23505 on rewards_name_key.
+  update app.rewards
+  set name = v_name, points = p_points, updated_at = now(), updated_by = v_author
+  where id = p_id
+  returning * into strict v_row;
+  return v_row;
+end;
+$$;
+
+revoke execute on function app.update_reward(uuid, text, int) from public, anon;
+grant execute on function app.update_reward(uuid, text, int) to authenticated;
+
+-- set_reward_active ------------------------------------------------------------------------
+-- Shows or hides a reward at the till and to the customer. Same order of checks.
+create function app.set_reward_active(p_id uuid, p_active boolean)
+returns app.rewards
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_author uuid;
+  v_row app.rewards;
+begin
+  if not private.is_admin() then
+    raise exception 'Only an admin can change the rewards' using errcode = '42501';
+  end if;
+  v_author := private.acting_operator_id();
+  if v_author is null then
+    raise exception 'No acting operator for this write' using errcode = '42501';
+  end if;
+
+  perform 1 from app.rewards where id = p_id for update;
+  if not found then
+    raise exception 'Reward % not found', p_id using errcode = 'P0002';
+  end if;
+
+  if p_active is null then
+    raise exception 'active is required' using errcode = '23514';
+  end if;
+
+  update app.rewards
+  set active = p_active, updated_at = now(), updated_by = v_author
+  where id = p_id
+  returning * into strict v_row;
+  return v_row;
+end;
+$$;
+
+revoke execute on function app.set_reward_active(uuid, boolean) from public, anon;
+grant execute on function app.set_reward_active(uuid, boolean) to authenticated;
+
+-- No API role can delete rewards: service_role gets every table privilege by
+-- default (init migration), so delete and truncate are taken back here too.
+revoke delete, truncate on app.rewards from service_role;

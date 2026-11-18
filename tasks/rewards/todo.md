@@ -36,13 +36,13 @@ riga. Nessuna funzione di cancellazione e nessun trigger su `app.rewards`. Seed 
 (Caffè 50, Cornetto e cappuccino 100, Colazione per due 180, Aperitivo 200 attivi; Dolce del giorno 120
 inattivo) creati dall'"Admin Prova" del seed.
 **Accettazione:**
-- [ ] pgTAP: operatore e utente senza profilo → `42501`; id inesistente → `P0002`; rinomina su un nome già
+- [x] pgTAP: operatore e utente senza profilo → `42501`; id inesistente → `P0002`; rinomina su un nome già
       usato (maiuscole o spazi diversi) → `23505`; valori fuori limite → `23514`; `update_reward` non cambia
       `active`; `updated_by` = chi agisce e `updated_at` aggiornato
-- [ ] pgTAP (criterio 3): nessun trigger su `app.rewards` (`triggers_are`); dopo le tre RPC il numero di righe
+- [x] pgTAP (criterio 3): nessun trigger su `app.rewards` (`triggers_are`); dopo le tre RPC il numero di righe
       delle altre tabelle di `app` non cambia; nessuna funzione in `app` o `private` cancella da
       `app.rewards`; nessun ruolo API ha `delete`
-- [ ] `npm run db:reset` carica il seed senza errori; nessun dato reale
+- [x] `npm run db:reset` carica il seed senza errori; nessun dato reale
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1 · **File:** supabase/migrations/*_rewards.sql, supabase/tests/rewards.test.sql,
 supabase/seed.sql · **Dimensione:** M

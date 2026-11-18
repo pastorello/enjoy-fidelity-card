@@ -67,7 +67,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Database (rischio più alto)
 - [x] Task 1: Tabella `rewards`, RLS, privilegi e `create_reward` idempotente; pgTAP
-- [ ] Task 2: `update_reward` e `set_reward_active`; nessuna cancellazione né trigger; seed; pgTAP
+- [x] Task 2: `update_reward` e `set_reward_active`; nessuna cancellazione né trigger; seed; pgTAP
 
 ### Checkpoint A: db:test verde; revisione di sicurezza su RLS, privilegi e RPC
 
