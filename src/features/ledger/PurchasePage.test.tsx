@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
+import { fakeOperator } from '../../test/fakeAuthService';
 import { createFakeCardsService } from '../../test/fakeCardsService';
 import { createTestCardReader } from '../../test/fakeCardReader';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
@@ -487,5 +488,132 @@ describe('PurchasePage: Spesa registrata', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Apri la scheda di Maria' }));
     await advance(0);
     expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`);
+  });
+});
+
+/** Types 12,50 € and confirms with fake timers: "Spesa registrata" with 132 points. */
+async function confirmTwelveFifty() {
+  await ready();
+  await press('1', '2', '5', '0');
+  vi.useFakeTimers();
+  fireEvent.click(screen.getByRole('button', { name: 'Conferma +12' }));
+  await advance(0);
+  expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('132 punti');
+}
+
+describe('PurchasePage: Annulla la spesa', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('cancelled at once: "Spesa annullata", the balance back to 120 from the server, no return (criterion 8)', async () => {
+    const { router, ledger } = renderPurchase();
+    // A waiter cancelling their own purchase within the window.
+    ledger.setOperator({ ...fakeOperator, role: 'operator' });
+    await confirmTwelveFifty();
+    await advance(4000);
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 6 s' }));
+    await advance(0);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa annullata' })).toHaveFocus();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('120 punti');
+    const [purchase, correction] = ledger.movements();
+    expect(ledger.movements()).toHaveLength(2);
+    expect(correction).toMatchObject({
+      kind: 'correction',
+      points: -12,
+      correctsMovementId: purchase?.id,
+    });
+    // A new operation id, not the purchase's.
+    expect(correction?.operationId).not.toBe(purchase?.operationId);
+    expect(ledger.customers.customers().find((c) => c.id === MARIA.id)?.balance).toBe(120);
+
+    await advance(30_000);
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/spesa`);
+    expect(screen.getByRole('link', { name: 'Leggi un’altra card' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Apri la scheda di Maria' })).toBeInTheDocument();
+  });
+
+  it('too late for the server (EC003 from the fake): the text, then back to / after 3 s', async () => {
+    const { router, ledger } = renderPurchase();
+    // A waiter: the server checks the 10-second window (an administrator has none).
+    ledger.setOperator({ ...fakeOperator, role: 'operator' });
+    await confirmTwelveFifty();
+    // The request reaches the server 11 s after the purchase (a slow network).
+    ledger.advanceClock(11_000);
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 10 s' }));
+    await advance(0);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Tempo scaduto: per annullare ora serve un amministratore.',
+    );
+    expect(screen.queryByRole('button', { name: /^Annulla la spesa/ })).not.toBeInTheDocument();
+    expect(ledger.movements()).toHaveLength(1);
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      'Torno alla lettura delle card tra 3 secondi',
+    );
+    await advance(3000);
+    expect(router.state.location.pathname).toBe('/');
+  });
+
+  it('answer lost: "Riprova" resends the same id and the fake holds a single cancellation', async () => {
+    const { router, ledger } = renderPurchase();
+    await confirmTwelveFifty();
+    ledger.failNext('cancelMovement', 'lost');
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 10 s' }));
+    await advance(0);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Annullamento non riuscito: controlla la connessione e riprova.',
+    );
+    await advance(20_000);
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/spesa`);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await advance(0);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa annullata' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('120 punti');
+    const cancels = ledger.calls.filter((call) => call.method === 'cancelMovement');
+    expect(cancels).toHaveLength(2);
+    expect(cancels[1]?.args).toEqual(cancels[0]?.args);
+    expect(ledger.movements().filter((m) => m.kind === 'correction')).toHaveLength(1);
+  });
+
+  it('network down: nothing written, "Riprova" once the network is back', async () => {
+    const { ledger } = renderPurchase();
+    await confirmTwelveFifty();
+    ledger.setNetworkDown(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 10 s' }));
+    await advance(0);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(ledger.movements()).toHaveLength(1);
+
+    ledger.setNetworkDown(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await advance(0);
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa annullata' })).toBeInTheDocument();
+    expect(ledger.movements()).toHaveLength(2);
+  });
+
+  it('forbidden on "Annulla": back to /accedi', async () => {
+    const auth = signedInFake();
+    const { router, ledger } = renderPurchase({ auth });
+    await confirmTwelveFifty();
+    vi.useRealTimers();
+    ledger.failNext('cancelMovement', 'forbidden');
+    auth.removeProfile();
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 10 s' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('the button is gone after 10 s, with the page back on /', async () => {
+    const { router } = renderPurchase();
+    await confirmTwelveFifty();
+    await advance(10_000);
+    expect(router.state.location.pathname).toBe('/');
+    expect(screen.queryByRole('button', { name: /^Annulla la spesa/ })).not.toBeInTheDocument();
   });
 });

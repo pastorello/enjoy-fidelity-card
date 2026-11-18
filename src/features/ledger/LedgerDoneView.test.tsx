@@ -1,7 +1,11 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ServerFaultError } from '../../lib/serverFault';
+import { fakeMovement } from '../../test/fakeLedgerService';
 import { LedgerDoneView, type LedgerDoneViewProps } from './LedgerDoneView';
+import { LedgerError, type LedgerResult } from './types';
+import { useOperation } from './useOperation';
 
 const CUSTOMER_ID = '00000000-0000-4000-8000-000000000001';
 
@@ -13,20 +17,50 @@ const PURCHASE: LedgerDoneViewProps = {
   customerId: CUSTOMER_ID,
   customerName: 'Maria Rossi',
   cancelLabel: 'Annulla la spesa',
+  cancelledTitle: 'Spesa annullata',
 };
 
-function renderDone(props: Partial<LedgerDoneViewProps> = {}) {
+type CancelRun = (operationId: string) => Promise<LedgerResult>;
+
+/** The view with its cancellation wired to `run`, as the pages do with `useOperation`. */
+function Harness({ run, ...props }: Partial<LedgerDoneViewProps> & { run?: CancelRun }) {
+  const cancel = useOperation<LedgerResult>(run ?? (() => Promise.reject(new Error('unused'))));
+  return <LedgerDoneView {...PURCHASE} {...props} cancel={run ? cancel : undefined} />;
+}
+
+function renderDone(props: Partial<LedgerDoneViewProps> & { run?: CancelRun } = {}) {
   const router = createMemoryRouter(
     [
       { path: '/', element: <p>Home</p> },
       { path: '/clienti/:id', element: <p>Scheda</p> },
-      { path: '/clienti/:id/spesa', element: <LedgerDoneView {...PURCHASE} {...props} /> },
+      { path: '/clienti/:id/spesa', element: <Harness {...props} /> },
     ],
     { initialEntries: ['/', `/clienti/${CUSTOMER_ID}/spesa`], initialIndex: 1 },
   );
   render(<RouterProvider router={router} />);
   return { router };
 }
+
+/** A cancellation the test settles by hand: one pending answer per call. */
+function controlledCancel() {
+  const calls: {
+    id: string;
+    resolve: (value: LedgerResult) => void;
+    reject: (e: unknown) => void;
+  }[] = [];
+  const run = vi.fn<CancelRun>(
+    (id) =>
+      new Promise<LedgerResult>((resolve, reject) => {
+        calls.push({ id, resolve, reject });
+      }),
+  );
+  return { run, calls };
+}
+
+const CORRECTION: LedgerResult = {
+  movement: fakeMovement({ kind: 'correction', points: -12, amountCents: null }),
+  balance: 120,
+};
 
 async function advance(ms: number) {
   await act(async () => {
@@ -49,7 +83,7 @@ afterEach(() => {
 
 describe('LedgerDoneView: Spesa registrata', () => {
   it('the texts of the wireframe, with no header, and the focus on the title', () => {
-    renderDone({ onCancel: vi.fn<() => void>() });
+    renderDone({ run: controlledCancel().run });
 
     const title = screen.getByRole('heading', { level: 1, name: 'Spesa registrata' });
     expect(title).toHaveFocus();
@@ -101,7 +135,7 @@ describe('LedgerDoneView: Spesa registrata', () => {
   });
 
   it('counts down every second and goes back to / after 10 s, replacing the entry (criterion 3)', async () => {
-    const { router } = renderDone({ onCancel: vi.fn<() => void>() });
+    const { router } = renderDone({ run: controlledCancel().run });
 
     await advance(2000);
     expect(screen.getByRole('timer')).toHaveTextContent(
@@ -122,16 +156,9 @@ describe('LedgerDoneView: Spesa registrata', () => {
     expect(router.state.historyAction).toBe('REPLACE');
   });
 
-  it('without onCancel there is no "Annulla" button', () => {
+  it('without a cancellation there is no "Annulla" button', () => {
     renderDone();
     expect(screen.queryByRole('button', { name: /^Annulla/ })).not.toBeInTheDocument();
-  });
-
-  it('"Annulla la spesa" calls onCancel', () => {
-    const onCancel = vi.fn<() => void>();
-    renderDone({ onCancel });
-    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 10 s' }));
-    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it('"Leggi un’altra card" goes to / at once, replacing the entry', async () => {
@@ -152,5 +179,146 @@ describe('LedgerDoneView: Spesa registrata', () => {
     expect(router.state.location.pathname).toBe(`/clienti/${CUSTOMER_ID}`);
     await advance(15_000);
     expect(router.state.location.pathname).toBe(`/clienti/${CUSTOMER_ID}`);
+  });
+});
+
+describe('LedgerDoneView: Annulla la spesa', () => {
+  const NETWORK_TEXT = 'Annullamento non riuscito: controlla la connessione e riprova.';
+
+  it('one tap, no dialog: a single call with a new operation id, busy, the countdown stopped', async () => {
+    const { run, calls } = controlledCancel();
+    const { router } = renderDone({ run });
+    await advance(2000);
+
+    const button = screen.getByRole('button', { name: 'Annulla la spesa · 8 s' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(calls[0]?.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Annulla la spesa/ })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+
+    await advance(15_000);
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      'Torno alla lettura delle card tra 8 secondi',
+    );
+    expect(router.state.location.pathname).toBe(`/clienti/${CUSTOMER_ID}/spesa`);
+  });
+
+  it('done: "Spesa annullata" focused, the server’s balance, no return (criterion 8)', async () => {
+    const { run, calls } = controlledCancel();
+    const { router } = renderDone({ run });
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 10 s' }));
+    await act(async () => {
+      calls[0]?.resolve(CORRECTION);
+    });
+
+    const title = screen.getByRole('heading', { level: 1, name: 'Spesa annullata' });
+    expect(title).toHaveFocus();
+    expect(screen.queryByRole('heading', { name: 'Spesa registrata' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('120 punti');
+    // The points added are struck out, as a cancelled movement in Movimenti.
+    expect(screen.getByText('+12 punti a Maria Rossi').closest('del')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: /^Annulla/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-progress]')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Leggi un’altra card' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Apri la scheda di Maria' })).toBeInTheDocument();
+
+    await advance(30_000);
+    expect(router.state.location.pathname).toBe(`/clienti/${CUSTOMER_ID}/spesa`);
+  });
+
+  it('time out (cancel-window-expired): the text, no button, back to / after 3 s', async () => {
+    const { run, calls } = controlledCancel();
+    const { router } = renderDone({ run });
+    await advance(9000);
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 1 s' }));
+    await advance(2000);
+    await act(async () => {
+      calls[0]?.reject(new LedgerError('cancel-window-expired'));
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Tempo scaduto: per annullare ora serve un amministratore.',
+    );
+    expect(screen.queryByRole('button', { name: /^Annulla|^Riprova/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeInTheDocument();
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      'Torno alla lettura delle card tra 3 secondi',
+    );
+
+    await advance(2000);
+    expect(router.state.location.pathname).toBe(`/clienti/${CUSTOMER_ID}/spesa`);
+    await advance(1000);
+    expect(router.state.location.pathname).toBe('/');
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+
+  it('points already spent: its own text and back to / after 3 s', async () => {
+    const { run, calls } = controlledCancel();
+    const { router } = renderDone({ run });
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 10 s' }));
+    await act(async () => {
+      calls[0]?.reject(new LedgerError('insufficient-balance'));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Punti già spesi: questa spesa non si può più annullare.',
+    );
+    await advance(3000);
+    expect(router.state.location.pathname).toBe('/');
+  });
+
+  it('network error: the text, "Riprova" with the same id, the countdown stopped', async () => {
+    const { run, calls } = controlledCancel();
+    const { router } = renderDone({ run });
+    await advance(3000);
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 7 s' }));
+    await act(async () => {
+      calls[0]?.reject(new LedgerError('network'));
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent(NETWORK_TEXT);
+    expect(screen.queryByRole('button', { name: /^Annulla la spesa/ })).not.toBeInTheDocument();
+    await advance(20_000);
+    expect(router.state.location.pathname).toBe(`/clienti/${CUSTOMER_ID}/spesa`);
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      'Torno alla lettura delle card tra 7 secondi',
+    );
+
+    const retry = screen.getByRole('button', { name: 'Riprova' });
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(calls[1]?.id).toBe(calls[0]?.id);
+    expect(screen.getByRole('button', { name: 'Riprova' })).toHaveAttribute('aria-busy', 'true');
+
+    await act(async () => {
+      calls[1]?.resolve(CORRECTION);
+    });
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa annullata' })).toHaveFocus();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('a server fault is retried like the network', async () => {
+    const { run, calls } = controlledCancel();
+    renderDone({ run });
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla la spesa · 10 s' }));
+    await act(async () => {
+      calls[0]?.reject(new ServerFaultError('unavailable'));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(NETWORK_TEXT);
+    expect(screen.getByRole('button', { name: 'Riprova' })).toBeInTheDocument();
+  });
+
+  it('the button is gone after 10 s', async () => {
+    renderDone({ run: controlledCancel().run });
+    await advance(9000);
+    expect(screen.getByRole('button', { name: 'Annulla la spesa · 1 s' })).toBeInTheDocument();
+    await advance(1000);
+    expect(screen.queryByRole('button', { name: /^Annulla la spesa/ })).not.toBeInTheDocument();
   });
 });

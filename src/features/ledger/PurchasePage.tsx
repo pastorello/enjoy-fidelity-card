@@ -76,10 +76,25 @@ function UnusualAmountWarning({ points, settings }: { points: number; settings: 
 
 /**
  * Spesa registrata (SPEC-ledger, point 3): "+12 punti a Maria Rossi", the server's balance and
- * "12,50 € · oggi 10:42 · Giulia", all from the movement the server returned.
+ * "12,50 € · oggi 10:42 · Giulia", all from the movement the server returned. "Annulla la spesa"
+ * sends `cancelMovement` with its own operation id; `forbidden` goes back to /accedi.
  */
 function PurchaseDone({ customer, result }: { customer: CustomerSummary; result: LedgerResult }) {
   const { movement, balance } = result;
+  const service = useLedgerService();
+  const { reportNotEnabled } = useAuth();
+  const cancel = useOperation((operationId) =>
+    service.cancelMovement({ operationId, movementId: movement.id }),
+  );
+  const forbidden =
+    cancel.status === 'error' &&
+    cancel.error instanceof LedgerError &&
+    cancel.error.kind === 'forbidden';
+
+  useEffect(() => {
+    if (forbidden) void reportNotEnabled();
+  }, [forbidden, reportNotEnabled]);
+
   const when = formatMovementDate(movement.createdAt);
   // "oggi 10:42" / "ieri 19:10" after the amount; "8 nov 18:05" is already lower case.
   const details = [
@@ -98,6 +113,8 @@ function PurchaseDone({ customer, result }: { customer: CustomerSummary; result:
       customerId={customer.id}
       customerName={customer.name}
       cancelLabel="Annulla la spesa"
+      cancelledTitle="Spesa annullata"
+      cancel={cancel}
     />
   );
 }
