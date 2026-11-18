@@ -235,13 +235,13 @@ come `file › titolo del test`) e `scripts/rewardsCriteria.test.ts` che la cont
 `customersCriteria.test.ts`); `brain/MAP.md` (file del modulo), `brain/STATUS.md`, RUNBOOK (trappole
 trovate); i task segnati in questo file.
 **Accettazione:**
-- [ ] Ognuno dei 9 criteri di successo con almeno un test che esiste davvero nel file indicato
-- [ ] Nessun segreto né dato reale nei documenti
+- [x] Ognuno dei 9 criteri di successo con almeno un test che esiste davvero nel file indicato
+- [x] Nessun segreto né dato reale nei documenti
 **Verifica:** quality bar completa verde; rilettura
 **Dipendenze:** 13 · **File:** tasks/rewards/plan.md, tasks/rewards/todo.md, scripts/rewardsCriteria.test.ts,
 brain/MAP.md, brain/STATUS.md · **Dimensione:** S
 
 ## Checkpoint E
-- [ ] I 9 criteri di successo di SPEC-rewards verificati
+- [x] I 9 criteri di successo di SPEC-rewards verificati
 - [ ] Quality bar completa verde in locale e in CI
 - [ ] PR (base `main`, da unire dopo #16 e #17) pronta per `code-review-and-quality`
