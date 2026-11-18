@@ -145,8 +145,8 @@ server, scadenza del turno, rete giù, attesa controllabile, registro delle chia
 `KioskServiceProvider` / `useKioskService()`; `main.tsx` e `renderApp` (parametro facoltativo in coda: i test
 esistenti restano invariati).
 **Accettazione:**
-- [ ] Unità del finto: 5 errori → `locked`, giusto durante il blocco → `locked`, successo azzera
-- [ ] `renderApp` senza il nuovo parametro funziona come prima (suite verde senza modifiche)
+- [x] Unità del finto: 5 errori → `locked`, giusto durante il blocco → `locked`, successo azzera
+- [x] `renderApp` senza il nuovo parametro funziona come prima (suite verde senza modifiche)
 **Verifica:** `npm test`
 **Dipendenze:** 7 · **File:** src/test/fakeKioskService.ts (+ .test.ts),
 src/features/tablet-kiosk/KioskServiceProvider.tsx, src/main.tsx, src/test/renderApp.tsx · **Dimensione:** M
