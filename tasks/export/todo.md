@@ -123,9 +123,9 @@ usa `getSupabase()` e nomina le due RPC; solo `main.tsx` lo importa; solo `downl
 o `URL.createObjectURL`; nessun `console.*`, `localStorage`, `sessionStorage` nel modulo; ogni `errcode`
 sollevato da `*_export.sql` ha una traduzione.
 **Accettazione:**
-- [ ] Unità con client finto: parametri e cursori delle RPC; `42501` → forbidden; `42501` "permission
+- [x] Unità con client finto: parametri e cursori delle RPC; `42501` → forbidden; `42501` "permission
       denied for function" → guasto del server; fetch fallita → network; altro → unknown
-- [ ] La guardia fallisce se un componente chiama Supabase, se un file diverso da `downloadFile.ts` crea il
+- [x] La guardia fallisce se un componente chiama Supabase, se un file diverso da `downloadFile.ts` crea il
       download, o se il modulo logga
 **Verifica:** `npm test -- supabaseExportService exportBoundary`
 **Dipendenze:** 6 · **File:** src/features/export/supabaseExportService.ts (+ .test.ts),
