@@ -2,7 +2,7 @@
 -- reads (SPEC-customers.md, "Modello dati e regole di accesso"). Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(105);
+select plan(109);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -66,6 +66,11 @@ select ok(
 
 -- Name key ----------------------------------------------------------------------------
 select is(private.clean_name('  Nicolò   Rossi  '), 'Nicolò Rossi', 'clean_name trims and collapses spaces');
+select is(
+  private.clean_name(chr(160) || 'Maria' || chr(160) || chr(160) || 'Prova' || chr(8239)),
+  'Maria Prova',
+  'clean_name trims and collapses non-breaking spaces too'
+);
 select is(private.customer_name_key('Nicolò Rossi'), 'nicolo rossi', 'the key drops accents and case');
 select is(
   private.customer_name_key('nicolo  rossi'),
@@ -640,6 +645,26 @@ select is_empty(
 
 -- customers_served_today: empty until ledger replaces its body
 select is_empty($$select * from app.customers_served_today()$$, 'nobody has been served today yet');
+
+-- Names pasted from contacts or chats: non-breaking spaces at the ends are trimmed, not refused
+select is(
+  (select name from app.create_customer(
+    '00000000-0000-4000-c100-0000000000a0', 'Nbsp Prova' || chr(160), null, true, null)),
+  'Nbsp Prova',
+  'create_customer trims a trailing non-breaking space'
+);
+select is(
+  (select name from app.update_customer(
+    (select id from app.customers where create_operation_id = '00000000-0000-4000-c100-0000000000a0'),
+    chr(8239) || 'Nbsp  Prova Serapo' || chr(160), null, null)),
+  'Nbsp Prova Serapo',
+  'update_customer trims leading and trailing narrow and non-breaking spaces'
+);
+select is(
+  (select name_key from app.customers where create_operation_id = '00000000-0000-4000-c100-0000000000a0'),
+  'nbsp prova serapo',
+  'the key of a name cleaned of non-breaking spaces has plain spaces'
+);
 reset role;
 
 -- Performance: 1 000 more customers, with phones

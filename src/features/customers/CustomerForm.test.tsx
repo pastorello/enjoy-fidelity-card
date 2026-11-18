@@ -193,11 +193,11 @@ describe('CustomerForm', () => {
     expect(message.className).toMatch(/error/);
   });
 
-  it('clears the errors once the form is valid and sends the values as typed', () => {
+  it('clears the errors once the form is valid and sends the name cleaned, the rest as typed', () => {
     const { onSubmit } = renderForm();
     save();
     fireEvent.change(screen.getByRole('textbox', { name: NAME }), {
-      target: { value: ' Maria  Rossi ' },
+      target: { value: '\u00a0Maria \u202fRossi\u00a0' },
     });
     fireEvent.change(screen.getByRole('textbox', { name: PHONE }), {
       target: { value: '333 123 4521' },
@@ -210,7 +210,7 @@ describe('CustomerForm', () => {
     expect(screen.queryByText('Scrivi nome e cognome.')).not.toBeInTheDocument();
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith({
-      name: ' Maria  Rossi ',
+      name: 'Maria Rossi',
       phone: '333 123 4521',
       notes: 'Preferisce il caffè macchiato',
       privacyConsent: true,

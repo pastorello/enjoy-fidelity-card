@@ -7,7 +7,7 @@ import { customerErrorText, type CustomerField } from './errorCodes';
 import { normalizePhone } from './phone';
 import { PrivacyNoticeDialog } from './PrivacyNoticeDialog';
 
-/** The fields as typed: the server cleans the name and normalizes the phone. */
+/** The fields sent on save: the name cleaned like the server does, the rest as typed. */
 export type CustomerFormValues = {
   name: string;
   phone: string;
@@ -24,7 +24,7 @@ const FIELD_ORDER: CustomerField[] = ['name', 'phone', 'consent', 'notes'];
 
 const EMPTY: CustomerFormValues = { name: '', phone: '', notes: '', privacyConsent: false };
 
-/** `private.clean_name`: trimmed, inner spaces collapsed to one. */
+/** `private.clean_name`: inner whitespace runs (non-breaking spaces too) collapsed to one, trimmed. */
 function cleanName(name: string): string {
   return name.trim().replace(/\s+/g, ' ');
 }
@@ -164,7 +164,7 @@ export function CustomerForm({
       refs[first].current?.focus();
       return;
     }
-    onSubmit(values);
+    onSubmit({ ...values, name: cleanName(values.name) });
   }
 
   return (
