@@ -418,10 +418,12 @@ select ok(
 
 -- Movements keyset pagination ------------------------------------------------------------
 -- …0005 is older; …0001 to …0004 share the created_at of this transaction (now()), so
--- pages of 2 cut through equal created_at values.
+-- pages of 2 cut through equal created_at values. The local database may already hold
+-- movements left by integration and E2E runs (older than now(), maybe older than …0005),
+-- so the first page is checked against the table's own order, not against fixture ids.
 select results_eq(
   $$select id from app.export_movements(null, null, 2)$$,
-  $$values ('00000000-0000-4000-e300-000000000005'::uuid), ('00000000-0000-4000-e300-000000000001'::uuid)$$,
+  $$select id from app.movements order by created_at, id limit 2$$,
   'the first page of 2 holds the two oldest movements'
 );
 select results_eq(
