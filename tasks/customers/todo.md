@@ -199,8 +199,8 @@ testo secondario; riquadro SALDO con numero e "punti"; posto per `CustomerLedger
 link alla home; errore con Riprova; cliente cancellato: titolo "Cliente cancellato", "Dati cancellati il
 17 nov 2026", saldo, nessuna modifica.
 **Accettazione:**
-- [ ] Componenti: ogni stato; id non uuid → nessuna chiamata; cliente cancellato senza "Modifica cliente"
-- [ ] `AppShell`: test esistenti verdi, nuova azione accessibile con target ≥ 48 px
+- [x] Componenti: ogni stato; id non uuid → nessuna chiamata; cliente cancellato senza "Modifica cliente"
+- [x] `AppShell`: test esistenti verdi, nuova azione accessibile con target ≥ 48 px
 **Verifica:** `npm test`
 **Dipendenze:** 6 · **File:** src/app/AppShell.tsx (+ .test.tsx), src/features/customers/CustomerPage.tsx
 (+ .module.css, .test.tsx), useCustomer.ts, src/app/routes.tsx · **Dimensione:** M
