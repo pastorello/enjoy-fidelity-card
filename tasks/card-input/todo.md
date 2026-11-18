@@ -123,9 +123,9 @@ attivo. `main.tsx` lo installa con `import()` dentro `if (import.meta.env.VITE_E
 `vite-env.d.ts` dichiara `VITE_E2E?: string`; `playwright.config.ts` aggiunge `VITE_E2E: '1'` all'ambiente
 del `webServer`. Primo test di `e2e/card-input.spec.ts`.
 **Accettazione:**
-- [ ] E2E (criterio 8): dopo l'accesso `typeof window.__enjoyFakeCard === 'function'`
-- [ ] Le suite E2E esistenti restano verdi con la build `VITE_E2E=1`
-- [ ] `npm run build` senza `VITE_E2E`: nessun `__enjoyFakeCard` in `dist/` (controllo a mano con `grep`,
+- [x] E2E (criterio 8): dopo l'accesso `typeof window.__enjoyFakeCard === 'function'`
+- [x] Le suite E2E esistenti restano verdi con la build `VITE_E2E=1`
+- [x] `npm run build` senza `VITE_E2E`: nessun `__enjoyFakeCard` in `dist/` (controllo a mano con `grep`,
       automatizzato nel task 8)
 **Verifica:** `npm run e2e`
 **Dipendenze:** 6 · **File:** src/features/card-input/fakeCardAdapter.ts, src/main.tsx, src/vite-env.d.ts,
