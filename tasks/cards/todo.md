@@ -284,10 +284,10 @@ link come nella tavola Associa-link; link scritto → `/clienti/:id` con «Card 
 «Più tardi» / dispositivo che non scrive → `/clienti/:id` con «… Link non scritto.»; già attiva con link non
 scritto → scrittura subito, con link scritto → «Scrivi di nuovo il link».
 **Accettazione:**
-- [ ] Componente: testi delle tavole Associa-link e Associa-link-errore; ogni uscita va su `/clienti/:id`
-- [ ] E2E: Sostituisci card → scrittura finta → `__enjoyFakeCardWrites` ha l'URL `…/s/[A-Za-z0-9_-]{22}`
+- [x] Componente: testi delle tavole Associa-link e Associa-link-errore; ogni uscita va su `/clienti/:id`
+- [x] E2E: Sostituisci card → scrittura finta → `__enjoyFakeCardWrites` ha l'URL `…/s/[A-Za-z0-9_-]{22}`
       senza l'uid (criterio 10)
-- [ ] E2E: `setCanWrite(false)` → associazione salvata, «Link non scritto», nessuna voce nel registro
+- [x] E2E: `setCanWrite(false)` → associazione salvata, «Link non scritto», nessuna voce nel registro
       (criterio 13)
 **Verifica:** `npm test -- AssociateCardPage && npm run e2e -- cards`
 **Dipendenze:** 12, 16 · **File:** src/features/cards/AssociateCardPage.tsx (+ .test.tsx),
