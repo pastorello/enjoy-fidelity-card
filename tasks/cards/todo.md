@@ -138,10 +138,10 @@ data «dal 3 nov» in `Europe/Rome` con anno se diverso; `cardLinkUrl.ts`: `card
 `vite.config.ts` fa fallire la build con `VERCEL_ENV=production` se la variabile manca o non è `https:`
 (`.env.example` nel task 23).
 **Accettazione:**
-- [ ] Unità: `04A1B2C3D4E5F6` → «…E5F6»; nome breve; data con e senza anno
-- [ ] Unità: origine da variabile o `location.origin`; origine con percorso, con `/` finale o `http:`
+- [x] Unità: `04A1B2C3D4E5F6` → «…E5F6»; nome breve; data con e senza anno
+- [x] Unità: origine da variabile o `location.origin`; origine con percorso, con `/` finale o `http:`
       rifiutata; l'URL non contiene mai l'uid
-- [ ] Unità del controllo di build (funzione esportata da un modulo usato da `vite.config.ts`): fallisce
+- [x] Unità del controllo di build (funzione esportata da un modulo usato da `vite.config.ts`): fallisce
       in produzione senza variabile o con `http:`, passa nelle anteprime e in locale
 **Verifica:** `npm test -- formatCard cardLinkUrl && npm run build`
 **Dipendenze:** nessuna · **File:** src/features/cards/formatCard.ts (+ .test.ts),
