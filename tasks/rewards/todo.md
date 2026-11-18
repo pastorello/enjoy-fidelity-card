@@ -17,12 +17,12 @@ revocati ad `authenticated`. `app.create_reward(p_id, p_name, p_points, p_active
 idempotenza (`insert … on conflict (id) do nothing`, poi `select`) → validazione; nome salvato con `btrim`;
 `execute` revocato a `public`/`anon`, concesso ad `authenticated`.
 **Accettazione:**
-- [ ] pgTAP: RLS attiva; operatore e admin leggono, utente senza profilo e `anon` no; `insert`/`update`/
+- [x] pgTAP: RLS attiva; operatore e admin leggono, utente senza profilo e `anon` no; `insert`/`update`/
       `delete`/`truncate` diretti negati ad `authenticated` anche se admin
-- [ ] pgTAP: operatore e utente senza profilo ricevono `42501`, anche come reinvio di un id esistente;
+- [x] pgTAP: operatore e utente senza profilo ricevono `42501`, anche come reinvio di un id esistente;
       l'admin crea con `created_by`/`updated_by` = operatore che agisce; stesso id due volte (anche con nome
       diverso) → una riga restituita invariata
-- [ ] pgTAP: nome duplicato con maiuscole diverse o spazi iniziali/finali → `23505`; punti 0, negativi,
+- [x] pgTAP: nome duplicato con maiuscole diverse o spazi iniziali/finali → `23505`; punti 0, negativi,
       100 000, nome vuoto, di soli spazi o di 61 caratteri → `23514`; " Spremuta " salvato "Spremuta";
       `function_privileges.test.sql` verde
 **Verifica:** `npm run db:reset && npm run db:test`

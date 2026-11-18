@@ -1,0 +1,332 @@
+-- rewards: the rewards catalogue, its access rules and the write RPCs
+-- (SPEC-rewards.md, "Modello dati e regole di accesso"). Fake data only.
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(57);
+
+-- Fake Auth users. Ids are fixed so the test can impersonate them.
+insert into auth.users (id, email) values
+  ('00000000-0000-4000-d000-000000000001', 'rewards.admin@example.com'),
+  ('00000000-0000-4000-d000-000000000002', 'rewards.operator@example.com'),
+  ('00000000-0000-4000-d000-000000000003', 'rewards.nobody@example.com');
+select private.add_operator('rewards.admin@example.com', 'Admin Premi', 'admin');
+select private.add_operator('rewards.operator@example.com', 'Operatore Premi', 'operator');
+
+-- Returns the constraint name of the error a statement raises, or null when it
+-- raises none. Lives only inside this rolled-back transaction.
+create function public.rewards_test_error_constraint(p_sql text)
+returns text
+language plpgsql
+as $$
+declare
+  v_constraint text;
+begin
+  execute p_sql;
+  return null;
+exception when others then
+  get stacked diagnostics v_constraint = constraint_name;
+  return v_constraint;
+end;
+$$;
+grant execute on function public.rewards_test_error_constraint(text) to authenticated;
+
+-- Structure and privileges ------------------------------------------------------------
+select has_table('app', 'rewards', 'app.rewards exists');
+select ok(
+  (select relrowsecurity from pg_class where oid = 'app.rewards'::regclass),
+  'RLS is enabled on app.rewards'
+);
+select index_is_unique('app', 'rewards', 'rewards_name_key', 'rewards_name_key is a unique index');
+select is(
+  (select pg_get_indexdef('app.rewards_name_key'::regclass)),
+  'CREATE UNIQUE INDEX rewards_name_key ON app.rewards USING btree (lower(name))',
+  'rewards_name_key is on lower(name)'
+);
+select ok(
+  not has_table_privilege('authenticated', 'app.rewards', 'insert')
+    and not has_table_privilege('authenticated', 'app.rewards', 'update')
+    and not has_table_privilege('authenticated', 'app.rewards', 'delete')
+    and not has_table_privilege('authenticated', 'app.rewards', 'truncate'),
+  'authenticated has no insert, update, delete or truncate on app.rewards'
+);
+select ok(
+  not has_table_privilege('anon', 'app.rewards', 'select'),
+  'anon has no select on app.rewards'
+);
+select ok(
+  has_function_privilege('authenticated', 'app.create_reward(uuid, text, int, boolean)', 'execute'),
+  'authenticated can execute create_reward'
+);
+select ok(
+  not has_function_privilege('anon', 'app.create_reward(uuid, text, int, boolean)', 'execute'),
+  'anon cannot execute create_reward'
+);
+select ok(
+  (select prosecdef from pg_proc where oid = 'app.create_reward(uuid, text, int, boolean)'::regprocedure),
+  'create_reward is security definer'
+);
+select is(
+  (select proconfig from pg_proc where oid = 'app.create_reward(uuid, text, int, boolean)'::regprocedure),
+  array['search_path=""'],
+  'create_reward pins an empty search_path'
+);
+select ok(
+  not has_function_privilege('authenticated', 'private.acting_operator_id()', 'execute'),
+  'authenticated cannot execute acting_operator_id'
+);
+select ok(
+  not has_function_privilege('anon', 'private.acting_operator_id()', 'execute'),
+  'anon cannot execute acting_operator_id'
+);
+select is(
+  (select prosrc from pg_proc where oid = 'private.acting_operator_id()'::regprocedure),
+  E'\n  select private.current_operator_id();\n',
+  'acting_operator_id keeps the common body'
+);
+
+-- A reward to read, written as the table owner.
+insert into app.rewards (id, name, points, created_by, updated_by)
+select '00000000-0000-4000-d100-000000000001', 'Caffè Premi', 50, id, id
+from app.operators where name = 'Admin Premi';
+
+-- anon ------------------------------------------------------------------------------------
+set local role anon;
+select throws_ok($$select * from app.rewards$$, '42501', null, 'anon cannot read rewards');
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000009', 'Anon', 10, true)$$,
+  '42501',
+  null,
+  'anon cannot call create_reward'
+);
+reset role;
+
+-- Signed-in operator ----------------------------------------------------------------------
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000002","role":"authenticated"}', true);
+
+select results_eq(
+  $$select name, points, active from app.rewards$$,
+  $$values ('Caffè Premi'::text, 50, true)$$,
+  'an active operator reads the rewards'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000002', 'Spremuta Operatore', 80, true)$$,
+  '42501',
+  null,
+  'an operator cannot call create_reward'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000001', 'Caffè Premi', 50, true)$$,
+  '42501',
+  null,
+  'an operator resending an existing id still gets 42501'
+);
+select throws_ok(
+  $$insert into app.rewards (id, name, points, created_by, updated_by)
+    values (gen_random_uuid(), 'Diretto', 10, gen_random_uuid(), gen_random_uuid())$$,
+  '42501',
+  null,
+  'an operator cannot insert directly'
+);
+select throws_ok($$update app.rewards set points = 1$$, '42501', null, 'an operator cannot update directly');
+select throws_ok($$delete from app.rewards$$, '42501', null, 'an operator cannot delete directly');
+
+-- Auth user without a profile ---------------------------------------------------------------
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000003","role":"authenticated"}', true);
+select is((select count(*) from app.rewards), 0::bigint, 'a user without a profile reads nothing');
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000003', 'Spremuta Nessuno', 80, true)$$,
+  '42501',
+  null,
+  'a user without a profile cannot call create_reward'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000001', 'Caffè Premi', 50, true)$$,
+  '42501',
+  null,
+  'a user without a profile resending an existing id still gets 42501'
+);
+
+-- Signed-in admin: direct writes ----------------------------------------------------------------
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000001","role":"authenticated"}', true);
+select results_eq(
+  $$select name from app.rewards$$,
+  $$values ('Caffè Premi'::text)$$,
+  'an admin reads the rewards'
+);
+select throws_ok(
+  $$insert into app.rewards (id, name, points, created_by, updated_by)
+    values (gen_random_uuid(), 'Diretto', 10, gen_random_uuid(), gen_random_uuid())$$,
+  '42501',
+  null,
+  'an admin cannot insert directly'
+);
+select throws_ok($$update app.rewards set points = 1$$, '42501', null, 'an admin cannot update directly');
+select throws_ok($$delete from app.rewards$$, '42501', null, 'an admin cannot delete directly');
+select throws_ok($$truncate app.rewards$$, '42501', null, 'an admin cannot truncate');
+
+reset role;
+select is((select count(*) from app.rewards), 1::bigint, 'refused calls add no reward');
+select results_eq(
+  $$select name, points, active from app.rewards$$,
+  $$values ('Caffè Premi'::text, 50, true)$$,
+  'refused calls leave the reward unchanged'
+);
+
+-- Signed-in admin: create_reward -----------------------------------------------------------------
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000001","role":"authenticated"}', true);
+
+select results_eq(
+  $$select id, name, points, active
+    from app.create_reward('00000000-0000-4000-d100-000000000010', ' Spremuta ', 80, true)$$,
+  $$values ('00000000-0000-4000-d100-000000000010'::uuid, 'Spremuta'::text, 80, true)$$,
+  'an admin creates a reward, the name saved without leading and trailing spaces'
+);
+select results_eq(
+  $$select id, name, points, active
+    from app.create_reward('00000000-0000-4000-d100-000000000010', 'Altro nome', 10, false)$$,
+  $$values ('00000000-0000-4000-d100-000000000010'::uuid, 'Spremuta'::text, 80, true)$$,
+  'the same id with a different name returns the existing row unchanged'
+);
+select results_eq(
+  $$select name from app.create_reward('00000000-0000-4000-d100-000000000010', 'Caffè Premi', 50, true)$$,
+  $$values ('Spremuta'::text)$$,
+  'a resent id is not checked against the names already used'
+);
+select results_eq(
+  $$select name from app.create_reward('00000000-0000-4000-d100-000000000010', '', 0, true)$$,
+  $$values ('Spremuta'::text)$$,
+  'a resent id is not validated again'
+);
+select is(
+  (select count(*) from app.rewards where id = '00000000-0000-4000-d100-000000000010'),
+  1::bigint,
+  'the same id sent four times makes one row'
+);
+select results_eq(
+  $$select active from app.create_reward('00000000-0000-4000-d100-000000000011', 'Dolce Premi', 120, false)$$,
+  $$values (false)$$,
+  'an admin creates an inactive reward'
+);
+select results_eq(
+  $$select name, points from app.create_reward('00000000-0000-4000-d100-000000000012', repeat('a', 60), 1, true)$$,
+  $$values (repeat('a', 60), 1)$$,
+  'a name of 60 characters and 1 point are accepted'
+);
+select results_eq(
+  $$select points from app.create_reward('00000000-0000-4000-d100-000000000013', 'Massimo Premi', 99999, true)$$,
+  $$values (99999)$$,
+  '99 999 points are accepted'
+);
+
+-- Duplicate names ---------------------------------------------------------------------------------
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000020', 'SPREMUTA', 80, true)$$,
+  '23505',
+  null,
+  'a duplicate name in different case is refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000021', '  spremuta  ', 80, true)$$,
+  '23505',
+  null,
+  'a duplicate name with leading and trailing spaces is refused'
+);
+select is(
+  public.rewards_test_error_constraint(
+    $$select app.create_reward('00000000-0000-4000-d100-000000000022', 'Spremuta', 80, true)$$
+  ),
+  'rewards_name_key',
+  'a duplicate name reports the rewards_name_key constraint'
+);
+
+-- Values out of range -------------------------------------------------------------------------------
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000030', 'Zero', 0, true)$$,
+  '23514', null, '0 points are refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000031', 'Negativo', -5, true)$$,
+  '23514', null, 'negative points are refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000032', 'Troppi', 100000, true)$$,
+  '23514', null, '100 000 points are refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000033', '', 10, true)$$,
+  '23514', null, 'an empty name is refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000034', '   ', 10, true)$$,
+  '23514', null, 'a name of only spaces is refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000035', repeat('b', 61), 10, true)$$,
+  '23514', null, 'a name of 61 characters is refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000036', null, 10, true)$$,
+  '23514', null, 'a null name is refused as invalid'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000037', 'Senza punti', null, true)$$,
+  '23514', null, 'null points are refused as invalid'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000038', 'Senza stato', 10, null)$$,
+  '23514', null, 'a null active flag is refused as invalid'
+);
+select throws_ok(
+  $$select app.create_reward(null, 'Senza id', 10, true)$$,
+  '23514', null, 'a null id is refused as invalid'
+);
+reset role;
+
+select is(
+  (select count(*) from app.rewards where id::text like '00000000-0000-4000-d100-00000000003%'),
+  0::bigint,
+  'refused values add no reward'
+);
+
+-- Authors ---------------------------------------------------------------------------------------------
+select results_eq(
+  $$select created_by, updated_by from app.rewards where id = '00000000-0000-4000-d100-000000000010'$$,
+  $$select id, id from app.operators where name = 'Admin Premi'$$,
+  'created_by and updated_by are the acting operator'
+);
+select ok(
+  (select created_at <= now() and updated_at = created_at
+   from app.rewards where id = '00000000-0000-4000-d100-000000000010'),
+  'created_at and updated_at are set at creation'
+);
+
+-- A missing author is refused: pretend acting_operator_id() returns null
+-- (tablet-kiosk redefines it; a reward never exists without an author).
+create or replace function private.acting_operator_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select null::uuid;
+$$;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000001","role":"authenticated"}', true);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000040', 'Senza autore', 10, true)$$,
+  '42501',
+  null,
+  'an admin without an acting operator gets 42501'
+);
+reset role;
+select is(
+  (select count(*) from app.rewards where id = '00000000-0000-4000-d100-000000000040'),
+  0::bigint,
+  'no reward is created without an author'
+);
+
+select * from finish();
+rollback;
