@@ -437,9 +437,9 @@ lo provano (`file › titolo`); `scripts/ledgerCriteria.test.ts` come `cardsCrit
 ogni prova esiste). `brain/MAP.md` registra il modulo. PR da `feat/ledger` su `main`, da unire dopo #18,
 #19 e #20.
 **Accettazione:**
-- [ ] Ogni criterio 1–10 ha almeno una prova esistente
-- [ ] Quality bar completa verde; `npm run build && npm run check:bundle` verde
-- [ ] PR aperta con base `main`
+- [x] Ogni criterio 1–10 ha almeno una prova esistente
+- [x] Quality bar completa verde; `npm run build && npm run check:bundle` verde
+- [x] PR aperta con base `main` (#21)
 **Verifica:** `npm test -- ledgerCriteria`; quality bar completa
 **Dipendenze:** 27 · **File:** tasks/ledger/plan.md, tasks/ledger/todo.md, scripts/ledgerCriteria.test.ts,
 brain/MAP.md · **Dimensione:** S
