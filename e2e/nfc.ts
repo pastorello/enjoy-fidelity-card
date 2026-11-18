@@ -130,22 +130,26 @@ export async function writeAfterSave(page: Page, uid: string, next: string | Reg
   return lastTap;
 }
 
-/** Registers a customer with a new card from the home, as at the till; returns its id. */
+/**
+ * Registers a customer with a new card from the home, as at the till; returns its id, its name and
+ * when the card was last tapped (the reader ignores the same uid for REPEAT_WINDOW_MS after it).
+ */
 export async function customerWithCard(page: Page, prefix: string, uid: string) {
   await page.goto('/');
   await expect(page.getByRole('region', { name: 'Lettura card' })).toContainText(
     'Avvicina la card',
   );
+  const firstTap = Date.now();
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
   await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
   const name = uniqueName(prefix);
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
   await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
   await page.getByRole('button', { name: 'Salva cliente' }).click();
-  await writeAfterSave(page, uid, /\/clienti\/[0-9a-f-]{36}\/spesa$/);
+  const lastTap = (await writeAfterSave(page, uid, /\/clienti\/[0-9a-f-]{36}\/spesa$/)) ?? firstTap;
   const id = /\/clienti\/([0-9a-f-]{36})\/spesa$/.exec(page.url())?.[1];
   if (id === undefined) throw new Error('No customer id in the URL');
-  return { id, name };
+  return { id, name, lastTap };
 }
 
 /**

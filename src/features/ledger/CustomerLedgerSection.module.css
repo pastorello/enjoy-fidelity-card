@@ -1,0 +1,100 @@
+/* "Registra spesa" and "Riscatta premio" side by side, as in the wireframe Scheda cliente. */
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+/* Long labels at large text sizes wrap inside the button instead of overflowing. */
+.actions > * {
+  min-width: 0;
+  padding-block: var(--space-2);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The title on the left, "Vedi tutti" on the right. */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* "ULTIMI MOVIMENTI": spaced condensed caps in muted ink, as SERVITI OGGI. */
+.title {
+  margin: 0;
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+/* "Vedi tutti": a text link, 48 px tall (the wireframe draws 44; the 48 px rule prevails). */
+.all {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  min-width: var(--touch-target);
+  font-family: var(--type-body-sm-family);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-accent-text);
+  touch-action: manipulation;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* "+15" / "−50" on the right of a row, in the body font: Enjoy Display is for titles. */
+.points {
+  flex-shrink: 0;
+  font-family: var(--type-body-lg-family);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: var(--type-label-lg-weight);
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: var(--space-2) 0 0;
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* Compact error row: the text and "Riprova" side by side, stacked when there is no room. */
+.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.errorText {
+  display: flex;
+  flex: 1 1 12rem;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-danger-text);
+}
+
+.errorText svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

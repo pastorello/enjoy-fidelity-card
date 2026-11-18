@@ -1,0 +1,35 @@
+/* Spesa non salvata (wireframe "Spesa non salvata"): raised panel, icon and title in the danger tone, text in ink. */
+.failure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-danger-text);
+}
+
+.icon {
+  flex-shrink: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+}
+
+.text {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}

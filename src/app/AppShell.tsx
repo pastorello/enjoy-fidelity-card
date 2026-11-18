@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation, useNavigate, type LinkProps } from 'react-router';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import styles from './AppShell.module.css';
 
@@ -8,6 +8,11 @@ type AppShellProps = {
   /** Screen title in the header, with a back link; without it the header shows the logo. */
   title?: string;
   backTo?: string;
+  /**
+   * "Indietro" goes back one step in the history (`navigate(-1)`), as the system back; `backTo`
+   * only when the screen is the first of the history (opened from a link or a reload).
+   */
+  backInHistory?: boolean;
   /** An icon link at the right of the title (e.g. "Modifica cliente"); `label` names it. */
   headerAction?: { label: string; icon: IconName; to: string } | undefined;
   /** Signed-in user: shows the account button. */
@@ -61,6 +66,7 @@ export function AppShell({
   children,
   title,
   backTo,
+  backInHistory = false,
   headerAction,
   account,
   actions,
@@ -71,12 +77,22 @@ export function AppShell({
   const hasBack = title !== undefined && backTo !== undefined;
   const titleRef = useRef<HTMLSpanElement>(null);
   const titleCut = useIsCut(titleRef, repeatCutTitle ? title : undefined);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // 'default' is the key of the first entry: there is nothing of the app's to go back to.
+  const goBack: LinkProps['onClick'] =
+    backInHistory && location.key !== 'default'
+      ? (event) => {
+          event.preventDefault();
+          void navigate(-1);
+        }
+      : undefined;
 
   return (
     <div className={styles.shell}>
       <header className={[styles.header, hasBack ? styles.withBack : ''].join(' ')}>
         {hasBack && (
-          <Link to={backTo} className={styles.iconButton} aria-label="Indietro">
+          <Link to={backTo} onClick={goBack} className={styles.iconButton} aria-label="Indietro">
             <Icon name="chevron-left" />
           </Link>
         )}

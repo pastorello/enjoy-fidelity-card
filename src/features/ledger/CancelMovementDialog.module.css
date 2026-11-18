@@ -1,0 +1,4 @@
+/* A reward's name in the dialog's title: the body font, which has every glyph. */
+.name {
+  font-family: var(--type-body-family);
+}

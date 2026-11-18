@@ -1,0 +1,120 @@
+/* Movimenti (wireframe "Movimenti"): one section per day, rows as in ULTIMI MOVIMENTI. */
+.day {
+  display: flex;
+  flex-direction: column;
+}
+
+/* OGGI, IERI, "8 NOVEMBRE": spaced condensed caps in muted ink, as ULTIMI MOVIMENTI. */
+.dayTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A movement: not interactive, 64 px tall, divided from the next. */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-ink);
+}
+
+/* Its cancellation is being asked: the row stands out, its text kept off the edge. */
+.row[data-selected] {
+  margin: 0 calc(-1 * var(--space-2));
+  padding-inline: var(--space-2);
+  background: var(--color-surface-raised);
+}
+
+/* "Annulla": compact beside the points, still a 48 px target (the wireframe draws 44). */
+.cancel {
+  flex-shrink: 0;
+  min-height: var(--touch-target);
+  padding: 0 12px;
+}
+
+/* "Punti già spesi" in place of "Annulla": a note, not a disabled button. */
+.spent {
+  flex-shrink: 0;
+  width: 76px;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+  text-align: right;
+}
+
+/* Cancelled: the whole row in the secondary colour, text and points struck through. */
+.row[data-cancelled] {
+  color: var(--color-ink-muted);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  overflow-wrap: anywhere;
+}
+
+.line {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* "+12" / "−100" on the right, in the body font: Enjoy Display is for titles. */
+.points {
+  flex-shrink: 0;
+  font-family: var(--type-body-lg-family);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: var(--type-label-lg-weight);
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* "Mostra altri" failed: a compact line above the button, which loads again. A cancellation
+   refused for good: the same line under the customer row. */
+.notice,
+.moreError {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-danger-text);
+}
+
+.notice svg,
+.moreError svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

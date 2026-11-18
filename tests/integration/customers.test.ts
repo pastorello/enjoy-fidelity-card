@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { supabaseCustomerService as service } from '../../src/features/customers/supabaseCustomerService';
+import { supabaseLedgerService as ledger } from '../../src/features/ledger/supabaseLedgerService';
 import { localSupabase, memoryClient, runSql, runSqlInBackground } from './localSupabase';
 
 // The service under test talks to whichever signed-in client the test sets here.
@@ -141,8 +142,20 @@ describe('operator', () => {
     await expect(service.get(createdId)).resolves.toMatchObject({ name, anonymizedAt: null });
   });
 
-  it('servedToday answers an empty list until ledger exists', async () => {
-    await expect(service.servedToday()).resolves.toEqual([]);
+  it('servedToday lists the customer after a purchase today, with the real balance', async () => {
+    // Other customers may have been served today on this stack (e2e runs): only ours is checked.
+    await expect(service.servedToday()).resolves.not.toContainEqual(
+      expect.objectContaining({ id: createdId }),
+    );
+    await ledger.recordPurchase({
+      operationId: randomUUID(),
+      customerId: createdId,
+      amountCents: 1250,
+    });
+
+    const ours = (await service.servedToday()).find((customer) => customer.id === createdId);
+    expect(ours).toMatchObject({ id: createdId, balance: 12, anonymizedAt: null });
+    expect(ours?.lastServedAt).not.toBeNull();
   });
 });
 

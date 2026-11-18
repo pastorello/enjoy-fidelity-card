@@ -24,6 +24,12 @@ const paths = {
   'chevron-right': <path d="m9 18 6-6-6-6" />,
   'chevron-left': <path d="m15 18-6-6 6-6" />,
   check: <path d="M20 6 9 17l-5-5" />,
+  'undo-2': (
+    <>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" />
+    </>
+  ),
   'credit-card': (
     <>
       <rect width="20" height="14" x="2" y="5" rx="2" />
@@ -81,6 +87,13 @@ const paths = {
     </>
   ),
   'loader-circle': <path d="M21 12a9 9 0 1 1-6.219-8.56" />,
+  delete: (
+    <>
+      <path d="M10 5a2 2 0 0 0-1.344.519l-6.328 5.74a1 1 0 0 0 0 1.481l6.328 5.741A2 2 0 0 0 10 19h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2z" />
+      <path d="m12 9 6 6" />
+      <path d="m18 9-6 6" />
+    </>
+  ),
   link: (
     <>
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />

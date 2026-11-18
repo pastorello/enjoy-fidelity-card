@@ -1,0 +1,105 @@
+/* Registra spesa (wireframe "Registra spesa"): IMPORTO, the points preview, the keypad. */
+.amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-ink);
+}
+
+.amountLabel {
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+.amountFigure {
+  font-family: var(--type-figure-family);
+  font-size: var(--type-figure-size);
+  line-height: var(--type-figure-line-height);
+  font-weight: var(--type-figure-weight);
+  letter-spacing: var(--type-figure-letter-spacing);
+  font-variant-numeric: lining-nums tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: end;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pointsRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+}
+
+.points {
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+  color: var(--color-accent-text);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.ratio {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+.failure {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+/* "Riscatta premio" and "Conferma +N" side by side, as in the wireframe. */
+.actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+/* Importo insolito: the warning tone of the design system, black on ochre (5,6:1). */
+.unusual {
+  display: flex;
+  align-items: flex-start;
+  /* 12px 16px as in the wireframe */
+  gap: calc(var(--space-2) + var(--space-1));
+  padding: calc(var(--space-2) + var(--space-1)) var(--space-3);
+  background: var(--color-ochre);
+  color: var(--color-ink);
+}
+
+.unusualIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.unusualTitle {
+  margin: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: var(--type-title-weight);
+}
+
+.unusualText {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+}
