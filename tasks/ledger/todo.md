@@ -394,9 +394,9 @@ e saldo si ricaricano; `already-cancelled` → ricarica senza errore; `insuffici
 spesi: questa spesa non si può più annullare." e ricarica; rete → dialogo aperto con "Annullamento non
 riuscito: controlla la connessione e riprova." (stesso id). L'operatore non vede pulsanti.
 **Accettazione:**
-- [ ] Componente: admin vede Annulla e "Punti già spesi"; operatore nessun Annulla (criteri 7, 8)
-- [ ] Componente: dialogo e testi per spesa e riscatto; correzione nell'elenco e saldo aggiornato
-- [ ] Componente: `already-cancelled`, `insufficient-balance`, rete con lo stesso id
+- [x] Componente: admin vede Annulla e "Punti già spesi"; operatore nessun Annulla (criteri 7, 8)
+- [x] Componente: dialogo e testi per spesa e riscatto; correzione nell'elenco e saldo aggiornato
+- [x] Componente: `already-cancelled`, `insufficient-balance`, rete con lo stesso id
 **Verifica:** `npm test -- MovementsPage`
 **Dipendenze:** 24 · **File:** src/features/ledger/MovementsPage.tsx, src/features/ledger/MovementsPage.test.tsx,
 src/features/ledger/CancelMovementDialog.tsx · **Dimensione:** M
