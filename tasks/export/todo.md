@@ -201,20 +201,20 @@ intestazioni." (idem movimenti), "Esportazione non riuscita: controlla la connes
 amministratore può esportare i dati." con `reportNotEnabled()`, "Esportazione non riuscita. Riprova; se
 succede ancora, avvisa chi gestisce l'app." (anche per un guasto del server).
 **Accettazione:**
-- [ ] Componente: due clic rapidi → una sola chiamata; messaggi di in corso, successo con conteggio
+- [x] Componente: due clic rapidi → una sola chiamata; messaggi di in corso, successo con conteggio
       raggruppato, nessun dato (file comunque scaricato)
-- [ ] Componente (criterio 7): rete giù → messaggio, download non chiamato, pulsante di nuovo attivo, nuovo
+- [x] Componente (criterio 7): rete giù → messaggio, download non chiamato, pulsante di nuovo attivo, nuovo
       tocco riuscito; imprevisto → messaggio
-- [ ] Componente: `forbidden` → messaggio e `reportNotEnabled()` chiamato (la sezione sparisce quando il
+- [x] Componente: `forbidden` → messaggio e `reportNotEnabled()` chiamato (la sezione sparisce quando il
       ruolo diventa operatore)
 **Verifica:** `npm test -- ExportSection`
 **Dipendenze:** 11 · **File:** src/features/export/ExportSection.tsx (+ .test.tsx),
 src/features/export/exportMessages.ts · **Dimensione:** M
 
 ## Checkpoint D
-- [ ] Quality bar completa verde; detector Impeccable pulito
-- [ ] Screenshot 390×844 confrontato con il wireframe Impostazioni (sezione ultima, pulsanti affiancati)
-- [ ] Revisione `security-and-hardening` del client: difesa dalle formule, nessun contenuto nei log o negli
+- [x] Quality bar completa verde; detector Impeccable pulito
+- [x] Screenshot 390×844 confrontato con il wireframe Impostazioni (sezione ultima, pulsanti affiancati)
+- [x] Revisione `security-and-hardening` del client: difesa dalle formule, nessun contenuto nei log o negli
       storage, ruolo deciso dal server
 
 ## Task 13: E2E dell'esportazione

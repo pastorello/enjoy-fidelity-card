@@ -122,7 +122,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 4: Impostazioni
 - [x] Task 11: Sezione ESPORTA DATI (solo admin, ultima della pagina) con icona `download`
-- [ ] Task 12: Stati della sezione: in corso, fatto, nessun dato, rete, permesso negato, imprevisto
+- [x] Task 12: Stati della sezione: in corso, fatto, nessun dato, rete, permesso negato, imprevisto
 
 ### Checkpoint D: Impeccable pulito; confronto a 390×844 con il wireframe Impostazioni; revisione `security-and-hardening` del client
 
