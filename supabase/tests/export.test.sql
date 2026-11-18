@@ -3,7 +3,7 @@
 -- accesso"). Fake data only: invented names, @example.com emails and uids.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(64);
+select plan(70);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -20,8 +20,9 @@ delete from auth.users where id = '00000000-0000-4000-e000-000000000004';
 
 -- Fake customers, with ids at the very end of the uuid order so the pagination
 -- checks below can start right before them:
---   …0001 Elio:    phone, notes, active card, purchase 12 + redemption -5 + its correction → 12
---   …0002 Fede:    no movements → 0
+--   …0001 Elio:    phone, notes, a lost card (deactivated) and the active one that replaced it,
+--                  purchase 12 + redemption -5 + its correction → 12
+--   …0002 Fede:    only a deactivated card, no movements → 0 (later: an uncorrected redemption -4)
 --   …0003 Anonimo: phone, notes, card, purchase 3, then anonymized with the RPC → 3
 --   …0004 Grezzo:  anonymized_at set by hand on a row that still holds personal data
 --                  and an active card: the function nulls them whatever the row holds
@@ -45,6 +46,15 @@ from (values
   ('04E0000000E001', 'ffffffff-ffff-4fff-8fff-000000000001'),
   ('04E0000000E003', 'ffffffff-ffff-4fff-8fff-000000000003'),
   ('04E0000000E004', 'ffffffff-ffff-4fff-8fff-000000000004')
+) as fake (uid, customer_id);
+-- Lost cards ("card persa → la vecchia si disattiva"): Elio's old one, replaced by E001,
+-- and Fede's only card. Neither may appear in the export.
+insert into app.cards (uid, customer_id, associated_by, active, deactivated_at)
+select fake.uid, fake.customer_id::uuid, (select id from app.operators where name = 'Operatore Esporta'),
+  false, timestamptz '2026-07-02 09:00:00+00'
+from (values
+  ('04E0000000E011', 'ffffffff-ffff-4fff-8fff-000000000001'),
+  ('04E0000000E002', 'ffffffff-ffff-4fff-8fff-000000000002')
 ) as fake (uid, customer_id);
 
 insert into app.movements
@@ -316,6 +326,30 @@ select is(
   'balance_points is 0 for a customer without movements'
 );
 select is(
+  (select count(*)::int from public.export_test_customers()
+   where id = 'ffffffff-ffff-4fff-8fff-000000000001'),
+  1,
+  'a customer with a deactivated card and an active one comes back once'
+);
+select is(
+  (select active_card_uid from public.export_test_customers()
+   where id = 'ffffffff-ffff-4fff-8fff-000000000001'),
+  '04E0000000E001',
+  'active_card_uid is the active card, not the deactivated one'
+);
+select is(
+  (select count(*)::int from public.export_test_customers()
+   where id = 'ffffffff-ffff-4fff-8fff-000000000002'),
+  1,
+  'a customer whose only card is deactivated comes back once'
+);
+select is(
+  (select active_card_uid from public.export_test_customers()
+   where id = 'ffffffff-ffff-4fff-8fff-000000000002'),
+  null,
+  'a customer whose only card is deactivated has active_card_uid null'
+);
+select is(
   (select row(name, phone, notes, active_card_uid)::text
    from app.export_customers('ffffffff-ffff-4fff-8fff-000000000002', 1)),
   '(,,,)',
@@ -407,6 +441,13 @@ select '00000000-0000-4000-e300-000000000005', gen_random_uuid(),
 from app.operators o where o.name = 'Admin Esporta';
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e000-000000000001","role":"authenticated"}', true);
+
+select is(
+  (select balance_points from public.export_test_customers()
+   where id = 'ffffffff-ffff-4fff-8fff-000000000002'),
+  -4,
+  'balance_points counts an uncorrected redemption, not only the purchases'
+);
 
 select results_eq(
   $$select id, customer_id, customer_name, kind, amount_cents, points, cents_per_point, description,
@@ -581,6 +622,17 @@ select throws_ok(
   'an unlinked admin profile cannot export movements'
 );
 reset role;
+
+-- balance_points against the ledger's own definition, read as the table owner with the
+-- admin's claims (private.customer_balance is not executable by authenticated).
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e000-000000000001","role":"authenticated"}', true);
+select ok(
+  not exists (
+    select 1 from public.export_test_customers() e
+    where e.balance_points is distinct from private.customer_balance(e.id)
+  ),
+  'every exported balance_points equals private.customer_balance of the customer'
+);
 
 -- anon -------------------------------------------------------------------------------------
 set local role anon;
