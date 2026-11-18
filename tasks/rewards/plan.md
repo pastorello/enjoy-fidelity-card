@@ -79,7 +79,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: unità e integrazione verdi; test esistenti invariati
 
 ### Fase 3: Impostazioni e catalogo
-- [ ] Task 6: Sezione GESTIONE nelle Impostazioni (solo admin, nell'ordine fissato)
+- [x] Task 6: Sezione GESTIONE nelle Impostazioni (solo admin, nell'ordine fissato)
 - [ ] Task 7: Rotta `/impostazioni/premi` e messaggio di permesso per l'operatore (icona `lock`)
 - [ ] Task 8: Elenco del catalogo: caricamento, vuoto, errore con Riprova, ordine, premio inattivo
 - [ ] Task 9: Casella Attivo: salvataggio immediato, ripristino in caso di errore, `forbidden`

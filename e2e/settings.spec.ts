@@ -98,13 +98,15 @@ test('an administrator changes the ratio and the threshold, and finds them after
 }) => {
   await openSettingsAs(page, seedAccounts.admin.email);
 
-  // Wireframe "Impostazioni": account box, PUNTI E CONTROLLI, then ACCOUNT (cross-review §1).
+  // Wireframe "Impostazioni": account box, PUNTI E CONTROLLI, ACCOUNT, then GESTIONE
+  // (cross-review §1).
   const sections = page.locator('main > section');
   await expect(sections.first()).toHaveAccessibleName('Account');
   await expect(sections.first()).toContainText(seedAccounts.admin.name);
   await expect(page.getByRole('main').getByRole('heading', { level: 2 })).toHaveText([
     'PUNTI E CONTROLLI',
     'ACCOUNT',
+    'GESTIONE',
   ]);
   await expect(page.getByText(FINAL_NOTE)).toHaveCount(0);
 
@@ -123,6 +125,7 @@ test('an administrator changes the ratio and the threshold, and finds them after
     thresholdField(page),
     page.getByRole('button', { name: 'Salva' }),
     page.getByRole('link', { name: /Cambia password/ }),
+    page.getByRole('link', { name: /Catalogo premi/ }),
   ]);
 
   await saveSettings(page, '2,00', '200,00');

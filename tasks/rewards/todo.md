@@ -110,9 +110,9 @@ src/features/rewards/RewardsServiceProvider.tsx, src/main.tsx, src/test/renderAp
 punti richiesti" con `to="/impostazioni/premi"`, solo se `useCurrentOperator().role === 'admin'`.
 `SettingsPage` la monta dopo ACCOUNT e prima della nota finale (ordine di `docs/specs/cross-review.md`).
 **Accettazione:**
-- [ ] Componenti: l'admin vede GESTIONE dopo ACCOUNT e prima di ogni sezione successiva; l'operatore non la
+- [x] Componenti: l'admin vede GESTIONE dopo ACCOUNT e prima di ogni sezione successiva; l'operatore non la
       vede; il tocco porta a `/impostazioni/premi`
-- [ ] Detector Impeccable pulito; riga ≥ 48 px
+- [x] Detector Impeccable pulito; riga ≥ 48 px
 **Verifica:** `npm test -- Settings`
 **Dipendenze:** 5 · **File:** src/features/rewards/RewardsSettingsSection.tsx (+ .test.tsx),
 src/features/identity/SettingsPage.tsx, src/features/identity/SettingsPage.test.tsx · **Dimensione:** S
