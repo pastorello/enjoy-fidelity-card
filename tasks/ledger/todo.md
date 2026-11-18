@@ -122,9 +122,9 @@ HH:MM"), gruppi per giorno (OGGI, IERI, "8 NOVEMBRE", con l'anno se diverso), te
 ("annulla la spesa delle 18:05", "annulla il riscatto delle HH:MM", "… del 7 nov alle 18:05"); sempre
 `timeZone: 'Europe/Rome'`.
 **Accettazione:**
-- [ ] Unità: date relative e gruppi a cavallo della mezzanotte di Roma e del cambio d'ora, con un orologio
+- [x] Unità: date relative e gruppi a cavallo della mezzanotte di Roma e del cambio d'ora, con un orologio
       fisso e la CI in UTC
-- [ ] Unità: testo della correzione stesso giorno / altro giorno, spesa / riscatto
+- [x] Unità: testo della correzione stesso giorno / altro giorno, spesa / riscatto
 **Verifica:** `npm test -- formatMovement`
 **Dipendenze:** 6 · **File:** src/features/ledger/formatMovement.ts, src/features/ledger/formatMovement.test.ts
 · **Dimensione:** S
