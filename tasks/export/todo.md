@@ -185,10 +185,10 @@ pulsanti `secondary` alti 48 px con icona, "Clienti CSV" a sinistra e "Movimenti
 `aria-live="polite"` sotto. `SettingsPage` la rende dopo `RewardsSettingsSection` e prima di
 `OperatorFinalNote`, solo se `operator.role === 'admin'`.
 **Accettazione:**
-- [ ] Componente (criterio 1): l'admin vede titolo e due pulsanti nell'ordine; l'operatore non vede la
+- [x] Componente (criterio 1): l'admin vede titolo e due pulsanti nell'ordine; l'operatore non vede la
       sezione (e vede ancora la nota finale di `settings`)
-- [ ] Componente (criterio 9): la sezione è l'ultima della pagina dell'admin; target ≥ 48 px
-- [ ] Detector Impeccable pulito; `displayGlyphs.test.ts` verde
+- [x] Componente (criterio 9): la sezione è l'ultima della pagina dell'admin; target ≥ 48 px
+- [x] Detector Impeccable pulito; `displayGlyphs.test.ts` verde
 **Verifica:** `npm test -- ExportSection SettingsPage displayGlyphs`
 **Dipendenze:** 10 · **File:** src/shared/ui/Icon.tsx, src/features/export/ExportSection.tsx
 (+ .module.css, .test.tsx), src/features/identity/SettingsPage.tsx · **Dimensione:** M

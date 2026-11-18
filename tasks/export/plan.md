@@ -121,7 +121,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint C: quality bar completa verde; revisione con l'utente prima della UI
 
 ### Fase 4: Impostazioni
-- [ ] Task 11: Sezione ESPORTA DATI (solo admin, ultima della pagina) con icona `download`
+- [x] Task 11: Sezione ESPORTA DATI (solo admin, ultima della pagina) con icona `download`
 - [ ] Task 12: Stati della sezione: in corso, fatto, nessun dato, rete, permesso negato, imprevisto
 
 ### Checkpoint D: Impeccable pulito; confronto a 390×844 con il wireframe Impostazioni; revisione `security-and-hardening` del client
