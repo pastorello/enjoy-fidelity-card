@@ -294,9 +294,9 @@ controlla che ogni criterio ne abbia almeno uno e che ogni test esista nel file 
 (criteri 2, 3 e 10 su Android, criterio 8 con `VITE_E2E=1`) restano annotate come tali. PR su `main`, da unire
 dopo #18.
 **Accettazione:**
-- [ ] `cardInputCriteria.test.ts` verde con 10 criteri
-- [ ] Quality bar completa verde; `npm run build && npm run check:bundle` verde
-- [ ] PR aperta con base `main`, descrizione con le verifiche manuali ancora da fare sul telefono
+- [x] `cardInputCriteria.test.ts` verde con 10 criteri
+- [x] Quality bar completa verde; `npm run build && npm run check:bundle` verde
+- [x] PR aperta con base `main`, descrizione con le verifiche manuali ancora da fare sul telefono (#19)
 **Verifica:** `npm test -- cardInputCriteria`; CI della PR
 **Dipendenze:** 15 · **File:** tasks/card-input/plan.md, tasks/card-input/todo.md,
 scripts/cardInputCriteria.test.ts · **Dimensione:** S

@@ -101,7 +101,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 5: Chiusura
 - [x] Task 15: Guardia del confine, procedura manuale nel RUNBOOK, memoria di progetto
-- [ ] Task 16: Verifica dei criteri di successo e PR
+- [x] Task 16: Verifica dei criteri di successo e PR
 
 ### Checkpoint E: i 10 criteri verificati (la parte manuale su Android con l'utente); quality bar completa verde; PR su `main` pronta per `code-review-and-quality`, da unire dopo #18
 
