@@ -280,9 +280,9 @@ e2e/card-input.spec.ts · **Dimensione:** M
 di `main.tsx`. RUNBOOK: procedura manuale su Android con un NTAG215 di prova (spec, Testing Strategy,
 "Manuale") e trappole trovate; `CLAUDE.md` (`npm run check:bundle`); `brain/MAP.md` e `brain/STATUS.md`.
 **Accettazione:**
-- [ ] La guardia fallisce se un componente chiama `NDEFReader` o se nel modulo compare un `console.log`
-- [ ] La procedura manuale copre i criteri 2, 3 e 10 passo per passo, con dove annotare l'esito
-- [ ] Nessun segreto, uid o URL reale nei documenti
+- [x] La guardia fallisce se un componente chiama `NDEFReader` o se nel modulo compare un `console.log`
+- [x] La procedura manuale copre i criteri 2, 3 e 10 passo per passo, con dove annotare l'esito
+- [x] Nessun segreto, uid o URL reale nei documenti
 **Verifica:** `npm test -- cardInputBoundary`; rilettura
 **Dipendenze:** 14 · **File:** scripts/cardInputBoundary.test.ts, brain/topics/operations/RUNBOOK.md,
 CLAUDE.md, brain/MAP.md, brain/STATUS.md · **Dimensione:** M
