@@ -5,6 +5,7 @@ import { formatDate, formatInteger } from '../../shared/format';
 import { ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
 import { CardSummary } from '../cards/CardSummary';
+import { CustomerLedgerSection } from '../ledger/CustomerLedgerSection';
 import styles from './CustomerPage.module.css';
 import { customerBackTo } from './customerBack';
 import { loadErrorText } from './loadErrorText';
@@ -43,6 +44,7 @@ function CustomerDetails({ customer }: { customer: CustomerSummary }) {
       <>
         <p className={styles.meta}>Dati cancellati il {formatDate(customer.anonymizedAt)}</p>
         <BalanceBox points={customer.balance} />
+        <CustomerLedgerSection customer={customer} />
       </>
     );
   }
@@ -56,6 +58,7 @@ function CustomerDetails({ customer }: { customer: CustomerSummary }) {
       />
       {customer.notes !== null && <p className={styles.notes}>{customer.notes}</p>}
       <BalanceBox points={customer.balance} />
+      <CustomerLedgerSection customer={customer} />
     </>
   );
 }
