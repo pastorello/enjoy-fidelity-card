@@ -150,10 +150,10 @@ di `rewards`, saldo aggiornato nel finto di `customers`), registro delle chiamat
 "arrivato ma risposta persa"; `LedgerServiceProvider` / `useLedgerService()`; `main.tsx` con
 `supabaseLedgerService`; `renderApp` con un parametro facoltativo in coda.
 **Accettazione:**
-- [ ] Unità del finto: stessi esiti di pgTAP per i casi principali (saldo insufficiente, replay, `EC003`,
+- [x] Unità del finto: stessi esiti di pgTAP per i casi principali (saldo insufficiente, replay, `EC003`,
       punti già spesi); "risposta persa" + reinvio = un movimento (criterio 4)
-- [ ] `useLedgerService()` fuori dal provider lancia un errore chiaro
-- [ ] Tutti i test esistenti passano senza modifiche
+- [x] `useLedgerService()` fuori dal provider lancia un errore chiaro
+- [x] Tutti i test esistenti passano senza modifiche
 **Verifica:** `npm test`
 **Dipendenze:** 8 · **File:** src/test/fakeLedgerService.ts (+ .test.ts),
 src/features/ledger/LedgerServiceProvider.tsx, src/main.tsx, src/test/renderApp.tsx · **Dimensione:** M

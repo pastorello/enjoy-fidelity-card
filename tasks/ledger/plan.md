@@ -114,7 +114,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 6: Tipi, `pointsFor`, riduttori dei tastierini, soglia strettamente sopra, importo del pulsante
 - [x] Task 7: `formatMovement`: etichette, date relative, gruppi per giorno, testo della correzione in `Europe/Rome`
 - [x] Task 8: `supabaseLedgerService`: RPC, vista, traduzione errori, timeout 8 s, guardia dei codici
-- [ ] Task 9: `fakeLedgerService`, `LedgerServiceProvider`, `main.tsx` e `renderApp`
+- [x] Task 9: `fakeLedgerService`, `LedgerServiceProvider`, `main.tsx` e `renderApp`
 - [ ] Task 10: Integrazione contro lo stack locale: concorrenza reale, idempotenza parallela, codici reali
 
 ### Checkpoint B: quality bar completa verde; test esistenti invariati; revisione con l'utente prima della UI
