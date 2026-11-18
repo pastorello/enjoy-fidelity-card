@@ -78,7 +78,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 3: Home "Cerca cliente"
 - [x] Task 7: Ricerca con attesa, `?q=`, risultati, limite 20, risposte fuori ordine; rotta indice
 - [x] Task 8: Nessun risultato, errore con Riprova, `not_operator` → `/accedi`
-- [ ] Task 9: SERVITI OGGI (vuota, errore, ricarica su `visibilitychange`) e messaggio di stato della home
+- [x] Task 9: SERVITI OGGI (vuota, errore, ricarica su `visibilitychange`) e messaggio di stato della home
 
 ### Checkpoint C: home verde nei test di componente; Impeccable pulito; confronto con Cerca cliente e Ricerca senza risultati
 

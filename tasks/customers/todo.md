@@ -151,9 +151,9 @@ src/features/customers/useNotOperator.ts · **Dimensione:** S
 caricare i clienti di oggi" con "Riprova"; ricarica all'apertura e su `visibilitychange`. Riga
 `role="status"` in cima con il messaggio passato nello stato della navigazione ("Dati del cliente cancellati.").
 **Accettazione:**
-- [ ] Componenti: lista piena con orari formattati; vuota → sezione assente; errore → riga compatta e
+- [x] Componenti: lista piena con orari formattati; vuota → sezione assente; errore → riga compatta e
       Riprova; ritorno visibile → nuova chiamata
-- [ ] Messaggio di navigazione mostrato una volta in `role="status"`
+- [x] Messaggio di navigazione mostrato una volta in `role="status"`
 **Verifica:** `npm test`
 **Dipendenze:** 7 · **File:** src/features/customers/HomePage.tsx (+ .module.css, .test.tsx),
 useServedToday.ts, src/shared/format.ts · **Dimensione:** M
