@@ -250,9 +250,9 @@ lo provano (`file › titolo`); `scripts/exportCriteria.test.ts` come `ledgerCri
 ogni prova esiste, il criterio 10 rimanda al RUNBOOK). `brain/MAP.md` registra il modulo. PR da
 `feat/export` su `main`, da unire dopo #21.
 **Accettazione:**
-- [ ] Ogni criterio 1–9 ha almeno una prova esistente; il 10 rimanda alla procedura del RUNBOOK
-- [ ] Quality bar completa verde; `npm run build && npm run check:bundle` verde
-- [ ] PR aperta con base `main`, con la nota "unire dopo #21"
+- [x] Ogni criterio 1–9 ha almeno una prova esistente; il 10 rimanda alla procedura del RUNBOOK
+- [x] Quality bar completa verde; `npm run build && npm run check:bundle` verde
+- [x] PR aperta con base `main`, con la nota "unire dopo #21"
 **Verifica:** `npm test -- exportCriteria`; quality bar completa
 **Dipendenze:** 14 · **File:** tasks/export/plan.md, tasks/export/todo.md, scripts/exportCriteria.test.ts,
 brain/MAP.md · **Dimensione:** S
