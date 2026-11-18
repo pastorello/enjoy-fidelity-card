@@ -45,8 +45,9 @@ del modulo `identity`.
    `app.rewards` con nome unico senza distinzione di maiuscole, RPC solo admin (`create_reward` idempotente,
    `update_reward`, `set_reward_active`), nessuna cancellazione; GESTIONE → "Catalogo premi" in
    `/impostazioni/premi` con Nuovo premio / Modifica premio; 9 criteri di successo verificati test per test
-   (`tasks/rewards/plan.md`), quality bar completa verde in locale. Migrazione `*_rewards.sql` da applicare
-   allo staging con `db push`. **Prossimi moduli**: gli altri nell'ordine di `CAPABILITY-MAP.md`.
+   (`tasks/rewards/plan.md`), quality bar completa verde in locale. Migrazioni `*_rewards*.sql` (3) da
+   applicare allo staging con `db push`. **Prossimo modulo**: `card-input` (poi `cards` e `ledger`,
+   ordine di `CAPABILITY-MAP.md`), su un nuovo ramo da `feat/rewards`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
