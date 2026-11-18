@@ -1,4 +1,4 @@
-/* Wireframe "Registra spesa (aperta dalla card)": the customer row right under the header, full width. */
+/* The customer row right under the header, full width (wireframes Associa card, Registra spesa). */
 .customer {
   display: flex;
   align-items: center;

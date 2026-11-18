@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { formatTime } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
@@ -14,8 +14,8 @@ import { useHomeCardRead } from '../cards/useHomeCardRead';
 import { useCurrentOperator } from '../identity/AuthProvider';
 import styles from './HomePage.module.css';
 import { customerBackState } from './customerBack';
-import { readHomeNotice } from './homeNotice';
 import { loadErrorText } from './loadErrorText';
+import { NavigationNotice } from './NavigationNotice';
 import { classifyQuery, maskPhone } from './phone';
 import type { CustomerSummary } from './types';
 import { SEARCH_SHOWN_ROWS, useCustomerSearch, type CustomerSearch } from './useCustomerSearch';
@@ -106,35 +106,6 @@ function searchAnnouncement(search: CustomerSearch): string {
   return count === 1 ? '1 cliente trovato' : `${count} clienti trovati`;
 }
 
-/** A live region is read only when its text changes after it is on the page. */
-const NOTICE_DELAY_MS = 100;
-
-/**
- * The one-time message of the navigation state (`homeNotice.ts`): kept for as long as the home
- * is open, dropped at once from the history entry so "Indietro" or a reload does not show it again.
- */
-function useHomeNotice(): { notice: string | null; written: boolean } {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [notice] = useState(() => readHomeNotice(location.state));
-  // The status row is mounted empty and the message written a moment later, so it is read out.
-  const [written, setWritten] = useState(false);
-  useEffect(() => {
-    if (notice === null) return undefined;
-    const timer = window.setTimeout(() => setWritten(true), NOTICE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-  const carried = readHomeNotice(location.state) !== null;
-  useEffect(() => {
-    if (!carried) return;
-    void navigate(
-      { pathname: location.pathname, search: location.search, hash: location.hash },
-      { replace: true, state: null },
-    );
-  }, [carried, navigate, location.pathname, location.search, location.hash]);
-  return { notice, written };
-}
-
 /** Text of the card panel while reading is active (wireframe Cerca cliente). */
 const CARD_PANEL_TITLE = 'Avvicina la card';
 const CARD_PANEL_TEXT =
@@ -146,7 +117,6 @@ const CARD_PANEL_READING = 'Lettura della card…';
 /** Home "Cerca cliente": card panel, search by name or phone, SERVITI OGGI, "Nuovo cliente". */
 export function HomePage() {
   const operator = useCurrentOperator();
-  const { notice, written: noticeWritten } = useHomeNotice();
   const served = useServedToday();
   const [searchParams, setSearchParams] = useSearchParams();
   // The text lives in the URL too (`?q=`, replaced), so "Indietro" from a customer finds it again.
@@ -223,16 +193,7 @@ export function HomePage() {
         )
       }
     >
-      {notice !== null && (
-        <output className={noticeWritten ? styles.notice : 'visually-hidden'}>
-          {noticeWritten && (
-            <>
-              <Icon name="check" size={20} />
-              {notice}
-            </>
-          )}
-        </output>
-      )}
+      <NavigationNotice />
       <CardReadPanel
         title={CARD_PANEL_TITLE}
         description={cardRead.status === 'reading' ? CARD_PANEL_READING : CARD_PANEL_TEXT}

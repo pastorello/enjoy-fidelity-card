@@ -21,16 +21,33 @@ type CardTakenNoticeProps = {
   owner: CardOwner | null;
   /** The screen's own way out, before "Apri la scheda di …" (e.g. "Continua senza card"). */
   children?: ReactNode;
+  /**
+   * False: the notice is only the alert, and the screen puts its buttons and `OpenOwnerLink` in its
+   * footer (wireframe "Card già di un altro cliente").
+   */
+  withActions?: boolean;
 };
+
+/** "Apri la scheda di Antonio", or nothing when the owner has no name (erased) or is unknown. */
+export function OpenOwnerLink({ owner }: { owner: CardOwner | null }) {
+  const name = owner?.name ? firstName(owner.name) : null;
+  if (!owner || name === null) return null;
+  return (
+    <ButtonLink to={`/clienti/${owner.customerId}`} variant="secondary" block>
+      Apri la scheda di{' '}
+      <span className={NOT_IN_DISPLAY.test(name) ? styles.typedName : undefined}>{name}</span>
+    </ButtonLink>
+  );
+}
 
 /**
  * "Card già associata" (SPEC-cards, point 4; wireframe "Card già di un altro cliente"): a uid
  * belongs to one customer forever. "Apri la scheda di …" only when the owner has a name: an erased
  * customer is never named nor opened.
  */
-export function CardTakenNotice({ owner, children }: CardTakenNoticeProps) {
+export function CardTakenNotice({ owner, children, withActions = true }: CardTakenNoticeProps) {
   const titleId = useId();
-  const name = owner?.name ? firstName(owner.name) : null;
+  const named = Boolean(owner?.name);
   return (
     <section role="alert" aria-labelledby={titleId} className={styles.notice}>
       <Icon name="circle-alert" size={48} className={styles.icon} />
@@ -38,17 +55,10 @@ export function CardTakenNotice({ owner, children }: CardTakenNoticeProps) {
         Card già associata
       </h2>
       <p className={styles.text}>{ownerText(owner)}</p>
-      {(children !== undefined || (owner && name !== null)) && (
+      {withActions && (children !== undefined || named) && (
         <div className={styles.actions}>
           {children}
-          {owner && name !== null && (
-            <ButtonLink to={`/clienti/${owner.customerId}`} variant="secondary" block>
-              Apri la scheda di{' '}
-              <span className={NOT_IN_DISPLAY.test(name) ? styles.typedName : undefined}>
-                {name}
-              </span>
-            </ButtonLink>
-          )}
+          <OpenOwnerLink owner={owner} />
         </div>
       )}
     </section>

@@ -7,6 +7,7 @@ import { StatusView } from '../../shared/ui/StatusView';
 import styles from './CustomerPage.module.css';
 import { customerBackTo } from './customerBack';
 import { loadErrorText } from './loadErrorText';
+import { NavigationNotice } from './NavigationNotice';
 import { formatPhoneForCard } from './phone';
 import type { CustomerSummary } from './types';
 import { useCustomer } from './useCustomer';
@@ -58,7 +59,8 @@ function CustomerDetails({ customer }: { customer: CustomerSummary }) {
 /**
  * Scheda cliente (`/clienti/:id`; wireframe Scheda cliente): the name as title with "Modifica
  * cliente", the phone, the notes and the balance. "Indietro" returns to the search it came from.
- * An id that is not a UUID is "Cliente non trovato" without asking the server.
+ * An id that is not a UUID is "Cliente non trovato" without asking the server. A one-time message
+ * of the navigation state ("Card …A1B2 associata.") opens the page.
  */
 export function CustomerPage() {
   const { id = '' } = useParams();
@@ -89,6 +91,7 @@ export function CustomerPage() {
             : { label: 'Modifica cliente', icon: 'pencil', to: `/clienti/${customer.id}/modifica` }
         }
       >
+        <NavigationNotice />
         <CustomerDetails customer={customer} />
       </AppShell>
     );

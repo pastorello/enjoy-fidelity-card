@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router';
+import { AssociateCardPage } from '../features/cards/AssociateCardPage';
 import { PurchasePlaceholderPage } from '../features/cards/PurchasePlaceholderPage';
 import { EditCustomerPage } from '../features/customers/EditCustomerPage';
 import { CustomerPage } from '../features/customers/CustomerPage';
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
           { path: 'clienti/nuovo', Component: NewCustomerPage },
           { path: 'clienti/:id', Component: CustomerPage },
           { path: 'clienti/:id/modifica', Component: EditCustomerPage },
+          { path: 'clienti/:id/card', Component: AssociateCardPage },
           // A placeholder until `ledger` builds Registra spesa on the same route.
           { path: 'clienti/:id/spesa', Component: PurchasePlaceholderPage },
           { path: 'impostazioni', Component: SettingsPage },

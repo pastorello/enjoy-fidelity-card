@@ -229,3 +229,21 @@ describe('CustomerPage: a long name', () => {
     expect(main.firstElementChild?.nextElementSibling).toHaveTextContent('Tel. 333 ••• 4521');
   });
 });
+
+describe('CustomerPage: a one-time message of the navigation state', () => {
+  it('shows it once in a status row, drops it from the history entry, keeps the rest of the state', async () => {
+    const { router } = renderCustomer('/');
+    await act(async () => {
+      await router.navigate(`/clienti/${MARIA.id}`, {
+        state: { notice: 'Card …0001 associata. Link non scritto.', backSearch: 'rossi' },
+      });
+    });
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Card …0001 associata. Link non scritto.',
+      ),
+    );
+    expect(router.state.location.state).toEqual({ backSearch: 'rossi' });
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/?q=rossi');
+  });
+});

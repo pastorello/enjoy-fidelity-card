@@ -1,0 +1,18 @@
+/* Wireframe "Associa o sostituisci card": the note under the panel, a small icon beside the text. */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+}
+
+.note svg {
+  flex-shrink: 0;
+}
+
+.check {
+  color: var(--color-accent-text);
+}
