@@ -284,3 +284,145 @@ $$;
 -- Explicit grants: never rely on the default privileges.
 revoke execute on function app.record_purchase(uuid, uuid, int) from public, anon;
 grant execute on function app.record_purchase(uuid, uuid, int) to authenticated;
+
+-- redeem_reward ------------------------------------------------------------------------------
+-- Redeems a reward of the catalogue (SPEC-rewards.md, "Interfaccia verso ledger"): the
+-- reward is read here, never trusted from the app; an inactive or unknown one is EC005.
+-- The movement saves its current points (negative) and name, so later changes to the
+-- reward never alter the history. The balance may never go below zero (EC001), checked
+-- after the customer's lock so two concurrent redemptions cannot spend the same points.
+create function app.redeem_reward(p_operation_id uuid, p_customer_id uuid, p_reward_id uuid)
+returns app.ledger_result
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_operator uuid;
+  v_existing app.movements;
+  v_reward app.rewards;
+  v_id uuid;
+begin
+  -- (1) who records it
+  v_operator := private.acting_operator_id();
+  if v_operator is null then
+    raise exception 'No acting operator for this write' using errcode = '42501';
+  end if;
+
+  -- (2) one write at a time per customer
+  perform private.lock_customer_for_ledger(p_customer_id);
+
+  -- (3) replay or conflict; a replay returns the first movement even if the reward
+  -- changed or was deactivated since
+  select * into v_existing from app.movements where operation_id = p_operation_id;
+  if found then
+    if v_existing.kind = 'redemption'
+       and v_existing.customer_id = p_customer_id
+       and v_existing.reward_id = p_reward_id then
+      return private.ledger_result_for(v_existing.id);
+    end if;
+    raise exception 'operation_id already used for another operation' using errcode = 'EC007';
+  end if;
+
+  -- (4) validate, read the reward, check the balance, insert
+  if p_operation_id is null then
+    raise exception 'operation_id is required' using errcode = '22023';
+  end if;
+
+  -- for share: a concurrent change of the reward waits until this redemption commits
+  select * into v_reward from app.rewards r where r.id = p_reward_id for share;
+  if not found or not v_reward.active then
+    raise exception 'reward unavailable' using errcode = 'EC005';
+  end if;
+
+  if private.customer_balance(p_customer_id) - v_reward.points < 0 then
+    raise exception 'insufficient balance' using errcode = 'EC001';
+  end if;
+
+  begin
+    insert into app.movements
+      (operation_id, customer_id, kind, points, reward_id, description, operator_id)
+    values
+      (p_operation_id, p_customer_id, 'redemption', -v_reward.points, v_reward.id, v_reward.name,
+       v_operator)
+    returning id into v_id;
+  exception when unique_violation then
+    raise exception 'operation_id already used for another operation' using errcode = 'EC007';
+  end;
+
+  return private.ledger_result_for(v_id);
+end;
+$$;
+
+revoke execute on function app.redeem_reward(uuid, uuid, uuid) from public, anon;
+grant execute on function app.redeem_reward(uuid, uuid, uuid) to authenticated;
+
+-- redeem_free_reward ---------------------------------------------------------------------------
+-- Redeems a reward outside the catalogue: a description of 1..80 characters after
+-- trimming outer (Unicode) spaces and 1..99999 points, otherwise 22023. Same lock,
+-- replay and balance rules as redeem_reward.
+create function app.redeem_free_reward(
+  p_operation_id uuid, p_customer_id uuid, p_description text, p_points int
+)
+returns app.ledger_result
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_operator uuid;
+  v_existing app.movements;
+  v_description text := private.trim_spaces(p_description);
+  v_id uuid;
+begin
+  -- (1) who records it
+  v_operator := private.acting_operator_id();
+  if v_operator is null then
+    raise exception 'No acting operator for this write' using errcode = '42501';
+  end if;
+
+  -- (2) one write at a time per customer
+  perform private.lock_customer_for_ledger(p_customer_id);
+
+  -- (3) replay or conflict
+  select * into v_existing from app.movements where operation_id = p_operation_id;
+  if found then
+    if v_existing.kind = 'redemption'
+       and v_existing.reward_id is null
+       and v_existing.customer_id = p_customer_id
+       and v_existing.description = v_description
+       and v_existing.points = -p_points then
+      return private.ledger_result_for(v_existing.id);
+    end if;
+    raise exception 'operation_id already used for another operation' using errcode = 'EC007';
+  end if;
+
+  -- (4) validate, check the balance, insert
+  if p_operation_id is null then
+    raise exception 'operation_id is required' using errcode = '22023';
+  end if;
+  if v_description is null or length(v_description) not between 1 and 80 then
+    raise exception 'description must be 1 to 80 characters' using errcode = '22023';
+  end if;
+  if p_points is null or p_points not between 1 and 99999 then
+    raise exception 'points must be between 1 and 99999, got %', p_points using errcode = '22023';
+  end if;
+
+  if private.customer_balance(p_customer_id) - p_points < 0 then
+    raise exception 'insufficient balance' using errcode = 'EC001';
+  end if;
+
+  begin
+    insert into app.movements (operation_id, customer_id, kind, points, description, operator_id)
+    values (p_operation_id, p_customer_id, 'redemption', -p_points, v_description, v_operator)
+    returning id into v_id;
+  exception when unique_violation then
+    raise exception 'operation_id already used for another operation' using errcode = 'EC007';
+  end;
+
+  return private.ledger_result_for(v_id);
+end;
+$$;
+
+revoke execute on function app.redeem_free_reward(uuid, uuid, text, int) from public, anon;
+grant execute on function app.redeem_free_reward(uuid, uuid, text, int) to authenticated;

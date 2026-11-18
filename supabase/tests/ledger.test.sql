@@ -3,7 +3,7 @@
 -- regole di accesso"). Fake data only: invented names and @example.com emails.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(89);
+select plan(133);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -540,6 +540,297 @@ select is(
   (select count(*) from app.movements where customer_id = '00000000-0000-4000-9100-000000000003'),
   4::bigint,
   'the rejected purchases recorded nothing'
+);
+
+-- redeem_reward and redeem_free_reward ---------------------------------------------------------
+select ok(
+  has_function_privilege('authenticated', 'app.redeem_reward(uuid, uuid, uuid)', 'execute')
+    and has_function_privilege('authenticated', 'app.redeem_free_reward(uuid, uuid, text, int)', 'execute'),
+  'authenticated executes redeem_reward and redeem_free_reward'
+);
+select ok(
+  not has_function_privilege('anon', 'app.redeem_reward(uuid, uuid, uuid)', 'execute')
+    and not has_function_privilege('anon', 'app.redeem_free_reward(uuid, uuid, text, int)', 'execute')
+    and not exists (
+      select 1
+      from pg_proc p
+      cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+      where p.oid in ('app.redeem_reward(uuid, uuid, uuid)'::regprocedure,
+                      'app.redeem_free_reward(uuid, uuid, text, int)'::regprocedure)
+        and acl.grantee = 0 and acl.privilege_type = 'EXECUTE'
+    ),
+  'neither anon nor PUBLIC execute the redemption RPCs'
+);
+select ok(
+  (select bool_and(prosecdef and proconfig = array['search_path=""']
+     and prorettype = 'app.ledger_result'::regtype)
+   from pg_proc
+   where oid in ('app.redeem_reward(uuid, uuid, uuid)'::regprocedure,
+                 'app.redeem_free_reward(uuid, uuid, text, int)'::regprocedure)),
+  'the redemption RPCs are security definer, pin an empty search_path and return app.ledger_result'
+);
+
+-- Elena redeems; a second reward of the catalogue is inactive.
+insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
+select '00000000-0000-4000-9100-000000000005', 'Elena Premi', now(), o.id,
+  '00000000-0000-4000-9200-000000000005'
+from app.operators o where o.name = 'Admin Movimenti';
+insert into app.rewards (id, name, points, active, created_by, updated_by)
+select '00000000-0000-4000-9400-000000000002', 'Premio spento di prova', 1, false, o.id, o.id
+from app.operators o where o.name = 'Admin Movimenti';
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000002","role":"authenticated"}', true);
+
+select results_eq(
+  $$select (r.movement).points, r.balance
+    from app.record_purchase('00000000-0000-4000-9700-000000000001',
+      '00000000-0000-4000-9100-000000000005', 2000) r$$,
+  $$values (20, 20)$$,
+  'Elena buys 20 points'
+);
+
+-- A catalogue redemption reads the reward on the server.
+select results_eq(
+  $$select (r.movement).kind, (r.movement).customer_id, (r.movement).points, (r.movement).reward_id,
+      (r.movement).description, (r.movement).amount_cents, (r.movement).cents_per_point,
+      (r.movement).operator_name, (r.movement).operation_id, r.balance
+    from app.redeem_reward('00000000-0000-4000-9700-000000000002',
+      '00000000-0000-4000-9100-000000000005', '00000000-0000-4000-9400-000000000001') r$$,
+  $$values ('redemption'::text, '00000000-0000-4000-9100-000000000005'::uuid, -10,
+      '00000000-0000-4000-9400-000000000001'::uuid, 'Caffè di prova'::text, null::int, null::int,
+      'Operatore Movimenti'::text, '00000000-0000-4000-9700-000000000002'::uuid, 10)$$,
+  'redeeming the 10-point reward saves -10 points, its name and its id; balance 10'
+);
+
+-- The admin renames the reward and raises it to 15 points.
+reset role;
+update app.rewards set name = 'Caffè grande di prova', points = 15
+where id = '00000000-0000-4000-9400-000000000001';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000002","role":"authenticated"}', true);
+
+select results_eq(
+  $$select description, points from app.movements
+    where operation_id = '00000000-0000-4000-9700-000000000002'$$,
+  $$values ('Caffè di prova'::text, -10)$$,
+  'renaming the reward or changing its points leaves the recorded redemption unchanged'
+);
+
+-- Replay (criterion 4): the first movement, with the current balance.
+select results_eq(
+  $$select (r.movement).id, (r.movement).description, (r.movement).points, r.balance
+    from app.redeem_reward('00000000-0000-4000-9700-000000000002',
+      '00000000-0000-4000-9100-000000000005', '00000000-0000-4000-9400-000000000001') r$$,
+  $$select id, 'Caffè di prova'::text, -10, 10 from app.movements
+    where operation_id = '00000000-0000-4000-9700-000000000002'$$,
+  'a resent redemption returns the first movement, not the reward as it is now'
+);
+select throws_ok(
+  $$select app.redeem_reward('00000000-0000-4000-9700-000000000002',
+      '00000000-0000-4000-9100-000000000005', '00000000-0000-4000-9400-000000000002')$$,
+  'EC007', null, 'the same operation_id with another reward is a conflict'
+);
+select throws_ok(
+  $$select app.redeem_reward('00000000-0000-4000-9700-000000000002',
+      '00000000-0000-4000-9100-000000000003', '00000000-0000-4000-9400-000000000001')$$,
+  'EC007', null, 'the same operation_id with another customer is a conflict'
+);
+select throws_ok(
+  $$select app.redeem_reward('00000000-0000-4000-9700-000000000001',
+      '00000000-0000-4000-9100-000000000005', '00000000-0000-4000-9400-000000000001')$$,
+  'EC007', null, 'the operation_id of a purchase is a conflict for a redemption'
+);
+select throws_ok(
+  $$select app.redeem_free_reward('00000000-0000-4000-9700-000000000002',
+      '00000000-0000-4000-9100-000000000005', 'Caffè di prova', 10)$$,
+  'EC007', null, 'the operation_id of a catalogue redemption is a conflict for a free one'
+);
+
+-- The current points of the reward (15) are more than the balance (10): EC001 (criterion 5).
+select throws_ok(
+  $$select app.redeem_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005',
+      '00000000-0000-4000-9400-000000000001')$$,
+  'EC001', null, 'a redemption beyond the balance is rejected, with the current points of the reward'
+);
+
+-- Unavailable rewards.
+select throws_ok(
+  $$select app.redeem_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005',
+      '00000000-0000-4000-9400-000000000002')$$,
+  'EC005', null, 'an inactive reward is unavailable'
+);
+select throws_ok(
+  $$select app.redeem_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005',
+      '00000000-0000-4000-9400-0000000000ff')$$,
+  'EC005', null, 'a reward that does not exist is unavailable'
+);
+select throws_ok(
+  $$select app.redeem_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005', null)$$,
+  'EC005', null, 'a null reward is unavailable'
+);
+select throws_ok(
+  $$select app.redeem_reward(null, '00000000-0000-4000-9100-000000000005',
+      '00000000-0000-4000-9400-000000000001')$$,
+  '22023', null, 'a redemption without operation_id is invalid'
+);
+
+-- A free redemption of exactly the balance leaves 0 (criterion 5); outer Unicode spaces trimmed.
+select results_eq(
+  $$select (r.movement).kind, (r.movement).points, (r.movement).reward_id, (r.movement).description,
+      r.balance
+    from app.redeem_free_reward('00000000-0000-4000-9700-000000000003',
+      '00000000-0000-4000-9100-000000000005', E'  Cornetto di prova\t', 10) r$$,
+  $$values ('redemption'::text, -10, null::uuid, 'Cornetto di prova'::text, 0)$$,
+  'a free redemption equal to the balance is accepted and leaves 0, its description trimmed'
+);
+select results_eq(
+  $$select (r.movement).id, r.balance
+    from app.redeem_free_reward('00000000-0000-4000-9700-000000000003',
+      '00000000-0000-4000-9100-000000000005', 'Cornetto di prova', 10) r$$,
+  $$select id, 0 from app.movements where operation_id = '00000000-0000-4000-9700-000000000003'$$,
+  'a resent free redemption returns the first movement'
+);
+select throws_ok(
+  $$select app.redeem_free_reward('00000000-0000-4000-9700-000000000003',
+      '00000000-0000-4000-9100-000000000005', 'Cornetto di prova', 11)$$,
+  'EC007', null, 'the same operation_id with other points is a conflict'
+);
+select throws_ok(
+  $$select app.redeem_free_reward('00000000-0000-4000-9700-000000000003',
+      '00000000-0000-4000-9100-000000000005', 'Brioche di prova', 10)$$,
+  'EC007', null, 'the same operation_id with another description is a conflict'
+);
+select throws_ok(
+  $$select app.redeem_reward('00000000-0000-4000-9700-000000000003',
+      '00000000-0000-4000-9100-000000000005', '00000000-0000-4000-9400-000000000001')$$,
+  'EC007', null, 'the operation_id of a free redemption is a conflict for a catalogue one'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005',
+      'Cornetto di prova', 1)$$,
+  'EC001', null, 'with balance 0 not even 1 point can be redeemed: the balance never goes below zero'
+);
+
+-- A catalogue redemption of exactly the balance.
+select results_eq(
+  $$select r.balance from app.record_purchase('00000000-0000-4000-9700-000000000004',
+      '00000000-0000-4000-9100-000000000005', 1500) r$$,
+  $$values (15)$$,
+  'Elena buys 15 points'
+);
+select results_eq(
+  $$select (r.movement).points, (r.movement).description, r.balance
+    from app.redeem_reward('00000000-0000-4000-9700-000000000005',
+      '00000000-0000-4000-9100-000000000005', '00000000-0000-4000-9400-000000000001') r$$,
+  $$values (-15, 'Caffè grande di prova'::text, 0)$$,
+  'a catalogue redemption equal to the balance uses the current name and points and leaves 0'
+);
+
+-- Free redemption limits.
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002', '', 1)$$,
+  '22023', null, 'an empty description is invalid'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002', '    ', 1)$$,
+  '22023', null, 'a description of spaces only is invalid'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002',
+      repeat('x', 81), 1)$$,
+  '22023', null, 'an 81-character description is invalid'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002', null, 1)$$,
+  '22023', null, 'a null description is invalid'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002', 'Premio', 0)$$,
+  '22023', null, 'a free redemption of 0 points is invalid'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002', 'Premio',
+      100000)$$,
+  '22023', null, 'a free redemption of 100000 points is invalid'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002', 'Premio', -5)$$,
+  '22023', null, 'a free redemption of negative points is invalid'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002', 'Premio',
+      null)$$,
+  '22023', null, 'a free redemption without points is invalid'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(null, '00000000-0000-4000-9100-000000000002', 'Premio', 1)$$,
+  '22023', null, 'a free redemption without operation_id is invalid'
+);
+-- Bruno has 99999 points from the largest purchase.
+select results_eq(
+  $$select (r.movement).points, length((r.movement).description), r.balance
+    from app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000002',
+      repeat('y', 80), 99999) r$$,
+  $$values (-99999, 80, 0)$$,
+  '80 characters and 99999 points are the largest free redemption accepted'
+);
+
+-- Customers that cannot redeem.
+select throws_ok(
+  $$select app.redeem_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000004',
+      '00000000-0000-4000-9400-000000000001')$$,
+  'EC006', null, 'an anonymized customer cannot redeem a reward'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000004', 'Premio', 1)$$,
+  'EC006', null, 'an anonymized customer cannot redeem a free reward'
+);
+select throws_ok(
+  $$select app.redeem_reward(gen_random_uuid(), '00000000-0000-4000-9100-0000000000ff',
+      '00000000-0000-4000-9400-000000000001')$$,
+  'EC006', null, 'a customer that does not exist cannot redeem a reward'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-0000000000ff', 'Premio', 1)$$,
+  'EC006', null, 'a customer that does not exist cannot redeem a free reward'
+);
+
+-- A signed-in user without an operator profile.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000003","role":"authenticated"}', true);
+select throws_ok(
+  $$select app.redeem_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005',
+      '00000000-0000-4000-9400-000000000001')$$,
+  '42501', null, 'a user without an operator profile cannot redeem a reward'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005', 'Premio', 1)$$,
+  '42501', null, 'a user without an operator profile cannot redeem a free reward'
+);
+reset role;
+
+set local role anon;
+select throws_ok(
+  $$select app.redeem_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005',
+      '00000000-0000-4000-9400-000000000001')$$,
+  '42501', null, 'anon cannot redeem a reward'
+);
+select throws_ok(
+  $$select app.redeem_free_reward(gen_random_uuid(), '00000000-0000-4000-9100-000000000005', 'Premio', 1)$$,
+  '42501', null, 'anon cannot redeem a free reward'
+);
+reset role;
+
+select results_eq(
+  $$select count(*), private.customer_balance('00000000-0000-4000-9100-000000000005')
+    from app.movements where customer_id = '00000000-0000-4000-9100-000000000005'$$,
+  $$values (5::bigint, 0)$$,
+  'only the accepted movements were recorded for Elena and her balance is 0'
+);
+select is(
+  (select count(*) from app.movements where customer_id = '00000000-0000-4000-9100-000000000004'),
+  0::bigint,
+  'nothing was recorded for the anonymized customer'
 );
 
 select * from finish();
