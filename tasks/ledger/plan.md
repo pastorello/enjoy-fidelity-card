@@ -142,7 +142,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 5: Scheda e storico
 - [x] Task 23: `CustomerLedgerSection` nella Scheda cliente: pulsanti e ULTIMI MOVIMENTI
-- [ ] Task 24: Movimenti (`/clienti/:id/movimenti`): gruppi per giorno, 50 per volta, correzioni e annullati
+- [x] Task 24: Movimenti (`/clienti/:id/movimenti`): gruppi per giorno, 50 per volta, correzioni e annullati
 - [ ] Task 25: Annullo dell'amministratore dallo storico: «Punti già spesi», dialogo di conferma, rifiuti
 - [ ] Task 26: E2E dello storico: admin annulla una spesa e vede la correzione; operatore senza Annulla
 

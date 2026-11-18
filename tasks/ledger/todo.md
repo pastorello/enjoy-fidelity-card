@@ -377,9 +377,9 @@ riga cliente; gruppi per giorno (`h2`), più recenti in alto, 50 per volta con "
 sola ora; correzione "Correzione · 18:12 · Andrea · annulla la spesa delle 18:05"; annullati barrati in
 colore secondario con "· annullata"; vuoto "Ancora nessun movimento"; stati comuni.
 **Accettazione:**
-- [ ] Componente: gruppi OGGI/IERI/data, testi di correzione e annullati (criterio 6)
-- [ ] Componente: "Mostra altri" carica i 50 successivi; vuoto; errore con Riprova
-- [ ] Impeccable pulito; confronto con Movimenti
+- [x] Componente: gruppi OGGI/IERI/data, testi di correzione e annullati (criterio 6)
+- [x] Componente: "Mostra altri" carica i 50 successivi; vuoto; errore con Riprova
+- [x] Impeccable pulito; confronto con Movimenti
 **Verifica:** `npm test -- MovementsPage`
 **Dipendenze:** 23 · **File:** src/features/ledger/MovementsPage.tsx (+ .module.css, .test.tsx),
 src/app/routes.tsx · **Dimensione:** M
