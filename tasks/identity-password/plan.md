@@ -1,6 +1,6 @@
 # Implementation Plan: identity-password
 
-Source spec: [SPEC-identity-password.md](../../SPEC-identity-password.md) (approvata il 2026-11-17; le Open
+Source spec: [SPEC-identity-password.md](../../docs/specs/SPEC-identity-password.md) (approvata il 2026-11-17; le Open
 Questions usano i default adottati)
 
 ## Overview

@@ -1,6 +1,6 @@
 # Implementation Plan: platform
 
-Source spec: [SPEC-platform.md](../SPEC-platform.md) (approvata il 2026-11-16)
+Source spec: [SPEC-platform.md](../docs/specs/SPEC-platform.md) (approvata il 2026-11-16)
 
 ## Overview
 

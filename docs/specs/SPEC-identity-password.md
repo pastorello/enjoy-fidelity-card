@@ -1,7 +1,7 @@
 # Spec: identity — Password dimenticata e Cambia password
 
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
-Modulo: `identity` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `identity` V1 ([SPEC-identity.md](SPEC-identity.md)) ·
+Modulo: `identity` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity` V1 ([SPEC-identity.md](SPEC-identity.md)) ·
 Fonti: specifiche ("Ruoli e account"), wireframe Accesso, Password dimenticata, Invito: scegli la password,
 Impostazioni (operatore) · Decisione: `brain/DECISIONS.md`, 2026-11-17 "Email di Auth attive; Password
 dimenticata subito dopo la V1".

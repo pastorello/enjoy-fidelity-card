@@ -1,6 +1,6 @@
 # Todo: customers
 
-Fonte: [plan.md](plan.md) · Spec: [SPEC-customers.md](../../SPEC-customers.md). Ogni task chiude con
+Fonte: [plan.md](plan.md) · Spec: [SPEC-customers.md](../../docs/specs/SPEC-customers.md). Ogni task chiude con
 `npm run typecheck && npm run lint && npm run format:check && npm test && npm run db:test &&
 npm run test:integration && npm run e2e` verdi e un commit Conventional Commits sul branch
 `feat/customers`. Test prima del codice (`test-driven-development`). Solo lo stack Supabase locale
@@ -251,14 +251,14 @@ dati → non si trova più; operatore crea un cliente con solo nome e consenso e
 
 ## Task 16: Documentazione e chiusura
 **Descrizione:** `brain/MAP.md` (file del modulo), `brain/STATUS.md`, RUNBOOK (trappole trovate),
-`CLAUDE.md` se cambiano comandi; nota in `SPEC-customers.md` che `test:integration` ora esiste; verifica
+`CLAUDE.md` se cambiano comandi; nota in `docs/specs/SPEC-customers.md` che `test:integration` ora esiste; verifica
 puntuale degli 8 criteri di successo; i task segnati in questo file.
 **Accettazione:**
 - [x] Ogni criterio di successo con il test che lo prova
 - [x] Nessun segreto né dato reale nei documenti
 **Verifica:** quality bar completa verde; rilettura
 **Dipendenze:** 15 · **File:** brain/MAP.md, brain/STATUS.md, brain/topics/operations/RUNBOOK.md,
-SPEC-customers.md, tasks/customers/todo.md · **Dimensione:** S
+docs/specs/SPEC-customers.md, tasks/customers/todo.md · **Dimensione:** S
 
 ## Checkpoint E
 - [x] Gli 8 criteri di successo di SPEC-customers verificati

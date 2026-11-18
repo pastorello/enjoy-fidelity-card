@@ -1,7 +1,7 @@
 # Spec: identity — V1
 
 Status: approvata (2026-11-17) — perimetro ridotto al solo accesso
-Modulo: `identity` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `platform` ·
+Modulo: `identity` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `platform` ·
 Fonti: specifiche (sezioni "Ruoli e account", "Sicurezza e privacy", "Modello dati") e wireframe
 Accedi, Impostazioni, Impostazioni operatore (link in `brain/MAP.md` §5) · Decisioni: `brain/DECISIONS.md`.
 

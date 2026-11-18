@@ -1,7 +1,7 @@
 # Spec: platform — V1
 
 Status: approved (2026-11-16)
-Modulo: `platform` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Fonti: specifiche, wireframe e design system
+Modulo: `platform` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Fonti: specifiche, wireframe e design system
 "Enjoy Bar" (link in `brain/MAP.md` §5) · Decisioni: `brain/DECISIONS.md`.
 
 ## Objective

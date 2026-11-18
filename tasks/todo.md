@@ -1,6 +1,6 @@
 # Todo: platform
 
-Fonte: [plan.md](plan.md) · Spec: [SPEC-platform.md](../SPEC-platform.md). Ogni task chiude con typecheck,
+Fonte: [plan.md](plan.md) · Spec: [SPEC-platform.md](../docs/specs/SPEC-platform.md). Ogni task chiude con typecheck,
 lint e test verdi e un commit Conventional Commits sul branch del modulo.
 
 ## Task 1: Scaffold dell'app

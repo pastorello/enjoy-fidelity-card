@@ -31,7 +31,7 @@ function proofs(): Proof[] {
 }
 
 const DOCUMENTS = [
-  'SPEC-customers.md',
+  'docs/specs/SPEC-customers.md',
   PLAN,
   'tasks/customers/todo.md',
   'brain/MAP.md',

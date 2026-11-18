@@ -1,7 +1,7 @@
 # Spec: rewards — V1
 
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
-Modulo: `rewards` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `identity` · Usato da: `ledger` ·
+Modulo: `rewards` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity` · Usato da: `ledger` ·
 Fonti: specifiche (sezioni "Premi", "Modello dati", "Ruoli e account"), wireframe "Catalogo premi",
 "Impostazioni (amministratore)", "Impostazioni (operatore)", "Riscatta premio" (solo come consumatore) e
 nota "Amministrazione" del canvas · Decisioni: `brain/DECISIONS.md`.

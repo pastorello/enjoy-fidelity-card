@@ -3,7 +3,7 @@
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3).
 Rivista il 2026-11-17 per la decisione del titolare «punti visibili al cliente con la card»: link scritto
 sulla card (punto 8), stato "link non scritto" (punti 4–5) e pagina pubblica dei punti (punto 9).
-Modulo: `cards` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `customers`, `card-input` ·
+Modulo: `cards` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `customers`, `card-input` ·
 Fonti: specifiche ("Nuovo cliente e consegna della card", "Registrare una spesa" punto 1, "Modello dati",
 "Sicurezza e privacy") e wireframe Cerca cliente, Card sconosciuta: nuovo cliente, Nuovo cliente senza card,
 Associa o sostituisci card, Card già di un altro cliente, Modifica cliente, Scheda cliente, Registra spesa,
