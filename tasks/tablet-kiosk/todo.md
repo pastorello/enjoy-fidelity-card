@@ -38,11 +38,11 @@ policy, `revoke all` da `anon`/`authenticated`), `private.operator_pins` (nessun
 inesistente o utente già operatore; ricollega per nome come `add_operator`), `private.add_operator`
 aggiornata con `create or replace` per rifiutare un utente collegato a un dispositivo.
 **Accettazione:**
-- [ ] pgTAP: `authenticated` e `anon` non leggono né scrivono `app.devices` e `private.operator_pins`
+- [x] pgTAP: `authenticated` e `anon` non leggono né scrivono `app.devices` e `private.operator_pins`
       (`has_table_privilege` e prova reale con il ruolo impostato)
-- [ ] pgTAP: `add_device` crea e ricollega; rifiuta email inesistente e utente operatore; `add_operator`
+- [x] pgTAP: `add_device` crea e ricollega; rifiuta email inesistente e utente operatore; `add_operator`
       rifiuta un utente dispositivo; solo `postgres` esegue entrambe
-- [ ] pgTAP: cancellare l'utente lascia il dispositivo con `user_id` null; `current_device_id()` null per un
+- [x] pgTAP: cancellare l'utente lascia il dispositivo con `user_id` null; `current_device_id()` null per un
       operatore e per un utente sconosciuto
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** nessuna · **File:** supabase/migrations/*_tablet_kiosk.sql,
