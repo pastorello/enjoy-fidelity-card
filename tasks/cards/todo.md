@@ -270,9 +270,9 @@ rimanda `confirmLink` con lo **stesso** token, senza nuova emissione né scrittu
 `unverified`; `wrong-card` con `otherUid` → testo con le due card; `unreadable` → «Scrivi comunque» con
 `allowUnreadable: true`; `card_inactive` → «Questa card non è più attiva.» senza «Scrivi di nuovo il link».
 **Accettazione:**
-- [ ] Componente: «Riprova» dopo rete su `confirm` non chiama `issueLink` né `writeUrl` (criterio 15)
-- [ ] Componente: `wrong-card` con e senza `otherUid`; `unreadable` → `writeUrl` con `allowUnreadable`
-- [ ] Componente: `card_inactive` senza pulsante di riscrittura; nessun log del token
+- [x] Componente: «Riprova» dopo rete su `confirm` non chiama `issueLink` né `writeUrl` (criterio 15)
+- [x] Componente: `wrong-card` con e senza `otherUid`; `unreadable` → `writeUrl` con `allowUnreadable`
+- [x] Componente: `card_inactive` senza pulsante di riscrittura; nessun log del token
 **Verifica:** `npm test -- CardLinkWriter`
 **Dipendenze:** 15 · **File:** src/features/cards/CardLinkWriter.tsx (+ .test.tsx),
 src/features/cards/useCardLinkWriter.ts · **Dimensione:** S
