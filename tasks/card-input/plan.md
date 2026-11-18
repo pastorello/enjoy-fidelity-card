@@ -95,7 +95,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 4: Riquadro e home
 - [x] Task 13: `CardReadPanel` in ogni stato, varianti `usb` e `compact`, `/dev/ui`
-- [ ] Task 14: Riquadro nella home ed E2E di `card-input`
+- [x] Task 14: Riquadro nella home ed E2E di `card-input`
 
 ### Checkpoint D: Impeccable pulito; confronto con i wireframe Cerca cliente, Lettura card: primo avvio, Lettura card spenta e Ricerca senza risultati a 390×844
 

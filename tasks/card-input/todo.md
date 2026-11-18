@@ -256,12 +256,12 @@ card sul retro del telefono. Una card nuova apre la registrazione del cliente.")
 home mostra una ricerca; `useCardRead(…, { enabled: false })`. `e2e/nfc.ts` aggiunge `stubWebNfc(page, …)`
 (via `page.addInitScript`, sostituisce `NDEFReader` e `navigator.permissions.query` per `nfc`).
 **Accettazione:**
-- [ ] Componente: riquadro sopra "Cerca per nome o telefono"; con una ricerca la riga compatta; una lettura
+- [x] Componente: riquadro sopra "Cerca per nome o telefono"; con una ricerca la riga compatta; una lettura
       finta non naviga e non vibra
-- [ ] E2E (criteri 2, 3, 4): permesso `prompt` → "Attiva la lettura" → riquadro attivo; `NotReadableError` →
+- [x] E2E (criteri 2, 3, 4): permesso `prompt` → "Attiva la lettura" → riquadro attivo; `NotReadableError` →
       "Lettura card spenta" con "Riprova la lettura" e la ricerca usabile; senza `NDEFReader` → riquadro
       spento senza pulsante
-- [ ] E2E (criterio 6): raffica con `delay: 0` + Invio con il focus su "Nuovo cliente" → nessuna
+- [x] E2E (criterio 6): raffica con `delay: 0` + Invio con il focus su "Nuovo cliente" → nessuna
       navigazione; digitazione con `delay: 120` nella ricerca → il testo resta nel campo; screenshot 390×844
       confrontato con i wireframe Main, NFC-permesso, NFC-spento e Ricerca-vuota
 **Verifica:** `npm test -- HomePage && npm run e2e`
