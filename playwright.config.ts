@@ -57,7 +57,13 @@ export default defineConfig({
     command: `npm run build && npx vite preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
     // VITE_E2E installs the fake card reader (window.__enjoyFakeCard, SPEC-card-input point 7).
-    env: { ...localSupabaseEnv(), VITE_E2E: '1' },
+    // The preview is plain http, but card-input writes only https links (SPEC-cards, point 8.6):
+    // the links written in E2E name the same host and port over https (open them with `http:`).
+    env: {
+      ...localSupabaseEnv(),
+      VITE_E2E: '1',
+      VITE_CARD_LINK_ORIGIN: `https://localhost:${PORT}`,
+    },
     // Never reuse a server: it could have been built against staging.
     reuseExistingServer: false,
     timeout: 120_000,

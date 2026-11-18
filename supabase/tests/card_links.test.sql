@@ -129,6 +129,10 @@ select is(
 );
 select is(octet_length(private.card_token_hash('AAAAAAAAAAAAAAAAAAAAAA')), 32, 'a fingerprint has 32 bytes');
 
+-- The local database keeps the links written by the E2E runs: count against what is there now.
+create temporary table links_before on commit drop as
+  select count(*) as n from private.card_links;
+
 -- anon ------------------------------------------------------------------------------
 set local role anon;
 select throws_ok(
@@ -157,7 +161,10 @@ select throws_ok(
   $$select * from private.card_links$$, '42501', null, 'a user without a profile cannot read card_links'
 );
 reset role;
-select is((select count(*) from private.card_links), 0::bigint, 'the refused calls wrote nothing');
+select is(
+  (select count(*) from private.card_links), (select n from links_before),
+  'the refused calls wrote nothing'
+);
 
 -- An operator signed in: direct access is refused ------------------------------------
 set local role authenticated;

@@ -89,6 +89,24 @@ async function customerWithCard(page: Page, prefix: string, uid: string) {
   return { id, name };
 }
 
+/**
+ * Puts `uid` on the phone in Associa card and waits for `customerPath`. The fake writer writes at
+ * once only on a card tapped less than 1.5 s before (IN_FIELD_MS): when the association took
+ * longer, the write asks for the card again («Avvicina la card …») and it is tapped again.
+ */
+async function tapUntilWritten(page: Page, uid: string, customerPath: string) {
+  await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+  const again = page
+    .getByRole('region', { name: 'Scrittura del link' })
+    .getByText(`Avvicina la card …${uid.slice(-4)}`);
+  await expect(async () => {
+    if (await again.isVisible()) {
+      await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+    }
+    await expect(page).toHaveURL(customerPath, { timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+}
+
 test.describe('Associa card', () => {
   // The card of another customer is refused by the server with a 400 (card_taken), shown on the page.
   test.use({ expectedRefusals: [/\/rest\/v1\/rpc\/associate_card$/] });
@@ -128,15 +146,13 @@ test.describe('Associa card', () => {
     await expect(page).toHaveURL(`/clienti/${antonio.id}`);
     await expect(page.getByRole('heading', { level: 1, name: antonio.name })).toBeVisible();
 
-    // A new card replaces Maria's: her customer page opens with the confirmation.
+    // A new card replaces Maria's: its link is written, then her customer page opens with the
+    // confirmation.
     await page.goto(`/clienti/${maria.id}/card`);
     await expect(panel).toContainText('Avvicina la card nuova');
     const newCard = freshUid();
-    await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(newCard));
-    await expect(page).toHaveURL(`/clienti/${maria.id}`);
-    await expect(page.getByRole('status')).toContainText(
-      `Card …${newCard.slice(-4)} associata. Link non scritto.`,
-    );
+    await tapUntilWritten(page, newCard, `/clienti/${maria.id}`);
+    await expect(page.getByRole('status')).toHaveText(`Card …${newCard.slice(-4)} associata`);
     // The line under the name names the new card (SPEC-cards, point 6).
     await expect(page.getByText(`Card attiva …${newCard.slice(-4)} · `)).toBeVisible();
 
@@ -148,6 +164,63 @@ test.describe('Associa card', () => {
     await expect(panel).toContainText(`era di ${maria.name}`);
     await expect(page).toHaveURL('/');
   });
+});
+
+test('Sostituisci card writes the link on the new card: a random token, never the uid (criterion 10)', async ({
+  page,
+}) => {
+  await stubWebNfc(page);
+  await signIn(page);
+  const oldCard = freshUid();
+  const customer = await customerWithCard(page, 'Maria Link E2E', oldCard);
+
+  await page.goto(`/clienti/${customer.id}/modifica`);
+  await page
+    .getByRole('region', { name: 'CARD' })
+    .getByRole('link', { name: 'Sostituisci card' })
+    .click();
+  await expect(page).toHaveURL(`/clienti/${customer.id}/card`);
+  await expect(page.getByRole('region', { name: 'Lettura card' })).toContainText(
+    'Avvicina la card nuova',
+  );
+
+  const newCard = freshUid();
+  await tapUntilWritten(page, newCard, `/clienti/${customer.id}`);
+  await expect(page.getByRole('status')).toHaveText(`Card …${newCard.slice(-4)} associata`);
+  await expect(page.getByText(`Card attiva …${newCard.slice(-4)} · `)).toBeVisible();
+
+  const written = (await fakeCardWrites(page)).filter((entry) => entry.uid === newCard);
+  expect(written).toHaveLength(1);
+  const url = written[0]?.url ?? '';
+  expect(url).toMatch(/^https?:\/\/[^/]+\/s\/[A-Za-z0-9_-]{22}$/);
+  for (const form of [newCard, newCard.toLowerCase(), asWebNfc(newCard)]) {
+    expect(url).not.toContain(form);
+  }
+  // Nothing was written on the old card.
+  expect((await fakeCardWrites(page)).filter((entry) => entry.uid === oldCard)).toEqual([]);
+});
+
+test('a phone that does not write: the association is saved, «Link non scritto», nothing written (criterion 13)', async ({
+  page,
+}) => {
+  await stubWebNfc(page);
+  await signIn(page);
+  const customer = await customerWithCard(page, 'Maria Senza Link E2E', freshUid());
+
+  await page.goto(`/clienti/${customer.id}/card`);
+  await expect(page.getByRole('region', { name: 'Lettura card' })).toContainText(
+    'Avvicina la card nuova',
+  );
+  await page.evaluate(() => window.__enjoyFakeCardControl?.setCanWrite(false));
+  const newCard = freshUid();
+  await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(newCard));
+
+  await expect(page).toHaveURL(`/clienti/${customer.id}`);
+  await expect(page.getByRole('status')).toHaveText(
+    `Card …${newCard.slice(-4)} associata. Link non scritto.`,
+  );
+  await expect(page.getByText(`Card attiva …${newCard.slice(-4)} · `)).toBeVisible();
+  expect(await fakeCardWrites(page)).toEqual([]);
 });
 
 test('Modifica cliente: «Disattiva card» asks first, then the section says «Nessuna card attiva» (SPEC-cards, point 5)', async ({

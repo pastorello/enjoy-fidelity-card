@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { ServerFaultError } from '../../lib/serverFault';
@@ -6,16 +6,20 @@ import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { StatusView } from '../../shared/ui/StatusView';
 import { CardReadPanel, type CardReadNotice } from '../card-input/CardReadPanel';
+import { homeNoticeState } from '../customers/homeNotice';
 import { loadErrorText } from '../customers/loadErrorText';
 import type { CustomerSummary } from '../customers/types';
 import { isCustomerId, useCustomer } from '../customers/useCustomer';
 import styles from './AssociateCardPage.module.css';
+import { CardLinkWriter, CardLinkWriterActions } from './CardLinkWriter';
 import { CardTakenNotice, OpenOwnerLink } from './CardTakenNotice';
+import { NOT_IN_DISPLAY } from './customerName';
 import { CustomerRowLink } from './CustomerRowLink';
 import { formatCardLabel, shortName } from './formatCard';
 import { NetworkError, type CardSummary } from './types';
 import { useActiveCard } from './useActiveCard';
-import { useAssociateCard } from './useAssociateCard';
+import { associatedNotice, useAssociateCard } from './useAssociateCard';
+import { useCardLinkWriter } from './useCardLinkWriter';
 
 const TITLE = 'Associa card';
 const PANEL_TITLE = 'Avvicina la card nuova';
@@ -30,6 +34,93 @@ function associateErrorText(error: unknown): string {
   return 'Card non associata: riprova.';
 }
 
+/** «Questa è già la card attiva di Maria.» */
+function AlreadyActive({ name }: { name: string }) {
+  return (
+    <output className={styles.note}>
+      <Icon name="check" size={20} className={styles.check} />
+      <span>Questa è già la card attiva di {name}.</span>
+    </output>
+  );
+}
+
+/** «Card associata a Maria», the check on green (board "Associa-link"). */
+function Associated({ name }: { name: string }) {
+  return (
+    <output className={styles.associated}>
+      <span className={styles.badge}>
+        <Icon name="check" size={18} />
+      </span>
+      <span className={styles.associatedText}>
+        Card associata a{' '}
+        {/* A typed name with a glyph Enjoy Display lacks is set in the body font. */}
+        {NOT_IN_DISPLAY.test(name) ? <span className={styles.typedName}>{name}</span> : name}
+      </span>
+    </output>
+  );
+}
+
+/**
+ * The write of the link on the card just associated (SPEC-cards, points 4 and 8; boards
+ * "Associa-link" and "Associa-link-errore"). Every way out goes to the customer page, in place of
+ * this one: «Card …A1B2 associata» once the link is written, with «Link non scritto.» after «Salta»,
+ * «Più tardi» or on a phone that does not write (the association is saved either way).
+ */
+function WriteLink({
+  customer,
+  card,
+  intro,
+}: {
+  customer: CustomerSummary;
+  card: CardSummary;
+  /** What the association did, above the write: hidden with a failure, as in the boards. */
+  intro: ReactNode;
+}) {
+  const navigate = useNavigate();
+  const customerPath = `/clienti/${customer.id}`;
+  const leave = useCallback(
+    (linkWritten: boolean) => {
+      void navigate(customerPath, {
+        replace: true,
+        state: homeNoticeState(associatedNotice(card.uid, linkWritten)),
+      });
+    },
+    [navigate, customerPath, card.uid],
+  );
+  const onWritten = useCallback(() => leave(true), [leave]);
+  const writing = useCardLinkWriter({ cardId: card.id, uid: card.uid, onWritten });
+  const { state, canWrite } = writing;
+
+  // iPhone, NFC off, the tablet's USB reader, or NFC lost while writing: the outcome of «Più tardi».
+  const cannotWrite = state.status === 'cannot-write' || (state.status === 'idle' && !canWrite);
+  useEffect(() => {
+    if (cannotWrite) leave(false);
+  }, [cannotWrite, leave]);
+
+  const failed = state.status === 'failed';
+  const name = shortName(customer.name);
+  return (
+    <AppShell
+      title={TITLE}
+      backTo={customerPath}
+      actions={<CardLinkWriterActions writing={writing} onLater={() => leave(false)} />}
+    >
+      <CustomerRowLink customer={customer} />
+      {!failed && intro}
+      <CardLinkWriter writing={writing} uid={card.uid} customerName={customer.name} />
+      {!failed && (
+        <p className={styles.note}>
+          <Icon name="link" size={20} />
+          <span>
+            Con il link, {name} vede i suoi punti avvicinando la card al proprio telefono. Sulla
+            card va solo il link: nessun dato personale.
+          </span>
+        </p>
+      )}
+    </AppShell>
+  );
+}
+
 /** The reading panel, the note about the current card, and the footer "Annulla" or the taken notice. */
 function AssociateCard({
   customer,
@@ -38,9 +129,30 @@ function AssociateCard({
   customer: CustomerSummary;
   activeCard: CardSummary | null;
 }) {
-  const association = useAssociateCard(customer.id, activeCard);
+  // «Scrivi di nuovo il link» on the card already active, whose link is written.
+  const [rewrite, setRewrite] = useState(false);
+  const association = useAssociateCard(customer.id, activeCard, { writing: rewrite });
   const name = shortName(customer.name);
   const editPath = `/clienti/${customer.id}/modifica`;
+
+  if (association.status === 'associated') {
+    return (
+      <WriteLink customer={customer} card={association.card} intro={<Associated name={name} />} />
+    );
+  }
+
+  if (
+    association.status === 'already' &&
+    (rewrite || association.card.linkState === 'not-written')
+  ) {
+    return (
+      <WriteLink
+        customer={customer}
+        card={association.card}
+        intro={<AlreadyActive name={name} />}
+      />
+    );
+  }
 
   if (association.status === 'unavailable') {
     return association.reason === 'anonymized' ? (
@@ -99,10 +211,12 @@ function AssociateCard({
         notice={notice}
       />
       {association.status === 'already' ? (
-        <output className={styles.note}>
-          <Icon name="check" size={20} className={styles.check} />
-          <span>Questa è già la card attiva di {name}.</span>
-        </output>
+        <>
+          <AlreadyActive name={name} />
+          <Button variant="secondary" block onClick={() => setRewrite(true)}>
+            Scrivi di nuovo il link
+          </Button>
+        </>
       ) : (
         activeCard !== null && (
           <p className={styles.note}>
@@ -157,10 +271,10 @@ function NotFound() {
 
 /**
  * Associa o sostituisci card (`/clienti/:id/card`; SPEC-cards, point 4; wireframes "Associa o
- * sostituisci card" and "Card già di un altro cliente"). The card read is associated to the
- * customer, replacing the active one (named in the note under the panel); every exit after an
- * association goes to the customer page. The link is written from task 17 on: until then the
- * confirmation says «Link non scritto.».
+ * sostituisci card" and "Card già di un altro cliente", boards "Associa-link" and
+ * "Associa-link-errore"). The card read is associated to the customer, replacing the active one
+ * (named in the note under the panel), and its link is written; every exit after an association
+ * goes to the customer page.
  */
 export function AssociateCardPage() {
   const { id = '' } = useParams();
