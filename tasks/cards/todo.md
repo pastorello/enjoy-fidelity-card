@@ -39,9 +39,9 @@ usato → restituisce quel cliente senza toccare le card; altrimenti `create_cus
 `associate_card` nella stessa transazione); trigger `after update of anonymized_at on app.customers` che
 disattiva la card attiva.
 **Accettazione:**
-- [ ] pgTAP: crea cliente e card attiva; stesso `operation_id` due volte → un cliente e una card (criterio 7)
-- [ ] pgTAP: `card_taken`, `invalid_uid` e `customer_name_taken` non lasciano né cliente né card (criterio 2)
-- [ ] pgTAP: l'anonimizzazione disattiva la card; l'uid resta legato a quel cliente e `associate_card` su
+- [x] pgTAP: crea cliente e card attiva; stesso `operation_id` due volte → un cliente e una card (criterio 7)
+- [x] pgTAP: `card_taken`, `invalid_uid` e `customer_name_taken` non lasciano né cliente né card (criterio 2)
+- [x] pgTAP: l'anonimizzazione disattiva la card; l'uid resta legato a quel cliente e `associate_card` su
       un altro cliente dà `card_taken` con `owner_name` null
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1 · **File:** supabase/migrations/*_cards.sql, supabase/tests/cards.test.sql · **Dimensione:** S
