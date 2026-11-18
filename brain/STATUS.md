@@ -62,12 +62,16 @@ del modulo `identity`.
    (`scripts/cardsCriteria.test.ts`), quality bar completa, build e `check:bundle` verdi in locale.
    Migrazione `*_cards.sql` da applicare allo staging con `db push`. Prima del lancio:
    `VITE_CARD_LINK_ORIGIN` su Vercel Production e prova manuale dei criteri 10 e 14 (RUNBOOK, "Prova
-   manuale del link ai punti"). **`ledger` in corso** su `feat/ledger` (2026-11-18, ramo da `feat/cards`,
-   PR verso `main` da unire dopo #18, #19 e #20): `app.movements` immutabile, RPC idempotenti con saldo
-   sotto lock, Registra spesa, Riscatta premio / Premio libero, ULTIMI MOVIMENTI nella scheda, guardia del
-   confine (`scripts/ledgerBoundary.test.ts`). Mancano lo storico Movimenti con l'annullo dell'admin
-   (task 24-26 di `tasks/ledger/todo.md`), la verifica dei criteri e la PR; poi la prova manuale alla
-   cassa con l'utente (RUNBOOK, "Prova manuale alla cassa").
+   manuale del link ai punti"). **`ledger` completo** su `feat/ledger`
+   (2026-11-18, ramo da `feat/cards`, PR #21 verso `main` da unire dopo #18, #19 e #20): `app.movements`
+   immutabile, RPC idempotenti con saldo sotto lock (concorrenza reale provata in
+   `tests/integration/ledger-concurrency.test.ts`), Registra spesa con tastierino a centesimi, Riscatta
+   premio / Premio libero, annullo dell'operatore entro 10 s e dell'admin dallo storico Movimenti, saldo
+   reale in ricerca, scheda, Serviti oggi e `card_points`; 10 criteri verificati test per test
+   (`scripts/ledgerCriteria.test.ts`), quality bar completa, build e `check:bundle` verdi. Migrazione
+   `*_ledger.sql` da applicare allo staging con `db push`; prova manuale alla cassa con l'utente (criteri 3
+   e 8, RUNBOOK, "Prova manuale alla cassa"). **Prossimo modulo: `export`** (`docs/specs/SPEC-export.md`),
+   poi il checkpoint di lancio e `tablet-kiosk`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -88,7 +92,7 @@ del modulo `identity`.
 
 - Rami in catena non ancora in `main`: `feat/identity` (PR #13), `feat/identity-password`, `feat/settings`,
   `feat/customers`, `chore/specs-folder` (PR #17), `feat/rewards` (PR #18), `feat/card-input` (PR #19),
-  `feat/cards` (PR #20), `feat/ledger`.
+  `feat/cards` (PR #20), `feat/ledger` (PR #21).
 
 ## Ultima sessione
 
