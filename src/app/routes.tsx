@@ -1,6 +1,5 @@
 import type { RouteObject } from 'react-router';
 import { AssociateCardPage } from '../features/cards/AssociateCardPage';
-import { PurchasePlaceholderPage } from '../features/cards/PurchasePlaceholderPage';
 import { EditCustomerPage } from '../features/customers/EditCustomerPage';
 import { CustomerPage } from '../features/customers/CustomerPage';
 import { HomePage } from '../features/customers/HomePage';
@@ -10,6 +9,7 @@ import { LoginPage } from '../features/identity/LoginPage';
 import { RequireAuth } from '../features/identity/RequireAuth';
 import { ResetPasswordPage } from '../features/identity/ResetPasswordPage';
 import { SettingsPage } from '../features/identity/SettingsPage';
+import { PurchasePage } from '../features/ledger/PurchasePage';
 import { RewardsCatalogPage } from '../features/rewards/RewardsCatalogPage';
 import { NotFoundPage } from './NotFoundPage';
 import { RootLayout } from './RootLayout';
@@ -50,8 +50,7 @@ export const routes: RouteObject[] = [
           { path: 'clienti/:id', Component: CustomerPage },
           { path: 'clienti/:id/modifica', Component: EditCustomerPage },
           { path: 'clienti/:id/card', Component: AssociateCardPage },
-          // A placeholder until `ledger` builds Registra spesa on the same route.
-          { path: 'clienti/:id/spesa', Component: PurchasePlaceholderPage },
+          { path: 'clienti/:id/spesa', Component: PurchasePage },
           { path: 'impostazioni', Component: SettingsPage },
           { path: 'impostazioni/premi', Component: RewardsCatalogPage },
         ],

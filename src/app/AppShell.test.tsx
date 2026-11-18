@@ -1,6 +1,7 @@
 import { createRef } from 'react';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import userEvent from '@testing-library/user-event';
+import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Button } from '../shared/ui/Button';
 import { AppShell } from './AppShell';
@@ -44,6 +45,32 @@ describe('AppShell', () => {
     expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/');
     expect(screen.getByRole('heading', { level: 1, name: 'Registra spesa' })).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'Enjoy Card' })).not.toBeInTheDocument();
+  });
+
+  it('backInHistory: "Indietro" goes back in the history, to backTo without one', async () => {
+    const router = createMemoryRouter(
+      [
+        { path: '/', element: <p>home</p> },
+        { path: '/scheda', element: <p>scheda</p> },
+        {
+          path: '/spesa',
+          element: (
+            <AppShell title="Registra spesa" backTo="/" backInHistory>
+              x
+            </AppShell>
+          ),
+        },
+      ],
+      { initialEntries: ['/scheda', '/spesa'], initialIndex: 1 },
+    );
+    render(<RouterProvider router={router} />);
+    await userEvent.click(screen.getByRole('link', { name: 'Indietro' }));
+    expect(router.state.location.pathname).toBe('/scheda');
+
+    const alone = createMemoryRouter(router.routes, { initialEntries: ['/spesa'] });
+    render(<RouterProvider router={alone} />);
+    await userEvent.click(screen.getByRole('link', { name: 'Indietro' }));
+    expect(alone.state.location.pathname).toBe('/');
   });
 
   it('header action: an icon link named by its label, to the right of the title', () => {

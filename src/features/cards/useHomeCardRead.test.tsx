@@ -229,28 +229,3 @@ describe('useHomeCardRead: a card read on the home', () => {
     ).toBeInTheDocument();
   });
 });
-
-describe('PurchasePlaceholderPage', () => {
-  it('a customer that does not exist: "Cliente non trovato"', async () => {
-    renderApp(
-      '/clienti/00000000-0000-4000-8000-00000000dead/spesa',
-      signedInFake(),
-      createFakeSettingsService(),
-      createFakeCustomerService({ customers: [MARIA] }),
-    );
-    expect(
-      await screen.findByRole('heading', { level: 1, name: 'Registra spesa' }),
-    ).toBeInTheDocument();
-    expect(await screen.findByText('Cliente non trovato')).toBeInTheDocument();
-  });
-
-  it('a load error: the message and "Riprova"', async () => {
-    const customers = createFakeCustomerService({ customers: [MARIA] });
-    customers.failNext('get', 'network');
-    renderApp(`/clienti/${MARIA.id}/spesa`, signedInFake(), createFakeSettingsService(), customers);
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Controlla la connessione e riprova.');
-    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-  });
-});
