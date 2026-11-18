@@ -1,0 +1,37 @@
+/* "Alla cassa: <nome> · Cambia" (wireframes "Tablet: …"): a 48 px outlined chip on the green
+   header, the cashier's initial in a white circle. */
+.chip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-3) 0 6px;
+  border: 2px solid var(--color-on-green);
+  color: var(--color-on-green);
+  text-decoration: none;
+  white-space: nowrap;
+  font-family: var(--type-label-family);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line-height);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-letter-spacing);
+}
+
+.initial {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-on-green);
+  color: var(--color-enjoy-green);
+}
+
+/* A name with a character Enjoy Display lacks is set in the body font (displayGlyphs.test.ts). */
+.chip[data-body-font='true'] {
+  font-family: var(--type-body-family);
+  letter-spacing: normal;
+}

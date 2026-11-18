@@ -1,4 +1,13 @@
-import { useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
+import {
+  createContext,
+  use,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+  type RefObject,
+} from 'react';
 import { Link, useLocation, useNavigate, type LinkProps } from 'react-router';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import styles from './AppShell.module.css';
@@ -32,6 +41,24 @@ type AppShellProps = {
    */
   headingRef?: Ref<HTMLHeadingElement> | undefined;
 };
+
+/**
+ * What every header below shows after its title, before the screen's action and the account
+ * button: on the till tablet, the cashier (`RequireCashier`, SPEC-tablet-kiosk point 4). Nothing
+ * elsewhere, so the phone's headers do not change.
+ */
+const HeaderExtraContext = createContext<ReactNode>(null);
+
+/** Puts `content` in the header of every `AppShell` inside. */
+export function AppShellHeaderExtra({
+  content,
+  children,
+}: {
+  content: ReactNode;
+  children: ReactNode;
+}) {
+  return <HeaderExtraContext value={content}>{children}</HeaderExtraContext>;
+}
 
 /**
  * Whether `text`, shown in the element, overflows its clamped box. Measured again when the text
@@ -75,6 +102,7 @@ export function AppShell({
   headingRef,
 }: AppShellProps) {
   const hasBack = title !== undefined && backTo !== undefined;
+  const headerExtra = use(HeaderExtraContext);
   const titleRef = useRef<HTMLSpanElement>(null);
   const titleCut = useIsCut(titleRef, repeatCutTitle ? title : undefined);
   const location = useLocation();
@@ -111,6 +139,7 @@ export function AppShell({
             </span>
           )}
         </h1>
+        {headerExtra}
         {headerAction && (
           <Link to={headerAction.to} className={styles.iconButton} aria-label={headerAction.label}>
             <Icon name={headerAction.icon} />

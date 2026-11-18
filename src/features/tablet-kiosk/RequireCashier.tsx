@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
+import { AppShellHeaderExtra } from '../../app/AppShell';
 import { CardReaderSession } from '../card-input/CardReaderSession';
 import { useAuth } from '../identity/AuthProvider';
 import { SettingsProvider } from '../settings/SettingsProvider';
+import { CashierChip } from './CashierChip';
 
 /** Location state of /cassa: the turn of the cashier who was at the till has ended. */
 export type CashierLocationState = { turnEnded?: boolean };
@@ -20,7 +22,9 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
  *
  * It mounts `SettingsProvider` and `CardReaderSession`, keyed by the operator (on a device, its
  * cashier): the configuration loads once per operator and never without one, and cards are read
- * only here, never on /cassa (SPEC-card-input, point 2; SPEC-tablet-kiosk, point 8).
+ * only here, never on /cassa (SPEC-card-input, point 2; SPEC-tablet-kiosk, point 8). On a device
+ * the headers of its pages show the cashier with "Cambia" (`CashierChip`, point 4); an operator's
+ * headers stay as they are.
  */
 export function RequireCashier() {
   const { state, refreshIdentity } = useAuth();
@@ -75,7 +79,9 @@ export function RequireCashier() {
   return (
     <SettingsProvider key={operator.id}>
       <CardReaderSession />
-      <Outlet />
+      <AppShellHeaderExtra content={isDevice ? <CashierChip name={operator.name} /> : null}>
+        <Outlet />
+      </AppShellHeaderExtra>
     </SettingsProvider>
   );
 }
