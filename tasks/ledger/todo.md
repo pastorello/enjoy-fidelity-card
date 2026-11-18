@@ -346,9 +346,9 @@ src/features/ledger/FreeRewardForm.test.tsx · **Dimensione:** M
 **Descrizione:** in `e2e/ledger.spec.ts`: cliente creato dal test con una spesa che gli dà punti; premi del
 seed di `rewards` (mai modificati).
 **Accettazione:**
-- [ ] Riscatto "Caffè" dal catalogo → "Premio riscattato" e saldo ridotto
-- [ ] Premio libero oltre il saldo → avviso e pulsante disabilitato
-- [ ] Il premio inattivo del seed ("Dolce del giorno") non compare in Riscatta premio; target ≥ 48 px
+- [x] Riscatto "Caffè" dal catalogo → "Premio riscattato" e saldo ridotto
+- [x] Premio libero oltre il saldo → avviso e pulsante disabilitato
+- [x] Il premio inattivo del seed ("Dolce del giorno") non compare in Riscatta premio; target ≥ 48 px
 **Verifica:** `npm run e2e -- ledger`
 **Dipendenze:** 21 · **File:** e2e/ledger.spec.ts · **Dimensione:** S
 
