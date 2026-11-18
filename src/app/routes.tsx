@@ -9,6 +9,7 @@ import { LoginPage } from '../features/identity/LoginPage';
 import { RequireAuth } from '../features/identity/RequireAuth';
 import { ResetPasswordPage } from '../features/identity/ResetPasswordPage';
 import { SettingsPage } from '../features/identity/SettingsPage';
+import { MovementsPage } from '../features/ledger/MovementsPage';
 import { PurchasePage } from '../features/ledger/PurchasePage';
 import { RedeemPage } from '../features/ledger/RedeemPage';
 import { RewardsCatalogPage } from '../features/rewards/RewardsCatalogPage';
@@ -53,6 +54,7 @@ export const routes: RouteObject[] = [
           { path: 'clienti/:id/card', Component: AssociateCardPage },
           { path: 'clienti/:id/spesa', Component: PurchasePage },
           { path: 'clienti/:id/premi', Component: RedeemPage },
+          { path: 'clienti/:id/movimenti', Component: MovementsPage },
           { path: 'impostazioni', Component: SettingsPage },
           { path: 'impostazioni/premi', Component: RewardsCatalogPage },
         ],
