@@ -225,11 +225,17 @@ Tentativi rimasti: N"), bloccato ("Troppi tentativi: riprova tra m:ss" dai secon
 all'apertura se `lockSecondsLeft` > 0), rete ("Connessione assente. Riprova.", nessun reinvio). Successo →
 `refreshIdentity()` → `/`.
 **Accettazione:**
-- [ ] Componente: selezione e cambio nome, invio alla 4ª cifra, errato, bloccato con conto alla rovescia a
+- [x] Componente: selezione e cambio nome, invio alla 4ª cifra, errato, bloccato con conto alla rovescia a
       timer finti, rete, nessun PIN, operatore senza PIN disattivato (criterio 3)
-- [ ] Componente: cifre e Invio da tastiera fisica, anche con un pulsante a fuoco, non cambiano nulla
+- [x] Componente: cifre e Invio da tastiera fisica, anche con un pulsante a fuoco, non cambiano nulla
       (criterio 5)
-- [ ] Detector Impeccable pulito; confronto 1280×800 con "Tablet: cambio operatore"
+- [x] Detector Impeccable pulito; confronto 1280×800 con "Tablet: cambio operatore"
+**Nota:** il blocco dei tasti è `useBlockedKeys` in `src/features/card-input/` (keydown, keypress e keyup su
+`window` in cattura): `scripts/cardInputBoundary.test.ts` tiene lì gli ascoltatori di tastiera su
+`document`/`window`. "Chi è alla cassa?" è un `h2` sotto il logo `h1`, come nel wireframe; i gruppi sono
+`<fieldset>` (lint `prefer-tag-over-role`). Il conto alla rovescia scala di un secondo alla volta i secondi
+del server; all'arrivo la pagina rilegge l'identità (un blocco di una lettura vecchia non resta).
+`routes.tsx` era già pronto dal Task 11.
 **Verifica:** `npm test -- CashierPage`
 **Dipendenze:** 12 · **File:** src/features/tablet-kiosk/CashierPage.tsx (+ .module.css, .test.tsx),
 src/app/routes.tsx · **Dimensione:** M
