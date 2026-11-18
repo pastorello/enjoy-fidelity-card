@@ -158,3 +158,129 @@ create type app.ledger_result as (
   movement app.movement_history,
   balance int
 );
+
+-- acting_operator_id -------------------------------------------------------------
+-- Common body shared word for word with settings, customers and rewards
+-- (docs/specs/cross-review.md §2.1). tablet-kiosk redefines it later.
+create or replace function private.acting_operator_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select private.current_operator_id();
+$$;
+
+revoke execute on function private.acting_operator_id() from public, anon, authenticated;
+
+-- ledger_result_for ------------------------------------------------------------------------
+-- A movement as the write RPCs return it: its history row and the current balance of
+-- its customer (a replay too returns the current balance, Open Question 6).
+create function private.ledger_result_for(p_movement_id uuid)
+returns app.ledger_result
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_movement app.movement_history;
+begin
+  select h.* into strict v_movement from app.movement_history h where h.id = p_movement_id;
+  return (v_movement, private.customer_balance(v_movement.customer_id))::app.ledger_result;
+end;
+$$;
+
+revoke execute on function private.ledger_result_for(uuid) from public, anon, authenticated;
+
+-- lock_customer_for_ledger -----------------------------------------------------------------
+-- Step 2 of every ledger write: locks the customer's row until the end of the
+-- transaction, so writes on the same customer (and their balance checks) run one
+-- after the other. A customer that does not exist or was anonymized is EC006.
+create function private.lock_customer_for_ledger(p_customer_id uuid)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_anonymized_at timestamptz;
+begin
+  select c.anonymized_at into v_anonymized_at
+  from app.customers c
+  where c.id = p_customer_id
+  for update;
+  if not found or v_anonymized_at is not null then
+    raise exception 'customer unavailable' using errcode = 'EC006';
+  end if;
+end;
+$$;
+
+revoke execute on function private.lock_customer_for_ledger(uuid) from public, anon, authenticated;
+
+-- record_purchase ------------------------------------------------------------------------------
+-- Records a purchase of p_amount_cents: points = amount / cents_per_point in force,
+-- rounded down; the ratio is saved on the movement. Resending the same operation_id
+-- returns the first movement.
+create function app.record_purchase(p_operation_id uuid, p_customer_id uuid, p_amount_cents int)
+returns app.ledger_result
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_operator uuid;
+  v_existing app.movements;
+  v_cents_per_point int;
+  v_id uuid;
+begin
+  -- (1) who records it
+  v_operator := private.acting_operator_id();
+  if v_operator is null then
+    raise exception 'No acting operator for this write' using errcode = '42501';
+  end if;
+
+  -- (2) one write at a time per customer
+  perform private.lock_customer_for_ledger(p_customer_id);
+
+  -- (3) after the lock, so a concurrent first request has committed: replay or conflict
+  select * into v_existing from app.movements where operation_id = p_operation_id;
+  if found then
+    if v_existing.kind = 'purchase'
+       and v_existing.customer_id = p_customer_id
+       and v_existing.amount_cents = p_amount_cents then
+      return private.ledger_result_for(v_existing.id);
+    end if;
+    raise exception 'operation_id already used for another operation' using errcode = 'EC007';
+  end if;
+
+  -- (4) validate, compute, insert
+  if p_operation_id is null then
+    raise exception 'operation_id is required' using errcode = '22023';
+  end if;
+  if p_amount_cents is null or p_amount_cents not between 1 and 9999999 then
+    raise exception 'amount_cents must be between 1 and 9999999, got %', p_amount_cents
+      using errcode = '22023';
+  end if;
+
+  select s.cents_per_point into strict v_cents_per_point from app.settings s;
+
+  begin
+    insert into app.movements
+      (operation_id, customer_id, kind, amount_cents, points, cents_per_point, operator_id)
+    values
+      (p_operation_id, p_customer_id, 'purchase', p_amount_cents,
+       p_amount_cents / v_cents_per_point, v_cents_per_point, v_operator)
+    returning id into v_id;
+  exception when unique_violation then
+    -- Only possible when a concurrent request used the same operation_id on another
+    -- customer (same customer: the lock serialised them and step 3 saw it).
+    raise exception 'operation_id already used for another operation' using errcode = 'EC007';
+  end;
+
+  return private.ledger_result_for(v_id);
+end;
+$$;
+
+-- Explicit grants: never rely on the default privileges.
+revoke execute on function app.record_purchase(uuid, uuid, int) from public, anon;
+grant execute on function app.record_purchase(uuid, uuid, int) to authenticated;

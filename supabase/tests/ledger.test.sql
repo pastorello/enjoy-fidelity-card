@@ -3,7 +3,7 @@
 -- regole di accesso"). Fake data only: invented names and @example.com emails.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(59);
+select plan(89);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -13,13 +13,21 @@ insert into auth.users (id, email) values
 select private.add_operator('ledger.admin@example.com', 'Admin Movimenti', 'admin');
 select private.add_operator('ledger.operator@example.com', 'Operatore Movimenti', 'operator');
 
--- Fake customers: Lucia gets movements, Bruno has none.
-insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
-select fake.id, fake.name, now(), (select id from app.operators where name = 'Admin Movimenti'), fake.op
+-- Fake customers: Lucia gets movements, Bruno has none, Carla buys through
+-- record_purchase, Dario's data have been erased.
+insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id, anonymized_at)
+select fake.id, fake.name, now(), (select id from app.operators where name = 'Admin Movimenti'), fake.op,
+  fake.anonymized_at
 from (values
-  ('00000000-0000-4000-9100-000000000001'::uuid, 'Lucia Movimenti', '00000000-0000-4000-9200-000000000001'::uuid),
-  ('00000000-0000-4000-9100-000000000002'::uuid, 'Bruno Movimenti', '00000000-0000-4000-9200-000000000002'::uuid)
-) as fake (id, name, op);
+  ('00000000-0000-4000-9100-000000000001'::uuid, 'Lucia Movimenti',
+   '00000000-0000-4000-9200-000000000001'::uuid, null::timestamptz),
+  ('00000000-0000-4000-9100-000000000002'::uuid, 'Bruno Movimenti',
+   '00000000-0000-4000-9200-000000000002'::uuid, null::timestamptz),
+  ('00000000-0000-4000-9100-000000000003'::uuid, 'Carla Spese',
+   '00000000-0000-4000-9200-000000000003'::uuid, null::timestamptz),
+  ('00000000-0000-4000-9100-000000000004'::uuid, 'Cliente cancellato 00000000',
+   '00000000-0000-4000-9200-000000000004'::uuid, now())
+) as fake (id, name, op, anonymized_at);
 
 -- A fake reward for the catalogue redemption.
 insert into app.rewards (id, name, points, created_by, updated_by)
@@ -330,6 +338,209 @@ select throws_ok($$select count(*) from app.movements$$, '42501', null, 'anon ca
 select throws_ok($$select count(*) from app.movement_history$$, '42501', null,
   'anon cannot read the history');
 reset role;
+
+-- record_purchase -------------------------------------------------------------------------------
+select ok(
+  has_function_privilege('authenticated', 'app.record_purchase(uuid, uuid, int)', 'execute'),
+  'authenticated executes record_purchase'
+);
+select ok(
+  not has_function_privilege('anon', 'app.record_purchase(uuid, uuid, int)', 'execute')
+    and not exists (
+      select 1
+      from pg_proc p
+      cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+      where p.oid = 'app.record_purchase(uuid, uuid, int)'::regprocedure
+        and acl.grantee = 0 and acl.privilege_type = 'EXECUTE'
+    ),
+  'neither anon nor PUBLIC execute record_purchase'
+);
+select ok(
+  (select prosecdef and proconfig = array['search_path=""']
+   from pg_proc where oid = 'app.record_purchase(uuid, uuid, int)'::regprocedure),
+  'record_purchase is security definer with an empty search_path'
+);
+select is(
+  (select prorettype::regtype from pg_proc where oid = 'app.record_purchase(uuid, uuid, int)'::regprocedure),
+  'app.ledger_result'::regtype,
+  'record_purchase returns app.ledger_result'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000002","role":"authenticated"}', true);
+
+-- Points rounded down with the ratio in force (criterion 1).
+select results_eq(
+  $$select (r.movement).kind, (r.movement).customer_id, (r.movement).amount_cents, (r.movement).points,
+      (r.movement).cents_per_point, (r.movement).operator_name, (r.movement).operation_id, r.balance
+    from app.record_purchase('00000000-0000-4000-9600-000000000001',
+      '00000000-0000-4000-9100-000000000003', 1250) r$$,
+  $$values ('purchase'::text, '00000000-0000-4000-9100-000000000003'::uuid, 1250, 12, 100,
+      'Operatore Movimenti'::text, '00000000-0000-4000-9600-000000000001'::uuid, 12)$$,
+  '12,50 € at 100 cents per point is a purchase of 12 points by the acting operator, balance 12'
+);
+select results_eq(
+  $$select (r.movement).points, r.balance
+    from app.record_purchase('00000000-0000-4000-9600-000000000002',
+      '00000000-0000-4000-9100-000000000003', 199) r$$,
+  $$values (1, 13)$$,
+  '1,99 € is 1 point (rounded down)'
+);
+select results_eq(
+  $$select (r.movement).amount_cents, (r.movement).points, r.balance
+    from app.record_purchase('00000000-0000-4000-9600-000000000003',
+      '00000000-0000-4000-9100-000000000003', 99) r$$,
+  $$values (99, 0, 13)$$,
+  '0,99 € is 0 points and is still recorded'
+);
+select is(
+  (select count(*) from app.movements where customer_id = '00000000-0000-4000-9100-000000000003'),
+  3::bigint,
+  'the three purchases are recorded, the one worth 0 points included'
+);
+select is(
+  (select created_at from app.movements where operation_id = '00000000-0000-4000-9600-000000000001'),
+  now(),
+  'the purchase is dated by the server'
+);
+
+-- The admin changes the ratio to 250 cents per point.
+reset role;
+update app.settings set cents_per_point = 250;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000002","role":"authenticated"}', true);
+
+select results_eq(
+  $$select (r.movement).points, (r.movement).cents_per_point, r.balance
+    from app.record_purchase('00000000-0000-4000-9600-000000000004',
+      '00000000-0000-4000-9100-000000000003', 1250) r$$,
+  $$values (5, 250, 18)$$,
+  'with 250 cents per point 12,50 € is 5 points and the movement saves 250 (criterion 1)'
+);
+
+-- Back to 100: the history keeps the ratio each purchase was recorded with.
+reset role;
+update app.settings set cents_per_point = 100;
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000002","role":"authenticated"}', true);
+
+select results_eq(
+  $$select amount_cents, points, cents_per_point from app.movements
+    where operation_id in ('00000000-0000-4000-9600-000000000001', '00000000-0000-4000-9600-000000000004')
+    order by points desc$$,
+  $$values (1250, 12, 100), (1250, 5, 250)$$,
+  'changing the settings later does not alter the history'
+);
+select is(
+  (select sum(points)::int from app.movements
+   where customer_id = '00000000-0000-4000-9100-000000000003'),
+  18,
+  'the balance is still the sum of the recorded points'
+);
+
+-- Idempotency (criterion 4): the same operation_id returns the first movement.
+select is(
+  (select (r.movement).id from app.record_purchase('00000000-0000-4000-9600-000000000001',
+     '00000000-0000-4000-9100-000000000003', 1250) r),
+  (select id from app.movements where operation_id = '00000000-0000-4000-9600-000000000001'),
+  'a resent purchase returns the movement of the first one'
+);
+select results_eq(
+  $$select (r.movement).points, (r.movement).cents_per_point, r.balance
+    from app.record_purchase('00000000-0000-4000-9600-000000000004',
+      '00000000-0000-4000-9100-000000000003', 1250) r$$,
+  $$values (5, 250, 18)$$,
+  'a resent purchase keeps the ratio of the first one and returns the current balance'
+);
+select is(
+  (select count(*) from app.movements where customer_id = '00000000-0000-4000-9100-000000000003'),
+  4::bigint,
+  'resending records nothing new'
+);
+select throws_ok(
+  $$select app.record_purchase('00000000-0000-4000-9600-000000000001',
+      '00000000-0000-4000-9100-000000000003', 1300)$$,
+  'EC007',
+  null,
+  'the same operation_id with another amount is a conflict'
+);
+select throws_ok(
+  $$select app.record_purchase('00000000-0000-4000-9600-000000000001',
+      '00000000-0000-4000-9100-000000000002', 1250)$$,
+  'EC007',
+  null,
+  'the same operation_id with another customer is a conflict'
+);
+select throws_ok(
+  $$select app.record_purchase('00000000-0000-4000-9500-000000000002',
+      '00000000-0000-4000-9100-000000000001', 1000)$$,
+  'EC007',
+  null,
+  'the operation_id of a redemption is a conflict for a purchase'
+);
+
+-- Invalid amounts.
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-000000000003', 0)$$,
+  '22023', null, 'an amount of 0 cents is invalid'
+);
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-000000000003', -100)$$,
+  '22023', null, 'a negative amount is invalid'
+);
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-000000000003', null)$$,
+  '22023', null, 'a null amount is invalid'
+);
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-000000000003', 10000000)$$,
+  '22023', null, 'an amount of 10.000.000 cents is invalid'
+);
+select throws_ok(
+  $$select app.record_purchase(null, '00000000-0000-4000-9100-000000000003', 1000)$$,
+  '22023', null, 'a purchase without operation_id is invalid'
+);
+select results_eq(
+  $$select (r.movement).amount_cents, (r.movement).points
+    from app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-000000000002', 9999999) r$$,
+  $$values (9999999, 99999)$$,
+  '99.999,99 € is the largest amount accepted'
+);
+
+-- Customers that cannot buy.
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-0000000000ff', 1000)$$,
+  'EC006', null, 'a customer that does not exist is unavailable'
+);
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), null, 1000)$$,
+  'EC006', null, 'a null customer is unavailable'
+);
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-000000000004', 1000)$$,
+  'EC006', null, 'an anonymized customer is unavailable'
+);
+
+-- A signed-in user without an operator profile.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000003","role":"authenticated"}', true);
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-000000000003', 1000)$$,
+  '42501', null, 'a user without an operator profile cannot record a purchase'
+);
+reset role;
+
+set local role anon;
+select throws_ok(
+  $$select app.record_purchase(gen_random_uuid(), '00000000-0000-4000-9100-000000000003', 1000)$$,
+  '42501', null, 'anon cannot record a purchase'
+);
+reset role;
+
+select is(
+  (select count(*) from app.movements where customer_id = '00000000-0000-4000-9100-000000000003'),
+  4::bigint,
+  'the rejected purchases recorded nothing'
+);
 
 select * from finish();
 rollback;
