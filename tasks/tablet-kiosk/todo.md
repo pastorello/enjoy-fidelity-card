@@ -170,9 +170,9 @@ src/test/fakeAuthService.ts · **Dimensione:** M
 chiudere la sessione; `signOut` resta per "Disconnetti il tablet". Dopo `signIn` con un dispositivo lo stato è
 `device`.
 **Accettazione:**
-- [ ] Componente: dispositivo senza cassiere, con cassiere (operatore corrente = cassiere), turno finito
+- [x] Componente: dispositivo senza cassiere, con cassiere (operatore corrente = cassiere), turno finito
       dopo `reportNotEnabled()`; utente senza profilo → `/accedi` "Account non abilitato" (regressione)
-- [ ] Test esistenti di `AuthProvider` verdi senza cambiare le aspettative
+- [x] Test esistenti di `AuthProvider` verdi senza cambiare le aspettative
 **Verifica:** `npm test -- AuthProvider`
 **Dipendenze:** 9 · **File:** src/features/identity/AuthProvider.tsx (+ .test.tsx) · **Dimensione:** M
 

@@ -138,7 +138,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 7: `KioskService`, `supabaseKioskService` e guardia del confine
 - [x] Task 8: `fakeKioskService`, `KioskServiceProvider`, `main.tsx` e `renderApp`
 - [x] Task 9: `AuthService.loadIdentity` su `get_session_identity` (servizio Supabase e finto)
-- [ ] Task 10: `AuthProvider` con lo stato "device": cassiere come operatore corrente, `reportNotEnabled` sul dispositivo
+- [x] Task 10: `AuthProvider` con lo stato "device": cassiere come operatore corrente, `reportNotEnabled` sul dispositivo
 - [ ] Task 11: `RequireCashier`: `/cassa` senza turno, scadenza programmata, rilettura a ogni rotta e al ritorno visibile; lettura card solo con turno
 
 ### Checkpoint B: quality bar completa verde; test di identity invariati nel comportamento; revisione con l'utente prima della UI
