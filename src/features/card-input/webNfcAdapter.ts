@@ -27,6 +27,8 @@ export interface WebNfcApi {
   /** The `nfc` permission, or null when the browser cannot tell. */
   queryPermission: () => Promise<NfcPermission | null>;
   createReader: () => NfcReaderLike;
+  /** True only when `NDEFReader` exists and has `write()` (SPEC-card-input, point 5: `canWrite`). */
+  isWriteSupported: () => boolean;
   /** A fresh `NDEFReader` used only to write (SPEC-card-input, point 9). */
   createWriter: () => NfcWriterLike;
   /** Calls `listener` each time the page becomes visible again; returns the remover. */
@@ -52,6 +54,8 @@ export type BrowserNfcHost = {
 export function createBrowserWebNfcApi(win: BrowserNfcHost): WebNfcApi {
   return {
     isSupported: () => typeof win.NDEFReader === 'function',
+    isWriteSupported: () =>
+      typeof win.NDEFReader === 'function' && typeof win.NDEFReader.prototype.write === 'function',
     async queryPermission() {
       try {
         const status = await win.navigator.permissions.query({ name: 'nfc' });

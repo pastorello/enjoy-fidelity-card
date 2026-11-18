@@ -6,8 +6,8 @@ import { createFakeWebNfc } from './fakeWebNfc';
 
 /**
  * The card-reading service of `renderApp`: the real service and keyboard wedge (listening on jsdom's
- * `document`) with `fakeWebNfc` in place of Chrome's Web NFC. `activate` and `deactivate` are spied on,
- * so tests check when reading is on (SPEC-card-input, success criterion 7).
+ * `document`) with `fakeWebNfc` in place of Chrome's Web NFC, for reading and writing. `activate` and
+ * `deactivate` are spied on, so tests check when reading is on (SPEC-card-input, success criterion 7).
  */
 export function createTestCardReader(options: Parameters<typeof createFakeWebNfc>[0] = {}) {
   const nfc = createFakeWebNfc(options);
@@ -17,6 +17,7 @@ export function createTestCardReader(options: Parameters<typeof createFakeWebNfc
     adapters: [],
     usb: createKeyboardWedge({ target: document, now: () => Date.now() }),
     nfc: createWebNfcAdapter(nfc.api),
+    writer: nfc.api,
   });
   const activate = vi.spyOn(reader, 'activate');
   const deactivate = vi.spyOn(reader, 'deactivate');

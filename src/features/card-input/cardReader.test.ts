@@ -6,6 +6,7 @@ import {
   type CardInputAdapter,
   type CardRead,
   type CardReaderOptions,
+  type CardWriteTarget,
   type DeliverRaw,
   type NfcInputAdapter,
   type NfcStatus,
@@ -759,5 +760,117 @@ describe('createCardReader: exclusive write session (SPEC point 9)', () => {
 
     expect(onInterrupt).not.toHaveBeenCalled();
     expect(restart).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** A writer target (`WebNfcApi` or the E2E fake) that can or cannot write. */
+function writeTarget(supported: boolean) {
+  return {
+    isWriteSupported: () => supported,
+    createWriter: vi.fn<CardWriteTarget['createWriter']>(() => ({
+      write: () => Promise.resolve(),
+    })),
+  };
+}
+
+function writerSetup(options: { supported?: boolean } = {}) {
+  const ports: { setStatus?: (status: NfcStatus) => void } = {};
+  const nfc: NfcInputAdapter = {
+    start: (given) => {
+      ports.setStatus = given.setStatus;
+    },
+    stop: () => {},
+    restart: () => Promise.resolve(),
+  };
+  const target = writeTarget(options.supported ?? true);
+  const reader = createCardReader({ now: () => 0, adapters: [], nfc, writer: target });
+  reader.activate({ usbFormat: null });
+  return { reader, ports, target };
+}
+
+describe('createCardReader: canWrite (point 5, criterion 10)', () => {
+  it('is true only with Web NFC active and a writer that can write', () => {
+    const { reader, ports } = writerSetup();
+    expect(reader.getState().canWrite).toBe(false);
+
+    ports.setStatus?.('active');
+
+    expect(reader.getState()).toMatchObject({ nfc: 'active', canWrite: true });
+  });
+
+  it.each<NfcStatus>(['off', 'denied', 'unsupported', 'needs-permission', 'starting', 'checking'])(
+    'is false with the Web NFC status %s',
+    (status) => {
+      const { reader, ports } = writerSetup();
+      ports.setStatus?.('active');
+
+      ports.setStatus?.(status);
+
+      expect(reader.getState()).toMatchObject({ nfc: status, canWrite: false });
+    },
+  );
+
+  it('is false with Web NFC active but no write() (NDEFReader without write)', () => {
+    const { reader, ports } = writerSetup({ supported: false });
+
+    ports.setStatus?.('active');
+
+    expect(reader.getState()).toMatchObject({ nfc: 'active', canWrite: false });
+  });
+
+  it('is false with no writer at all, even with Web NFC active', () => {
+    const { reader, ports } = nfcSetup();
+    reader.activate({ usbFormat: null });
+
+    ports.setStatus?.('active');
+
+    expect(reader.getState().canWrite).toBe(false);
+  });
+
+  it('is false with only the USB reader (tablet): the USB reader never writes', () => {
+    const usb: UsbInputAdapter = {
+      start: vi.fn<UsbInputAdapter['start']>(),
+      stop: vi.fn<UsbInputAdapter['stop']>(),
+    };
+    const reader = createCardReader({ now: () => 0, adapters: [], usb, writer: writeTarget(true) });
+
+    reader.activate({ usbFormat: 'dec' });
+
+    expect(reader.getState()).toMatchObject({ usb: { enabled: true }, canWrite: false });
+  });
+
+  it('goes back to false and notifies when the service is deactivated', () => {
+    const { reader, ports } = writerSetup();
+    ports.setStatus?.('active');
+    const listener = vi.fn<() => void>();
+    reader.subscribe(listener);
+
+    reader.deactivate();
+
+    expect(reader.getState().canWrite).toBe(false);
+    expect(listener).toHaveBeenCalled();
+  });
+
+  it('writeUrl refuses with cannot-write while canWrite is false, without creating a writer', async () => {
+    const { reader, target } = writerSetup();
+
+    await expect(
+      reader.writeUrl('https://example.test/p/invented-token', { expectedUid: UID }),
+    ).resolves.toEqual({ ok: false, reason: 'cannot-write' });
+    expect(target.createWriter).not.toHaveBeenCalled();
+  });
+
+  it('writeUrl gets past the canWrite check once canWrite is true', async () => {
+    const { reader, ports, target } = writerSetup();
+    ports.setStatus?.('active');
+
+    const result = reader.writeUrl('https://example.test/p/invented-token', {
+      expectedUid: UID,
+      signal: AbortSignal.abort(),
+    });
+
+    // Aborted before starting: the service's writer checked canWrite and the signal, nothing written.
+    await expect(result).resolves.toEqual({ ok: false, reason: 'aborted' });
+    expect(target.createWriter).not.toHaveBeenCalled();
   });
 });

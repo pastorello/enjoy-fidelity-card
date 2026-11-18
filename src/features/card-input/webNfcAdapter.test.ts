@@ -460,6 +460,20 @@ describe('createBrowserWebNfcApi', () => {
     );
   });
 
+  it('can write only with an NDEFReader that has write()', () => {
+    class ReadOnlyReader extends StubReader {}
+    // An NDEFReader that scans but cannot write (no write() on its prototype).
+    Object.defineProperty(ReadOnlyReader.prototype, 'write', { value: undefined });
+
+    expect(createBrowserWebNfcApi(fakeHost().host).isWriteSupported()).toBe(false);
+    expect(
+      createBrowserWebNfcApi(fakeHost({ NDEFReader: ReadOnlyReader }).host).isWriteSupported(),
+    ).toBe(false);
+    expect(
+      createBrowserWebNfcApi(fakeHost({ NDEFReader: StubReader }).host).isWriteSupported(),
+    ).toBe(true);
+  });
+
   it('queries the nfc permission and returns its state', async () => {
     const query = vi.fn<BrowserNfcHost['navigator']['permissions']['query']>(() =>
       Promise.resolve({ state: 'granted' }),

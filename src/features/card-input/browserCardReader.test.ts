@@ -60,6 +60,34 @@ describe('createBrowserCardReader', () => {
     expect(extra.stop).toHaveBeenCalledOnce();
   });
 
+  it('can write with Chrome Web NFC active, never on a browser without it (point 5)', async () => {
+    class StubReader extends EventTarget {
+      onreading: NDEFReader['onreading'] = null;
+      onreadingerror: NDEFReader['onreadingerror'] = null;
+      scan() {
+        return Promise.resolve();
+      }
+      write() {
+        return Promise.resolve();
+      }
+    }
+    const withNfc = createBrowserCardReader({
+      NDEFReader: StubReader,
+      document,
+      navigator: { permissions: { query: () => Promise.resolve({ state: 'granted' }) } },
+    });
+    const withoutNfc = createBrowserCardReader(hostWithoutNfc());
+
+    withNfc.activate({ usbFormat: null });
+    withoutNfc.activate({ usbFormat: 'hex' });
+    await settle();
+
+    expect(withNfc.getState()).toMatchObject({ nfc: 'active', canWrite: true });
+    expect(withoutNfc.getState()).toMatchObject({ nfc: 'unsupported', canWrite: false });
+    withNfc.deactivate();
+    withoutNfc.deactivate();
+  });
+
   it('works on a browser without navigator.vibrate', async () => {
     const reader = createBrowserCardReader(hostWithoutNfc());
     const onRead = vi.fn<(read: CardRead) => void>();

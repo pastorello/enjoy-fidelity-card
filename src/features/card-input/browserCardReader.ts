@@ -18,11 +18,13 @@ export function createBrowserCardReader(
   options: { adapters?: readonly CardInputAdapter[] } = {},
 ): CardReader {
   const navigator = win.navigator;
+  const webNfc = createBrowserWebNfcApi(win);
   return createCardReader({
     now: () => Date.now(),
     vibrate: typeof navigator.vibrate === 'function' ? (ms) => navigator.vibrate?.(ms) : undefined,
     adapters: options.adapters ?? [],
     usb: createKeyboardWedge({ target: win.document, now: () => Date.now() }),
-    nfc: createWebNfcAdapter(createBrowserWebNfcApi(win)),
+    nfc: createWebNfcAdapter(webNfc),
+    writer: webNfc,
   });
 }

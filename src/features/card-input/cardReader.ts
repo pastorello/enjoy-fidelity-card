@@ -1,4 +1,6 @@
 import { normalizeUid, type UsbUidFormat } from './normalizeUid';
+import type { WebNfcApi } from './webNfcAdapter';
+import { createWebNfcWriter, type WriteUrl } from './webNfcWriter';
 
 /** The same uid read again within this window from its last read (delivered or not) is ignored. */
 export const REPEAT_WINDOW_MS = 2000;
@@ -89,6 +91,20 @@ export interface NfcInputAdapter {
   restart(): Promise<void>;
 }
 
+/**
+ * Where links are written (SPEC-card-input, point 9): the browser's `WebNfcApi`, or in E2E builds the
+ * fake tags of `fakeCardAdapter`. `isWriteSupported()` is false without an `NDEFReader` with `write()`.
+ */
+export type CardWriteTarget = Pick<WebNfcApi, 'isWriteSupported' | 'createWriter'>;
+
+/** Stands in when the service has nothing to write with: `canWrite` stays false. */
+const NO_WRITE_TARGET: CardWriteTarget = {
+  isWriteSupported: () => false,
+  createWriter: () => {
+    throw new ReferenceError('No card writer is available');
+  },
+};
+
 export type CardReaderOptions = {
   now: () => number;
   /** `navigator.vibrate` bound to navigator, when the browser has it. */
@@ -98,6 +114,8 @@ export type CardReaderOptions = {
   usb?: UsbInputAdapter | undefined;
   /** The Web NFC reader, started and stopped with the service. */
   nfc?: NfcInputAdapter | undefined;
+  /** Where `writeUrl` writes; without it `canWrite` is always false. */
+  writer?: CardWriteTarget | undefined;
 };
 
 export type CardReader = {
@@ -115,6 +133,11 @@ export type CardReader = {
    * in progress is interrupted first (`onInterrupt`): its verification needs the scan running.
    */
   start(): Promise<void>;
+  /**
+   * Writes a link on the expected card (SPEC-card-input, point 9). Refuses with `cannot-write` unless
+   * `canWrite`: Web NFC `active` and a writer with `write()`; the USB reader never writes.
+   */
+  writeUrl: WriteUrl;
   getState(): CardReaderState;
   subscribe(listener: () => void): () => void;
 };
@@ -130,6 +153,7 @@ export function createCardReader({
   adapters,
   usb,
   nfc,
+  writer: writeTarget = NO_WRITE_TARGET,
 }: CardReaderOptions): CardReader {
   // Each push gets its own entry object, so removal is by identity even if a function is pushed twice.
   const stack: { consumer: CardConsumer }[] = [];
@@ -156,7 +180,9 @@ export function createCardReader({
 
   function setNfcStatus(status: NfcStatus) {
     if (state.nfc === status) return;
-    state = { ...state, nfc: status };
+    // Writing needs the scan running (to recognize the card and verify the link) and write().
+    const canWrite = status === 'active' && writeTarget.isWriteSupported();
+    state = { ...state, nfc: status, canWrite };
     notify();
   }
 
@@ -214,6 +240,29 @@ export function createCardReader({
     top.consumer(read);
   };
 
+  function openWriteSession(
+    onRead: WriteSessionConsumer,
+    events: WriteSessionEvents = {},
+  ): WriteSession {
+    if (session !== null) throw new Error('A card write session is already open.');
+    const entry = { onRead, ...events };
+    session = entry;
+    return {
+      lastRead,
+      close() {
+        if (session === entry) session = null;
+      },
+    };
+  }
+
+  const writer = createWebNfcWriter({
+    api: writeTarget,
+    reader: { openWriteSession },
+    now,
+    canWrite: () => state.canWrite,
+    vibrate,
+  });
+
   return {
     activate(options) {
       usbFormat = options.usbFormat;
@@ -246,17 +295,8 @@ export function createCardReader({
         if (index !== -1) stack.splice(index, 1);
       };
     },
-    openWriteSession(onRead, events = {}) {
-      if (session !== null) throw new Error('A card write session is already open.');
-      const entry = { onRead, ...events };
-      session = entry;
-      return {
-        lastRead,
-        close() {
-          if (session === entry) session = null;
-        },
-      };
-    },
+    openWriteSession,
+    writeUrl: writer.writeUrl,
     async start() {
       session?.onInterrupt?.();
       if (active) await nfc?.restart();

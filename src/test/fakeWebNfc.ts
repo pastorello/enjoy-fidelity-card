@@ -26,6 +26,8 @@ export type FakeWrite = {
 type FakeWebNfcOptions = {
   /** False simulates iPhone or a desktop browser: no `NDEFReader`. Default true. */
   supported?: boolean;
+  /** False simulates an `NDEFReader` without `write()`. Default: the same as `supported`. */
+  writable?: boolean;
   /** What `permissions.query({ name: 'nfc' })` says; null when the query is not available. */
   permission?: NfcPermission | null;
   /** Outcomes of the next `scan()` calls, in order; then every scan succeeds. */
@@ -47,6 +49,7 @@ type FakeScan = { readonly reader: NfcReaderLike; readonly signal: AbortSignal; 
  */
 export function createFakeWebNfc(options: FakeWebNfcOptions = {}) {
   const supported = options.supported ?? true;
+  const writable = supported && (options.writable ?? true);
   let permission: NfcPermission | null =
     options.permission === undefined ? 'granted' : options.permission;
   const outcomes = [...(options.scanOutcomes ?? [])];
@@ -110,6 +113,7 @@ export function createFakeWebNfc(options: FakeWebNfcOptions = {}) {
 
   const api: WebNfcApi = {
     isSupported: () => supported,
+    isWriteSupported: () => writable,
     queryPermission: () => {
       permissionQueries += 1;
       return Promise.resolve(permission);
