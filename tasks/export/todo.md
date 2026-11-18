@@ -88,11 +88,11 @@ di correzione solo dove servono. Clienti ordinati per nome con `Intl.Collator('i
 'base' })`, anonimizzati in fondo per data di creazione; movimenti nell'ordine del server. Campi personali di
 un anonimizzato vuoti anche se la riga li contiene.
 **Accettazione:**
-- [ ] Unità (criterio 3): intestazione Movimenti esatta della spec; spesa 1250 con rapporto 100 → `12,50`,
+- [x] Unità (criterio 3): intestazione Movimenti esatta della spec; spesa 1250 con rapporto 100 → `12,50`,
       `12`, `1,00`; riscatto senza importo né rapporto; correzione con "Annulla il movimento"
-- [ ] Unità (criterio 5): anonimizzato con `Nome`, `Telefono`, `Note`, `Card attiva` vuoti e saldo; i suoi
+- [x] Unità (criterio 5): anonimizzato con `Nome`, `Telefono`, `Note`, `Card attiva` vuoti e saldo; i suoi
       movimenti con `Cliente` vuoto
-- [ ] Unità (criterio 6): nome `=1+1` nei due file → `'=1+1`; ordinamento con accenti ("Èlia" fra "Elia" e
+- [x] Unità (criterio 6): nome `=1+1` nei due file → `'=1+1`; ordinamento con accenti ("Èlia" fra "Elia" e
       "Fabio") e anonimizzati in fondo; nessuna riga → solo intestazione
 **Verifica:** `npm test -- export/build`
 **Dipendenze:** 3, 4 · **File:** src/features/export/types.ts, buildCustomersCsv.ts (+ .test.ts),
