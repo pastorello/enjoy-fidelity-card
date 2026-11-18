@@ -24,6 +24,8 @@ export type MovementHistoryState =
 export type MovementHistory = MovementHistoryState & {
   /** Load the first page again (after an error), showing the loading state meanwhile. */
   retry: () => void;
+  /** Load the first page again while the rows shown stay until the answer replaces them. */
+  reload: () => void;
   /** Load the next page, older than the last movement shown. */
   loadMore: () => void;
 };
@@ -120,5 +122,5 @@ export function useMovementHistory(customerId: string): MovementHistory {
       );
   }, [state, service, customerId, reportForbidden]);
 
-  return { ...state, retry, loadMore };
+  return { ...state, retry, reload: load, loadMore };
 }

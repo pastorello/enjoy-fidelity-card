@@ -151,9 +151,12 @@ describe('MovementsPage: the history of a customer (/clienti/:id/movimenti)', ()
     expect(await days()).toEqual([
       {
         title: 'OGGI',
-        rows: ['Premio: Cornetto e cappuccino10:45 · Giulia−100', 'Spesa 12,50 €10:42 · Giulia+12'],
+        rows: [
+          'Premio: Cornetto e cappuccino10:45 · Giulia−100Annulla',
+          'Spesa 12,50 €10:42 · Giulia+12Annulla',
+        ],
       },
-      { title: 'IERI', rows: ['Spesa 31,50 €19:10 · Andrea+31'] },
+      { title: 'IERI', rows: ['Spesa 31,50 €19:10 · Andrea+31Punti già spesi'] },
       {
         title: '8 NOVEMBRE',
         rows: [
@@ -227,7 +230,7 @@ describe('MovementsPage: the history of a customer (/clienti/:id/movimenti)', ()
     });
     setup({ movements: [old] }).open(MARIA.id);
     expect(await days()).toEqual([
-      { title: '8 NOVEMBRE 2025', rows: ['Spesa 5,00 €18:05 · Marco+5'] },
+      { title: '8 NOVEMBRE 2025', rows: ['Spesa 5,00 €18:05 · Marco+5Annulla'] },
     ]);
   });
 
@@ -248,8 +251,8 @@ describe('MovementsPage: the history of a customer (/clienti/:id/movimenti)', ()
     });
     // The rows keep their order across the pages, the oldest at the bottom.
     const rows = screen.getAllByRole('listitem').map(rowText);
-    expect(rows.at(0)).toBe('Spesa 1,00 €10:59 · Giulia+1');
-    expect(rows.at(-1)).toBe('Spesa 60,00 €10:00 · Giulia+60');
+    expect(rows.at(0)).toBe('Spesa 1,00 €10:59 · Giulia+1Annulla');
+    expect(rows.at(-1)).toBe('Spesa 60,00 €10:00 · Giulia+60Punti già spesi');
     expect(screen.queryByRole('button', { name: 'Mostra altri' })).not.toBeInTheDocument();
   });
 
@@ -337,7 +340,9 @@ describe('MovementsPage: the history of a customer (/clienti/:id/movimenti)', ()
     setup({ movements: [movement] }).open(ERASED.id);
     expect(await screen.findByRole('link', { name: /Cliente cancellato/ })).toBeInTheDocument();
     expect(screen.queryByText('cancellato-7f3a')).not.toBeInTheDocument();
-    expect(await days()).toEqual([{ title: 'OGGI', rows: ['Spesa 40,00 €09:42 · Giulia+40'] }]);
+    expect(await days()).toEqual([
+      { title: 'OGGI', rows: ['Spesa 40,00 €09:42 · Giulia+40Annulla'] },
+    ]);
   });
 
   it('forbidden from the ledger: back to /accedi', async () => {
@@ -349,6 +354,191 @@ describe('MovementsPage: the history of a customer (/clienti/:id/movimenti)', ()
     await screen.findByRole('heading', { level: 1, name: 'Movimenti' });
     auth.removeProfile();
     held.release();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+  });
+});
+
+const OPERATOR = { id: 'op-2', name: 'Marco Prova', role: 'operator' as const };
+// Amounts keep their figure and "€" together with a no-break space.
+const PURCHASE_TITLE = 'Annullare la spesa di 12,50\u00a0€?';
+const PURCHASE_TEXT =
+  'Oggi alle 10:42, +12 punti. Si registra una correzione di −12 punti e il saldo passa da 20 a 8. Il movimento resta nello storico.';
+const REDEMPTION_TITLE = 'Annullare il riscatto di Cornetto e cappuccino?';
+const REDEMPTION_TEXT =
+  'Oggi alle 10:45, −100 punti. Si registra una correzione di +100 punti e il saldo passa da 20 a 120. Il movimento resta nello storico.';
+const NETWORK_TEXT = 'Annullamento non riuscito: controlla la connessione e riprova.';
+const SPENT_TEXT = 'Punti già spesi: questa spesa non si può più annullare.';
+
+/** The row whose text starts with `start` ("Spesa 12,50 €"). */
+async function rowStarting(start: string): Promise<HTMLElement> {
+  await screen.findAllByRole('listitem');
+  const row = screen.getAllByRole('listitem').find((item) => rowText(item).startsWith(start));
+  if (!row) throw new Error(`no row starting with ${start}`);
+  return row;
+}
+
+async function openCancel(start: string) {
+  const row = await rowStarting(start);
+  await userEvent.click(within(row).getByRole('button', { name: 'Annulla' }));
+  return { row, dialog: screen.getByRole('dialog') };
+}
+
+describe('MovementsPage: an administrator cancels from the history (SPEC-ledger point 9)', () => {
+  it('admin: "Annulla" on purchases and redemptions not cancelled, "Punti già spesi" when spent (criterion 7)', async () => {
+    setup().open(MARIA.id);
+    const redemption = await rowStarting('Premio: Cornetto');
+    const today = await rowStarting('Spesa 12,50 €');
+    const yesterday = await rowStarting('Spesa 31,50 €');
+    const correction = await rowStarting('Correzione');
+    const cancelled = await rowStarting('Spesa 8,00 €');
+
+    for (const [row, label] of [
+      [redemption, 'Premio: Cornetto e cappuccino'],
+      [today, 'Spesa 12,50\u00a0€'],
+    ] as const) {
+      const button = within(row).getByRole('button', { name: 'Annulla' });
+      expect(button).toHaveAttribute('data-variant', 'danger-secondary');
+      expect(button).toHaveAccessibleDescription(label);
+    }
+    // 20 − 31 < 0: a text, not a disabled button.
+    expect(within(yesterday).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(yesterday).getByText('Punti già spesi')).toBeInTheDocument();
+    expect(within(correction).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(cancelled).queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Annulla' })).toHaveLength(2);
+  });
+
+  it('operator: no "Annulla" and no "Punti già spesi" in the history (criterion 8)', async () => {
+    setup({ auth: signedInFake({ operator: OPERATOR }) }).open(MARIA.id);
+    expect(await screen.findAllByRole('listitem')).toHaveLength(5);
+    expect(screen.queryByRole('button', { name: 'Annulla' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Punti già spesi')).not.toBeInTheDocument();
+  });
+
+  it('a purchase: the row is highlighted and the dialog asks, "Lascia com’è" closes it without a call', async () => {
+    const { ledger, open } = setup();
+    open(MARIA.id);
+    const { row, dialog } = await openCancel('Spesa 12,50 €');
+    expect(row).toHaveAttribute('data-selected', 'true');
+    expect(dialog).toHaveAccessibleName(PURCHASE_TITLE);
+    expect(dialog).toHaveAccessibleDescription(PURCHASE_TEXT);
+    expect(within(dialog).getByRole('button', { name: 'Annulla la spesa' })).toHaveAttribute(
+      'data-variant',
+      'danger',
+    );
+    expect(within(dialog).getByRole('button', { name: 'Lascia com’è' })).toHaveFocus();
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(row).not.toHaveAttribute('data-selected');
+    expect(ledger.service.cancelMovement).not.toHaveBeenCalled();
+  });
+
+  it('a purchase confirmed: the correction shows in the list and the balance is updated (criterion 6)', async () => {
+    const { ledger, open } = setup();
+    open(MARIA.id);
+    const { dialog } = await openCancel('Spesa 12,50 €');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Annulla la spesa' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(async () =>
+      expect((await days())[0]?.rows).toEqual([
+        'Correzione11:00 · Giulia Prova · annulla la spesa delle 10:42−12',
+        'Premio: Cornetto e cappuccino10:45 · Giulia−100Annulla',
+        'Spesa 12,50 €10:42 · Giulia · annullata+12',
+      ]),
+    );
+    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toHaveTextContent('8 pt');
+    expect(ledger.service.cancelMovement).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Movimenti' })).toHaveFocus();
+  });
+
+  it('a redemption: its own texts, and confirmed it gives the points back', async () => {
+    setup().open(MARIA.id);
+    const { dialog } = await openCancel('Premio: Cornetto');
+    expect(dialog).toHaveAccessibleName(REDEMPTION_TITLE);
+    expect(dialog).toHaveAccessibleDescription(REDEMPTION_TEXT);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Annulla il riscatto' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await screen.findByText(/annulla il riscatto delle 10:45/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /Maria Rossi/ })).toHaveTextContent('120 pt'),
+    );
+  });
+
+  it('a double tap on the confirmation sends one cancellation', async () => {
+    const { ledger, open } = setup();
+    open(MARIA.id);
+    const { dialog } = await openCancel('Spesa 12,50 €');
+    const held = ledger.holdNext('cancelMovement');
+    const confirm = within(dialog).getByRole('button', { name: 'Annulla la spesa' });
+    await userEvent.click(confirm);
+    expect(confirm).toHaveAttribute('aria-busy', 'true');
+    await userEvent.click(confirm);
+    // While it is sent the dialog cannot be dismissed.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    held.release();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(ledger.service.cancelMovement).toHaveBeenCalledTimes(1);
+  });
+
+  it('already-cancelled (another administrator was quicker): reloads without an error', async () => {
+    const { ledger, open } = setup();
+    open(MARIA.id);
+    const { dialog } = await openCancel('Spesa 12,50 €');
+    ledger.failNext('cancelMovement', 'already-cancelled');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Annulla la spesa' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() => expect(ledger.service.listMovements).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('insufficient-balance: "Punti già spesi" and the list reloads', async () => {
+    const { ledger, open } = setup();
+    open(MARIA.id);
+    const { dialog } = await openCancel('Spesa 12,50 €');
+    ledger.failNext('cancelMovement', 'insufficient-balance');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Annulla la spesa' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(SPENT_TEXT);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(ledger.service.listMovements).toHaveBeenCalledTimes(2));
+  });
+
+  it('no answer: the dialog stays open with the message and confirming again sends the same id', async () => {
+    const { ledger, open } = setup();
+    open(MARIA.id);
+    const { dialog } = await openCancel('Spesa 12,50 €');
+    ledger.failNext('cancelMovement', 'lost');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Annulla la spesa' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(NETWORK_TEXT);
+    expect(screen.getByRole('dialog')).toBe(dialog);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Annulla la spesa' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const [first, second] = ledger.service.cancelMovement.mock.calls.map(([input]) => input);
+    expect(second?.operationId).toBe(first?.operationId);
+    // The lost answer was applied once: one correction, the balance from 20 to 8.
+    expect(ledger.movements().filter((movement) => movement.kind === 'correction')).toHaveLength(2);
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /Maria Rossi/ })).toHaveTextContent('8 pt'),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('forbidden from the cancellation: back to /accedi', async () => {
+    const auth = signedInFake();
+    const { ledger, open } = setup({ auth });
+    const { router } = open(MARIA.id);
+    const { dialog } = await openCancel('Spesa 12,50 €');
+    ledger.failNext('cancelMovement', 'forbidden');
+    auth.removeProfile();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Annulla la spesa' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
   });
 });
