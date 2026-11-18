@@ -402,7 +402,7 @@ export function useAuth(): AuthContextValue {
 /**
  * The operator using the app: the signed-in operator, or on a device the cashier whose turn is
  * running (SPEC-tablet-kiosk, point 11: the existing screens do not change). Only for screens
- * behind <RequireAuth>, which shows them only with one.
+ * behind <RequireCashier>, which shows them only with one.
  */
 export function useCurrentOperator(): Operator {
   const { state } = useAuth();

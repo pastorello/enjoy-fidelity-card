@@ -38,6 +38,11 @@ describe('routes', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps /cassa behind the sign-in: signed out → /accedi', async () => {
+    const { router } = renderApp('/cassa');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+  });
+
   describe('fallback recovery link on site_url', () => {
     it('forwards /?token_hash=…&type=recovery to /imposta-password keeping the query', async () => {
       const { router } = renderApp('/?token_hash=abc&type=recovery');

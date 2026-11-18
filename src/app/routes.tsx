@@ -13,6 +13,8 @@ import { MovementsPage } from '../features/ledger/MovementsPage';
 import { PurchasePage } from '../features/ledger/PurchasePage';
 import { RedeemPage } from '../features/ledger/RedeemPage';
 import { RewardsCatalogPage } from '../features/rewards/RewardsCatalogPage';
+import { CashierPage } from '../features/tablet-kiosk/CashierPage';
+import { RequireCashier } from '../features/tablet-kiosk/RequireCashier';
 import { NotFoundPage } from './NotFoundPage';
 import { RootLayout } from './RootLayout';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
@@ -43,20 +45,28 @@ export const routes: RouteObject[] = [
           return { Component: CardPointsPage };
         },
       },
-      // Every page below needs a signed-in operator.
+      // Every page below needs a signed-in account.
       {
         Component: RequireAuth,
         children: [
-          { index: true, Component: HomePage },
-          { path: 'clienti/nuovo', Component: NewCustomerPage },
-          { path: 'clienti/:id', Component: CustomerPage },
-          { path: 'clienti/:id/modifica', Component: EditCustomerPage },
-          { path: 'clienti/:id/card', Component: AssociateCardPage },
-          { path: 'clienti/:id/spesa', Component: PurchasePage },
-          { path: 'clienti/:id/premi', Component: RedeemPage },
-          { path: 'clienti/:id/movimenti', Component: MovementsPage },
-          { path: 'impostazioni', Component: SettingsPage },
-          { path: 'impostazioni/premi', Component: RewardsCatalogPage },
+          // The till tablet chooses its cashier here, without one (SPEC-tablet-kiosk, point 3).
+          { path: 'cassa', Component: CashierPage },
+          // These need an operator at work: on a device, a cashier whose turn is running.
+          {
+            Component: RequireCashier,
+            children: [
+              { index: true, Component: HomePage },
+              { path: 'clienti/nuovo', Component: NewCustomerPage },
+              { path: 'clienti/:id', Component: CustomerPage },
+              { path: 'clienti/:id/modifica', Component: EditCustomerPage },
+              { path: 'clienti/:id/card', Component: AssociateCardPage },
+              { path: 'clienti/:id/spesa', Component: PurchasePage },
+              { path: 'clienti/:id/premi', Component: RedeemPage },
+              { path: 'clienti/:id/movimenti', Component: MovementsPage },
+              { path: 'impostazioni', Component: SettingsPage },
+              { path: 'impostazioni/premi', Component: RewardsCatalogPage },
+            ],
+          },
         ],
       },
       // Component showcase, development builds only.

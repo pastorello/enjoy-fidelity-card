@@ -30,7 +30,7 @@ type LoadState =
   { status: 'loading' } | { status: 'error' } | { status: 'ready'; settings: Settings };
 
 /**
- * Holds the bar's configuration for the signed-in operator. Mounted by <RequireAuth>, so it loads
+ * Holds the bar's configuration for the signed-in operator. Mounted by <RequireCashier>, so it loads
  * once per session; it loads again after a save and whenever the page becomes visible, so a phone
  * left open sees a ratio changed by another administrator.
  */
@@ -101,7 +101,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   return <SettingsContext value={value}>{children}</SettingsContext>;
 }
 
-/** The bar's configuration. Only for screens behind <RequireAuth>. */
+/** The bar's configuration. Only for screens behind <RequireCashier>. */
 export function useSettings(): SettingsContextValue {
   const value = use(SettingsContext);
   if (!value) throw new Error('useSettings must be used inside <SettingsProvider>');

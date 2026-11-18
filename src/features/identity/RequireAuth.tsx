@@ -1,7 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { StatusView } from '../../shared/ui/StatusView';
-import { CardReaderSession } from '../card-input/CardReaderSession';
-import { SettingsProvider } from '../settings/SettingsProvider';
 import { useAuth } from './AuthProvider';
 import styles from './RequireAuth.module.css';
 
@@ -15,10 +13,10 @@ const errorDescriptions = {
 export type SignInLocationState = { from?: string };
 
 /**
- * Layout route: its pages need a signed-in operator (on a device, its cashier), otherwise /accedi
- * (or /cassa on a device without a cashier). It also mounts
- * <SettingsProvider>, so the configuration loads once per session and never without an operator,
- * and <CardReaderSession>, so cards are read only with an operator (SPEC-card-input, point 2).
+ * Layout route: its pages need a signed-in account (an operator, or a device such as the till
+ * tablet), otherwise /accedi. Inside it, `RequireCashier` guards the pages that also need an
+ * operator at work (on a device, its cashier) and mounts the settings and the card reader; /cassa,
+ * where the cashier is chosen, stays outside that guard.
  */
 export function RequireAuth() {
   const { state, retry } = useAuth();
@@ -47,16 +45,5 @@ export function RequireAuth() {
     const from = `${location.pathname}${location.search}`;
     return <Navigate to="/accedi" replace state={{ from } satisfies SignInLocationState} />;
   }
-  // A device shows the pages only to its cashier (SPEC-tablet-kiosk, point 3): without one, nothing
-  // here loads, the settings and the card reader included. /cassa is where the cashier is chosen.
-  const operator = state.status === 'device' ? state.cashier : state.operator;
-  if (!operator) return <Navigate to="/cassa" replace />;
-  // Keyed by operator (on a device, its cashier): another user signing in on this device, or the
-  // next cashier at the till, loads the configuration again.
-  return (
-    <SettingsProvider key={operator.id}>
-      <CardReaderSession />
-      <Outlet />
-    </SettingsProvider>
-  );
+  return <Outlet />;
 }
