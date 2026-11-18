@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
-import { Icon } from '../shared/ui/Icon';
+import { Icon, type IconName } from '../shared/ui/Icon';
 import styles from './AppShell.module.css';
 
 type AppShellProps = {
@@ -8,6 +8,8 @@ type AppShellProps = {
   /** Screen title in the header, with a back link; without it the header shows the logo. */
   title?: string;
   backTo?: string;
+  /** An icon link at the right of the title (e.g. "Modifica cliente"); `label` names it. */
+  headerAction?: { label: string; icon: IconName; to: string } | undefined;
   /** Signed-in user: shows the account button. */
   account?: { name: string; to: string };
   /** Main actions of the screen, in the footer. */
@@ -15,7 +17,14 @@ type AppShellProps = {
 };
 
 /** Common screen frame from the wireframes: green header, content, footer actions. */
-export function AppShell({ children, title, backTo, account, actions }: AppShellProps) {
+export function AppShell({
+  children,
+  title,
+  backTo,
+  headerAction,
+  account,
+  actions,
+}: AppShellProps) {
   const hasBack = title !== undefined && backTo !== undefined;
 
   return (
@@ -39,6 +48,11 @@ export function AppShell({ children, title, backTo, account, actions }: AppShell
             <span className={styles.title}>{title}</span>
           )}
         </h1>
+        {headerAction && (
+          <Link to={headerAction.to} className={styles.iconButton} aria-label={headerAction.label}>
+            <Icon name={headerAction.icon} />
+          </Link>
+        )}
         {account && (
           <Link
             to={account.to}

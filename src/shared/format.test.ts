@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCents, formatPoints, formatTime } from './format';
+import { formatCents, formatDate, formatInteger, formatPoints, formatTime } from './format';
 
 // Non-breaking space keeps the number and the unit on the same line.
 const NBSP = ' ';
@@ -58,5 +58,35 @@ describe('formatTime', () => {
 
   it('rejects a text that is not a date', () => {
     expect(() => formatTime('ieri')).toThrow(RangeError);
+  });
+});
+
+describe('formatInteger', () => {
+  it.each([
+    [0, '0'],
+    [120, '120'],
+    [1250, '1.250'],
+    [-30, '-30'],
+  ])('formats %i as %s', (value, expected) => {
+    expect(formatInteger(value)).toBe(expected);
+  });
+
+  it('rejects a non-integer', () => {
+    expect(() => formatInteger(1.5)).toThrow(RangeError);
+  });
+});
+
+describe('formatDate', () => {
+  it.each([
+    ['2026-11-17T12:00:00.000Z', '17 nov 2026'],
+    ['2026-03-05T10:00:00Z', '5 mar 2026'],
+    // Just after midnight in Rome, still the day before in UTC.
+    ['2026-11-17T23:30:00Z', '18 nov 2026'],
+  ])('formats %s as %s (Europe/Rome)', (iso, expected) => {
+    expect(formatDate(iso)).toBe(expected);
+  });
+
+  it('rejects a text that is not a date', () => {
+    expect(() => formatDate('ieri')).toThrow(RangeError);
   });
 });

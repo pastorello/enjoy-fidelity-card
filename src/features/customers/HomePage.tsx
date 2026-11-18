@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
-import { ServerFaultError } from '../../lib/serverFault';
 import { formatTime } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
@@ -11,7 +10,9 @@ import { SearchField } from '../../shared/ui/SearchField';
 import { StatusView } from '../../shared/ui/StatusView';
 import { useCurrentOperator } from '../identity/AuthProvider';
 import styles from './HomePage.module.css';
+import { customerBackState } from './customerBack';
 import { readHomeNotice } from './homeNotice';
+import { loadErrorText } from './loadErrorText';
 import { classifyQuery, maskPhone } from './phone';
 import type { CustomerSummary } from './types';
 import { SEARCH_SHOWN_ROWS, useCustomerSearch } from './useCustomerSearch';
@@ -28,16 +29,6 @@ function newCustomerLabel(name: string): ReactNode {
       Nuovo cliente <span className={styles.typedName}>«{name}»</span>
     </span>
   );
-}
-
-/** A server fault is not a connection problem: same words as the sign-in page. */
-function searchErrorText(error: unknown): string {
-  if (error instanceof ServerFaultError) {
-    return error.kind === 'misconfigured'
-      ? 'Servizio non configurato: chiedi a un amministratore.'
-      : 'Servizio momentaneamente non disponibile: riprova tra poco.';
-  }
-  return 'Controlla la connessione e riprova.';
 }
 
 /** "••• 4521" or "Senza telefono": the second line of a customer row. */
@@ -175,7 +166,7 @@ export function HomePage() {
         <StatusView
           kind="error"
           title="Ricerca non riuscita"
-          description={searchErrorText(search.error)}
+          description={loadErrorText(search.error)}
           onRetry={search.retry}
         />
       )}
@@ -193,6 +184,8 @@ export function HomePage() {
               <ListRow
                 key={customer.id}
                 to={`/clienti/${customer.id}`}
+                // "Indietro" from the customer page comes back to this search.
+                state={customerBackState(text)}
                 title={customer.name}
                 subtitle={phoneLine(customer)}
                 trailing={<PointsBadge points={customer.balance} />}

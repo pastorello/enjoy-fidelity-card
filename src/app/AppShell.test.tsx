@@ -35,6 +35,34 @@ describe('AppShell', () => {
     expect(screen.queryByRole('img', { name: 'Enjoy Card' })).not.toBeInTheDocument();
   });
 
+  it('header action: an icon link named by its label, to the right of the title', () => {
+    renderShell(
+      <AppShell
+        title="Maria Rossi"
+        backTo="/"
+        headerAction={{ label: 'Modifica cliente', icon: 'pencil', to: '/clienti/1/modifica' }}
+      >
+        x
+      </AppShell>,
+    );
+    const banner = screen.getByRole('banner');
+    const action = within(banner).getByRole('link', { name: 'Modifica cliente' });
+    expect(action).toHaveAttribute('href', '/clienti/1/modifica');
+    // Same 48 px icon button as "Indietro" (var(--touch-target)).
+    expect(action).toHaveClass(within(banner).getByRole('link', { name: 'Indietro' }).className);
+    const heading = within(banner).getByRole('heading', { level: 1, name: 'Maria Rossi' });
+    expect(heading.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('has no header action unless given', () => {
+    renderShell(
+      <AppShell title="Registra spesa" backTo="/">
+        x
+      </AppShell>,
+    );
+    expect(within(screen.getByRole('banner')).getAllByRole('link')).toHaveLength(1);
+  });
+
   it('puts actions in a footer below the content', () => {
     renderShell(<AppShell actions={<Button>Conferma</Button>}>x</AppShell>);
     const footer = screen.getByRole('contentinfo');

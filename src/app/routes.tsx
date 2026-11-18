@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router';
+import { CustomerPage } from '../features/customers/CustomerPage';
 import { HomePage } from '../features/customers/HomePage';
 import { NewCustomerPage } from '../features/customers/NewCustomerPage';
 import { ForgotPasswordPage } from '../features/identity/ForgotPasswordPage';
@@ -30,6 +31,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, Component: HomePage },
           { path: 'clienti/nuovo', Component: NewCustomerPage },
+          { path: 'clienti/:id', Component: CustomerPage },
           { path: 'impostazioni', Component: SettingsPage },
         ],
       },
