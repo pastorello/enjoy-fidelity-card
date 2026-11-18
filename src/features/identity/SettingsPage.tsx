@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button } from '../../shared/ui/Button';
 import { ListRow } from '../../shared/ui/ListRow';
+import { ExportSection } from '../export/ExportSection';
 import { RewardsSettingsSection } from '../rewards/RewardsSettingsSection';
 import { OperatorFinalNote, PointsSettingsSection } from '../settings/PointsSettingsSection';
 import { useAuth, useCurrentOperator } from './AuthProvider';
@@ -55,6 +56,7 @@ export function SettingsPage() {
         </ul>
       </section>
       <RewardsSettingsSection />
+      <ExportSection />
       <OperatorFinalNote />
     </AppShell>
   );

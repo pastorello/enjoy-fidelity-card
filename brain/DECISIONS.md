@@ -10,6 +10,20 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-18 — Indirizzo scritto sulle card: enjoy-fidelity-card.vercel.app
+
+- **Decisione**: i link scritti sulle Enjoy Card usano l'origine `https://enjoy-fidelity-card.vercel.app`
+  (`VITE_CARD_LINK_ORIGIN` impostata su Vercel solo per l'ambiente Production). Dopo il lancio non si cambia.
+- **Perché**: scelta del titolare; è l'indirizzo che l'app ha già, funziona subito senza configurare DNS.
+- **Alternative scartate (Rejected alternatives)**:
+  - Sottodominio del bar (per esempio `card.enjoygaeta.it`): sopravvive a un cambio di hosting, ma richiede
+    DNS su Register.it e il collegamento del dominio su Vercel; non scelto.
+- **Ambito**: `cards` (link ai punti), configurazione Vercel Production, RUNBOOK "Pubblicazione".
+- **Contesto**: risposta del titolare del 2026-11-18, dopo l'unione della PR #20; la build di produzione
+  si era fermata per l'assenza della variabile, come previsto da `vite.config.ts`. Chiude il punto "da
+  decidere prima del lancio" della voce del 2026-11-17 sul saldo del cliente.
+  Conseguenza da ricordare: un cambio di hosting renderebbe morti i link sulle card già consegnate.
+
 ### 2026-11-18 — Enjoy Display nel repo pubblico
 
 - **Decisione**: Enjoy Display, il font del bar arrivato con il design system "Enjoy Bar", si usa nell'app per

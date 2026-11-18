@@ -1,0 +1,47 @@
+/* Same section rhythm as the other /impostazioni sections (SettingsPage.module.css). */
+.section {
+  margin-top: var(--space-2);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+/*
+ * The pair of the wireframe, as in CustomerCardSection: the label size (16px) and a 48px target, so
+ * "Movimenti CSV" stays on one line in half the width, down to a 360px phone.
+ */
+.actions > button {
+  min-height: var(--touch-target);
+  padding-inline: var(--space-2);
+  font-family: var(--type-label-family);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line-height);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-letter-spacing);
+  white-space: nowrap;
+}
+
+/* Empty until an export starts; takes no room meanwhile, so the page ends with the buttons. */
+.status {
+  display: block;
+  margin: var(--space-2) 0 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+}
+
+.status:empty {
+  margin: 0;
+}

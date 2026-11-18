@@ -10,6 +10,8 @@ import { CardsServiceProvider } from './features/cards/CardsServiceProvider';
 import { supabaseCardsService } from './features/cards/supabaseCardsService';
 import { CustomerServiceProvider } from './features/customers/CustomerServiceProvider';
 import { supabaseCustomerService } from './features/customers/supabaseCustomerService';
+import { ExportServiceProvider } from './features/export/ExportServiceProvider';
+import { supabaseExportService } from './features/export/supabaseExportService';
 import { LedgerServiceProvider } from './features/ledger/LedgerServiceProvider';
 import { supabaseLedgerService } from './features/ledger/supabaseLedgerService';
 import { RewardsServiceProvider } from './features/rewards/RewardsServiceProvider';
@@ -53,9 +55,11 @@ createRoot(container).render(
           <RewardsServiceProvider service={supabaseRewardsService}>
             <CardsServiceProvider service={supabaseCardsService}>
               <LedgerServiceProvider service={supabaseLedgerService}>
-                <CardReaderProvider reader={cardReader}>
-                  <RouterProvider router={router} />
-                </CardReaderProvider>
+                <ExportServiceProvider service={supabaseExportService}>
+                  <CardReaderProvider reader={cardReader}>
+                    <RouterProvider router={router} />
+                  </CardReaderProvider>
+                </ExportServiceProvider>
               </LedgerServiceProvider>
             </CardsServiceProvider>
           </RewardsServiceProvider>
