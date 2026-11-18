@@ -2,7 +2,7 @@
 -- (SPEC-rewards.md, "Modello dati e regole di accesso"). Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(118);
+select plan(119);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -32,25 +32,19 @@ end;
 $$;
 grant execute on function public.rewards_test_error_constraint(text) to authenticated;
 
--- Row counts of every table in app except rewards, to prove the rewards RPCs
--- write nothing else (success criterion 3).
-create function public.rewards_test_other_row_counts()
+-- Rows inserted, updated and deleted so far in this transaction in every table of app
+-- except rewards, to prove the rewards RPCs write nothing else (success criterion 3).
+-- Write counters, not row counts: an update leaves the counts as they were.
+create function public.rewards_test_other_writes()
 returns jsonb
-language plpgsql
+language sql
 as $$
-declare
-  v_counts jsonb := '{}';
-  v_table name;
-  v_count bigint;
-begin
-  for v_table in
-    select tablename from pg_tables where schemaname = 'app' and tablename <> 'rewards' order by 1
-  loop
-    execute format('select count(*) from app.%I', v_table) into v_count;
-    v_counts := v_counts || jsonb_build_object(v_table, v_count);
-  end loop;
-  return v_counts;
-end;
+  select coalesce(
+    jsonb_object_agg(relname, n_tup_ins + n_tup_upd + n_tup_del order by relname),
+    '{}'
+  )
+  from pg_stat_xact_user_tables
+  where schemaname = 'app' and relname <> 'rewards';
 $$;
 
 -- Structure and privileges ------------------------------------------------------------
@@ -480,12 +474,13 @@ select ok(
 );
 
 -- update_reward and set_reward_active -------------------------------------------------------
--- Snapshot of the other tables, and timestamps moved to the past so a change is visible.
-create temp table rewards_test_counts_before as
-  select public.rewards_test_other_row_counts() as counts;
+-- Snapshot of the writes to the other tables, and timestamps moved to the past so a change
+-- is visible.
+create temp table rewards_test_writes_before as
+  select public.rewards_test_other_writes() as writes;
 select ok(
-  (select counts ? 'operators' and counts ? 'customers' from rewards_test_counts_before),
-  'the row count snapshot covers the other tables of app'
+  (select writes ? 'operators' and writes ? 'customers' from rewards_test_writes_before),
+  'the write snapshot covers the other tables of app'
 );
 update app.rewards
 set updated_at = now() - interval '1 day'
@@ -642,9 +637,16 @@ select ok(
   'updated_at is set to now() by update_reward and set_reward_active'
 );
 select is(
-  public.rewards_test_other_row_counts(),
-  (select counts from rewards_test_counts_before),
+  public.rewards_test_other_writes(),
+  (select writes from rewards_test_writes_before),
   'the rewards RPCs change no other table in app'
+);
+-- The check sees an update that leaves every row count as it was.
+update app.operators set name = name where name = 'Admin Premi';
+select isnt(
+  public.rewards_test_other_writes(),
+  (select writes from rewards_test_writes_before),
+  'the check above would see an update of another table'
 );
 
 -- A missing author is refused: pretend acting_operator_id() returns null
