@@ -157,8 +157,8 @@ src/features/tablet-kiosk/KioskServiceProvider.tsx, src/main.tsx, src/test/rende
 `turnExpiresAt`, `lockSecondsLeft` | null), in `supabaseAuthService.ts` e in `fakeAuthService.ts`
 (dispositivi e cassiere impostabili dai test). Gli errori come oggi (`ServerFaultError`, rete).
 **Accettazione:**
-- [ ] Unità del servizio Supabase: tre forme di risposta mappate; guasto e rete come prima
-- [ ] Il finto riproduce operatore, dispositivo senza cassiere, con cassiere e turno scaduto
+- [x] Unità del servizio Supabase: tre forme di risposta mappate; guasto e rete come prima
+- [x] Il finto riproduce operatore, dispositivo senza cassiere, con cassiere e turno scaduto
 **Verifica:** `npm test -- identity fakeAuthService`
 **Dipendenze:** 5 · **File:** src/features/identity/types.ts, supabaseAuthService.ts (+ .test.ts),
 src/test/fakeAuthService.ts · **Dimensione:** M
