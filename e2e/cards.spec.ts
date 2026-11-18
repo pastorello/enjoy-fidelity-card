@@ -137,6 +137,8 @@ test.describe('Associa card', () => {
     await expect(page.getByRole('status')).toContainText(
       `Card …${newCard.slice(-4)} associata. Link non scritto.`,
     );
+    // The line under the name names the new card (SPEC-cards, point 6).
+    await expect(page.getByText(`Card attiva …${newCard.slice(-4)} · `)).toBeVisible();
 
     // The old card, read on the home: deactivated, it does not open Registra spesa.
     await page.goto('/');

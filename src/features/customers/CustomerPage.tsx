@@ -4,6 +4,7 @@ import { AppShell } from '../../app/AppShell';
 import { formatDate, formatInteger } from '../../shared/format';
 import { ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
+import { CardSummary } from '../cards/CardSummary';
 import styles from './CustomerPage.module.css';
 import { customerBackTo } from './customerBack';
 import { loadErrorText } from './loadErrorText';
@@ -31,8 +32,8 @@ function BalanceBox({ points }: { points: number }) {
 }
 
 /**
- * The customer's details. The "Card attiva …E5F6 · " part of the first line belongs to `cards`,
- * and `ledger` mounts its `CustomerLedgerSection` (Registra spesa, Riscatta premio, ULTIMI
+ * The customer's details. The first line is `cards`' CardSummary ("Card attiva …E5F6 · ") with the
+ * phone part of this module; `ledger` mounts its `CustomerLedgerSection` (Registra spesa, Riscatta premio, ULTIMI
  * MOVIMENTI) below the SALDO block.
  */
 function CustomerDetails({ customer }: { customer: CustomerSummary }) {
@@ -47,9 +48,12 @@ function CustomerDetails({ customer }: { customer: CustomerSummary }) {
   }
   return (
     <>
-      <p className={styles.meta}>
-        {customer.phone === null ? 'Senza telefono' : `Tel. ${formatPhoneForCard(customer.phone)}`}
-      </p>
+      <CardSummary
+        customerId={customer.id}
+        phone={
+          customer.phone === null ? 'Senza telefono' : `Tel. ${formatPhoneForCard(customer.phone)}`
+        }
+      />
       {customer.notes !== null && <p className={styles.notes}>{customer.notes}</p>}
       <BalanceBox points={customer.balance} />
     </>

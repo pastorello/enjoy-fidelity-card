@@ -1,0 +1,15 @@
+/* "Card attiva …E5F6 · Tel. 333 ••• 4521": the card icon and the secondary text of "Senza telefono". */
+.summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-family: var(--type-body-sm-family);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+.icon {
+  flex-shrink: 0;
+}

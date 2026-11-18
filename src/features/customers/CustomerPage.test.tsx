@@ -56,7 +56,8 @@ describe('CustomerPage: Scheda cliente', () => {
       'href',
       `/clienti/${MARIA.id}/modifica`,
     );
-    const phone = screen.getByText('Tel. 333 ••• 4521');
+    // After the card part of `cards` (CardSummary): "Senza card · Tel. 333 ••• 4521".
+    const phone = await screen.findByText(/· Tel\. 333 ••• 4521$/);
     expect(screen.queryByText(/3331234521/)).not.toBeInTheDocument();
     // The phone only finds the customer: it is never a link to call or text them.
     expect(phone.closest('a')).toBeNull();
@@ -70,7 +71,7 @@ describe('CustomerPage: Scheda cliente', () => {
 
   it('a customer without phone or notes: "Senza telefono", no notes line', async () => {
     renderCustomer(`/clienti/${ROSA.id}`);
-    expect(await screen.findByText('Senza telefono')).toBeInTheDocument();
+    expect(await screen.findByText(/· Senza telefono$/)).toBeInTheDocument();
     expect(screen.queryByText(/^Tel\./)).not.toBeInTheDocument();
     expect(balanceBox()).toHaveTextContent('0');
     expect(balanceBox()).toHaveTextContent('punti');
