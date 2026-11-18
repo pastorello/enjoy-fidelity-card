@@ -1,8 +1,8 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
-import { createFakeAuthService } from '../../test/fakeAuthService';
+import { createFakeAuthService, fakeDevice } from '../../test/fakeAuthService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
 async function fillAndSubmit(email: string, password: string) {
@@ -109,6 +109,79 @@ describe('sign-in page', () => {
 
   it('leaves the page when already signed in', async () => {
     const { router } = renderApp('/accedi', signedInFake());
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+});
+
+const TABLET_NOTE =
+  'Sul tablet della cassa si accede una volta con l’account del bar; poi ognuno si alterna con il proprio PIN.';
+
+/** A matchMedia that answers every query with `matches`: true is the 1280×800 tablet. */
+function stubLayout(matches: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+describe('sign-in page on the cash-desk tablet (SPEC-tablet-kiosk, point 2)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the phone page at 390 px: no tablet note, the accounts note as before', async () => {
+    stubLayout(false);
+    renderApp('/accedi');
+    await screen.findByRole('heading', { level: 1, name: 'Accedi' });
+    expect(screen.queryByText(TABLET_NOTE)).not.toBeInTheDocument();
+    expect(screen.getByText(/Gli account li crea un amministratore/)).toBeInTheDocument();
+    expect(screen.getByRole('main')).not.toHaveAttribute('data-tablet', 'true');
+  });
+
+  it('shows the tablet note below "Password dimenticata?" in the tablet layout', async () => {
+    stubLayout(true);
+    renderApp('/accedi');
+    await screen.findByRole('heading', { level: 1, name: 'Accedi' });
+    const note = screen.getByText(TABLET_NOTE);
+    const link = screen.getByRole('link', { name: 'Password dimenticata?' });
+    expect(link).toHaveAttribute('href', '/password-dimenticata');
+    expect(link.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Wireframe "Tablet: accesso": the tablet note takes the place of the phone one.
+    expect(screen.queryByText(/Gli account li crea un amministratore/)).not.toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveAttribute('data-tablet', 'true');
+  });
+
+  it('sends a device account to "Chi è alla cassa?" after signing in', async () => {
+    stubLayout(true);
+    const fake = createFakeAuthService({ device: fakeDevice });
+    const { router } = renderApp('/accedi', fake);
+    await fillAndSubmit('cassa@example.com', 'password-di-prova');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
+    expect(await screen.findByRole('group', { name: 'Operatori' })).toBeInTheDocument();
+  });
+
+  it('sends a device to /cassa even when another page was asked for', async () => {
+    const fake = createFakeAuthService({ device: fakeDevice });
+    const { router } = renderApp('/impostazioni', fake);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    await fillAndSubmit('cassa@example.com', 'password-di-prova');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
+  });
+
+  it('leaves the page for /cassa when a device session is already saved', async () => {
+    const { router } = renderApp(
+      '/accedi',
+      createFakeAuthService({ userId: 'u', device: fakeDevice }),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
+  });
+
+  it('still sends an operator to the home on the tablet', async () => {
+    stubLayout(true);
+    const { router } = renderApp('/accedi');
+    await fillAndSubmit('giulia@example.com', 'password-di-prova');
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
   });
 });

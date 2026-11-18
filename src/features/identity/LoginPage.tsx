@@ -6,6 +6,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { ScreenTitle } from '../../shared/ui/ScreenTitle';
 import { StatusView } from '../../shared/ui/StatusView';
 import { TextField } from '../../shared/ui/TextField';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { useAuth, type SignInOutcome } from './AuthProvider';
 import type { SignedOutReason } from './types';
 import styles from './LoginPage.module.css';
@@ -44,7 +45,13 @@ export function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [failure, setFailure] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const tablet = useTabletLayout();
 
+  // A device account (the cash-desk tablet) always starts at "Chi è alla cassa?", whatever page
+  // was asked for: without a cashier it can open nothing else (SPEC-tablet-kiosk, point 2).
+  if (state.status === 'device') {
+    return <Navigate to="/cassa" replace />;
+  }
   if (state.status === 'signed-in') {
     return <Navigate to={returnPath(location.state)} replace />;
   }
@@ -85,7 +92,7 @@ export function LoginPage() {
   const reason = state.status === 'signed-out' ? state.reason : undefined;
 
   return (
-    <main className={styles.page}>
+    <main className={styles.page} data-tablet={tablet}>
       <div className={styles.brand}>
         <div aria-hidden="true" className={styles.logo} />
         <p className="visually-hidden">Enjoy Card</p>
@@ -131,10 +138,18 @@ export function LoginPage() {
       <Link to="/password-dimenticata" className={styles.forgot}>
         Password dimenticata?
       </Link>
-      <p className={styles.note}>
-        Gli account li crea un amministratore: se non riesci ad accedere, rivolgiti a chi gestisce
-        l’app.
-      </p>
+      {tablet ? (
+        // Wireframe "Tablet: accesso": on the shared tablet this note takes the phone one's place.
+        <p className={styles.note}>
+          Sul tablet della cassa si accede una volta con l’account del bar; poi ognuno si alterna
+          con il proprio PIN.
+        </p>
+      ) : (
+        <p className={styles.note}>
+          Gli account li crea un amministratore: se non riesci ad accedere, rivolgiti a chi gestisce
+          l’app.
+        </p>
+      )}
     </main>
   );
 }
