@@ -35,20 +35,20 @@ ordine `(created_at, id)`. `customer_name` = nome attuale del cliente (`null` se
 `corrected_by_movement_id` dalla correzione che punta al movimento. Nessun indice nuovo
 (`movements_created_idx` di `ledger`).
 **Accettazione:**
-- [ ] pgTAP: admin legge; operatore, utente senza profilo e `anon` → `42501` / permesso negato;
+- [x] pgTAP: admin legge; operatore, utente senza profilo e `anon` → `42501` / permesso negato;
       `provolatile = 's'`; nessun privilegio a `anon`/`public`
-- [ ] pgTAP: spesa con `amount_cents`, `points`, `cents_per_point`; riscatto con la descrizione o il nome
+- [x] pgTAP: spesa con `amount_cents`, `points`, `cents_per_point`; riscatto con la descrizione o il nome
       del premio; `corrected_by_movement_id` coerente con `corrects_movement_id`; movimenti di un
       anonimizzato presenti con `customer_name` `null`; nome attuale dopo una rinomina del cliente
-- [ ] pgTAP: due pagine con `p_limit = 2` (anche con `created_at` uguali) coprono tutto senza duplicati;
+- [x] pgTAP: due pagine con `p_limit = 2` (anche con `created_at` uguali) coprono tutto senza duplicati;
       `p_limit` 0, 1001, null e cursore con un solo campo → `22023`
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1 · **File:** supabase/migrations/*_export.sql, supabase/tests/export.test.sql ·
 **Dimensione:** M
 
 ## Checkpoint A
-- [ ] `db:test` verde (anche `function_privileges.test.sql` e `rls_default.test.sql`)
-- [ ] Revisione `security-and-hardening`: ruolo prima di tutto, `search_path` vuoto, privilegi, anonimizzati
+- [x] `db:test` verde (anche `function_privileges.test.sql` e `rls_default.test.sql`)
+- [x] Revisione `security-and-hardening`: ruolo prima di tutto, `search_path` vuoto, privilegi, anonimizzati
       azzerati in SQL, nessuna scrittura possibile
 - [ ] Revisione con l'utente prima del client
 
