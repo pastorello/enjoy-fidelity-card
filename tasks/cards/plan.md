@@ -154,7 +154,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint E: revisione `security-and-hardening` della pagina pubblica; Impeccable pulito; leggibile a 320 px
 
 ### Fase 7: Chiusura
-- [ ] Task 23: Guardia del confine, testi in Enjoy Display, RUNBOOK, `.env.example`, memoria di progetto
+- [x] Task 23: Guardia del confine, testi in Enjoy Display, RUNBOOK, `.env.example`, memoria di progetto
 - [ ] Task 24: Verifica dei criteri di successo e PR
 
 ### Checkpoint F: i 15 criteri verificati (parte manuale su Android/iPhone con l'utente sull'anteprima); quality bar completa verde; PR su `main` pronta per `code-review-and-quality`, da unire dopo #18 e #19

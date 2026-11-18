@@ -387,9 +387,9 @@ pagina dei punti (criterio 14, OQ 21), `curl -I` di `/s/…` sull'anteprima, car
 dall'app di produzione, `VITE_CARD_LINK_ORIGIN` su Vercel Production. `VITE_CARD_LINK_ORIGIN=` (vuota) in
 `.env.example`. `brain/STATUS.md` aggiornato; proposta all'utente per `brain/DECISIONS.md`.
 **Accettazione:**
-- [ ] La guardia fallisce se un componente chiama Supabase o registra uid/URL
-- [ ] RUNBOOK con le verifiche manuali dei criteri 10 e 14
-- [ ] Nessun segreto né dato reale nei documenti
+- [x] La guardia fallisce se un componente chiama Supabase o registra uid/URL
+- [x] RUNBOOK con le verifiche manuali dei criteri 10 e 14
+- [x] Nessun segreto né dato reale nei documenti
 **Verifica:** `npm test -- cardsBoundary displayGlyphs`
 **Dipendenze:** 22 · **File:** scripts/cardsBoundary.test.ts, scripts/displayGlyphs.test.ts,
 brain/topics/operations/RUNBOOK.md, brain/STATUS.md, .env.example · **Dimensione:** M
