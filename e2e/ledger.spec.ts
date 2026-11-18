@@ -315,3 +315,144 @@ test.describe('Riscatta premio', () => {
     ]);
   });
 });
+
+/**
+ * A customer created by the test, signed in as `email`, with one purchase of 12,50 € (+12 points)
+ * registered from the card: ends on «Spesa registrata».
+ */
+async function customerWithPurchase(page: Page, email: string, prefix: string) {
+  await stubWebNfc(page);
+  await signIn(page, email);
+  const customer = await customerWithCard(page, prefix, freshUid());
+  await expect(page.getByRole('heading', { level: 1, name: 'Registra spesa' })).toBeVisible();
+  await typeAmount(page, '1250');
+  await page.getByRole('button', { name: 'Conferma +12' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeVisible();
+  return customer;
+}
+
+/** The history of today (OGGI) on Movimenti, opened from its URL. */
+async function openTodayHistory(page: Page, customerId: string) {
+  await page.goto(`/clienti/${customerId}/movimenti`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Movimenti' })).toBeVisible();
+  return page.getByRole('region', { name: 'OGGI' });
+}
+
+test.describe('Movimenti', () => {
+  test('an administrator cancels a purchase from the history: the correction and the balance (criterion 6)', async ({
+    page,
+    request,
+  }) => {
+    const customer = await customerWithPurchase(
+      page,
+      seedAccounts.admin.email,
+      'Maria Storico E2E',
+    );
+    const today = await openTodayHistory(page, customer.id);
+    const customerRow = page.getByRole('link', { name: new RegExp(customer.name) });
+    await expect(customerRow).toContainText('12 punti');
+
+    const purchase = today.getByRole('listitem').filter({ hasText: 'Spesa 12,50 €' });
+    await expect(purchase).toContainText(/\d{2}:\d{2} · Admin Prova/);
+    await expect(purchase).toContainText('+12');
+    const cancel = purchase.getByRole('button', { name: 'Annulla', exact: true });
+    expect((await cancel.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    await cancel.click();
+
+    const dialog = page.getByRole('dialog', { name: 'Annullare la spesa di 12,50 €?' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAccessibleDescription(
+      /^Oggi alle \d{2}:\d{2}, \+12 punti\. Si registra una correzione di −12 punti e il saldo passa da 12 a 0\. Il movimento resta nello storico\.$/,
+    );
+    await expectTouchTargets(page, ['Annulla la spesa', 'Lascia com’è']);
+    await dialog.getByRole('button', { name: 'Annulla la spesa' }).click();
+    await expect(dialog).toBeHidden();
+
+    // The correction is in the history, the purchase struck through; nothing left to cancel.
+    const correction = today.getByRole('listitem').filter({ hasText: 'Correzione' });
+    await expect(correction).toContainText(
+      /\d{2}:\d{2} · Admin Prova · annulla la spesa delle \d{2}:\d{2}/,
+    );
+    await expect(correction).toContainText('−12');
+    await expect(purchase).toContainText('annullata');
+    await expect(purchase.locator('s')).toHaveCount(2);
+    await expect(page.getByRole('button', { name: 'Annulla', exact: true })).toHaveCount(0);
+    await expect(customerRow).toContainText('0 punti');
+
+    // The purchase stays; the correction of opposite sign brings the balance back to 0.
+    const movements = await movementsOf(request, customer.id);
+    expect(movements).toEqual(
+      expect.arrayContaining([
+        { kind: 'purchase', amount_cents: 1250, points: 12, corrects_movement_id: null },
+        {
+          kind: 'correction',
+          amount_cents: null,
+          points: -12,
+          corrects_movement_id: expect.any(String),
+        },
+      ]),
+    );
+    expect(movements).toHaveLength(2);
+  });
+
+  test('an operator cancels their own purchase from «Spesa registrata» within 10 s, and has no Annulla in the history (criterion 8)', async ({
+    page,
+    request,
+  }) => {
+    const customer = await customerWithPurchase(
+      page,
+      seedAccounts.operator.email,
+      'Maria Annullo E2E',
+    );
+    const cancel = page.getByRole('button', { name: /^Annulla la spesa · \d+ s$/ });
+    expect((await cancel.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    await cancel.click();
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Spesa annullata' })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Nuovo saldo' })).toContainText('0');
+    await expect(page.getByRole('button', { name: /^Annulla la spesa/ })).toHaveCount(0);
+    await expectTouchTargets(page, ['Leggi un’altra card']);
+
+    const today = await openTodayHistory(page, customer.id);
+    await expect(today.getByRole('listitem').filter({ hasText: 'Correzione' })).toContainText(
+      /\d{2}:\d{2} · Operatore Prova · annulla la spesa delle \d{2}:\d{2}/,
+    );
+    await expect(today.getByRole('listitem').filter({ hasText: 'Spesa 12,50 €' })).toContainText(
+      'annullata',
+    );
+    await expect(page.getByRole('button', { name: 'Annulla', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: new RegExp(customer.name) })).toContainText(
+      '0 punti',
+    );
+
+    const movements = await movementsOf(request, customer.id);
+    expect(movements).toEqual(
+      expect.arrayContaining([
+        { kind: 'purchase', amount_cents: 1250, points: 12, corrects_movement_id: null },
+        {
+          kind: 'correction',
+          amount_cents: null,
+          points: -12,
+          corrects_movement_id: expect.any(String),
+        },
+      ]),
+    );
+    expect(movements).toHaveLength(2);
+  });
+
+  test('an operator sees no Annulla on a purchase still standing in the history (criterion 8)', async ({
+    page,
+  }) => {
+    const customer = await customerWithPurchase(
+      page,
+      seedAccounts.operator.email,
+      'Maria Operatore E2E',
+    );
+    const today = await openTodayHistory(page, customer.id);
+    const purchase = today.getByRole('listitem').filter({ hasText: 'Spesa 12,50 €' });
+    await expect(purchase).toContainText(/\d{2}:\d{2} · Operatore Prova/);
+    await expect(purchase).not.toContainText('annullata');
+    await expect(page.getByRole('button', { name: 'Annulla', exact: true })).toHaveCount(0);
+    await expect(page.getByText('Punti già spesi')).toHaveCount(0);
+  });
+});
