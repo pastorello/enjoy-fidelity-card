@@ -69,11 +69,11 @@ se non `private.is_admin()`: solo `operator_id = v_operator` e `clock_timestamp(
 altrimenti `EC003`; spesa con saldo − punti < 0 → `EC001`; inserisce `correction` con `points = -points`
 e `corrects_movement_id`; replay che confronta `p_movement_id`.
 **Accettazione:**
-- [ ] pgTAP: correzione di segno opposto, saldo = somma di tutti i movimenti; doppio annullo `EC002`;
+- [x] pgTAP: correzione di segno opposto, saldo = somma di tutti i movimenti; doppio annullo `EC002`;
       correzione non annullabile `EC004`; spesa con punti già spesi `EC001` (criteri 6, 7)
-- [ ] pgTAP: operatore su movimento altrui → `EC003`; su movimento proprio con `created_at` di 11 s fa →
+- [x] pgTAP: operatore su movimento altrui → `EC003`; su movimento proprio con `created_at` di 11 s fa →
       `EC003`, di 5 s fa → ok; admin su qualsiasi movimento, anche di cliente anonimizzato (criterio 8)
-- [ ] pgTAP: annullo di un riscatto restituisce i punti; replay con lo stesso id → stessa correzione, con
+- [x] pgTAP: annullo di un riscatto restituisce i punti; replay con lo stesso id → stessa correzione, con
       un altro `p_movement_id` → `EC007` (criterio 4)
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 3 · **File:** supabase/migrations/*_ledger.sql, supabase/tests/ledger.test.sql
