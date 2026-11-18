@@ -46,13 +46,14 @@ del modulo `identity`.
    `update_reward`, `set_reward_active`), nessuna cancellazione; GESTIONE → "Catalogo premi" in
    `/impostazioni/premi` con Nuovo premio / Modifica premio; 9 criteri di successo verificati test per test
    (`tasks/rewards/plan.md`), quality bar completa verde in locale. Migrazioni `*_rewards*.sql` (3) da
-   applicare allo staging con `db push`. **`card-input` quasi completo** su `feat/card-input` (2026-11-18,
-   ramo da `feat/rewards`, PR verso `main` da unire dopo #18): servizio di lettura unico (Web NFC + lettore
-   USB), `normalizeUid`, scrittura del link con verifica, `CardReadPanel` nella home, card finta solo con
-   `VITE_E2E=1` e `check:bundle` in CI e su Vercel, guardia del confine; nessuna migrazione. Resta il task 16
-   (verifica dei 10 criteri test per test e PR) e la **prova manuale su Android** con l'utente (RUNBOOK,
-   "Prova manuale della lettura card": criteri 2, 3 e 10, in parte solo dopo `cards`). **Prossimo modulo**:
-   `cards` (poi `ledger`, ordine di `CAPABILITY-MAP.md`).
+   applicare allo staging con `db push`. **`card-input` completo** su `feat/card-input` (2026-11-18,
+   ramo da `feat/rewards`, PR #19 verso `main` da unire dopo #18): servizio di lettura unico (Web NFC +
+   lettore USB), `normalizeUid`, scrittura del link con verifica, `CardReadPanel` nella home, card finta solo
+   con `VITE_E2E=1` e `check:bundle` in CI e su Vercel, guardia del confine; nessuna migrazione; 10 criteri di
+   successo verificati test per test (`scripts/cardInputCriteria.test.ts`), quality bar completa e build verdi
+   in locale. Resta la **prova manuale su Android** con l'utente (RUNBOOK, "Prova manuale della lettura
+   card": criteri 2, 3 e 10, in parte solo dopo `cards`). **Prossimo modulo**: `cards` (poi `ledger`, ordine
+   di `CAPABILITY-MAP.md`).
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
