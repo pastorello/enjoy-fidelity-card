@@ -148,7 +148,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 6: Pagina pubblica
 - [x] Task 20: `CardPointsPage` su `/s/:token` (tavole Saldo-punti e Saldo-card-non-attiva), rotta lazy fuori da `RequireAuth`
-- [ ] Task 21: Niente PWA su `/s/`: service worker saltato, installazione annullata
+- [x] Task 21: Niente PWA su `/s/`: service worker saltato, installazione annullata
 - [ ] Task 22: E2E della pagina pubblica (link scritto → saldo senza accesso; vecchio link → «Card non attiva») e intestazioni di `/s/(.*)` in `vercel.json`
 
 ### Checkpoint E: revisione `security-and-hardening` della pagina pubblica; Impeccable pulito; leggibile a 320 px

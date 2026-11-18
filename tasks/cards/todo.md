@@ -348,9 +348,9 @@ src/features/cards/public/CardPointsPage.tsx (+ .module.css, .test.tsx), src/app
 **Descrizione:** `vite.config.ts` con `injectRegister: false`; `main.tsx` registra il service worker tranne
 sui percorsi `/s/` e su `/s/` annulla `beforeinstallprompt` (le intestazioni di `vercel.json`: task 22).
 **Accettazione:**
-- [ ] Unità: la funzione di registrazione salta `/s/…` e registra altrove; `beforeinstallprompt` annullato
+- [x] Unità: la funzione di registrazione salta `/s/…` e registra altrove; `beforeinstallprompt` annullato
       su `/s/`
-- [ ] E2E di `pwa.spec.ts` ancora verde (il service worker si registra sulle pagine degli operatori)
+- [x] E2E di `pwa.spec.ts` ancora verde (il service worker si registra sulle pagine degli operatori)
 **Verifica:** `npm test && npm run build && npm run check:bundle && npm run e2e -- pwa`
 **Dipendenze:** 20 · **File:** src/main.tsx, src/app/registerServiceWorker.ts (+ .test.ts),
 vite.config.ts · **Dimensione:** M
