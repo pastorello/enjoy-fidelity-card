@@ -35,7 +35,13 @@ del modulo `identity`.
    `private.acting_operator_id()` e `reportNotEnabled()` condivisi, sezioni PUNTI / PUNTI E CONTROLLI di
    `/impostazioni`, progetto E2E `phone-settings`; 8 criteri di successo verificati
    (`tasks/settings/plan.md`), controlli tutti verdi in locale. Migrazione da applicare allo staging con
-   `db push` insieme alle altre. **Prossimi moduli**: `customers` e `rewards` (`CAPABILITY-MAP.md`).
+   `db push` insieme alle altre. **`customers` completo** su `feat/customers` (2026-11-18, PR verso `main` da
+   unire dopo #15): tabella `app.customers` con nome unico senza accenti, RPC idempotenti, ricerca per nome
+   o telefono, home "Cerca cliente", Nuovo/scheda/Modifica cliente, cancellazione dei dati solo admin;
+   8 criteri di successo verificati test per test (`tasks/customers/plan.md`), quality bar completa verde
+   in locale. Migrazione `*_customers.sql` da applicare allo staging con `db push`. Il ramo contiene anche
+   modifiche trasversali (Enjoy Display, `src/lib/serverFault.ts`, allineamento ai wireframe finali).
+   **Prossimi moduli**: `rewards`, poi gli altri nell'ordine di `CAPABILITY-MAP.md`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -54,7 +60,8 @@ del modulo `identity`.
 
 ## Modifiche non pubblicate
 
-- Rami in catena non ancora in `main`: `feat/identity` (PR #13), `feat/identity-password`, `feat/settings`.
+- Rami in catena non ancora in `main`: `feat/identity` (PR #13), `feat/identity-password`, `feat/settings`,
+  `feat/customers`.
 
 ## Ultima sessione
 

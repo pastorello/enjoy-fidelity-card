@@ -176,3 +176,19 @@ staging poi produzione, mai `supabase config push`.
 32. Senza sessione (`anon`) la lettura di `app.settings` dà un errore di privilegio, non un risultato vuoto:
     il servizio lo riporta come `unknown`, non `not-found`. L'app carica la configurazione solo dentro
     `RequireAuth`, con un operatore collegato.
+33. Un rifiuto di una RPC (`raise exception` con codice P0001, es. `customer_name_taken`) arriva al browser
+    come HTTP 400, e il browser lo stampa in console ("Failed to load resource"): il controllo "console
+    pulita" di `e2e/fixtures.ts` farebbe fallire il test. Il test che provoca il rifiuto apposta lo dichiara
+    con `test.use({ expectedRefusals: [/\/rest\/v1\/rpc\/<funzione>$/] })` solo nel proprio `describe`
+    (vuoto per tutti gli altri), mai allargando il filtro in `fixtures.ts`.
+34. Gli E2E dei clienti girano nel progetto `phone` (parallelo) e usano nomi con un suffisso unico per
+    esecuzione (`… E2E <suffisso>`): si rieseguono senza `db:reset`, ma lo stack locale accumula clienti di
+    prova (anche anonimizzati, che restano come righe). È innocuo; `npm run db:reset` riparte dai 5 clienti
+    del seed. Il seed `Giulia Bianchi` serve al test del nome già usato: non rinominarlo.
+35. `app.customer_summary` e le firme di `search_customers`, `get_customer`, `customers_served_today` sono
+    definitive: `ledger` ne cambia solo i corpi con `create or replace` in una **migrazione nuova** (mai
+    modificando `*_customers.sql`, che va su staging con `db push`), mantenendo il controllo `not_operator`
+    in testa e ridefinendo `private.acting_operator_id()`, se serve, con il corpo comune parola per parola.
+36. `impeccable detect` su file `.ts`/`.tsx`/`.css` usa solo le regole a espressioni regolari; contrasto e
+    testo minuscolo richiedono una pagina disegnata, e le schermate dei clienti stanno dietro
+    l'accesso. Le misure (≥ 48 px) si provano quindi negli E2E (`e2e/customers.spec.ts`), non col detector.
