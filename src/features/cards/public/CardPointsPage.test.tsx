@@ -170,3 +170,46 @@ describe('CardPointsPage', () => {
     expect(setItem).not.toHaveBeenCalled();
   });
 });
+
+/** The h1 headings on the page now. */
+function h1s() {
+  return screen.queryAllByRole('heading', { level: 1 });
+}
+
+describe('CardPointsPage: one h1 in every state, for whoever jumps by headings', () => {
+  it('while loading: the page title, hidden, and no other heading', async () => {
+    db.abortSignal.mockReturnValue(new Promise<never>(() => {}));
+    renderPage();
+    await screen.findByText('Carico i tuoi punti…');
+    expect(h1s()).toHaveLength(1);
+    expect(h1s()[0]).toHaveTextContent('I tuoi punti Enjoy');
+    expect(h1s()[0]).toHaveClass('visually-hidden');
+  });
+
+  it('on a network error: the page title, then the error as its sub-heading', async () => {
+    answers({ data: null, error: { message: 'TypeError: Failed to fetch' }, status: 0 });
+    renderPage();
+    await screen.findByRole('alert');
+    expect(h1s()).toHaveLength(1);
+    expect(h1s()[0]).toHaveTextContent('I tuoi punti Enjoy');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Non riesco a caricare i punti.',
+    );
+  });
+
+  it('with the points: «ENJOY YOUR POINTS» only', async () => {
+    answers({ data: 120, error: null, status: 200 });
+    renderPage();
+    await screen.findByText('120');
+    expect(h1s()).toHaveLength(1);
+    expect(h1s()[0]).toHaveTextContent('ENJOY YOUR POINTS');
+  });
+
+  it('a card without points: «Card non attiva» only', async () => {
+    answers({ data: null, error: null, status: 200 });
+    renderPage();
+    await screen.findByText('Questa card non mostra punti. Chiedi al bar.');
+    expect(h1s()).toHaveLength(1);
+    expect(h1s()[0]).toHaveTextContent('Card non attiva');
+  });
+});

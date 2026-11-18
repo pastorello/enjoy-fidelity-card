@@ -73,6 +73,10 @@ export function CardPointsPage() {
             height={120}
           />
         </div>
+        {/* The page has its own document: before the panel's own h1, a hidden one names it. */}
+        {(load.status === 'loading' || load.status === 'error') && (
+          <h1 className="visually-hidden">I tuoi punti Enjoy</h1>
+        )}
         {load.status === 'loading' && <StatusView kind="loading" label="Carico i tuoi punti…" />}
         {load.status === 'error' && (
           <div className={styles.status}>
