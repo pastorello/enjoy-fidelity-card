@@ -225,6 +225,29 @@ describe('createWebNfcWriter: outcomes of write()', () => {
     expect(nfc.writes[0]?.options.signal.aborted).toBe(true);
   });
 
+  it("the caller's signal during the verification → aborted, no vibration, no further write()", async () => {
+    const { nfc, writer, vibrate } = await setup();
+    nfc.read(UID);
+    const controller = new AbortController();
+    const steps: CardWriteStep[] = [];
+    const result = writer.writeUrl(URL, {
+      expectedUid: UID,
+      signal: controller.signal,
+      onStep: (step) => steps.push(step),
+    });
+    await settle();
+    expect(steps.at(-1)).toBe('verifying');
+
+    controller.abort();
+
+    await expect(result).resolves.toEqual({ ok: false, reason: 'aborted' });
+    nfc.read(UID, { urls: [URL] }); // the card read back after the abort changes nothing
+    await settle();
+    expect(nfc.writes).toHaveLength(1);
+    expect(nfc.writes[0]?.options.signal.aborted).toBe(true);
+    expect(vibrate).not.toHaveBeenCalled();
+  });
+
   it('a signal already aborted → aborted without write()', async () => {
     const { nfc, writer } = await setup();
     nfc.read(UID);
@@ -331,7 +354,7 @@ describe('createWebNfcWriter: exclusive session', () => {
     nfc.read(UID); // the expected card: written, then verification starts
     await settle();
     advance(REPEAT_WINDOW_MS + 1);
-    nfc.read(UID); // again, during the verification
+    nfc.read(OTHER_UID); // another card, during the verification: it stays with the writer
     await settle();
 
     expect(top).not.toHaveBeenCalled();
@@ -339,7 +362,7 @@ describe('createWebNfcWriter: exclusive session', () => {
     expect(vibrate).not.toHaveBeenCalled();
 
     controller.abort();
-    await result;
+    await expect(result).resolves.toEqual({ ok: false, reason: 'aborted' });
     advance(REPEAT_WINDOW_MS + 1);
     nfc.read(UID);
 
