@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
+import { ServerFaultError } from '../../lib/serverFault';
 
 const SEARCH_LABEL = 'Cerca per nome o telefono';
 
@@ -209,5 +210,103 @@ describe('HomePage: Cerca cliente', () => {
     expect(router.state.location.search).toBe('?q=rossi');
     expect(await screen.findByRole('searchbox', { name: SEARCH_LABEL })).toHaveValue('rossi');
     expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
+  });
+
+  it('no results by name: says so and turns the button into "Nuovo cliente «<testo>»"', async () => {
+    const { field } = await renderHome();
+    await userEvent.type(field, '  verdi   luca ');
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Nessun cliente trovato' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Controlla come è scritto, o cerca con le ultime 4 cifre del telefono.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Risultati della ricerca' })).not.toBeInTheDocument();
+    const links = screen.getAllByRole('link', { name: /^Nuovo cliente/ });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAccessibleName('Nuovo cliente «verdi luca»');
+    expect(links[0]).toHaveAttribute('href', '/clienti/nuovo?nome=verdi+luca');
+  });
+
+  it('"Nuovo cliente «<testo>»" opens Nuovo cliente with the name in the URL', async () => {
+    const { router, field } = await renderHome();
+    await userEvent.type(field, "D'Angelo & figli");
+    await userEvent.click(await screen.findByRole('link', { name: /^Nuovo cliente «/ }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/clienti/nuovo'));
+    expect(new URLSearchParams(router.state.location.search).get('nome')).toBe("D'Angelo & figli");
+  });
+
+  it('no results by phone: the button stays "Nuovo cliente" with nothing prefilled', async () => {
+    const { field } = await renderHome();
+    await userEvent.type(field, '9999');
+
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Nessun cliente trovato' }),
+    ).toBeInTheDocument();
+    const links = screen.getAllByRole('link', { name: /^Nuovo cliente/ });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAccessibleName('Nuovo cliente');
+    expect(links[0]).toHaveAttribute('href', '/clienti/nuovo');
+  });
+
+  it('the button goes back to "Nuovo cliente" once the search finds someone', async () => {
+    const { field } = await renderHome();
+    await userEvent.type(field, 'verdi');
+    expect(await screen.findByRole('link', { name: 'Nuovo cliente «verdi»' })).toBeInTheDocument();
+    await userEvent.clear(field);
+    await userEvent.type(field, 'rossi');
+    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Nuovo cliente/ })).toHaveAccessibleName(
+      'Nuovo cliente',
+    );
+  });
+
+  it('a failed search shows "Ricerca non riuscita", and "Riprova" searches again', async () => {
+    const customers = customersFake();
+    const { field } = await renderHome('/', customers);
+    customers.failNext('search', 'network');
+    await userEvent.type(field, 'rossi');
+
+    const alert = await screen.findByRole('alert');
+    expect(
+      within(alert).getByRole('heading', { name: 'Ricerca non riuscita' }),
+    ).toBeInTheDocument();
+    expect(alert).toHaveTextContent('Controlla la connessione e riprova.');
+    expect(screen.queryByRole('list', { name: 'Risultati della ricerca' })).not.toBeInTheDocument();
+    expect(searchCalls(customers)).toHaveLength(1);
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(searchCalls(customers).map((call) => call.args)).toEqual([['rossi'], ['rossi']]);
+  });
+
+  it('a server fault is worded apart from a network error', async () => {
+    const customers = customersFake();
+    const { field } = await renderHome('/', customers);
+    customers.failNext('search', new ServerFaultError('misconfigured'));
+    await userEvent.type(field, 'rossi');
+
+    const alert = await screen.findByRole('alert');
+    expect(
+      within(alert).getByRole('heading', { name: 'Ricerca non riuscita' }),
+    ).toBeInTheDocument();
+    expect(alert).toHaveTextContent('Servizio non configurato: chiedi a un amministratore.');
+  });
+
+  it('not_operator: back to /accedi with "Account non abilitato"', async () => {
+    const auth = signedInFake();
+    const customers = customersFake();
+    const { router } = renderApp('/', auth, createFakeSettingsService(), customers);
+    const field = await screen.findByRole('searchbox', { name: SEARCH_LABEL });
+    auth.removeProfile();
+    customers.failNext('search', 'not_operator');
+    await userEvent.type(field, 'rossi');
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    expect(
+      await screen.findByText('Account non abilitato: chiedi a un amministratore.'),
+    ).toBeInTheDocument();
   });
 });

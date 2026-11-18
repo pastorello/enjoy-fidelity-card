@@ -11,3 +11,15 @@
   line-height: var(--type-body-sm-line-height);
   color: var(--color-ink-muted);
 }
+
+/* "Nuovo cliente «<testo>»": a long name wraps inside the button instead of overflowing. */
+.newCustomerLabel {
+  min-width: 0;
+  padding-block: var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+/* The name typed by the user and the « »: Enjoy Display lacks these glyphs (displayGlyphs.test.ts). */
+.typedName {
+  font-family: var(--type-body-family);
+}
