@@ -243,5 +243,5 @@ brain/MAP.md, brain/STATUS.md · **Dimensione:** S
 
 ## Checkpoint E
 - [x] I 9 criteri di successo di SPEC-rewards verificati
-- [ ] Quality bar completa verde in locale e in CI
-- [ ] PR (base `main`, da unire dopo #16 e #17) pronta per `code-review-and-quality`
+- [x] Quality bar completa verde in locale e in CI
+- [x] PR #18 (base `main`, da unire dopo #16 e #17) pronta per `code-review-and-quality`
