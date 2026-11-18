@@ -179,6 +179,8 @@ select is(
 );
 
 -- Append-only, even for postgres (criterion 6) --------------------------------------------------
+-- Counted before the attempts: the local database may already hold movements of other suites.
+create temporary table movements_before as select count(*) as n from app.movements;
 select throws_ok(
   $$update app.movements set points = 100 where id = '00000000-0000-4000-9300-000000000001'$$,
   '42501',
@@ -199,7 +201,7 @@ select throws_ok(
 );
 select is(
   (select count(*) from app.movements),
-  4::bigint,
+  (select n from movements_before),
   'the movements are all still there'
 );
 
