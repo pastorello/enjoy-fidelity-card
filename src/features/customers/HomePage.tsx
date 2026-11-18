@@ -8,6 +8,8 @@ import { ListRow } from '../../shared/ui/ListRow';
 import { PointsBadge } from '../../shared/ui/PointsBadge';
 import { SearchField } from '../../shared/ui/SearchField';
 import { StatusView } from '../../shared/ui/StatusView';
+import { CardReadPanel } from '../card-input/CardReadPanel';
+import { useCardRead } from '../card-input/useCardRead';
 import { useCurrentOperator } from '../identity/AuthProvider';
 import styles from './HomePage.module.css';
 import { customerBackState } from './customerBack';
@@ -132,7 +134,15 @@ function useHomeNotice(): { notice: string | null; written: boolean } {
   return { notice, written };
 }
 
-/** Home "Cerca cliente": search by name or phone, SERVITI OGGI, "Nuovo cliente". */
+/** Text of the card panel while reading is active (wireframe Cerca cliente). */
+const CARD_PANEL_TITLE = 'Avvicina la card';
+const CARD_PANEL_TEXT =
+  'Lettura attiva: appoggia la card sul retro del telefono. Una card nuova apre la registrazione del cliente.';
+
+/** Until `cards` wires the navigation, a card read on the home is dropped (SPEC-card-input, point 8). */
+function ignoreCardRead() {}
+
+/** Home "Cerca cliente": card panel, search by name or phone, SERVITI OGGI, "Nuovo cliente". */
 export function HomePage() {
   const operator = useCurrentOperator();
   const { notice, written: noticeWritten } = useHomeNotice();
@@ -147,6 +157,10 @@ export function HomePage() {
   // Set by SERVITI OGGI's "Riprova" until its answer arrives.
   const servedRetrying = useRef(false);
   const servedCount = served.status === 'done' ? served.customers.length : null;
+  // No consumer yet: the panel shows the reading state, a card read does nothing and does not vibrate.
+  useCardRead(ignoreCardRead, { enabled: false });
+  // While a search is shown the card panel shrinks to one line (wireframe Ricerca senza risultati).
+  const searching = search.status !== 'idle';
 
   // "Riprova" is replaced by the loading state: the focus goes to the search outcome, which
   // stays mounted while searching and then holds the results, not to <body>.
@@ -216,10 +230,14 @@ export function HomePage() {
           )}
         </output>
       )}
-      {/* The card reading panel of `card-input` goes here, above the search. */}
+      <CardReadPanel
+        title={CARD_PANEL_TITLE}
+        description={CARD_PANEL_TEXT}
+        variant={searching ? 'compact' : 'full'}
+      />
       <SearchField
         ref={searchInput}
-        label="Cerca per nome o telefono"
+        label={searching ? 'Cerca per nome o telefono' : 'Oppure cerca per nome o telefono'}
         placeholder="Es. Rossi o 4521"
         value={text}
         onChange={changeText}
@@ -229,7 +247,7 @@ export function HomePage() {
         {searchAnnouncement(search)}
       </p>
       {/* The focus target of "Riprova": mounted from the first search to the last result. */}
-      {search.status !== 'idle' && (
+      {searching && (
         <div ref={searchOutcome} tabIndex={-1} className={styles.outcome}>
           {search.status === 'loading' && <StatusView kind="loading" label="Ricerca…" />}
           {search.status === 'error' && (
@@ -272,7 +290,7 @@ export function HomePage() {
         </div>
       )}
       {/* While a search is shown, SERVITI OGGI is not. */}
-      {search.status === 'idle' && (
+      {!searching && (
         <ServedTodaySection served={served} headingRef={servedHeading} onRetry={retryServed} />
       )}
     </AppShell>
