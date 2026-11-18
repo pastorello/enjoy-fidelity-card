@@ -1,0 +1,98 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Under the phone, as in the wireframe: what the name and the phone are for. */
+.help {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+.privacy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* "PRIVACY": spaced condensed caps in muted ink, as SERVITI OGGI and the settings sections. */
+.legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+/* The whole row is the touch target of the checkbox: at least 48 px tall. */
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--space-2) + var(--space-1));
+  padding-block: var(--space-1);
+  min-height: var(--touch-target);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  color: var(--color-ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.checkbox {
+  flex-shrink: 0;
+  width: var(--icon);
+  height: var(--icon);
+  /* First line of the label, as in the wireframe. */
+  margin: 2px 0 0;
+  accent-color: var(--color-enjoy-green);
+}
+
+.checkbox[aria-invalid='true'] {
+  outline: 2px solid var(--color-danger);
+  outline-offset: 2px;
+}
+
+.mandatory {
+  color: var(--color-ink-muted);
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-danger-text);
+}
+
+.error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* A text link that opens the notice, lined up with the label (checkbox + gap). */
+.noticeLink {
+  align-self: flex-start;
+  min-height: var(--touch-target);
+  padding: 0 0 0 calc(var(--icon) + var(--space-2) + var(--space-1));
+  border: 0;
+  background: transparent;
+  color: var(--color-accent-text);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  text-decoration: underline;
+  cursor: pointer;
+  touch-action: manipulation;
+}

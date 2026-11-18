@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router';
 import { HomePage } from '../features/customers/HomePage';
+import { NewCustomerPage } from '../features/customers/NewCustomerPage';
 import { ForgotPasswordPage } from '../features/identity/ForgotPasswordPage';
 import { LoginPage } from '../features/identity/LoginPage';
 import { RequireAuth } from '../features/identity/RequireAuth';
@@ -28,6 +29,7 @@ export const routes: RouteObject[] = [
         Component: RequireAuth,
         children: [
           { index: true, Component: HomePage },
+          { path: 'clienti/nuovo', Component: NewCustomerPage },
           { path: 'impostazioni', Component: SettingsPage },
         ],
       },
