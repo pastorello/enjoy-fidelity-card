@@ -57,4 +57,11 @@ describe('customers data boundary', () => {
       .map((file) => file.path);
     expect(offenders).toEqual([]);
   });
+
+  // SPEC-customers, Boundaries/Always: the phone only finds the customer, it never contacts them.
+  it('has no tel: or sms: link anywhere in the app', () => {
+    const contact = /\b(tel|sms):/i;
+    const offenders = files.filter((file) => contact.test(file.text)).map((file) => file.path);
+    expect(offenders).toEqual([]);
+  });
 });

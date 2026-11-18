@@ -70,6 +70,11 @@ describe('HomePage: Cerca cliente', () => {
     await advance(1);
     expect(searchCalls(customers)).toEqual([{ method: 'search', args: ['rossi'] }]);
     expect(within(resultList()).getByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
+    // The masked phone in the row is never a link to call or text the customer.
+    expect(within(resultList()).getByRole('link', { name: /Maria Rossi/ })).toHaveTextContent(
+      '••• 4521',
+    );
+    expect(document.querySelector('[href^="tel:"], [href^="sms:"]')).toBeNull();
     await advance(1000);
     expect(searchCalls(customers)).toHaveLength(1);
   });
@@ -385,6 +390,8 @@ describe('HomePage: SERVITI OGGI', () => {
     expect(rows[1]).toHaveTextContent('Senza telefono · 09:58');
     expect(rows[1]).toHaveTextContent('310 punti');
     expect(rows[1]).toHaveAttribute('href', `/clienti/${lucia?.id}`);
+    // The phone never becomes a link to call or text the customer.
+    expect(document.querySelector('[href^="tel:"], [href^="sms:"]')).toBeNull();
     expect(servedCalls(customers)).toHaveLength(1);
   });
 

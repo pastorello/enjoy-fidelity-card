@@ -56,8 +56,12 @@ describe('CustomerPage: Scheda cliente', () => {
       'href',
       `/clienti/${MARIA.id}/modifica`,
     );
-    expect(screen.getByText('Tel. 333 ••• 4521')).toBeInTheDocument();
+    const phone = screen.getByText('Tel. 333 ••• 4521');
     expect(screen.queryByText(/3331234521/)).not.toBeInTheDocument();
+    // The phone only finds the customer: it is never a link to call or text them.
+    expect(phone.closest('a')).toBeNull();
+    expect(within(phone).queryByRole('link')).not.toBeInTheDocument();
+    expect(document.querySelector('[href^="tel:"], [href^="sms:"]')).toBeNull();
     expect(screen.getByText('Preferisce il caffè d’orzo')).toBeInTheDocument();
     expect(balanceBox()).toHaveTextContent('SALDO');
     expect(balanceBox()).toHaveTextContent('1.250');
