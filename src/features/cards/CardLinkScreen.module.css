@@ -1,0 +1,49 @@
+/* Board "Associa-link": the note on the link, a small icon beside the text. */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+}
+
+.note svg {
+  flex-shrink: 0;
+}
+
+/* Board "Associa-link": «Card associata a Maria», the check on green beside a section title. */
+.associated {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-2) + var(--space-1));
+  margin: 0;
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-enjoy-green);
+  color: var(--color-on-green);
+}
+
+.associatedText {
+  min-width: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+  color: var(--color-accent-text);
+}
+
+/* A typed name with a character Enjoy Display lacks is set in the body font (displayGlyphs.test.ts). */
+.typedName {
+  font-family: var(--type-body-family);
+}

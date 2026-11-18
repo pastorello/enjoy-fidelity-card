@@ -1,0 +1,55 @@
+/* Wireframe "Card sconosciuta: nuovo cliente": a raised block above the form, the check on green. */
+.panel {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--space-2) + var(--space-1));
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-enjoy-green);
+  color: var(--color-on-green);
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+}
+
+/* The uid is one long word: it may break anywhere rather than widen the page. */
+.text {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink);
+}
+
+.hint a {
+  color: var(--color-accent-text);
+}

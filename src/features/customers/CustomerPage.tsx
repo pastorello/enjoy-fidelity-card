@@ -4,9 +4,11 @@ import { AppShell } from '../../app/AppShell';
 import { formatDate, formatInteger } from '../../shared/format';
 import { ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
+import { CardSummary } from '../cards/CardSummary';
 import styles from './CustomerPage.module.css';
 import { customerBackTo } from './customerBack';
 import { loadErrorText } from './loadErrorText';
+import { NavigationNotice } from './NavigationNotice';
 import { formatPhoneForCard } from './phone';
 import type { CustomerSummary } from './types';
 import { useCustomer } from './useCustomer';
@@ -30,8 +32,8 @@ function BalanceBox({ points }: { points: number }) {
 }
 
 /**
- * The customer's details. The "Card attiva …E5F6 · " part of the first line belongs to `cards`,
- * and `ledger` mounts its `CustomerLedgerSection` (Registra spesa, Riscatta premio, ULTIMI
+ * The customer's details. The first line is `cards`' CardSummary ("Card attiva …E5F6 · ") with the
+ * phone part of this module; `ledger` mounts its `CustomerLedgerSection` (Registra spesa, Riscatta premio, ULTIMI
  * MOVIMENTI) below the SALDO block.
  */
 function CustomerDetails({ customer }: { customer: CustomerSummary }) {
@@ -46,9 +48,12 @@ function CustomerDetails({ customer }: { customer: CustomerSummary }) {
   }
   return (
     <>
-      <p className={styles.meta}>
-        {customer.phone === null ? 'Senza telefono' : `Tel. ${formatPhoneForCard(customer.phone)}`}
-      </p>
+      <CardSummary
+        customerId={customer.id}
+        phone={
+          customer.phone === null ? 'Senza telefono' : `Tel. ${formatPhoneForCard(customer.phone)}`
+        }
+      />
       {customer.notes !== null && <p className={styles.notes}>{customer.notes}</p>}
       <BalanceBox points={customer.balance} />
     </>
@@ -58,7 +63,8 @@ function CustomerDetails({ customer }: { customer: CustomerSummary }) {
 /**
  * Scheda cliente (`/clienti/:id`; wireframe Scheda cliente): the name as title with "Modifica
  * cliente", the phone, the notes and the balance. "Indietro" returns to the search it came from.
- * An id that is not a UUID is "Cliente non trovato" without asking the server.
+ * An id that is not a UUID is "Cliente non trovato" without asking the server. A one-time message
+ * of the navigation state ("Card …A1B2 associata.") opens the page.
  */
 export function CustomerPage() {
   const { id = '' } = useParams();
@@ -89,6 +95,7 @@ export function CustomerPage() {
             : { label: 'Modifica cliente', icon: 'pencil', to: `/clienti/${customer.id}/modifica` }
         }
       >
+        <NavigationNotice />
         <CustomerDetails customer={customer} />
       </AppShell>
     );

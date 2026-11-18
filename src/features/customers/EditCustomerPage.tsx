@@ -3,6 +3,7 @@ import { Navigate, useParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
+import { CustomerCardSection } from '../cards/CustomerCardSection';
 import { AnonymizeSection } from './AnonymizeSection';
 import { CustomerForm } from './CustomerForm';
 import { loadErrorText } from './loadErrorText';
@@ -17,7 +18,7 @@ const FORM_ID = 'edit-customer';
 
 /**
  * The form, filled with the customer as saved, and "Salva modifiche" (or "Riprova") below; then
- * DATI DEL CLIENTE for administrators (the CARD section of `cards` goes before it).
+ * CARD (`cards`, saved on its own) and DATI DEL CLIENTE for administrators.
  */
 function EditForm({
   customer,
@@ -56,6 +57,7 @@ function EditForm({
         refusal={refusal}
       />
       {failure && <SaveFailure text={failure.text} />}
+      <CustomerCardSection customer={customer} />
       <AnonymizeSection customer={customer} />
     </AppShell>
   );

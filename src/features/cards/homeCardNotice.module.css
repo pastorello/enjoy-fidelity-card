@@ -1,0 +1,4 @@
+/* A typed name with a character Enjoy Display lacks is set in the body font (displayGlyphs.test.ts). */
+.typedName {
+  font-family: var(--type-body-family);
+}

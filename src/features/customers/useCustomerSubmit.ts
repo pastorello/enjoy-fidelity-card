@@ -40,6 +40,12 @@ export type CustomerSubmitOptions = {
   onSettled?: () => void;
   /** A refusal the page handles itself (returns true), before the usual messages. */
   onRefused?: (error: CustomerError) => boolean;
+  /**
+   * A rejection that is not a `CustomerError` (e.g. `card_taken` of a create with the card) the page
+   * handles itself (returns true): nothing else happens, `onSettled` included. Otherwise it is an
+   * unknown outcome.
+   */
+  onOtherError?: (error: unknown) => boolean;
   /** "Cliente non salvato…" or "Modifiche non salvate…". */
   networkText: string;
 };
@@ -64,7 +70,7 @@ export function useCustomerSubmit(options: CustomerSubmitOptions): CustomerSubmi
 
   const send = useCallback(
     async (values: CustomerFormValues) => {
-      const { request, onSaved, onSettled, onRefused, networkText } = latest.current;
+      const { request, onSaved, onSettled, onRefused, onOtherError, networkText } = latest.current;
       try {
         const customer = await request(values);
         onSettled?.();
@@ -73,7 +79,9 @@ export function useCustomerSubmit(options: CustomerSubmitOptions): CustomerSubmi
       } catch (error) {
         const refused =
           error instanceof CustomerError && error.kind !== 'network' && error.kind !== 'unknown';
-        if (!refused) {
+        if (!(error instanceof CustomerError) && onOtherError?.(error)) {
+          // Handled by the page.
+        } else if (!refused) {
           setFailure({ text: failureText(error, networkText), uncertain: true });
         } else {
           onSettled?.();

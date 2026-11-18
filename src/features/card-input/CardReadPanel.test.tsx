@@ -269,3 +269,43 @@ describe('CardReadPanel', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
+
+describe('CardReadPanel: notice of the screen', () => {
+  const notice = {
+    title: 'Card disattivata',
+    text: 'Questa card non è più attiva.',
+    action: <button type="button">Apri la scheda</button>,
+  };
+
+  it('replaces the active text with an alert and its action', () => {
+    render(
+      <CardReadPanelView
+        title={HOME_TITLE}
+        description={HOME_TEXT}
+        status="active"
+        notice={notice}
+        onStart={noop}
+      />,
+    );
+    const region = screen.getByRole('region', { name: 'Lettura card' });
+    const alert = within(region).getByRole('alert');
+    expect(alert).toHaveTextContent('Card disattivata');
+    expect(alert).toHaveTextContent('Questa card non è più attiva.');
+    expect(within(region).getByRole('button', { name: 'Apri la scheda' })).toBeInTheDocument();
+    expect(region).not.toHaveTextContent(HOME_TEXT);
+  });
+
+  it('is not shown while reading is off: the panel says why', () => {
+    render(
+      <CardReadPanelView
+        title={HOME_TITLE}
+        description={HOME_TEXT}
+        status="off"
+        notice={notice}
+        onStart={noop}
+      />,
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByText('Lettura card spenta')).toBeInTheDocument();
+  });
+});

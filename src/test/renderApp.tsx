@@ -2,19 +2,22 @@ import { render } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { routes } from '../app/routes';
 import { CardReaderProvider } from '../features/card-input/CardReaderProvider';
+import { CardsServiceProvider } from '../features/cards/CardsServiceProvider';
 import { CustomerServiceProvider } from '../features/customers/CustomerServiceProvider';
 import { AuthProvider } from '../features/identity/AuthProvider';
 import { RewardsServiceProvider } from '../features/rewards/RewardsServiceProvider';
 import { SettingsServiceProvider } from '../features/settings/SettingsProvider';
 import { createFakeAuthService } from './fakeAuthService';
 import { createTestCardReader } from './fakeCardReader';
+import { createFakeCardsService } from './fakeCardsService';
 import { createFakeCustomerService } from './fakeCustomerService';
 import { createFakeRewardsService } from './fakeRewardsService';
 import { createFakeSettingsService } from './fakeSettingsService';
 
 /**
- * Renders the whole app at `path`, with fake Auth, Settings, Customer and Rewards services instead of
- * Supabase, and a card reader with `fakeWebNfc` and the USB wedge on jsdom's `document`.
+ * Renders the whole app at `path`, with fake Auth, Settings, Customer, Rewards and Cards services
+ * instead of Supabase, and a card reader with `fakeWebNfc` and the USB wedge on jsdom's `document`.
+ * The cards fake reads (and creates) its customers in `customers` unless one is passed.
  */
 export function renderApp(
   path: string,
@@ -23,6 +26,7 @@ export function renderApp(
   customers = createFakeCustomerService(),
   rewards = createFakeRewardsService(),
   card = createTestCardReader(),
+  cards = createFakeCardsService({ customers }),
 ) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   render(
@@ -30,15 +34,17 @@ export function renderApp(
       <SettingsServiceProvider service={settings.service}>
         <CustomerServiceProvider service={customers.service}>
           <RewardsServiceProvider service={rewards.service}>
-            <CardReaderProvider reader={card.reader}>
-              <RouterProvider router={router} />
-            </CardReaderProvider>
+            <CardsServiceProvider service={cards.service}>
+              <CardReaderProvider reader={card.reader}>
+                <RouterProvider router={router} />
+              </CardReaderProvider>
+            </CardsServiceProvider>
           </RewardsServiceProvider>
         </CustomerServiceProvider>
       </SettingsServiceProvider>
     </AuthProvider>,
   );
-  return { router, fake, settings, customers, rewards, card };
+  return { router, fake, settings, customers, rewards, card, cards };
 }
 
 /** A fake with a session already saved on the device. */

@@ -740,7 +740,7 @@ describe('HomePage: Lettura card', () => {
     expect(field).toHaveAccessibleName('Oppure cerca per nome o telefono');
   });
 
-  it('a card read does nothing yet: no navigation and no vibration', async () => {
+  it('a card read is handed to cards: an unknown card opens Nuovo cliente with it', async () => {
     const card = createTestCardReader();
     const { router } = await renderWithCard('/', card);
     await within(cardPanel()).findByText(HOME_TITLE);
@@ -748,8 +748,8 @@ describe('HomePage: Lettura card', () => {
     act(() => {
       card.nfc.read('04:a1:b2:c3:d4:e5:f6');
     });
-    expect(router.state.location.pathname).toBe('/');
-    expect(router.state.location.search).toBe('');
-    expect(card.vibrate).not.toHaveBeenCalled();
+    expect(card.vibrate).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/clienti/nuovo'));
+    expect(router.state.location.search).toBe('?card=04A1B2C3D4E5F6');
   });
 });

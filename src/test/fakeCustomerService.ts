@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { classifyQuery, normalizePhone } from '../features/customers/phone';
 import { CustomerError } from '../features/customers/types';
 import type {
+  CreateCustomerInput,
   CustomerErrorKind,
   CustomerService,
   CustomerSummary,
@@ -136,6 +137,37 @@ export function createFakeCustomerService({
     return null;
   }
 
+  /** The customer a create with this `operationId` made, or null. */
+  function createdFor(operationId: string): CustomerSummary | null {
+    const existing = stored.get(createdBy.get(operationId) ?? '');
+    return existing ? copy(existing) : null;
+  }
+
+  /**
+   * The checks of the server create (throwing its `CustomerError`), then a function that stores
+   * the customer: `fakeCardsService` runs the card checks in between, all or nothing.
+   */
+  function prepareCreate(input: CreateCustomerInput): () => CustomerSummary {
+    const { name, phone, notes } = validate(input, input.privacyConsent);
+    const taken = takenBy(name, null);
+    if (taken !== null) throw new CustomerError('customer_name_taken', taken);
+    return () => {
+      created += 1;
+      const customer: CustomerSummary = {
+        id: fakeId(created),
+        name,
+        phone,
+        notes,
+        anonymizedAt: null,
+        balance: 0,
+        lastServedAt: null,
+      };
+      stored.set(customer.id, customer);
+      createdBy.set(input.operationId, customer.id);
+      return copy(customer);
+    };
+  }
+
   /** Logs the call, then answers it as programmed (network, failure, hold) or with `compute`. */
   function run<T>(method: Method, args: unknown[], compute: () => T): Promise<T> {
     calls.push({ method, args });
@@ -196,24 +228,7 @@ export function createFakeCustomerService({
     create: vi.fn<CustomerService['create']>((input) =>
       run('create', [input], () => {
         // A resent request returns what the first one created, before any check.
-        const existing = stored.get(createdBy.get(input.operationId) ?? '');
-        if (existing) return copy(existing);
-        const { name, phone, notes } = validate(input, input.privacyConsent);
-        const taken = takenBy(name, null);
-        if (taken !== null) throw new CustomerError('customer_name_taken', taken);
-        created += 1;
-        const customer: CustomerSummary = {
-          id: fakeId(created),
-          name,
-          phone,
-          notes,
-          anonymizedAt: null,
-          balance: 0,
-          lastServedAt: null,
-        };
-        stored.set(customer.id, customer);
-        createdBy.set(input.operationId, customer.id);
-        return copy(customer);
+        return createdFor(input.operationId) ?? prepareCreate(input)();
       }),
     ),
     update: vi.fn<CustomerService['update']>((input) =>
@@ -252,6 +267,9 @@ export function createFakeCustomerService({
     calls,
     /** The stored customers, as copies. */
     customers: () => [...stored.values()].map(copy),
+    /** For `fakeCardsService` (new customer with a card): not logged, not programmable. */
+    createdFor,
+    prepareCreate,
     /** The customers served today, most recent first (until `ledger`, the server's list is empty). */
     setServedToday(ids: string[]) {
       servedTodayIds = [...ids];

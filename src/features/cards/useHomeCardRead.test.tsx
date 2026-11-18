@@ -1,0 +1,256 @@
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import { ServerFaultError } from '../../lib/serverFault';
+import { createTestCardReader } from '../../test/fakeCardReader';
+import { createFakeCardsService, fakeCard } from '../../test/fakeCardsService';
+import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
+import { createFakeRewardsService } from '../../test/fakeRewardsService';
+import { createFakeSettingsService } from '../../test/fakeSettingsService';
+import { renderApp, signedInFake } from '../../test/renderApp';
+
+const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393330004521', balance: 120 });
+const ERASED = fakeCustomer({ name: 'cancellato-7f3a', anonymizedAt: '2026-11-17T09:00:00.000Z' });
+
+/** Uids as Web NFC gives them, and as the app keeps them. */
+const ACTIVE = { read: '04:a1:b2:c3:d4:e5:f6', uid: '04A1B2C3D4E5F6' };
+const LOST = { read: '04:11:22:33:44:55:66', uid: '04112233445566' };
+const OF_ERASED = { read: '04:77:88:99:aa:bb:cc', uid: '04778899AABBCC' };
+const UNKNOWN = { read: '04:de:ad:be:ef:00:01', uid: '04DEADBEEF0001' };
+
+const HOME_TITLE = 'Avvicina la card';
+
+function setup({ auth = signedInFake() } = {}) {
+  const customers = createFakeCustomerService({ customers: [MARIA, ERASED] });
+  const cards = createFakeCardsService({
+    customers,
+    cards: [
+      fakeCard({ uid: ACTIVE.uid, customerId: MARIA.id }),
+      fakeCard({
+        uid: LOST.uid,
+        customerId: MARIA.id,
+        active: false,
+        deactivatedAt: '2026-11-16T10:00:00.000Z',
+      }),
+      fakeCard({ uid: OF_ERASED.uid, customerId: ERASED.id, active: false }),
+    ],
+  });
+  const card = createTestCardReader();
+  return { customers, cards, card, auth };
+}
+
+async function renderHome(fixture = setup(), path = '/') {
+  const rendered = renderApp(
+    path,
+    fixture.auth,
+    createFakeSettingsService(),
+    fixture.customers,
+    createFakeRewardsService(),
+    fixture.card,
+    fixture.cards,
+  );
+  const panel = await screen.findByRole('region', { name: 'Lettura card' });
+  await within(panel).findByText(path === '/' ? HOME_TITLE : /Lettura attiva/);
+  return rendered;
+}
+
+function cardPanel() {
+  return screen.getByRole('region', { name: 'Lettura card' });
+}
+
+function tap(fixture: ReturnType<typeof setup>, read: string) {
+  act(() => {
+    fixture.card.nfc.read(read);
+  });
+}
+
+function lookups(fixture: ReturnType<typeof setup>) {
+  return fixture.cards.calls.filter((call) => call.method === 'lookup');
+}
+
+describe('useHomeCardRead: a card read on the home', () => {
+  it('an active card opens Registra spesa of its customer, with name and balance', async () => {
+    const fixture = setup();
+    const { router } = await renderHome(fixture);
+    tap(fixture, ACTIVE.read);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/spesa`));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Registra spesa' }),
+    ).toBeInTheDocument();
+    const row = await screen.findByRole('link', { name: /Maria Rossi/ });
+    expect(row).toHaveAttribute('href', `/clienti/${MARIA.id}`);
+    expect(row).toHaveTextContent('120 pt');
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/');
+    expect(lookups(fixture).map((call) => call.args)).toEqual([[ACTIVE.uid]]);
+  });
+
+  it('the active card path never issues a link nor writes the card (criterion 14)', async () => {
+    const fixture = setup();
+    const { router } = await renderHome(fixture);
+    tap(fixture, ACTIVE.read);
+    await screen.findByRole('heading', { level: 1, name: 'Registra spesa' });
+    await screen.findByRole('link', { name: /Maria Rossi/ });
+
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/spesa`);
+    const methods = fixture.cards.calls.map((call) => call.method);
+    expect(methods).not.toContain('issueLink');
+    expect(methods).not.toContain('confirmLink');
+    expect(fixture.card.nfc.writes).toHaveLength(0);
+  });
+
+  it('an unknown card opens Nuovo cliente with the card', async () => {
+    const fixture = setup();
+    const { router } = await renderHome(fixture);
+    tap(fixture, UNKNOWN.read);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/clienti/nuovo'));
+    expect(router.state.location.search).toBe(`?card=${UNKNOWN.uid}`);
+  });
+
+  it('a deactivated card does not open the purchase: "Card disattivata" with the customer (criterion 6)', async () => {
+    const fixture = setup();
+    const { router } = await renderHome(fixture);
+    tap(fixture, LOST.read);
+
+    const alert = await within(cardPanel()).findByRole('alert');
+    expect(alert).toHaveTextContent('Card disattivata');
+    expect(alert).toHaveTextContent(
+      'Questa card non è più attiva: era di Maria Rossi. Cerca il cliente per nome o telefono.',
+    );
+    const open = within(cardPanel()).getByRole('link', { name: 'Apri la scheda di Maria' });
+    expect(open).toHaveAttribute('href', `/clienti/${MARIA.id}`);
+    // One flex item: the button's gap never adds to the space before the name.
+    expect(open.childNodes).toHaveLength(1);
+    expect(open).toHaveTextContent(/^Apri la scheda di Maria$/);
+    expect(router.state.location.pathname).toBe('/');
+    // The search stays usable.
+    expect(screen.getByRole('searchbox')).toBeEnabled();
+  });
+
+  it('a card of an erased customer: "Card non più valida", no name, no link to the customer', async () => {
+    const fixture = setup();
+    const { router } = await renderHome(fixture);
+    tap(fixture, OF_ERASED.read);
+
+    const alert = await within(cardPanel()).findByRole('alert');
+    expect(alert).toHaveTextContent('Card non più valida');
+    expect(alert).toHaveTextContent(
+      'I dati del cliente di questa card sono stati cancellati. Usa un’altra card.',
+    );
+    expect(cardPanel()).not.toHaveTextContent('cancellato-7f3a');
+    expect(within(cardPanel()).queryByRole('link')).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/');
+  });
+
+  it('while looking up: "Lettura della card…", other reads ignored', async () => {
+    const fixture = setup();
+    const held = fixture.cards.holdNext('lookup');
+    const { router } = await renderHome(fixture);
+    tap(fixture, ACTIVE.read);
+
+    expect(await within(cardPanel()).findByText('Lettura della card…')).toBeInTheDocument();
+    tap(fixture, UNKNOWN.read);
+    tap(fixture, LOST.read);
+    expect(lookups(fixture)).toHaveLength(1);
+
+    await act(async () => {
+      held.release();
+    });
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/spesa`));
+    expect(lookups(fixture)).toHaveLength(1);
+  });
+
+  it('network error: "Card non letta", "Riprova" repeats the same lookup', async () => {
+    const fixture = setup();
+    fixture.cards.failNext('lookup', 'network');
+    const { router } = await renderHome(fixture);
+    tap(fixture, ACTIVE.read);
+
+    const alert = await within(cardPanel()).findByRole('alert');
+    expect(alert).toHaveTextContent('Card non letta: controlla la connessione.');
+    expect(router.state.location.pathname).toBe('/');
+    expect(screen.getByRole('searchbox')).toBeEnabled();
+
+    await userEvent.click(within(cardPanel()).getByRole('button', { name: 'Riprova' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/spesa`));
+    expect(lookups(fixture).map((call) => call.args)).toEqual([[ACTIVE.uid], [ACTIVE.uid]]);
+  });
+
+  it('a server fault is worded apart from the connection', async () => {
+    const fixture = setup();
+    fixture.cards.failNext('lookup', new ServerFaultError('unavailable'));
+    await renderHome(fixture);
+    tap(fixture, ACTIVE.read);
+
+    const alert = await within(cardPanel()).findByRole('alert');
+    expect(alert).toHaveTextContent('Card non letta');
+    expect(alert).toHaveTextContent('Servizio momentaneamente non disponibile: riprova tra poco.');
+    expect(within(cardPanel()).getByRole('button', { name: 'Riprova' })).toBeInTheDocument();
+  });
+
+  it('a new card replaces the notice', async () => {
+    const fixture = setup();
+    await renderHome(fixture);
+    tap(fixture, LOST.read);
+    expect(await within(cardPanel()).findByRole('alert')).toHaveTextContent('Card disattivata');
+
+    tap(fixture, OF_ERASED.read);
+    await waitFor(() =>
+      expect(within(cardPanel()).getByRole('alert')).toHaveTextContent('Card non più valida'),
+    );
+    expect(cardPanel()).not.toHaveTextContent('Card disattivata');
+    expect(lookups(fixture)).toHaveLength(2);
+  });
+
+  it('while a search is shown, the notice still appears in the card panel', async () => {
+    const fixture = setup();
+    await renderHome(fixture, '/?q=rossi');
+    await screen.findByRole('list', { name: 'Risultati della ricerca' });
+    tap(fixture, LOST.read);
+
+    expect(await within(cardPanel()).findByRole('alert')).toHaveTextContent('Card disattivata');
+    expect(screen.getByRole('list', { name: 'Risultati della ricerca' })).toBeInTheDocument();
+  });
+
+  it('not_operator: back to /accedi', async () => {
+    const fixture = setup();
+    fixture.cards.failNext('lookup', 'not_operator');
+    const held = fixture.cards.holdNext('lookup');
+    const { router } = await renderHome(fixture);
+    tap(fixture, ACTIVE.read);
+    fixture.auth.removeProfile();
+    await act(async () => {
+      held.release();
+    });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    expect(
+      await screen.findByText('Account non abilitato: chiedi a un amministratore.'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('PurchasePlaceholderPage', () => {
+  it('a customer that does not exist: "Cliente non trovato"', async () => {
+    renderApp(
+      '/clienti/00000000-0000-4000-8000-00000000dead/spesa',
+      signedInFake(),
+      createFakeSettingsService(),
+      createFakeCustomerService({ customers: [MARIA] }),
+    );
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Registra spesa' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText('Cliente non trovato')).toBeInTheDocument();
+  });
+
+  it('a load error: the message and "Riprova"', async () => {
+    const customers = createFakeCustomerService({ customers: [MARIA] });
+    customers.failNext('get', 'network');
+    renderApp(`/clienti/${MARIA.id}/spesa`, signedInFake(), createFakeSettingsService(), customers);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Controlla la connessione e riprova.');
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
+  });
+});

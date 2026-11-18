@@ -1,5 +1,6 @@
 import { ServerFaultError, serverFaultFor } from '../../lib/serverFault';
 import { getSupabase } from '../../lib/supabase';
+import { toCustomerSummary } from './customerRow';
 import { isCustomerErrorCode } from './errorCodes';
 import { CustomerError } from './types';
 import type { CustomerService, CustomerSummary } from './types';
@@ -14,31 +15,6 @@ type Answer = {
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function isNullableString(value: unknown): value is string | null {
-  return value === null || typeof value === 'string';
-}
-
-/** Maps an `app.customer_summary` row (snake_case), or null when its shape is unexpected. */
-function toCustomer(data: unknown): CustomerSummary | null {
-  if (typeof data !== 'object' || data === null) return null;
-  const row: Record<string, unknown> = { ...data };
-  const { id, name, phone, notes, balance } = row;
-  const { anonymized_at: anonymizedAt, last_served_at: lastServedAt } = row;
-  if (
-    typeof id !== 'string' ||
-    typeof name !== 'string' ||
-    !isNullableString(phone) ||
-    !isNullableString(notes) ||
-    !isNullableString(anonymizedAt) ||
-    typeof balance !== 'number' ||
-    !Number.isInteger(balance) ||
-    !isNullableString(lastServedAt)
-  ) {
-    return null;
-  }
-  return { id, name, phone, notes, anonymizedAt, balance, lastServedAt };
-}
 
 /** The error to reject with, or null when the answer carries data. */
 function failureOf(answer: Answer): Error | null {
@@ -70,7 +46,7 @@ async function call(fn: string, args?: Record<string, unknown>): Promise<unknown
 }
 
 async function one(fn: string, args: Record<string, unknown>): Promise<CustomerSummary> {
-  const customer = toCustomer(await call(fn, args));
+  const customer = toCustomerSummary(await call(fn, args));
   if (!customer) throw new CustomerError('unknown');
   return customer;
 }
@@ -80,7 +56,7 @@ async function many(fn: string, args?: Record<string, unknown>): Promise<Custome
   if (!Array.isArray(data)) throw new CustomerError('unknown');
   const customers: unknown[] = data;
   return customers.map((item) => {
-    const customer = toCustomer(item);
+    const customer = toCustomerSummary(item);
     if (!customer) throw new CustomerError('unknown');
     return customer;
   });

@@ -64,3 +64,11 @@ from (values
   ('e0000000-0000-4000-8000-000000000005'::uuid, 'Aperitivo', 200, true)
 ) as fake (id, name, points, active)
 cross join (select id from app.operators where name = 'Admin Prova') as admin;
+
+-- Fake card (cards module): an invented uid on a fake customer, its link not written.
+-- No token here: the repository is public. Tests never modify this row.
+insert into app.cards (id, uid, customer_id, associated_by)
+select
+  'ca000000-0000-4000-8000-000000000001'::uuid, '04AABBCCDDEE01',
+  'c0000000-0000-4000-8000-000000000003'::uuid, admin.id
+from (select id from app.operators where name = 'Admin Prova') as admin;

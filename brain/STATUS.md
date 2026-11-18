@@ -52,8 +52,17 @@ del modulo `identity`.
    con `VITE_E2E=1` e `check:bundle` in CI e su Vercel, guardia del confine; nessuna migrazione; 10 criteri di
    successo verificati test per test (`scripts/cardInputCriteria.test.ts`), quality bar completa e build verdi
    in locale. Resta la **prova manuale su Android** con l'utente (RUNBOOK, "Prova manuale della lettura
-   card": criteri 2, 3 e 10, in parte solo dopo `cards`). **Prossimo modulo**: `cards` (poi `ledger`, ordine
-   di `CAPABILITY-MAP.md`).
+   card": criteri 2, 3 e 10, in parte solo dopo `cards`). **`cards` completo** su `feat/cards`
+   (2026-11-18, ramo da `feat/card-input`, PR #20 verso `main` da unire dopo #18 e #19): `app.cards` con una
+   card attiva per cliente, RPC idempotenti (associa, sostituisci, disattiva, Nuovo cliente con card),
+   card letta in home → Registra spesa o Nuovo cliente con la card, link ai punti con token casuale (solo
+   l'impronta sul server, mai l'uid) scritto e verificato sulla card, pagina pubblica `/s/:token` con il
+   solo saldo (`public.card_points`, unica funzione eseguibile da `anon`), guardia del confine
+   (`scripts/cardsBoundary.test.ts`); 15 criteri di successo verificati test per test
+   (`scripts/cardsCriteria.test.ts`), quality bar completa, build e `check:bundle` verdi in locale.
+   Migrazione `*_cards.sql` da applicare allo staging con `db push`. Prima del lancio:
+   `VITE_CARD_LINK_ORIGIN` su Vercel Production e prova manuale dei criteri 10 e 14 (RUNBOOK, "Prova
+   manuale del link ai punti"). **Prossimo modulo**: `ledger` (ordine di `CAPABILITY-MAP.md`).
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -73,7 +82,8 @@ del modulo `identity`.
 ## Modifiche non pubblicate
 
 - Rami in catena non ancora in `main`: `feat/identity` (PR #13), `feat/identity-password`, `feat/settings`,
-  `feat/customers`, `chore/specs-folder` (PR #17), `feat/rewards` (PR #18), `feat/card-input`.
+  `feat/customers`, `chore/specs-folder` (PR #17), `feat/rewards` (PR #18), `feat/card-input` (PR #19),
+  `feat/cards`.
 
 ## Ultima sessione
 

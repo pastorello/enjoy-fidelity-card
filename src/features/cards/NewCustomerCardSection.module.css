@@ -1,0 +1,75 @@
+/* Wireframe "Nuovo cliente senza card": a raised row under PRIVACY, the NFC mark beside the texts. */
+.section {
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--space-2) + var(--space-1));
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+}
+
+.icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-accent-text);
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--type-body-lg-family);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: var(--type-label-lg-weight);
+}
+
+.text {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* «Card non associata»: as "Card già associata", a raised, centred block in the danger colour. */
+.notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  text-align: center;
+}
+
+.noticeIcon {
+  flex-shrink: 0;
+  color: var(--color-danger-text);
+}
+
+.noticeTitle {
+  margin: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+  color: var(--color-danger-text);
+}
+
+.noticeText {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}

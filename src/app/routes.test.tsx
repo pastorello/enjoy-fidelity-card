@@ -1,10 +1,22 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ErrorScreen } from './ErrorScreen';
+import { createTestCardReader } from '../test/fakeCardReader';
 import { renderApp, signedInFake } from '../test/renderApp';
 import { rootRoute, routes } from './routes';
+
+// The public points page (/s/:token) calls Supabase directly: a client that never answers.
+vi.mock('../lib/supabase', () => ({
+  getSupabase: () => ({
+    schema: () => ({
+      rpc: () => ({ abortSignal: () => new Promise<never>(() => {}) }),
+    }),
+  }),
+}));
+
+const CARD_TOKEN = 'Zq3_x-9KpL2mN8vR4tY6wA';
 
 function Boom(): never {
   throw new Error('boom');
@@ -74,6 +86,66 @@ describe('routes', () => {
     it('does not forward from other paths', async () => {
       const { router } = renderApp('/impostazioni?token_hash=abc&type=recovery');
       await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    });
+  });
+
+  describe('public points page /s/:token', () => {
+    it('opens without an account, never sending to /accedi', async () => {
+      const { router } = renderApp(`/s/${CARD_TOKEN}`);
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(`/s/${CARD_TOKEN}`);
+    });
+
+    it('does not wait for the session check', async () => {
+      const fake = signedInFake();
+      fake.service.currentUserId.mockReturnValue(new Promise<never>(() => {}));
+      renderApp(`/s/${CARD_TOKEN}`, fake);
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+    });
+
+    it("stays outside the operators' shell even with a session", async () => {
+      renderApp(`/s/${CARD_TOKEN}`, signedInFake());
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Enjoy Card' })).not.toBeInTheDocument();
+      expect(screen.queryAllByRole('link')).toEqual([]);
+    });
+
+    // SPEC-cards point 9: on a staff phone with a session, the card link must not start a scan
+    // (it would take the NFC from Android); the home, with the same session and reader, does.
+    it('never turns the card reader on, even with an operator signed in', async () => {
+      const card = createTestCardReader({ permission: 'granted' });
+      renderApp(`/s/${CARD_TOKEN}`, signedInFake(), undefined, undefined, undefined, card);
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+      await act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+      expect(card.activate).not.toHaveBeenCalled();
+      expect(card.nfc.scanCount()).toBe(0);
+    });
+
+    it('the same session and reader on / do turn it on (the check above can fail)', async () => {
+      const card = createTestCardReader({ permission: 'granted' });
+      renderApp('/', signedInFake(), undefined, undefined, undefined, card);
+      await waitFor(() => expect(card.activate).toHaveBeenCalled());
+      await waitFor(() => expect(card.nfc.scanCount()).toBeGreaterThan(0));
+    });
+
+    it("is loaded lazily, apart from the operators' screens", () => {
+      const root = routes[0];
+      const page = root?.children?.find((route) => route.path === 's/:token');
+      expect(page?.lazy).toBeTypeOf('function');
+      expect(page?.Component).toBeUndefined();
+    });
+
+    // Opened from the card, the lazy page is the first route React Router renders: without a
+    // HydrateFallback it warns in the console (React Router warns once per run, so this checks the
+    // route; e2e/card-points.spec.ts checks the console of a real first load).
+    it('has a blank HydrateFallback for the first load from the card link', async () => {
+      const root = routes[0];
+      const page = root?.children?.find((route) => route.path === 's/:token');
+      expect(page?.HydrateFallback).toBeTypeOf('function');
+
+      const { container } = renderAt(`/s/${CARD_TOKEN}`);
+      expect(container).toBeEmptyDOMElement();
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
     });
   });
 

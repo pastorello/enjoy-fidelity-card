@@ -12,7 +12,7 @@ test('the E2E build exposes the fake card reader once an operator is signed in',
 }) => {
   await signIn(page);
   expect(await page.evaluate(() => typeof window.__enjoyFakeCard)).toBe('function');
-  // A read with nobody listening is dropped without errors (the fixture fails on console errors).
+  // A read reaches the home without errors (the fixture fails on console errors).
   await page.evaluate(() => window.__enjoyFakeCard?.('04A1B2C3D4E5F6'));
 });
 
@@ -120,11 +120,14 @@ test.describe('the USB reader on the home (keyboard wedge, format hex)', () => {
     await newCustomer.focus();
     await page.keyboard.type('04A1B2C3D4E5F6', { delay: 0 });
     await page.keyboard.press('Enter');
-    // Enter stopped by the wedge: still on the home, the link keeps the focus.
-    await expect(newCustomer).toBeFocused();
+    // Enter stopped by the wedge: the burst is a read, which the home hands to `cards` (an unknown
+    // card opens Nuovo cliente with it), and the link was not followed: one step back is the home.
+    await expect(page).toHaveURL(/\/clienti\/nuovo\?card=04A1B2C3D4E5F6$/);
+    await page.goBack();
     await expect(page).toHaveURL(/\/$/);
 
     // Control: a plain Enter on the same link does follow it.
+    await newCustomer.focus();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/clienti\/nuovo$/);
   });

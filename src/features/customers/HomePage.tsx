@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { formatTime } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
@@ -9,12 +9,13 @@ import { PointsBadge } from '../../shared/ui/PointsBadge';
 import { SearchField } from '../../shared/ui/SearchField';
 import { StatusView } from '../../shared/ui/StatusView';
 import { CardReadPanel } from '../card-input/CardReadPanel';
-import { useCardRead } from '../card-input/useCardRead';
+import { homeCardNotice } from '../cards/homeCardNotice';
+import { useHomeCardRead } from '../cards/useHomeCardRead';
 import { useCurrentOperator } from '../identity/AuthProvider';
 import styles from './HomePage.module.css';
 import { customerBackState } from './customerBack';
-import { readHomeNotice } from './homeNotice';
 import { loadErrorText } from './loadErrorText';
+import { NavigationNotice } from './NavigationNotice';
 import { classifyQuery, maskPhone } from './phone';
 import type { CustomerSummary } from './types';
 import { SEARCH_SHOWN_ROWS, useCustomerSearch, type CustomerSearch } from './useCustomerSearch';
@@ -105,47 +106,17 @@ function searchAnnouncement(search: CustomerSearch): string {
   return count === 1 ? '1 cliente trovato' : `${count} clienti trovati`;
 }
 
-/** A live region is read only when its text changes after it is on the page. */
-const NOTICE_DELAY_MS = 100;
-
-/**
- * The one-time message of the navigation state (`homeNotice.ts`): kept for as long as the home
- * is open, dropped at once from the history entry so "Indietro" or a reload does not show it again.
- */
-function useHomeNotice(): { notice: string | null; written: boolean } {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const [notice] = useState(() => readHomeNotice(location.state));
-  // The status row is mounted empty and the message written a moment later, so it is read out.
-  const [written, setWritten] = useState(false);
-  useEffect(() => {
-    if (notice === null) return undefined;
-    const timer = window.setTimeout(() => setWritten(true), NOTICE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [notice]);
-  const carried = readHomeNotice(location.state) !== null;
-  useEffect(() => {
-    if (!carried) return;
-    void navigate(
-      { pathname: location.pathname, search: location.search, hash: location.hash },
-      { replace: true, state: null },
-    );
-  }, [carried, navigate, location.pathname, location.search, location.hash]);
-  return { notice, written };
-}
-
 /** Text of the card panel while reading is active (wireframe Cerca cliente). */
 const CARD_PANEL_TITLE = 'Avvicina la card';
 const CARD_PANEL_TEXT =
   'Lettura attiva: appoggia la card sul retro del telefono. Una card nuova apre la registrazione del cliente.';
 
-/** Until `cards` wires the navigation, a card read on the home is dropped (SPEC-card-input, point 8). */
-function ignoreCardRead() {}
+/** The panel's text while `cards` looks the card up (SPEC-cards, point 1). */
+const CARD_PANEL_READING = 'Lettura della card…';
 
 /** Home "Cerca cliente": card panel, search by name or phone, SERVITI OGGI, "Nuovo cliente". */
 export function HomePage() {
   const operator = useCurrentOperator();
-  const { notice, written: noticeWritten } = useHomeNotice();
   const served = useServedToday();
   const [searchParams, setSearchParams] = useSearchParams();
   // The text lives in the URL too (`?q=`, replaced), so "Indietro" from a customer finds it again.
@@ -157,9 +128,11 @@ export function HomePage() {
   // Set by SERVITI OGGI's "Riprova" until its answer arrives.
   const servedRetrying = useRef(false);
   const servedCount = served.status === 'done' ? served.customers.length : null;
-  // No consumer yet: the panel shows the reading state, a card read does nothing and does not vibrate.
-  useCardRead(ignoreCardRead, { enabled: false });
-  // While a search is shown the card panel shrinks to one line (wireframe Ricerca senza risultati).
+  // `cards` handles the card reads: Registra spesa, Nuovo cliente with the card, or a notice.
+  const cardRead = useHomeCardRead();
+  const cardNotice = homeCardNotice(cardRead);
+  // While a search is shown the card panel shrinks to one line (wireframe Ricerca senza risultati),
+  // unless it has something to say about the card just read.
   const searching = search.status !== 'idle';
 
   // "Riprova" is replaced by the loading state: the focus goes to the search outcome, which
@@ -220,20 +193,12 @@ export function HomePage() {
         )
       }
     >
-      {notice !== null && (
-        <output className={noticeWritten ? styles.notice : 'visually-hidden'}>
-          {noticeWritten && (
-            <>
-              <Icon name="check" size={20} />
-              {notice}
-            </>
-          )}
-        </output>
-      )}
+      <NavigationNotice />
       <CardReadPanel
         title={CARD_PANEL_TITLE}
-        description={CARD_PANEL_TEXT}
-        variant={searching ? 'compact' : 'full'}
+        description={cardRead.status === 'reading' ? CARD_PANEL_READING : CARD_PANEL_TEXT}
+        variant={searching && cardRead.status === 'idle' ? 'compact' : 'full'}
+        notice={cardNotice}
       />
       <SearchField
         ref={searchInput}

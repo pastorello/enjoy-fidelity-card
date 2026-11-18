@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import type { NfcStatus } from './cardReader';
@@ -44,6 +44,17 @@ function contentFor(status: NfcStatus, title: string, description: string): Cont
   return contents[status];
 }
 
+/**
+ * What the screen says about the last card it read (e.g. "Card disattivata" on the home): shown in
+ * place of the active state's text, as an alert, while reading is active.
+ */
+export type CardReadNotice = {
+  title?: string | undefined;
+  text: string;
+  /** A button or link under the text (e.g. "Riprova"). */
+  action?: ReactNode;
+};
+
 export type CardReadPanelProps = {
   /** Title of the active state, from the screen that reads cards. */
   title: string;
@@ -53,6 +64,13 @@ export type CardReadPanelProps = {
   mode?: 'web-nfc' | 'usb';
   /** `compact`: one line, only while reading is active (a search is on screen). */
   variant?: 'full' | 'compact';
+  /** Shown only in the full variant, while reading is active; the screen picks `full` meanwhile. */
+  notice?: CardReadNotice | null | undefined;
+  /**
+   * The panel replaces what a tap unmounted (e.g. «Riprova con un’altra card» in Associa card):
+   * its text takes the focus when it mounts, so the focus does not fall to the page.
+   */
+  focusOnMount?: boolean | undefined;
 };
 
 type CardReadPanelViewProps = CardReadPanelProps & {
@@ -69,6 +87,8 @@ export function CardReadPanelView({
   description,
   mode = 'web-nfc',
   variant = 'full',
+  notice = null,
+  focusOnMount = false,
   status,
   onStart,
 }: CardReadPanelViewProps) {
@@ -76,6 +96,10 @@ export function CardReadPanelView({
   const effective: NfcStatus = mode === 'usb' ? 'active' : status;
   const texts = useRef<HTMLDivElement>(null);
   const action = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    if (focusOnMount) texts.current?.focus();
+  }, [focusOnMount]);
   // Set when the button is pressed while focused, until the tap has an outcome: the button unmounts
   // with the state change, so focus must not fall to the page (SPEC-card-input, point 6).
   const keepFocus = useRef(false);
@@ -114,6 +138,18 @@ export function CardReadPanelView({
   }
 
   const content = contentFor(effective, title, description);
+  if (notice !== null && effective === 'active') {
+    return (
+      <section aria-label="Lettura card" className={styles.panel}>
+        <Icon name="nfc" size={48} className={styles.icon} />
+        <div ref={texts} tabIndex={-1} role="alert" className={styles.texts}>
+          {notice.title !== undefined && <p className={styles.title}>{notice.title}</p>}
+          <p className={styles.noticeText}>{notice.text}</p>
+        </div>
+        {notice.action !== undefined && <div className={styles.action}>{notice.action}</div>}
+      </section>
+    );
+  }
   return (
     <section aria-label="Lettura card" className={styles.panel} data-off={content.off || undefined}>
       <Icon name={content.off ? 'nfc-off' : 'nfc'} size={48} className={styles.icon} />

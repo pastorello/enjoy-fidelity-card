@@ -1,0 +1,117 @@
+/* Boards "Associa-link" (the write, live) and "Associa-link-errore" (an outcome without the link). */
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  /* 40 px top and bottom, as in the board. */
+  padding: calc(var(--space-4) + var(--space-2)) var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  text-align: center;
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--color-accent-text);
+}
+
+.iconOff {
+  flex-shrink: 0;
+  color: var(--color-ink-muted);
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+}
+
+/* The card label in a title: Enjoy Display has no "…", the body font has. */
+.label {
+  font-family: var(--type-body-family);
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+.spinner {
+  flex-shrink: 0;
+  animation: spin 0.9s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.text,
+.written {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+.failure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  text-align: center;
+}
+
+.failureIcon {
+  flex-shrink: 0;
+  color: var(--color-danger-text);
+}
+
+.failureTitle {
+  margin: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+  color: var(--color-danger-text);
+}
+
+.failureText {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+  text-align: center;
+}

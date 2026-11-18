@@ -1,10 +1,13 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
+import { setUpServiceWorker } from './app/registerServiceWorker';
 import { routes } from './app/routes';
 import { createBrowserCardReader } from './features/card-input/browserCardReader';
 import type { CardInputAdapter, CardWriteTarget } from './features/card-input/cardReader';
 import { CardReaderProvider } from './features/card-input/CardReaderProvider';
+import { CardsServiceProvider } from './features/cards/CardsServiceProvider';
+import { supabaseCardsService } from './features/cards/supabaseCardsService';
 import { CustomerServiceProvider } from './features/customers/CustomerServiceProvider';
 import { supabaseCustomerService } from './features/customers/supabaseCustomerService';
 import { RewardsServiceProvider } from './features/rewards/RewardsServiceProvider';
@@ -19,6 +22,9 @@ import './styles/base.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Missing #root element');
+
+// Production build only: in `npm run dev` there is no /sw.js. Skipped on /s/:token (SPEC-cards 9).
+if (import.meta.env.PROD) setUpServiceWorker(window);
 
 const router = createBrowserRouter(routes);
 // One card reader for the whole app; it reads only once CardReaderSession activates it.
@@ -43,9 +49,11 @@ createRoot(container).render(
       <SettingsServiceProvider service={supabaseSettingsService}>
         <CustomerServiceProvider service={supabaseCustomerService}>
           <RewardsServiceProvider service={supabaseRewardsService}>
-            <CardReaderProvider reader={cardReader}>
-              <RouterProvider router={router} />
-            </CardReaderProvider>
+            <CardsServiceProvider service={supabaseCardsService}>
+              <CardReaderProvider reader={cardReader}>
+                <RouterProvider router={router} />
+              </CardReaderProvider>
+            </CardsServiceProvider>
           </RewardsServiceProvider>
         </CustomerServiceProvider>
       </SettingsServiceProvider>
