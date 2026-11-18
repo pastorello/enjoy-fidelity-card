@@ -86,10 +86,10 @@ iniziale) di `app.search_customers`, `app.get_customer` e `app.customers_served_
 oggi (`Europe/Rome`), annullati inclusi, correzioni escluse, `last_served_at` = ora dell'ultimo, ordine
 `last_served_at desc`, massimo 50. `public.card_points` di `cards` usa ora il saldo reale.
 **Accettazione:**
-- [ ] pgTAP: `search_customers` e `get_customer` col saldo reale (spesa, riscatto, correzione)
-- [ ] pgTAP: `customers_served_today` con movimenti alle 23:59 di ieri e 00:01 di oggi ora di Roma,
+- [x] pgTAP: `search_customers` e `get_customer` col saldo reale (spesa, riscatto, correzione)
+- [x] pgTAP: `customers_served_today` con movimenti alle 23:59 di ieri e 00:01 di oggi ora di Roma,
       annullati inclusi, correzioni escluse, anonimizzati esclusi, ordine, limite 50
-- [ ] pgTAP: `card_points` di un link confermato restituisce il saldo reale; `customers.test.sql`,
+- [x] pgTAP: `card_points` di un link confermato restituisce il saldo reale; `customers.test.sql`,
       `card_points.test.sql` e `function_privileges.test.sql` verdi senza modifiche ai casi esistenti
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 4 · **File:** supabase/migrations/*_ledger.sql, supabase/tests/ledger_reads.test.sql
