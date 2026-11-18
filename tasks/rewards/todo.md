@@ -139,9 +139,9 @@ con "120 punti · non visibile alla cassa né al cliente". Stati: `StatusView` "
 vuoto "Nessun premio nel catalogo" / "Aggiungi il primo premio qui sotto."; errore "Catalogo non caricato" /
 "Controlla la connessione e riprova." (o le parole dei guasti del server) con "Riprova".
 **Accettazione:**
-- [ ] Componenti: caricamento, vuoto, errore e Riprova che ricarica; righe nell'ordine di `sortRewards()`;
+- [x] Componenti: caricamento, vuoto, errore e Riprova che ricarica; righe nell'ordine di `sortRewards()`;
       riga inattiva con il suo sottotitolo
-- [ ] Caselle con nomi accessibili distinti ("Caffè attivo", …)
+- [x] Caselle con nomi accessibili distinti ("Caffè attivo", …)
 **Verifica:** `npm test`
 **Dipendenze:** 7 · **File:** src/features/rewards/RewardsCatalogPage.tsx (+ .module.css, .test.tsx),
 src/features/rewards/RewardsServiceProvider.tsx · **Dimensione:** M
