@@ -210,9 +210,9 @@ scrittura arriva nel task 17); `card_taken` (`CardTakenNotice` con «Riprova con
 scheda di Antonio», letture ignorate); già attiva di questo cliente; riattivazione; «Associazione in corso…»;
 rete con «Riprova» sullo stesso uid; anonimizzato → `StatusView`; inesistente → pagina non trovata.
 **Accettazione:**
-- [ ] Componente: ogni esito del punto 4 con i testi del wireframe; nota solo con card attiva (criterio 5)
-- [ ] Componente: «Riprova» rimanda lo stesso uid; `not_operator` → `reportNotEnabled()` (criterio 7)
-- [ ] E2E: card di un altro cliente → «Card già associata» → «Apri la scheda di …»; Sostituisci card → la
+- [x] Componente: ogni esito del punto 4 con i testi del wireframe; nota solo con card attiva (criterio 5)
+- [x] Componente: «Riprova» rimanda lo stesso uid; `not_operator` → `reportNotEnabled()` (criterio 7)
+- [x] E2E: card di un altro cliente → «Card già associata» → «Apri la scheda di …»; Sostituisci card → la
       vecchia letta in home mostra «Card disattivata» (criteri 3, 5, 6)
 **Verifica:** `npm test -- AssociateCardPage && npm run e2e -- cards`
 **Dipendenze:** 11 · **File:** src/features/cards/AssociateCardPage.tsx (+ .module.css, .test.tsx),

@@ -131,7 +131,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 11: Sezione «Card (facoltativa)» in Nuovo cliente senza card
 
 ### Fase 4: Associa, Modifica, Scheda
-- [ ] Task 12: Associa o sostituisci card (`/clienti/:id/card`): tutti gli esiti dell'associazione
+- [x] Task 12: Associa o sostituisci card (`/clienti/:id/card`): tutti gli esiti dell'associazione
 - [ ] Task 13: Sezione CARD di Modifica cliente: card attiva, sostituisci, disattiva, nessuna card
 - [ ] Task 14: Riga card della Scheda cliente
 
