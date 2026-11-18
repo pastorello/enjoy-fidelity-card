@@ -124,7 +124,9 @@ describe('protected pages', () => {
 
   it('show the page when signed in', async () => {
     renderApp('/', signedInFake());
-    expect(await screen.findByText('Enjoy Card è quasi pronta')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' }),
+    ).toBeInTheDocument();
   });
 
   it('tell a user without a profile that the account is not enabled', async () => {
@@ -136,7 +138,7 @@ describe('protected pages', () => {
 
   it('tell the user when the session has expired', async () => {
     const { fake } = renderApp('/', signedInFake());
-    await screen.findByText('Enjoy Card è quasi pronta');
+    await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' });
     fake.endSession();
     expect(await screen.findByText('La sessione è scaduta: accedi di nuovo.')).toHaveRole('status');
     expect(screen.getByRole('heading', { level: 1, name: 'Accedi' })).toBeInTheDocument();
@@ -174,6 +176,8 @@ describe('protected pages', () => {
     fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
     renderApp('/', fake);
     await userEvent.click(await screen.findByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByText('Enjoy Card è quasi pronta')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' }),
+    ).toBeInTheDocument();
   });
 });

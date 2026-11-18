@@ -16,10 +16,13 @@ function renderAt(path: string) {
 }
 
 describe('routes', () => {
-  it('shows the placeholder home on / when signed in', async () => {
+  it('shows the "Cerca cliente" home on / when signed in', async () => {
     renderApp('/', signedInFake());
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Enjoy Card' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('searchbox', { name: 'Cerca per nome o telefono' }),
     ).toBeInTheDocument();
   });
 

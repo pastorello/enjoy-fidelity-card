@@ -1,0 +1,13 @@
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Below the 20 rows: tells the operator to narrow the search. */
+.more {
+  margin: var(--space-2) 0 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}

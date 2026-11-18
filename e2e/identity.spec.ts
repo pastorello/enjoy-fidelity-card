@@ -10,7 +10,7 @@ test('without a session the app opens the sign-in page', async ({ page }) => {
 test('a seed operator signs in and reaches the home', async ({ page }) => {
   await signIn(page);
   await expect(page).toHaveURL('/');
-  await expect(page.getByText('Enjoy Card è quasi pronta')).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Cerca per nome o telefono' })).toBeVisible();
 });
 
 test('wrong credentials get one generic message', async ({ page }) => {
@@ -39,7 +39,7 @@ test('the session survives a reload', async ({ page }) => {
   await signIn(page);
   await page.reload();
   await expect(page).toHaveURL('/');
-  await expect(page.getByText('Enjoy Card è quasi pronta')).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Cerca per nome o telefono' })).toBeVisible();
 });
 
 test('settings show the account and "Esci" ends the session', async ({ page }) => {
