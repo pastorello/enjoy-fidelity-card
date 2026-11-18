@@ -4,6 +4,9 @@
 -- Fake accounts for local development, E2E and integration tests.
 -- Password for all: password-di-prova. recupero@example.com is reserved to e2e/password.spec.ts,
 -- which changes its password: no other test signs in with it.
+-- tablet-kiosk: pin@example.com is reserved to the E2E that sets a PIN from the phone (it starts
+-- without one); cassa@example.com is the till tablet (device account) and cassa-blocco@example.com
+-- a second tablet reserved to the E2E of the 5-wrong-PIN lock, so the lock never stops other tests.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
@@ -16,7 +19,10 @@ select
 from (values
   ('11111111-1111-4111-8111-111111111111'::uuid, 'admin@example.com'),
   ('22222222-2222-4222-8222-222222222222'::uuid, 'operatore@example.com'),
-  ('33333333-3333-4333-8333-333333333333'::uuid, 'recupero@example.com')
+  ('33333333-3333-4333-8333-333333333333'::uuid, 'recupero@example.com'),
+  ('44444444-4444-4444-8444-444444444444'::uuid, 'pin@example.com'),
+  ('55555555-5555-4555-8555-555555555555'::uuid, 'cassa@example.com'),
+  ('66666666-6666-4666-8666-666666666666'::uuid, 'cassa-blocco@example.com')
 ) as fake (id, email);
 
 insert into auth.identities (
@@ -27,11 +33,28 @@ select
   jsonb_build_object('sub', id::text, 'email', email, 'email_verified', true),
   now(), now(), now()
 from auth.users
-where email in ('admin@example.com', 'operatore@example.com', 'recupero@example.com');
+where email in ('admin@example.com', 'operatore@example.com', 'recupero@example.com',
+                'pin@example.com', 'cassa@example.com', 'cassa-blocco@example.com');
 
 select private.add_operator('admin@example.com', 'Admin Prova', 'admin');
 select private.add_operator('operatore@example.com', 'Operatore Prova', 'operator');
 select private.add_operator('recupero@example.com', 'Recupero Prova', 'operator');
+select private.add_operator('pin@example.com', 'Pin Prova', 'operator');
+
+-- Device accounts (tablet-kiosk): no cashier, unlocked.
+select private.add_device('cassa@example.com', 'Tablet cassa');
+select private.add_device('cassa-blocco@example.com', 'Tablet blocco');
+
+-- Fake till PINs (tablet-kiosk), stored as set_my_pin stores them (bcrypt, cost 8):
+-- Admin Prova 2468, Operatore Prova 1357, Recupero Prova 8024. Pin Prova has none.
+insert into private.operator_pins (operator_id, pin_hash)
+select o.id, extensions.crypt(fake.pin, extensions.gen_salt('bf', 8))
+from (values
+  ('Admin Prova', '2468'),
+  ('Operatore Prova', '1357'),
+  ('Recupero Prova', '8024')
+) as fake (name, pin)
+join app.operators o on o.name = fake.name;
 
 -- Fake customers (customers module): invented names, phones +39333000000x.
 insert into app.customers (id, name, phone, privacy_consent_at, notes, created_by, create_operation_id)

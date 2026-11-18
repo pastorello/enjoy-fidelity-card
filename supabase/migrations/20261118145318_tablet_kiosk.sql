@@ -364,3 +364,80 @@ revoke execute on function app.set_my_pin(text), app.unlock_cashier(uuid, text),
   from public, anon;
 grant execute on function app.set_my_pin(text), app.unlock_cashier(uuid, text), app.end_cashier_turn()
   to authenticated;
+
+-- Session identity and the list of cashiers -----------------------------------------------
+-- get_session_identity tells the app who the signed-in account is, in one call:
+--   {kind: 'operator', operator: {id, name, role, has_pin}} for an operator account;
+--   {kind: 'device', device: {id, name}, cashier: {id, name, role} | null,
+--    turn_expires_at: timestamptz | null, lock_seconds_left: int} for a device account;
+--   null for anyone else (no profile, deleted user).
+-- The cashier is the one acting_operator_id() would use (valid_cashier_id: same 12 hours,
+-- same account and PIN checks), so the app never shows a cashier the server ignores.
+-- lock_seconds_left is read from the stored locked_until against the clock (not the
+-- transaction start): a reloaded page sees the lock and how long it still lasts.
+-- Volatile because of clock_timestamp(). Never returns a PIN or its hash.
+create function app.get_session_identity()
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_operator app.operators;
+  v_device app.devices;
+  v_cashier app.operators;
+  v_now timestamptz := clock_timestamp();
+begin
+  select * into v_operator from app.operators where user_id = (select auth.uid());
+  if v_operator.id is not null then
+    return jsonb_build_object('kind', 'operator', 'operator', jsonb_build_object(
+      'id', v_operator.id, 'name', v_operator.name, 'role', v_operator.role,
+      'has_pin', exists (select 1 from private.operator_pins p where p.operator_id = v_operator.id)));
+  end if;
+
+  select * into v_device from app.devices where user_id = (select auth.uid());
+  if v_device.id is null then
+    return null;
+  end if;
+
+  select * into v_cashier from app.operators where id = private.valid_cashier_id();
+  return jsonb_build_object(
+    'kind', 'device',
+    'device', jsonb_build_object('id', v_device.id, 'name', v_device.name),
+    'cashier', case when v_cashier.id is null then null else jsonb_build_object(
+      'id', v_cashier.id, 'name', v_cashier.name, 'role', v_cashier.role) end,
+    'turn_expires_at', case when v_cashier.id is null then null
+                            else v_device.cashier_since + interval '12 hours' end,
+    'lock_seconds_left', case when v_device.locked_until > v_now
+                              then ceil(extract(epoch from v_device.locked_until - v_now))::int
+                              else 0 end);
+end;
+$$;
+
+-- list_cashiers: who can be chosen at the till, for a device account only (with or
+-- without a cashier). Linked operators, alphabetically regardless of case; has_pin
+-- tells which ones still have to set a PIN from their phone. Never the hash.
+create function app.list_cashiers()
+returns table (id uuid, name text, role text, has_pin boolean)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if private.current_device_id() is null then
+    raise exception 'Only a device account can list the cashiers' using errcode = '42501';
+  end if;
+
+  return query
+    select o.id, o.name, o.role,
+           exists (select 1 from private.operator_pins p where p.operator_id = o.id)
+    from app.operators o
+    where o.user_id is not null
+    order by lower(o.name), o.id;
+end;
+$$;
+
+revoke execute on function app.get_session_identity(), app.list_cashiers() from public, anon;
+grant execute on function app.get_session_identity(), app.list_cashiers() to authenticated;

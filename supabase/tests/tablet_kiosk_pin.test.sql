@@ -28,6 +28,8 @@ select set_config('test.nopin_id', (select id::text from app.operators where nam
 select set_config('test.gone_id', (select id::text from app.operators where name = 'Andato Pin'), true);
 select set_config('test.device_id', (select id::text from app.devices where name = 'Tablet Pin'), true);
 select set_config('test.device2_id', (select id::text from app.devices where name = 'Tablet Pin Due'), true);
+-- PIN rows already there (the seed's fake PINs): the counts below are of new rows only.
+select set_config('test.pins_before', (select count(*)::text from private.operator_pins), true);
 
 -- Shape and privileges of the RPCs ------------------------------------------------------
 select is(
@@ -89,7 +91,7 @@ from (values ('123'), ('12345'), ('abcd'), ('12 4'), (' 1234'), ('1234 '), ('Ù¡Ù
              (null)) v (pin);
 reset role;
 select is(
-  (select count(*) from private.operator_pins),
+  (select count(*) - current_setting('test.pins_before')::bigint from private.operator_pins),
   0::bigint,
   'no PIN was stored by the rejected calls'
 );
@@ -169,7 +171,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-b000-0000000
 select lives_ok($$select app.set_my_pin('1357')$$, 'an admin sets their own PIN');
 reset role;
 select is(
-  (select count(*) from private.operator_pins),
+  (select count(*) - current_setting('test.pins_before')::bigint from private.operator_pins),
   2::bigint,
   'an admin sets only their own PIN'
 );
