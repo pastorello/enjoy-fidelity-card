@@ -115,6 +115,19 @@ describe('routes', () => {
       expect(page?.lazy).toBeTypeOf('function');
       expect(page?.Component).toBeUndefined();
     });
+
+    // Opened from the card, the lazy page is the first route React Router renders: without a
+    // HydrateFallback it warns in the console (React Router warns once per run, so this checks the
+    // route; e2e/card-points.spec.ts checks the console of a real first load).
+    it('has a blank HydrateFallback for the first load from the card link', async () => {
+      const root = routes[0];
+      const page = root?.children?.find((route) => route.path === 's/:token');
+      expect(page?.HydrateFallback).toBeTypeOf('function');
+
+      const { container } = renderAt(`/s/${CARD_TOKEN}`);
+      expect(container).toBeEmptyDOMElement();
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+    });
   });
 
   it('shows the not-found page on an unknown path', () => {

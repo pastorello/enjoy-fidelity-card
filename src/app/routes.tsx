@@ -33,6 +33,9 @@ export const routes: RouteObject[] = [
       // in its own chunk so a customer never downloads the operators' screens.
       {
         path: 's/:token',
+        // Shown while the chunk loads on the first load from the card: blank, as before the page's
+        // own «Carico i tuoi punti…». Without it React Router warns in the console.
+        HydrateFallback: () => null,
         lazy: async () => {
           const { CardPointsPage } = await import('../features/cards/public/CardPointsPage');
           return { Component: CardPointsPage };
