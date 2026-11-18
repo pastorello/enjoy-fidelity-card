@@ -313,8 +313,8 @@ controllare…» e «Scrivi di nuovo il link»; i pulsanti aprono `CardLinkWrite
 «Avvicina la card …E5F6»; `canWrite` falso → «Per scrivere il link serve un telefono Android con l'NFC
 attivo.» al posto del pulsante; a scrittura finita la sezione si ricarica.
 **Accettazione:**
-- [ ] Componente: i tre `LinkState` con testi e pulsanti; dispositivo che non scrive (criteri 13, 15)
-- [ ] E2E: `failNextWrite('io')` → «Link non scritto…» → «Più tardi» → Modifica cliente «Link non scritto»
+- [x] Componente: i tre `LinkState` con testi e pulsanti; dispositivo che non scrive (criteri 13, 15)
+- [x] E2E: `failNextWrite('io')` → «Link non scritto…» → «Più tardi» → Modifica cliente «Link non scritto»
       → «Scrivi il link» + `__enjoyFakeCard(uid)` → «Link ai punti scritto» (criterio 13)
 **Verifica:** `npm test -- CustomerCardSection && npm run e2e -- cards`
 **Dipendenze:** 13, 16 · **File:** src/features/cards/CustomerCardSection.tsx (+ .test.tsx),
