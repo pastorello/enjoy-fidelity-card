@@ -162,12 +162,12 @@ src/features/ledger/LedgerServiceProvider.tsx, src/main.tsx, src/test/renderApp.
 **Descrizione:** `tests/integration/ledger-concurrency.test.ts` con admin e operatore del seed (due client
 autenticati), su clienti creati dal test; importi calcolati dal rapporto in vigore.
 **Accettazione:**
-- [ ] Saldo 100, due riscatti liberi da 60 lanciati insieme con id diversi, 20 ripetizioni → sempre uno
+- [x] Saldo 100, due riscatti liberi da 60 lanciati insieme con id diversi, 20 ripetizioni → sempre uno
       solo riuscito, l'altro `insufficient-balance`, saldo finale mai < 0; stessa prova con un riscatto e
       l'annullo (admin) di una spesa (criterio 5)
-- [ ] Due chiamate parallele con lo **stesso** id → un solo movimento ed entrambe le risposte con lo stesso
+- [x] Due chiamate parallele con lo **stesso** id → un solo movimento ed entrambe le risposte con lo stesso
       movimento (criterio 4)
-- [ ] `supabaseLedgerService` traduce i codici reali (`EC001`…`EC007`, `22023`, `42501`)
+- [x] `supabaseLedgerService` traduce i codici reali (`EC001`…`EC007`, `22023`, `42501`)
 **Verifica:** `npm run test:integration`
 **Dipendenze:** 9 · **File:** tests/integration/ledger-concurrency.test.ts, tests/integration/ledger.test.ts
 · **Dimensione:** M
