@@ -79,7 +79,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 2: Collegamento all'app e infrastruttura di prova
 - [x] Task 5: `CardReaderProvider`, `useCardRead`, `useCardReaderState`
-- [ ] Task 6: `CardReaderSession` in `RequireAuth`; `main.tsx` e `renderApp`
+- [x] Task 6: `CardReaderSession` in `RequireAuth`; `main.tsx` e `renderApp`
 - [ ] Task 7: Adattatore finto (lettura) solo con `VITE_E2E=1`; Playwright con `VITE_E2E`
 - [ ] Task 8: `check:bundle` in CI e nel `buildCommand` di Vercel
 

@@ -107,11 +107,11 @@ src/features/card-input/useCardRead.ts · **Dimensione:** S
 `RouterProvider`; `renderApp` accetta un quinto parametro facoltativo (servizio con `fakeWebNfc` e target
 della tastiera di jsdom), i test esistenti restano invariati.
 **Accettazione:**
-- [ ] Componente (criterio 7): `renderApp('/accedi')` → nessuna attivazione e nessuna `scan()`; dopo "Esci"
+- [x] Componente (criterio 7): `renderApp('/accedi')` → nessuna attivazione e nessuna `scan()`; dopo "Esci"
       servizio disattivato, `abort()` chiamato, un `keydown` non viene fermato
-- [ ] Componente (criteri 5 e 6): pagina finta con due consumatori annidati e formato `dec` nelle impostazioni
+- [x] Componente (criteri 5 e 6): pagina finta con due consumatori annidati e formato `dec` nelle impostazioni
       finte, eventi `keydown` reali → solo quello in cima riceve `04A1B2C3D4E5F6`
-- [ ] Componente: impostazioni in caricamento o in errore → lettore USB spento; arrivano → acceso
+- [x] Componente: impostazioni in caricamento o in errore → lettore USB spento; arrivano → acceso
 **Verifica:** `npm test` (tutta la suite: `renderApp` cambia)
 **Dipendenze:** 3, 5 · **File:** src/features/card-input/CardReaderSession.tsx (+ .test.tsx),
 src/features/identity/RequireAuth.tsx, src/main.tsx, src/test/renderApp.tsx · **Dimensione:** M
