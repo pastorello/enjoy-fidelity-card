@@ -1,4 +1,4 @@
-import { useId, type InputHTMLAttributes, type Ref } from 'react';
+import { useId, type InputHTMLAttributes, type ReactNode, type Ref } from 'react';
 import { Icon } from './Icon';
 import styles from './TextField.module.css';
 
@@ -10,8 +10,13 @@ type TextFieldProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onC
   onChange: (value: string) => void;
   /** Short help under the field. */
   hint?: string | undefined;
-  /** Says what is wrong and what to do; marks the field invalid. */
-  error?: string | undefined;
+  /**
+   * Says what is wrong and what to do; marks the field invalid. Text, possibly with a link to
+   * act on it (e.g. "Apri la scheda" of the customer that already has the name).
+   */
+  error?: ReactNode;
+  /** Help shown under the error, in place of `hint`, while there is one: how to fix it. */
+  errorHint?: string | undefined;
   type?: 'text' | 'tel' | 'email' | 'password';
   /** `inline`: label on the left, short right-aligned field on the right (48 px tall). */
   layout?: 'stacked' | 'inline' | undefined;
@@ -26,6 +31,7 @@ export function TextField({
   onChange,
   hint,
   error,
+  errorHint,
   type = 'text',
   layout = 'stacked',
   suffix,
@@ -34,11 +40,16 @@ export function TextField({
 }: TextFieldProps) {
   const id = useId();
   const messageId = `${id}-message`;
+  const errorHintId = `${id}-error-hint`;
   const suffixId = `${id}-suffix`;
-  const message = error ?? hint;
+  const invalid = error !== undefined && error !== null && error !== false && error !== '';
+  const message = invalid || Boolean(hint);
+  const withErrorHint = invalid && Boolean(errorHint);
   // The unit is only visible text after the input: screen readers hear it with the description.
   const describedBy =
-    [suffix && suffixId, message && messageId].filter(Boolean).join(' ') || undefined;
+    [suffix && suffixId, message && messageId, withErrorHint && errorHintId]
+      .filter(Boolean)
+      .join(' ') || undefined;
 
   const inline = layout === 'inline';
   const labelElement = (
@@ -56,7 +67,7 @@ export function TextField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className={styles.input}
-        aria-invalid={error ? true : undefined}
+        aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
       />
       {suffix && (
@@ -83,11 +94,19 @@ export function TextField({
           {suffix ? <div className={styles.row}>{control}</div> : control}
         </>
       )}
-      {error ? (
-        <p id={messageId} className={styles.error}>
-          <Icon name="circle-alert" size={18} />
-          {error}
-        </p>
+      {invalid ? (
+        <>
+          <p id={messageId} className={styles.error}>
+            <Icon name="circle-alert" size={18} />
+            {/* Text with a link stays one flowing sentence next to the icon. */}
+            {typeof error === 'string' ? error : <span>{error}</span>}
+          </p>
+          {withErrorHint && (
+            <p id={errorHintId} className={styles.hint}>
+              {errorHint}
+            </p>
+          )}
+        </>
       ) : (
         hint && (
           <p id={messageId} className={styles.hint}>

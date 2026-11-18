@@ -32,3 +32,21 @@ where email in ('admin@example.com', 'operatore@example.com', 'recupero@example.
 select private.add_operator('admin@example.com', 'Admin Prova', 'admin');
 select private.add_operator('operatore@example.com', 'Operatore Prova', 'operator');
 select private.add_operator('recupero@example.com', 'Recupero Prova', 'operator');
+
+-- Fake customers (customers module): invented names, phones +39333000000x.
+insert into app.customers (id, name, phone, privacy_consent_at, notes, created_by, create_operation_id)
+select
+  fake.id, fake.name, fake.phone, now(), fake.notes,
+  (select id from app.operators where name = 'Admin Prova'), fake.operation_id
+from (values
+  ('c0000000-0000-4000-8000-000000000001'::uuid, 'Giulia Bianchi', '+393330000001', 'Cappuccino d''orzo',
+   'c1000000-0000-4000-8000-000000000001'::uuid),
+  ('c0000000-0000-4000-8000-000000000002'::uuid, 'Marco Esposito', '+393330000002', null,
+   'c1000000-0000-4000-8000-000000000002'::uuid),
+  ('c0000000-0000-4000-8000-000000000003'::uuid, 'Anna Ferrari', '+393330000003', null,
+   'c1000000-0000-4000-8000-000000000003'::uuid),
+  ('c0000000-0000-4000-8000-000000000004'::uuid, 'Luca Romano', null, null,
+   'c1000000-0000-4000-8000-000000000004'::uuid),
+  ('c0000000-0000-4000-8000-000000000005'::uuid, 'Sara Colombo', '+393330000005', 'Senza lattosio',
+   'c1000000-0000-4000-8000-000000000005'::uuid)
+) as fake (id, name, phone, notes, operation_id);

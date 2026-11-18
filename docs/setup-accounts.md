@@ -52,10 +52,15 @@ Le tabelle dell'app stanno nello schema `app`, protetto dalla RLS. In locale lo 
 nei progetti online va aggiunto a mano, in **entrambi** i progetti, dopo il primo `db push`:
 
 1. **Project Settings → Data API** (o **Integrations → Data API → Settings**, secondo la versione della dashboard).
-2. **Exposed schemas**: aggiungi `app` (lascia `public`) e salva.
+2. **Exposed schemas**: aggiungi `app` (lascia `public`) e salva. Il menu elenca `app` solo dopo che le
+   migrazioni sono state applicate al progetto (`npx supabase db push`, sezione 2): se non c'è, manca il push.
+3. Subito dopo il salvataggio, per qualche secondo l'API può rispondere con l'errore `PGRST002` mentre
+   ricarica lo schema: è normale, basta attendere e riprovare.
 
 Senza questo passo l'accesso fallisce anche con email e password giuste e la rete funzionante: l'app
-dice "Connessione assente: controlla la rete e riprova." perché non riesce a leggere il profilo.
+dice "Servizio non configurato: chiedi a un amministratore." perché non riesce a leggere il profilo. Un
+"Servizio momentaneamente non disponibile: riprova tra poco." subito dopo il salvataggio è invece il
+`PGRST002` del punto 3.
 
 ## 4. Operatori e amministratori
 
@@ -68,7 +73,11 @@ repository.
 
 1. **Authentication → Users → Add user → Create new user**: email e password della persona, con
    **Auto Confirm User** attivo (così l'account è subito utilizzabile e non parte nessuna email).
-   Comunica la password di persona, non per messaggio.
+   Comunica la password di persona, non per messaggio; oppure usa una password lunga e casuale che non
+   comunichi a nessuno e, dopo il passo 2, scegli **Send password recovery** dalla riga dell'utente: la
+   persona riceve la mail e sceglie da sola la password su `/imposta-password`.
+   Non usare "Send magic link" né "Invite user": con le iscrizioni chiuse rispondono "Signups not allowed
+   for this instance", ed è giusto così (nessuno deve potersi creare un account da solo).
 2. **SQL Editor**, con una nuova query:
 
    ```sql
@@ -136,6 +145,9 @@ email l'ora per i test).
 
 `<team>` è lo slug del team Vercel: si legge su vercel.com nell'indirizzo del team
 (`vercel.com/<team>`) o nell'URL di un'anteprima di una PR, che finisce con `-<team>.vercel.app`.
+Per questo progetto il team è `lucapastorello23-2780s-projects`: nello staging l'indirizzo delle anteprime da
+aggiungere è quindi
+`https://enjoy-fidelity-card-*-lucapastorello23-2780s-projects.vercel.app/imposta-password`.
 
 | Voce | Staging | Produzione |
 |---|---|---|

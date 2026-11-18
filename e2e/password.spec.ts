@@ -54,7 +54,7 @@ test('a forgotten password is replaced through the emailed link, which works onc
   await expect(page.getByRole('heading', { name: 'Scegli una nuova password' })).toBeVisible();
   await chooseNewPassword(page, newPassword);
   await expect(page).toHaveURL('/');
-  await expect(page.getByText('Enjoy Card è quasi pronta')).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Cerca per nome o telefono' })).toBeVisible();
 
   await page.getByRole('link', { name: `Account e impostazioni: ${name}` }).click();
   await page.getByRole('button', { name: 'Esci' }).click();
@@ -77,7 +77,7 @@ test('a forgotten password is replaced through the emailed link, which works onc
   await page.goto('/accedi');
   await submitSignIn(page, email, newPassword);
   await expect(page).toHaveURL('/');
-  await expect(page.getByText('Enjoy Card è quasi pronta')).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Cerca per nome o telefono' })).toBeVisible();
 });
 
 test('an unknown email gets the same confirmation and no email', async ({ page }) => {

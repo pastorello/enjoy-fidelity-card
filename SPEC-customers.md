@@ -197,8 +197,10 @@ anonymized_at        timestamptz
 
 ## Commands
 
-Nessun comando nuovo (`npm test`, `npm run db:test`, `npm run e2e`; non esiste uno script
-`test:integration`: la traduzione degli errori si prova come in `identity`, vedi Testing Strategy).
+Nessun comando nuovo (`npm test`, `npm run db:test`, `npm run e2e`). Nota (2026-11-18, task 16): quando la
+spec è stata scritta `test:integration` non esisteva; oggi esiste (`npm run test:integration`,
+`tests/integration/`) e `tests/integration/customers.test.ts` prova le RPC e la traduzione degli errori di
+`supabaseCustomerService` contro lo stack locale, oltre ai test unitari con `getSupabase` finto.
 
 ## Project Structure
 

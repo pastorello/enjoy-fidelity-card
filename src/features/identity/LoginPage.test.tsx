@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { ServerFaultError } from '../../lib/serverFault';
 import { createFakeAuthService } from '../../test/fakeAuthService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
@@ -73,6 +74,17 @@ describe('sign-in page', () => {
     expect(fake.service.signOut).toHaveBeenCalledOnce();
   });
 
+  it.each([
+    ['misconfigured', 'Servizio non configurato: chiedi a un amministratore.'],
+    ['unavailable', 'Servizio momentaneamente non disponibile: riprova tra poco.'],
+  ] as const)('tells a %s server apart from a missing connection', async (kind, message) => {
+    const fake = createFakeAuthService();
+    fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+    renderApp('/accedi', fake);
+    await fillAndSubmit('giulia@example.com', 'password-di-prova');
+    expect(await screen.findByRole('alert')).toHaveTextContent(message);
+  });
+
   it('refuses an account without an operator profile', async () => {
     renderApp('/accedi', createFakeAuthService({ operator: null }));
     await fillAndSubmit('nuovo@example.com', 'password-di-prova');
@@ -112,7 +124,9 @@ describe('protected pages', () => {
 
   it('show the page when signed in', async () => {
     renderApp('/', signedInFake());
-    expect(await screen.findByText('Enjoy Card è quasi pronta')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' }),
+    ).toBeInTheDocument();
   });
 
   it('tell a user without a profile that the account is not enabled', async () => {
@@ -124,10 +138,37 @@ describe('protected pages', () => {
 
   it('tell the user when the session has expired', async () => {
     const { fake } = renderApp('/', signedInFake());
-    await screen.findByText('Enjoy Card è quasi pronta');
+    await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' });
     fake.endSession();
     expect(await screen.findByText('La sessione è scaduta: accedi di nuovo.')).toHaveRole('status');
     expect(screen.getByRole('heading', { level: 1, name: 'Accedi' })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['misconfigured', 'Servizio non configurato: chiedi a un amministratore.'],
+    ['unavailable', 'Servizio momentaneamente non disponibile: riprova tra poco.'],
+  ] as const)(
+    'word a %s server when the saved profile cannot be loaded for that',
+    async (kind, message) => {
+      const fake = signedInFake();
+      fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+      renderApp('/', fake);
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(screen.queryByText('Controlla la connessione e riprova.')).not.toBeInTheDocument();
+    },
+  );
+
+  it('keep the fault message when "Riprova" fails again with a fault', async () => {
+    const fake = signedInFake();
+    fake.service.loadOperator
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new ServerFaultError('misconfigured'));
+    renderApp('/', fake);
+    await userEvent.click(await screen.findByRole('button', { name: 'Riprova' }));
+    expect(
+      await screen.findByText('Servizio non configurato: chiedi a un amministratore.'),
+    ).toBeInTheDocument();
+    expect(fake.service.loadOperator).toHaveBeenCalledTimes(2);
   });
 
   it('offer "Riprova" when the profile cannot be loaded', async () => {
@@ -135,6 +176,8 @@ describe('protected pages', () => {
     fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
     renderApp('/', fake);
     await userEvent.click(await screen.findByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByText('Enjoy Card è quasi pronta')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' }),
+    ).toBeInTheDocument();
   });
 });

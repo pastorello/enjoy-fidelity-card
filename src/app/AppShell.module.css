@@ -39,15 +39,30 @@
   width: auto;
 }
 
+/* Enjoy Display is all caps and wide: at screen-title size long Italian titles
+   ("Password dimenticata") do not fit next to the back button at 390px. Section-title
+   size, and a second line rather than an ellipsis (U+2026 is not in Enjoy Display). */
 .title {
-  font-family: var(--type-screen-title-family);
-  font-size: var(--type-screen-title-size);
-  line-height: var(--type-screen-title-line-height);
-  font-weight: var(--type-screen-title-weight);
-  letter-spacing: var(--type-screen-title-letter-spacing);
-  white-space: nowrap;
+  display: block;
+  max-height: calc(2em * var(--type-section-title-line-height));
   overflow: hidden;
-  text-overflow: ellipsis;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+}
+
+/* A title cut by the header, repeated in full at the top of the content in the body font. */
+.fullTitle {
+  margin: 0;
+  font-family: var(--type-body-lg-family);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: var(--type-body-lg-weight);
+  letter-spacing: var(--type-body-lg-letter-spacing);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
 }
 
 .iconButton {
@@ -69,8 +84,10 @@
   height: 36px;
   border: 2px solid currentColor;
   border-radius: var(--radius-full);
+  font-family: var(--type-label-family);
   font-size: var(--type-label-size);
   font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-letter-spacing);
 }
 
 .main {

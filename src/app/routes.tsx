@@ -1,10 +1,13 @@
 import type { RouteObject } from 'react-router';
+import { EditCustomerPage } from '../features/customers/EditCustomerPage';
+import { CustomerPage } from '../features/customers/CustomerPage';
+import { HomePage } from '../features/customers/HomePage';
+import { NewCustomerPage } from '../features/customers/NewCustomerPage';
 import { ForgotPasswordPage } from '../features/identity/ForgotPasswordPage';
 import { LoginPage } from '../features/identity/LoginPage';
 import { RequireAuth } from '../features/identity/RequireAuth';
 import { ResetPasswordPage } from '../features/identity/ResetPasswordPage';
 import { SettingsPage } from '../features/identity/SettingsPage';
-import { HomePage } from './HomePage';
 import { NotFoundPage } from './NotFoundPage';
 import { RootLayout } from './RootLayout';
 import { RouteErrorBoundary } from './RouteErrorBoundary';
@@ -28,6 +31,9 @@ export const routes: RouteObject[] = [
         Component: RequireAuth,
         children: [
           { index: true, Component: HomePage },
+          { path: 'clienti/nuovo', Component: NewCustomerPage },
+          { path: 'clienti/:id', Component: CustomerPage },
+          { path: 'clienti/:id/modifica', Component: EditCustomerPage },
           { path: 'impostazioni', Component: SettingsPage },
         ],
       },

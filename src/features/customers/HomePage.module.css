@@ -1,0 +1,91 @@
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Below the 20 rows: tells the operator to narrow the search. */
+.more {
+  margin: var(--space-2) 0 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* "Nuovo cliente «<testo>»": a long name wraps inside the button instead of overflowing. */
+.newCustomerLabel {
+  min-width: 0;
+  padding-block: var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+/* The name typed by the user and the « »: Enjoy Display lacks these glyphs (displayGlyphs.test.ts). */
+.typedName {
+  font-family: var(--type-body-family);
+}
+
+/* The one-time message of the navigation state ("Dati del cliente cancellati."). */
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+.notice svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-accent-text);
+}
+
+/* The search's loading, error, empty state or results: one block, spaced as the page. */
+.outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.served {
+  display: flex;
+  flex-direction: column;
+}
+
+/* "SERVITI OGGI": spaced condensed caps in muted ink, as the settings sections. */
+.sectionTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+/* Compact error row: the text and "Riprova" side by side, stacked when there is no room. */
+.servedError {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.servedErrorText {
+  display: flex;
+  flex: 1 1 12rem;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-danger-text);
+}
+
+.servedErrorText svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

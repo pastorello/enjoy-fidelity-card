@@ -7,7 +7,8 @@ Modulo: `cards` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `custome
 Fonti: specifiche ("Nuovo cliente e consegna della card", "Registrare una spesa" punto 1, "Modello dati",
 "Sicurezza e privacy") e wireframe Cerca cliente, Card sconosciuta: nuovo cliente, Nuovo cliente senza card,
 Associa o sostituisci card, Card già di un altro cliente, Modifica cliente, Scheda cliente, Registra spesa,
-con le note n1, n2, n6 · Decisioni: `brain/DECISIONS.md` (2026-11-17 "Punti visibili al cliente con la
+Associa-link, Associa-link-errore, Saldo-punti, Saldo-card-non-attiva (pagina "Telefono", tavole definitive
+del titolare per scrittura del link e pagina pubblica), con le note n1, n2, n6 · Decisioni: `brain/DECISIONS.md` (2026-11-17 "Punti visibili al cliente con la
 card": cambia i non-obiettivi "Nessuna schermata per il cliente" e "Non scriviamo le card" di
 `brain/PROJECT.md`).
 
@@ -99,10 +100,16 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
    disattivata. I punti restano a Maria.»; footer «Annulla» → `/clienti/:id/modifica`. Alla lettura
    (`app.associate_card`):
    - **riuscita** → riquadro e nota lasciano il posto alla **scrittura del link** (punto 8) sulla card
-     appena letta; link scritto → `navigate('/clienti/:id/modifica', { replace: true })` con messaggio
+     appena letta, come nella tavola "Associa-link": sotto la riga cliente il messaggio `role="status"`
+     con spunta «Card associata a Maria», poi il riquadro di scrittura (`aria-label="Scrittura del link"`,
+     icona NFC) «Tieni la card appoggiata» · «Scrivo il link per vedere i punti…», la nota con icona link
+     «Con il link, Maria vede i suoi punti avvicinando la card al proprio telefono. Sulla card va solo il
+     link: nessun dato personale.» e nel footer il pulsante secondario «Salta, lo scrivo più tardi» (è il
+     «Più tardi» del punto 8 durante la scrittura); link scritto → `navigate('/clienti/:id', { replace: true })` (Scheda cliente, come nelle tavole) con messaggio
      `role="status"` «Card …A1B2 associata»; scrittura non riuscita → resta sulla pagina con l'esito del
-     punto 8 («Scrivi di nuovo il link» / «Più tardi»); «Più tardi» o dispositivo che non scrive →
-     `/clienti/:id/modifica` con «Card …A1B2 associata. Link non scritto.»;
+     punto 8, tavola "Associa-link-errore" («Scrivi di nuovo il link» / «Più tardi»); «Salta, lo scrivo più
+     tardi», «Più tardi» o dispositivo che non scrive →
+     `/clienti/:id` (Scheda cliente) con «Card …A1B2 associata. Link non scritto.»;
    - **card di un altro cliente** (wireframe "Card già di un altro cliente"): riquadro, nota e footer
      lasciano il posto all'avviso `role="alert"` (restano intestazione e riga cliente): «Card già
      associata» · «Questa card è di Antonio Esposito. Una card può essere di un solo cliente: usa un'altra
@@ -161,14 +168,17 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
    1. `app.issue_card_link(card_id)` → token nuovo (solo in memoria, mai salvato nel browser, nei log o a
       schermo); URL = `cardLinkUrl(token)` = `${CARD_LINK_ORIGIN}/s/${token}`;
    2. `writeUrl(url, { expectedUid, signal })`, con i passi mostrati nella sezione (`aria-live="polite"`):
-      `waiting-card` «Avvicina la card …E5F6», `writing` «Scrittura del link… tieni ferma la card»,
-      `verifying` «Controllo del link: allontana la card e riavvicinala»; pulsante «Più tardi» (interrompe
-      con il `signal`) sempre disponibile;
+      `waiting-card` «Avvicina la card …E5F6», `writing` «Tieni la card appoggiata» · «Scrivo il link per
+      vedere i punti…» (tavola "Associa-link"), `verifying` «Controllo del link: allontana la card e
+      riavvicinala»; pulsante secondario «Salta, lo scrivo più tardi» (il «Più tardi» della scrittura in
+      corso: interrompe con il `signal`) sempre disponibile;
    3. verifica riuscita → `app.confirm_card_link(card_id, token)`: solo ora il link funziona (prima il token
       è "in attesa" e la pagina pubblica non lo riconosce); esito «Link scritto: il cliente può vedere i
       suoi punti avvicinando la card al suo telefono.»;
-   4. esiti non riusciti (`role="alert"`, «Scrivi di nuovo il link» primario e «Più tardi»): `timeout` o
-      `io` «Link non scritto: la card si è allontanata. Riavvicinala e riprova.»; `wrong-card` «Questa non
+   4. esiti non riusciti (`role="alert"`, «Scrivi di nuovo il link» primario e «Più tardi» secondario):
+      `timeout` o `io` come nella tavola "Associa-link-errore": titolo «Link non scritto» · «La card è
+      associata a Maria e funziona alla cassa. Il link per vedere i punti non è stato scritto: la card si è
+      staccata troppo presto.» e, sotto l'avviso, «Puoi scriverlo anche dopo, da Modifica cliente.»; `wrong-card` «Questa non
       è la card …E5F6: il link non è stato scritto.»; `verify-failed` «Il link sulla card non risulta
       giusto. Riprova.»; `not-allowed` «Il telefono non permette di scrivere la card: controlla il
       permesso NFC di Chrome.»; `cannot-write` come dispositivo che non scrive (punto 4); errore di rete su
@@ -202,7 +212,8 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
    7. spazio sulla card: l'URL è di circa 55–60 caratteri (`https://<progetto>.vercel.app/s/` + 22), cioè un
       messaggio NDEF di circa 60 byte con il prefisso `https://` compresso (al più ~70 senza): l'NTAG215 ha
       504 byte utili (anche un NTAG213 da 144 basterebbe). `card-input` rifiuta URL oltre 200 caratteri.
-9. **Pagina pubblica dei punti** (`/s/:token`, `CardPointsPage`; nessun wireframe, Open Question 15):
+9. **Pagina pubblica dei punti** (`/s/:token`, `CardPointsPage`; tavole "Saldo-punti" e
+   "Saldo-card-non-attiva", Open Question 15):
    - rotta **fuori da `RequireAuth`** e da `AppShell`: niente accesso, niente `CardReaderSession` (nessuna
      lettura card), nessun link verso le schermate degli operatori; funziona anche se sul telefono c'è una
      sessione di un operatore, e non la usa;
@@ -212,11 +223,16 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
      manda il token nel corpo di una `POST`, non nell'URL della richiesta; mai `{ get: true }`); se sul
      telefono c'è la sessione di un operatore la richiesta porta il suo JWT e la risposta è identica;
    - caricamento «Carico i tuoi punti…»; timeout 8 s come errore di rete;
-   - numero → riquadro "Enjoy your points": logo Enjoy del design system, «I tuoi punti Enjoy», il saldo
-     grande (`Intl.NumberFormat('it-IT')`) e «punti» («punto» se 1); nessun nome, nessun altro dato;
+   - numero → tavola "Saldo-punti": logo Enjoy del design system in alto (`alt` «Bar Enjoy Gaeta»),
+     riquadro verde con il titolo «ENJOY YOUR POINTS» (`lang="en"`), il saldo grande
+     (`Intl.NumberFormat('it-IT')`, stile `figure` del design system, Enjoy Display) e «punti» («punto» se
+     1); sotto il riquadro «Mostra la card alla cassa per usare i tuoi punti.» e, più piccolo, «Questa
+     pagina mostra solo i punti della card, senza dati personali.»; piè di pagina «Enjoy Bar · Gaeta»;
+     nessun nome, nessun altro dato;
    - `null` (token sconosciuto, malformato, in attesa, di una card disattivata o di un cliente anonimizzato:
-     sempre lo stesso) → «Nessun punto da mostrare» · «Questa card non mostra punti. Chiedi al bar.», con lo
-     stesso logo; il testo non dice se il link è esistito;
+     sempre lo stesso) → tavola "Saldo-card-non-attiva": icona card, «Card non attiva» · «Questa card non
+     mostra punti. Chiedi al bar.», con lo stesso logo e lo stesso piè di pagina; il testo non dice se il
+     link è esistito;
    - errore di rete → «Non riesco a caricare i punti. Controlla la connessione.» con «Riprova»;
    - `<meta name="robots" content="noindex, nofollow">` aggiunto dalla pagina; il token non si salva
      (niente `localStorage`, niente log, niente strumenti di analisi) e non compare nel titolo della pagina;
@@ -452,8 +468,8 @@ export function cardLinkUrl(token: string): string {
 azzerato da `confirm` e dalla disattivazione, e uguale a `pending_issued_at`; nessun messaggio d'errore delle
 tre funzioni contiene il token; `card_points` come `anon`: token valido → intero (0 senza movimenti; con `ledger` unito, uguale a `private.customer_balance`), token sconosciuto, malformato (21/23 caratteri, `+`, `/`, null) → `null` senza errore; `anon` non legge `private.card_links` né `app.cards` e non esegue `issue_card_link`/`confirm_card_link`; `has_function_privilege('anon', 'public.card_points(text)', 'execute')` vero e `prosecdef` vero con `search_path` vuoto; **allowlist**: in `public` l'insieme delle funzioni eseguibili da `anon` è esattamente `{card_points(text)}` (i privilegi predefiniti di Supabase danno `execute` ad `anon` su ogni nuova funzione di `public`: il test blocca le aggiunte involontarie) e `function_privileges.test.sql` resta verde per `app` e `private` |
 | Integrazione (Vitest + stack locale, `npm run test:integration`) | due associazioni concorrenti dello stesso uid a clienti diversi: una riesce, l'altra `card_taken`; due associazioni concorrenti di uid diversi allo stesso cliente: alla fine una sola card attiva; `supabaseCardsService` traduce i codici d'errore (anche `card_inactive`, `link_token_mismatch`); `card_points` chiamata via HTTP con la chiave anon: risposta con `Cache-Control: no-store`, corpo solo numero o `null`, stessa forma per token mai esistito e di card disattivata |
-| Componenti (Vitest + `fakeCardsService`, `fakeCustomerService`, adattatore card finto) | home: attiva → `/clienti/:id/spesa`, sconosciuta → `/clienti/nuovo?card=`, disattivata e anonimizzata → avvisi (nessun nome nel secondo), letture ignorate durante la ricerca, rete → «Riprova»; Nuovo cliente da card: riquadro «Card letta» con uid completo, `?card` non valido ignorato, salvataggio → `replace` su `/clienti/:id/spesa`, `card_taken` → avviso e «Continua senza card», reinvio dopo errore di rete con lo **stesso** `operation_id`; Nuovo cliente senza card: lettura sconosciuta/nota; Associa card: tutti gli stati del punto 4 e testi dei wireframe (nota sulla card attuale solo se c'è); Modifica cliente con e senza card, dialogo di disattivazione, errore di caricamento; riga della Scheda cliente; `formatCardLabel`; `cardLinkUrl` (origine da variabile o `location.origin`, origine con percorso o `http:` rifiutata). `CardLinkWriter` con uno scrittore finto: passi e testi, link scritto → `confirm_card_link` chiamata una volta con lo stesso token, ogni esito non riuscito con i suoi testi, «Scrivi di nuovo il link» → nuova `issue_card_link`, «Più tardi» interrompe la scrittura, rete su `issue`/`confirm`, `card_inactive`, `canWrite` falso → niente pulsante e testo del dispositivo; il token non compare nel DOM; Nuovo cliente e Associa card: scrittura dopo il salvataggio e navigazione anche con «Più tardi»; Modifica cliente: «Link non scritto» / «Scrivi il link» e «Link ai punti scritto» / «Scrivi di nuovo il link». `CardPointsPage`: numero formattato, «punto»/«punti», `null` → messaggio neutro, token malformato → messaggio neutro senza chiamata, timeout 8 s → «Riprova», nessun nome, `meta robots` presente, nessuna scrittura in `localStorage`, nessuna attesa di `AuthProvider`, `beforeinstallprompt` annullato. `CardLinkWriter`: rete su `confirm` → «Riprova» rimanda lo **stesso** token senza nuova `issue` né nuova scrittura; `wrong-card` con `otherUid` → testo con le due card; `unreadable` → «Scrivi comunque» → `writeUrl` con `allowUnreadable: true`. Modifica cliente nei tre `LinkState`. Registrazione del service worker saltata su `/s/…` |
-| E2E (Playwright 390×844, Supabase locale, `window.__enjoyFakeCard`; dati e uid creati dal test con nomi univoci, rieseguibile) | card sconosciuta → Nuovo cliente con codice → Salva → `/clienti/:id/spesa` con il nome del cliente; card nota → stessa pagina entro 2 s; Sostituisci card → la vecchia letta in home mostra «Card disattivata»; card di un altro cliente → «Card già associata» → «Apri la scheda di …»; Disattiva card → «Nessuna card attiva»; target touch ≥ 48 px. **Link**: card sconosciuta → Salva → «Avvicina la card …» (il form ha richiesto più di 1,5 s: il test riappoggia la card con `__enjoyFakeCard(uid)`) → scrittura finta → `__enjoyFakeCardWrites` ha una voce per quell'uid con URL `…/s/[A-Za-z0-9_-]{22}` che non contiene l'uid → in un contesto del browser **senza accesso** l'URL mostra «I tuoi punti Enjoy» e `0`, nessun nome; Sostituisci card → il link della vecchia mostra «Nessun punto da mostrare», quello della nuova il saldo; `failNextWrite('io')` → «Link non scritto…» → «Più tardi» → Modifica cliente con «Link non scritto» → «Scrivi il link» + `__enjoyFakeCard(uid)` → «Link ai punti scritto»; `setCanWrite(false)` → associazione salvata con link non scritto e nessuna voce nel registro; `/s/` con token inventato → messaggio neutro; sulla pagina pubblica le sole richieste a Supabase sono `rpc/card_points` in `POST` e nessuna URL di richiesta contiene il token; nessuna registrazione di service worker su `/s/…`; il percorso card nota → Registra spesa non produce voci nel registro delle scritture. Le intestazioni di `/s/(.*)` (`Cache-Control: no-store`, `X-Robots-Tag`) non si provano in locale (`vercel.json` vale solo su Vercel): le controlla un test Vitest che legge `vercel.json` e una verifica con `curl -I` sull'anteprima, annotata nel RUNBOOK |
+| Componenti (Vitest + `fakeCardsService`, `fakeCustomerService`, adattatore card finto) | home: attiva → `/clienti/:id/spesa`, sconosciuta → `/clienti/nuovo?card=`, disattivata e anonimizzata → avvisi (nessun nome nel secondo), letture ignorate durante la ricerca, rete → «Riprova»; Nuovo cliente da card: riquadro «Card letta» con uid completo, `?card` non valido ignorato, salvataggio → `replace` su `/clienti/:id/spesa`, `card_taken` → avviso e «Continua senza card», reinvio dopo errore di rete con lo **stesso** `operation_id`; Nuovo cliente senza card: lettura sconosciuta/nota; Associa card: tutti gli stati del punto 4 e testi dei wireframe (nota sulla card attuale solo se c'è); Modifica cliente con e senza card, dialogo di disattivazione, errore di caricamento; riga della Scheda cliente; `formatCardLabel`; `cardLinkUrl` (origine da variabile o `location.origin`, origine con percorso o `http:` rifiutata). `CardLinkWriter` con uno scrittore finto: passi e testi, link scritto → `confirm_card_link` chiamata una volta con lo stesso token, ogni esito non riuscito con i suoi testi, «Scrivi di nuovo il link» → nuova `issue_card_link`, «Salta, lo scrivo più tardi» interrompe la scrittura, rete su `issue`/`confirm`, `card_inactive`, `canWrite` falso → niente pulsante e testo del dispositivo; il token non compare nel DOM; Nuovo cliente e Associa card: scrittura dopo il salvataggio e navigazione anche con «Più tardi»; Modifica cliente: «Link non scritto» / «Scrivi il link» e «Link ai punti scritto» / «Scrivi di nuovo il link». `CardPointsPage`: numero formattato, «punto»/«punti», `null` → messaggio neutro, token malformato → messaggio neutro senza chiamata, timeout 8 s → «Riprova», nessun nome, `meta robots` presente, nessuna scrittura in `localStorage`, nessuna attesa di `AuthProvider`, `beforeinstallprompt` annullato. `CardLinkWriter`: rete su `confirm` → «Riprova» rimanda lo **stesso** token senza nuova `issue` né nuova scrittura; `wrong-card` con `otherUid` → testo con le due card; `unreadable` → «Scrivi comunque» → `writeUrl` con `allowUnreadable: true`. Modifica cliente nei tre `LinkState`. Registrazione del service worker saltata su `/s/…` |
+| E2E (Playwright 390×844, Supabase locale, `window.__enjoyFakeCard`; dati e uid creati dal test con nomi univoci, rieseguibile) | card sconosciuta → Nuovo cliente con codice → Salva → `/clienti/:id/spesa` con il nome del cliente; card nota → stessa pagina entro 2 s; Sostituisci card → la vecchia letta in home mostra «Card disattivata»; card di un altro cliente → «Card già associata» → «Apri la scheda di …»; Disattiva card → «Nessuna card attiva»; target touch ≥ 48 px. **Link**: card sconosciuta → Salva → «Avvicina la card …» (il form ha richiesto più di 1,5 s: il test riappoggia la card con `__enjoyFakeCard(uid)`) → scrittura finta → `__enjoyFakeCardWrites` ha una voce per quell'uid con URL `…/s/[A-Za-z0-9_-]{22}` che non contiene l'uid → in un contesto del browser **senza accesso** l'URL mostra «ENJOY YOUR POINTS» e `0`, nessun nome; Sostituisci card → il link della vecchia mostra «Card non attiva», quello della nuova il saldo; `failNextWrite('io')` → «Link non scritto…» → «Più tardi» → Modifica cliente con «Link non scritto» → «Scrivi il link» + `__enjoyFakeCard(uid)` → «Link ai punti scritto»; `setCanWrite(false)` → associazione salvata con link non scritto e nessuna voce nel registro; `/s/` con token inventato → messaggio neutro; sulla pagina pubblica le sole richieste a Supabase sono `rpc/card_points` in `POST` e nessuna URL di richiesta contiene il token; nessuna registrazione di service worker su `/s/…`; il percorso card nota → Registra spesa non produce voci nel registro delle scritture. Le intestazioni di `/s/(.*)` (`Cache-Control: no-store`, `X-Robots-Tag`) non si provano in locale (`vercel.json` vale solo su Vercel): le controlla un test Vitest che legge `vercel.json` e una verifica con `curl -I` sull'anteprima, annotata nel RUNBOOK |
 
 Test scritti prima del codice (TDD). Solo dati finti (`@example.com`, nomi e uid inventati).
 
@@ -493,7 +509,7 @@ Test scritti prima del codice (TDD). Solo dati finti (`@example.com`, nomi e uid
 9. Detector Impeccable pulito; typecheck, lint, test, pgTAP ed E2E verdi in CI.
 10. Dopo un'associazione su Android il link è scritto e verificato senza altri tocchi oltre a tenere la
     card appoggiata (o riavvicinarla una volta); il link aperto da un telefono non collegato mostra solo
-    «I tuoi punti Enjoy» e il saldo; su iPhone XS o successivo la card apre la pagina senza app (verifica
+    «ENJOY YOUR POINTS» e il saldo; su iPhone XS o successivo la card apre la pagina senza app (verifica
     manuale, RUNBOOK).
 11. Sostituire, disattivare o anonimizzare rende il vecchio link indistinguibile da un link inventato
     (pgTAP + E2E); un token emesso ma non verificato non mostra mai punti.
@@ -537,7 +553,9 @@ Test scritti prima del codice (TDD). Solo dati finti (`@example.com`, nomi e uid
    «Senza card», dialogo di disattivazione, conferma «Card … associata», «Questa è già la card attiva…»,
    errori di rete e di caricamento, cliente anonimizzato in Associa card). Proposta: quelli scritti sopra,
    nello stile dei wireframe (default adottato).
-7. Dopo l'associazione. Proposta: ritorno a Modifica cliente con messaggio di conferma (default adottato).
+7. Dopo l'associazione. Risolta dalle tavole Associa-link e Associa-link-errore (2026-11-18): «Salta, lo
+   scrivo più tardi» e «Più tardi» portano alla Scheda cliente; per coerenza anche il link scritto torna
+   alla Scheda cliente `/clienti/:id`, con lo stesso messaggio di conferma. «Indietro» resta su Modifica cliente.
 8. Chi può disattivare/associare. Proposta: amministratori e operatori, come nelle specifiche (default
    adottato).
 9. Idempotenza di associazione e disattivazione. CLAUDE.md chiede un identificativo generato dall'app per
@@ -555,9 +573,9 @@ Test scritti prima del codice (TDD). Solo dati finti (`@example.com`, nomi e uid
     (default adottato, tecnica).
 14. Riscrittura e token in attesa. Proposta: ogni tentativo emette un token nuovo, che vale solo dopo la
     verifica sulla card; fino ad allora resta valido il link precedente (default adottato, tecnica).
-15. Pagina pubblica dei punti: nessun wireframe. Proposta: «I tuoi punti Enjoy» + numero + «punti» con il
-    logo; per i link non validi «Nessun punto da mostrare» · «Questa card non mostra punti. Chiedi al bar.»;
-    testi da rivedere con il titolare nella lista unica (cross-review §3.2) (default adottato).
+15. Pagina pubblica dei punti: chiusa dalle tavole del titolare "Saldo-punti" («ENJOY YOUR POINTS», numero
+    e «punti», con il logo) e "Saldo-card-non-attiva" («Card non attiva» · «Questa card non mostra punti.
+    Chiedi al bar.»); testi al punto 9.
 16. Informativa privacy. Proposta di riga per il consulente: «Avvicinando la card al tuo telefono vedi il
     saldo dei tuoi punti: la pagina mostra solo i punti, senza nome né altri dati, e smette di funzionare
     se la card viene disattivata.» Non blocca lo sviluppo (come cross-review §3.1).

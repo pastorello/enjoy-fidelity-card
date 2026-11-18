@@ -1,9 +1,18 @@
 import { test as base, expect } from '@playwright/test';
 
 /** Fails the test on any console error or warning, or page error (CSP and header problems included). */
-export const test = base.extend<{ consoleErrors: string[]; onlyLocalSupabase: void }>({
+export const test = base.extend<{
+  /**
+   * URLs whose failed load is an answer the test expects (a refusal the app shows as a message),
+   * set with `test.use` around the tests that provoke it. Empty by default.
+   */
+  expectedRefusals: RegExp[];
+  consoleErrors: string[];
+  onlyLocalSupabase: void;
+}>({
+  expectedRefusals: [[], { option: true }],
   consoleErrors: [
-    async ({ page }, use) => {
+    async ({ page, expectedRefusals }, use) => {
       const errors: string[] = [];
       page.on('console', (message) => {
         // Rejected sign-in attempts (400 on /token) and used or expired recovery links (403 on
@@ -13,6 +22,7 @@ export const test = base.extend<{ consoleErrors: string[]; onlyLocalSupabase: vo
         const rejectedByAuth =
           failedLoad && (url.includes('/auth/v1/token') || url.includes('/auth/v1/verify'));
         if (rejectedByAuth) return;
+        if (failedLoad && expectedRefusals.some((pattern) => pattern.test(url))) return;
         if (message.type() === 'error' || message.type() === 'warning') {
           errors.push(`${message.type()}: ${message.text()}`);
         }

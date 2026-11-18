@@ -7,6 +7,7 @@ import {
 } from '@supabase/supabase-js';
 import type { AuthError } from '@supabase/supabase-js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ServerFaultError } from '../../lib/serverFault';
 import { signInResultFor, supabaseAuthService } from './supabaseAuthService';
 
 const auth = vi.hoisted(() => ({
@@ -16,7 +17,13 @@ const auth = vi.hoisted(() => ({
   updateUser: vi.fn<(attributes: unknown) => Promise<unknown>>(),
   signOut: vi.fn<(options: unknown) => Promise<unknown>>(),
 }));
-vi.mock('../../lib/supabase', () => ({ getSupabase: () => ({ auth }) }));
+const db = vi.hoisted(() => ({
+  maybeSingle: vi.fn<() => Promise<unknown>>(),
+}));
+vi.mock('../../lib/supabase', () => {
+  const query = { select: () => query, eq: () => query, maybeSingle: db.maybeSingle };
+  return { getSupabase: () => ({ auth, schema: () => ({ from: () => query }) }) };
+});
 
 describe('signInResultFor', () => {
   it('no error means signed in', () => {
@@ -80,6 +87,62 @@ describe('currentUserId', () => {
       error: new AuthApiError('Invalid Refresh Token', 400, 'refresh_token_not_found'),
     });
     await expect(supabaseAuthService.currentUserId()).resolves.toBeNull();
+  });
+});
+
+/** A Data API error answer. */
+const answer = (code: string, message: string, status: number) => ({
+  data: null,
+  error: { code, message, details: null, hint: null },
+  status,
+});
+
+describe('loadOperator', () => {
+  beforeEach(() => {
+    db.maybeSingle.mockReset();
+  });
+
+  it('returns the profile of the user', async () => {
+    db.maybeSingle.mockResolvedValue({
+      data: { id: 'op-1', name: 'Giulia Prova', role: 'admin' },
+      error: null,
+      status: 200,
+    });
+    await expect(supabaseAuthService.loadOperator('user-1')).resolves.toEqual({
+      id: 'op-1',
+      name: 'Giulia Prova',
+      role: 'admin',
+    });
+  });
+
+  it.each([
+    ['PGRST106', 'Invalid schema: app', 406, 'misconfigured'],
+    ['42501', 'permission denied for schema app', 403, 'misconfigured'],
+    ['42501', 'permission denied for table operators', 403, 'misconfigured'],
+    [
+      'PGRST205',
+      "Could not find the table 'app.operators' in the schema cache",
+      404,
+      'misconfigured',
+    ],
+    ['XX000', 'internal error', 500, 'misconfigured'],
+    ['PGRST002', 'Could not query the database for the schema cache', 503, 'unavailable'],
+  ] as const)('a server fault (%s, HTTP %i) says which', async (code, message, status, kind) => {
+    db.maybeSingle.mockResolvedValue(answer(code, message, status));
+    const error: unknown = await supabaseAuthService
+      .loadOperator('user-1')
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ServerFaultError);
+    expect(error).toHaveProperty('kind', kind);
+  });
+
+  it('a failed fetch is a plain error (network)', async () => {
+    db.maybeSingle.mockResolvedValue(answer('', 'TypeError: Failed to fetch', 0));
+    const error: unknown = await supabaseAuthService
+      .loadOperator('user-1')
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).not.toBeInstanceOf(ServerFaultError);
   });
 });
 

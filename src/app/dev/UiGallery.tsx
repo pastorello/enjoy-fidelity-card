@@ -90,7 +90,7 @@ export function UiGallery() {
           <ListRow
             title="Spesa 12,50 €"
             subtitle="10:42 · Giulia"
-            trailing={<strong>+12</strong>}
+            trailing={<span className={styles.delta}>+12</span>}
           />
         </ul>
       </section>
@@ -104,7 +104,7 @@ export function UiGallery() {
           Annulla
         </Button>
         <Button variant="danger-secondary" block onClick={() => setDialogOpen(true)}>
-          Annulla la spesa…
+          Annulla la spesa
         </Button>
         <Button busy block>
           Salvataggio

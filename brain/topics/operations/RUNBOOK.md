@@ -81,7 +81,8 @@ staging poi produzione, mai `supabase config push`.
 | L'app si ferma con "Missing VITE_SUPABASE_…" | `.env` assente o incompleto | `.env.example`, `npx supabase status` |
 | `db:start` / `db:reset` scade in attesa di un container | `docker ps` (container non sani) | `npx supabase stop` e di nuovo `db:start` |
 | `npm run e2e` si ferma con "Local Supabase is not running" | `npx supabase status` | avviare lo stack (comando sopra) |
-| Online: accesso con credenziali giuste dà "Connessione assente" | Schema `app` esposto nella Data API? | `docs/setup-accounts.md` §3 |
+| Online: accesso con credenziali giuste dà "Servizio non configurato" (prima: "Connessione assente") | Schema `app` esposto nella Data API (`PGRST106`)? Permessi sullo schema (`42501`)? | `docs/setup-accounts.md` §3 |
+| Online: "Servizio momentaneamente non disponibile" | Data API in ricarica (503 `PGRST002`), di solito dopo aver cambiato gli schemi esposti | attendere un minuto e riprovare |
 | Online: "Account non abilitato" | Profilo collegato? `select * from app.operators;` nello SQL Editor | `private.add_operator` (§4 della guida) |
 | In locale l'email di recupero non arriva | Mailpit acceso? http://127.0.0.1:54324 (`npx supabase status`) | riavviare lo stack senza `mailpit` tra gli esclusi (`-x`); dopo modifiche a `config.toml`: `npx supabase stop && npm run db:start` |
 | Online: il link dell'email apre "Il link è scaduto o è già stato usato." | Template "Reset password" ancora quello predefinito (`#error_code=…` nell'URL)? | `docs/setup-accounts.md` §6 passo 2; link davvero usato o più vecchio di un'ora |
@@ -175,3 +176,19 @@ staging poi produzione, mai `supabase config push`.
 32. Senza sessione (`anon`) la lettura di `app.settings` dà un errore di privilegio, non un risultato vuoto:
     il servizio lo riporta come `unknown`, non `not-found`. L'app carica la configurazione solo dentro
     `RequireAuth`, con un operatore collegato.
+33. Un rifiuto di una RPC (`raise exception` con codice P0001, es. `customer_name_taken`) arriva al browser
+    come HTTP 400, e il browser lo stampa in console ("Failed to load resource"): il controllo "console
+    pulita" di `e2e/fixtures.ts` farebbe fallire il test. Il test che provoca il rifiuto apposta lo dichiara
+    con `test.use({ expectedRefusals: [/\/rest\/v1\/rpc\/<funzione>$/] })` solo nel proprio `describe`
+    (vuoto per tutti gli altri), mai allargando il filtro in `fixtures.ts`.
+34. Gli E2E dei clienti girano nel progetto `phone` (parallelo) e usano nomi con un suffisso unico per
+    esecuzione (`… E2E <suffisso>`): si rieseguono senza `db:reset`, ma lo stack locale accumula clienti di
+    prova (anche anonimizzati, che restano come righe). È innocuo; `npm run db:reset` riparte dai 5 clienti
+    del seed. Il seed `Giulia Bianchi` serve al test del nome già usato: non rinominarlo.
+35. `app.customer_summary` e le firme di `search_customers`, `get_customer`, `customers_served_today` sono
+    definitive: `ledger` ne cambia solo i corpi con `create or replace` in una **migrazione nuova** (mai
+    modificando `*_customers.sql`, che va su staging con `db push`), mantenendo il controllo `not_operator`
+    in testa e ridefinendo `private.acting_operator_id()`, se serve, con il corpo comune parola per parola.
+36. `impeccable detect` su file `.ts`/`.tsx`/`.css` usa solo le regole a espressioni regolari; contrasto e
+    testo minuscolo richiedono una pagina disegnata, e le schermate dei clienti stanno dietro
+    l'accesso. Le misure (≥ 48 px) si provano quindi negli E2E (`e2e/customers.spec.ts`), non col detector.

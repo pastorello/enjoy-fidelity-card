@@ -31,7 +31,11 @@ export type AuthService = {
   signIn(email: string, password: string): Promise<SignInResult>;
   /** Ends the session on this device only. */
   signOut(): Promise<void>;
-  /** The profile linked to this user, or null when there is none (removed or never linked). */
+  /**
+   * The profile linked to this user, or null when there is none (removed or never linked).
+   * Rejects with a `ServerFaultError` when the server is misconfigured or unavailable, with
+   * any other error when there is no answer.
+   */
   loadOperator(userId: string): Promise<Operator | null>;
   /**
    * Called when the saved session changes outside the app's own calls: with its user id

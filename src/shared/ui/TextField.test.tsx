@@ -1,6 +1,7 @@
 import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Link, MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { TextField } from './TextField';
 
@@ -29,6 +30,43 @@ describe('TextField', () => {
     const input = screen.getByRole('textbox', { name: 'Nome' });
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(input).toHaveAccessibleDescription('Esiste già Maria Rossi');
+  });
+
+  it('shows an error with a link and a help for that error, both linked to the input', () => {
+    render(
+      <MemoryRouter>
+        <TextField
+          label="Nome"
+          value="Maria Rossi"
+          onChange={() => {}}
+          hint="Il nome identifica il cliente."
+          error={
+            <>
+              Esiste già un cliente con questo nome. <Link to="/clienti/1">Apri la scheda</Link>
+            </>
+          }
+          errorHint="Aggiungi un dettaglio al nome."
+        />
+      </MemoryRouter>,
+    );
+    const input = screen.getByRole('textbox', { name: 'Nome' });
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription(
+      'Esiste già un cliente con questo nome. Apri la scheda Aggiungi un dettaglio al nome.',
+    );
+    expect(screen.getByRole('link', { name: 'Apri la scheda' })).toHaveAttribute(
+      'href',
+      '/clienti/1',
+    );
+    expect(screen.queryByText('Il nome identifica il cliente.')).not.toBeInTheDocument();
+  });
+
+  it('shows the help for an error only with the error', () => {
+    render(
+      <TextField label="Nome" value="" onChange={() => {}} errorHint="Aggiungi un dettaglio." />,
+    );
+    expect(screen.queryByText('Aggiungi un dettaglio.')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Nome' })).not.toHaveAttribute('aria-invalid');
   });
 
   it('links a hint to the input when there is no error', () => {

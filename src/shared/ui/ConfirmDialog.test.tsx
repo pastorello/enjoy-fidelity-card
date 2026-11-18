@@ -75,4 +75,31 @@ describe('ConfirmDialog', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(opener).toHaveFocus();
   });
+
+  it('shows an error inside the dialog, as an alert after the consequence', () => {
+    render(
+      <ConfirmDialog
+        open
+        tone="danger"
+        title="Cancellare i dati?"
+        description="Non si può tornare indietro."
+        confirmLabel="Cancella i dati"
+        error="Dati non cancellati: controlla la connessione e riprova."
+        onConfirm={noop}
+        onCancel={noop}
+      />,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Cancellare i dati?' });
+    expect(dialog).toContainElement(screen.getByRole('alert'));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Dati non cancellati: controlla la connessione e riprova.',
+    );
+    expect(dialog).toHaveAccessibleDescription('Non si può tornare indietro.');
+  });
+
+  it('has no alert without an error', async () => {
+    render(<Harness />);
+    await userEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

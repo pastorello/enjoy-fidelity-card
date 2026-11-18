@@ -25,6 +25,10 @@ body {
   /* Amounts and points: all digits the same height. */
   font-variant-numeric: lining-nums;
   text-rendering: optimizeLegibility;
+  /* Enjoy Display and Stint Ultra Condensed have a single weight: the tokens ask for
+     500-700, which must not turn into a browser-made faux bold. Texturina is variable
+     and keeps its real weights. */
+  font-synthesis-weight: none;
 }
 
 h1,

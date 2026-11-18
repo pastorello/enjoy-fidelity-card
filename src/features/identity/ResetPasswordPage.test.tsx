@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import { ServerFaultError } from '../../lib/serverFault';
 import { createFakeAuthService, fakeOperator } from '../../test/fakeAuthService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
@@ -252,6 +253,17 @@ describe('reset password page', () => {
     expect(fake.service.verifyRecovery).toHaveBeenCalledTimes(2);
     expect(fake.service.updatePassword).not.toHaveBeenCalled();
     await expectInvalidLinkView(router);
+  });
+
+  it('says the service is not configured when the profile read after saving hits a fault', async () => {
+    const fake = createFakeAuthService({ recoveryUser: linkUser });
+    fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError('misconfigured'));
+    renderApp(LINK, fake);
+    await fill('nuova-password');
+    expect(
+      await screen.findByText('Servizio non configurato: chiedi a un amministratore.'),
+    ).toBeInTheDocument();
+    expect(fake.service.updatePassword).toHaveBeenCalledOnce();
   });
 
   it('sends an account without profile to the sign-in page as "not enabled"', async () => {
