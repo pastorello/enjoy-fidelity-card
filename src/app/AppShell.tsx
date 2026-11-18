@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
 import { Link } from 'react-router';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import styles from './AppShell.module.css';
@@ -19,6 +19,11 @@ type AppShellProps = {
    * the content (a customer's name, whose last words may tell namesakes apart).
    */
   repeatCutTitle?: boolean;
+  /**
+   * The h1, made focusable from script (tabIndex -1): where a screen puts the focus when the
+   * control that had it goes away, e.g. "Riprova" replaced by the loading state.
+   */
+  headingRef?: Ref<HTMLHeadingElement> | undefined;
 };
 
 /**
@@ -58,6 +63,7 @@ export function AppShell({
   account,
   actions,
   repeatCutTitle = false,
+  headingRef,
 }: AppShellProps) {
   const hasBack = title !== undefined && backTo !== undefined;
   const titleRef = useRef<HTMLSpanElement>(null);
@@ -71,7 +77,7 @@ export function AppShell({
             <Icon name="chevron-left" />
           </Link>
         )}
-        <h1 className={styles.heading}>
+        <h1 ref={headingRef} tabIndex={headingRef ? -1 : undefined} className={styles.heading}>
           {title === undefined ? (
             <img
               className={styles.logo}

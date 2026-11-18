@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { formatTime } from '../../shared/format';
@@ -46,12 +46,21 @@ function servedLine(customer: CustomerSummary): string {
  * SERVITI OGGI (wireframe Cerca cliente): nothing while loading or when nobody was served today,
  * a compact row with "Riprova" when the list cannot be loaded.
  */
-function ServedTodaySection({ served }: { served: ServedToday }) {
+function ServedTodaySection({
+  served,
+  headingRef,
+  onRetry,
+}: {
+  served: ServedToday;
+  /** The h2, which takes the focus from "Riprova" and stays mounted while the list loads. */
+  headingRef: RefObject<HTMLHeadingElement | null>;
+  onRetry: () => void;
+}) {
   if (served.status === 'loading') return null;
   if (served.status === 'done' && served.customers.length === 0) return null;
   return (
     <section aria-labelledby="served-today" className={styles.served}>
-      <h2 id="served-today" className={styles.sectionTitle}>
+      <h2 ref={headingRef} id="served-today" tabIndex={-1} className={styles.sectionTitle}>
         SERVITI OGGI
       </h2>
       {served.status === 'error' ? (
@@ -60,7 +69,7 @@ function ServedTodaySection({ served }: { served: ServedToday }) {
             <Icon name="circle-alert" size={20} />
             Non riesco a caricare i clienti di oggi
           </p>
-          <Button variant="secondary" busy={served.retrying} onClick={served.retry}>
+          <Button variant="secondary" busy={served.retrying} onClick={onRetry}>
             Riprova
           </Button>
         </div>
@@ -132,6 +141,32 @@ export function HomePage() {
   // The text lives in the URL too (`?q=`, replaced), so "Indietro" from a customer finds it again.
   const [text, setText] = useState(() => searchParams.get('q') ?? '');
   const search = useCustomerSearch(text);
+  const searchInput = useRef<HTMLInputElement>(null);
+  const searchOutcome = useRef<HTMLDivElement>(null);
+  const servedHeading = useRef<HTMLHeadingElement>(null);
+  // Set by SERVITI OGGI's "Riprova" until its answer arrives.
+  const servedRetrying = useRef(false);
+  const servedCount = served.status === 'done' ? served.customers.length : null;
+
+  // "Riprova" is replaced by the loading state: the focus goes to the search outcome, which
+  // stays mounted while searching and then holds the results, not to <body>.
+  function retrySearch() {
+    search.retry();
+    searchOutcome.current?.focus();
+  }
+
+  function retryServed() {
+    servedRetrying.current = true;
+    served.retry();
+    servedHeading.current?.focus();
+  }
+
+  // With nobody served today the section goes away after "Riprova": the focus goes to the search.
+  useEffect(() => {
+    if (!servedRetrying.current || servedCount === null) return;
+    servedRetrying.current = false;
+    if (servedCount === 0) searchInput.current?.focus();
+  }, [servedCount]);
   // No results for a name: the button registers that name (`?nome=`); for a phone, nothing.
   const typedName = text.trim().replace(/\s+/g, ' ');
   const prefill =
@@ -183,6 +218,7 @@ export function HomePage() {
       )}
       {/* The card reading panel of `card-input` goes here, above the search. */}
       <SearchField
+        ref={searchInput}
         label="Cerca per nome o telefono"
         placeholder="Es. Rossi o 4521"
         value={text}
@@ -192,46 +228,53 @@ export function HomePage() {
       <p className="visually-hidden" aria-live="polite" data-testid="search-announcer">
         {searchAnnouncement(search)}
       </p>
-      {search.status === 'loading' && <StatusView kind="loading" label="Ricerca…" />}
-      {search.status === 'error' && (
-        <StatusView
-          kind="error"
-          title="Ricerca non riuscita"
-          description={loadErrorText(search.error)}
-          onRetry={search.retry}
-        />
-      )}
-      {search.status === 'done' && search.customers.length === 0 && (
-        <StatusView
-          kind="empty"
-          title="Nessun cliente trovato"
-          description="Controlla come è scritto, o cerca con le ultime 4 cifre del telefono."
-        />
-      )}
-      {search.status === 'done' && search.customers.length > 0 && (
-        <section>
-          <ul className={styles.list} aria-label="Risultati della ricerca">
-            {search.customers.map((customer) => (
-              <ListRow
-                key={customer.id}
-                to={`/clienti/${customer.id}`}
-                // "Indietro" from the customer page comes back to this search.
-                state={customerBackState(text)}
-                title={customer.name}
-                subtitle={phoneLine(customer)}
-                trailing={<PointsBadge points={customer.balance} />}
-              />
-            ))}
-          </ul>
-          {search.hasMore && (
-            <p className={styles.more}>
-              Mostro i primi {SEARCH_SHOWN_ROWS}: scrivi qualcosa in più
-            </p>
+      {/* The focus target of "Riprova": mounted from the first search to the last result. */}
+      {search.status !== 'idle' && (
+        <div ref={searchOutcome} tabIndex={-1} className={styles.outcome}>
+          {search.status === 'loading' && <StatusView kind="loading" label="Ricerca…" />}
+          {search.status === 'error' && (
+            <StatusView
+              kind="error"
+              title="Ricerca non riuscita"
+              description={loadErrorText(search.error)}
+              onRetry={retrySearch}
+            />
           )}
-        </section>
+          {search.status === 'done' && search.customers.length === 0 && (
+            <StatusView
+              kind="empty"
+              title="Nessun cliente trovato"
+              description="Controlla come è scritto, o cerca con le ultime 4 cifre del telefono."
+            />
+          )}
+          {search.status === 'done' && search.customers.length > 0 && (
+            <section>
+              <ul className={styles.list} aria-label="Risultati della ricerca">
+                {search.customers.map((customer) => (
+                  <ListRow
+                    key={customer.id}
+                    to={`/clienti/${customer.id}`}
+                    // "Indietro" from the customer page comes back to this search.
+                    state={customerBackState(text)}
+                    title={customer.name}
+                    subtitle={phoneLine(customer)}
+                    trailing={<PointsBadge points={customer.balance} />}
+                  />
+                ))}
+              </ul>
+              {search.hasMore && (
+                <p className={styles.more}>
+                  Mostro i primi {SEARCH_SHOWN_ROWS}: scrivi qualcosa in più
+                </p>
+              )}
+            </section>
+          )}
+        </div>
       )}
       {/* While a search is shown, SERVITI OGGI is not. */}
-      {search.status === 'idle' && <ServedTodaySection served={served} />}
+      {search.status === 'idle' && (
+        <ServedTodaySection served={served} headingRef={servedHeading} onRetry={retryServed} />
+      )}
     </AppShell>
   );
 }

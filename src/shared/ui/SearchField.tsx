@@ -1,4 +1,4 @@
-import { useId, useRef, type InputHTMLAttributes } from 'react';
+import { useId, useRef, type InputHTMLAttributes, type Ref } from 'react';
 import { Icon } from './Icon';
 import styles from './SearchField.module.css';
 import fieldStyles from './TextField.module.css';
@@ -10,11 +10,19 @@ type SearchFieldProps = Omit<
   label: string;
   value: string;
   onChange: (value: string) => void;
+  ref?: Ref<HTMLInputElement> | undefined;
 };
 
-export function SearchField({ label, value, onChange, className, ...rest }: SearchFieldProps) {
+export function SearchField({ label, value, onChange, className, ref, ...rest }: SearchFieldProps) {
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // The input goes both to the clear button's ref and to the caller's.
+  function setInput(node: HTMLInputElement | null) {
+    inputRef.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  }
 
   function clear() {
     onChange('');
@@ -30,7 +38,7 @@ export function SearchField({ label, value, onChange, className, ...rest }: Sear
         <Icon name="search" className={styles.icon} />
         <input
           {...rest}
-          ref={inputRef}
+          ref={setInput}
           id={id}
           type="search"
           value={value}

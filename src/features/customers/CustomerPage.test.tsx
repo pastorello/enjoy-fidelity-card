@@ -125,6 +125,23 @@ describe('CustomerPage: Scheda cliente', () => {
     expect(getCalls(customers)).toHaveLength(2);
   });
 
+  it('after "Riprova" the focus stays on the page title, while loading and after', async () => {
+    const customers = customersFake();
+    customers.failNext('get', 'network');
+    renderCustomer(`/clienti/${MARIA.id}`, customers);
+    const alert = await screen.findByRole('alert');
+    const held = customers.holdNext('get');
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(screen.getByText('Caricamento…')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Scheda cliente' })).toHaveFocus();
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Maria Rossi' })).toHaveFocus();
+  });
+
   it('a server fault is not a connection problem', async () => {
     const customers = customersFake();
     customers.failNext('get', new ServerFaultError('unavailable'));

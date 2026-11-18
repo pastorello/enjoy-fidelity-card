@@ -266,6 +266,30 @@ describe('EditCustomerPage: Modifica cliente', () => {
     expect(await nameField()).toHaveValue('Maria Rossi');
   });
 
+  it('after "Riprova" the focus stays on the page title, while loading and once the form is shown', async () => {
+    const customers = customersFake();
+    customers.failNext('get', 'network');
+    renderEdit(MARIA.id, customers);
+    const alert = await screen.findByRole('alert');
+    const held = customers.holdNext('get');
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(screen.getByText('Caricamento…')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Modifica cliente' })).toHaveFocus();
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    expect(await nameField()).toHaveValue('Maria Rossi');
+    expect(screen.getByRole('heading', { level: 1, name: 'Modifica cliente' })).toHaveFocus();
+  });
+
+  it('the form opened without a "Riprova" does not take the focus', async () => {
+    renderEdit(MARIA.id);
+    await nameField();
+    expect(document.activeElement).toBe(document.body);
+  });
+
   it('not_operator on save: back to /accedi', async () => {
     const auth = signedInFake();
     const customers = customersFake();

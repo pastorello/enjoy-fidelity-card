@@ -282,6 +282,26 @@ describe('HomePage: Cerca cliente', () => {
     expect(searchCalls(customers).map((call) => call.args)).toEqual([['rossi'], ['rossi']]);
   });
 
+  it('keeps the focus in the search outcome after "Riprova", while searching and after', async () => {
+    const customers = customersFake();
+    const { field } = await renderHome('/', customers);
+    customers.failNext('search', 'network');
+    await userEvent.type(field, 'rossi');
+    const alert = await screen.findByRole('alert');
+    const held = customers.holdNext('search');
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(screen.getByText('Ricerca…')).toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    const list = await screen.findByRole('list', { name: 'Risultati della ricerca' });
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement?.contains(list)).toBe(true);
+  });
+
   it('a server fault is worded apart from a network error', async () => {
     const customers = customersFake();
     const { field } = await renderHome('/', customers);
@@ -408,6 +428,36 @@ describe('HomePage: SERVITI OGGI', () => {
     expect(within(section).getAllByRole('link')).toHaveLength(2);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(servedCalls(customers)).toHaveLength(2);
+  });
+
+  it('after "Riprova" the focus goes to SERVITI OGGI and stays there once the list arrives', async () => {
+    const customers = servedFake();
+    customers.failNext('servedToday', 'network');
+    await renderHome('/', customers);
+    const alert = await screen.findByRole('alert');
+    const held = customers.holdNext('servedToday');
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    const heading = screen.getByRole('heading', { level: 2, name: 'SERVITI OGGI' });
+    expect(heading).toHaveFocus();
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
+    expect(within(section).getAllByRole('link')).toHaveLength(2);
+    expect(heading).toHaveFocus();
+  });
+
+  it('after "Riprova" with nobody served today, the focus goes to the search field', async () => {
+    const customers = customersFake();
+    customers.failNext('servedToday', 'network');
+    const { field } = await renderHome('/', customers);
+    const alert = await screen.findByRole('alert');
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    await waitFor(() => expect(servedSection()).not.toBeInTheDocument());
+    expect(field).toHaveFocus();
   });
 
   it('loads again when the page becomes visible', async () => {

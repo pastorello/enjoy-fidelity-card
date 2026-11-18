@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { formatDate, formatInteger } from '../../shared/format';
@@ -64,6 +65,14 @@ export function CustomerPage() {
   const location = useLocation();
   const backTo = customerBackTo(location.state);
   const load = useCustomer(id);
+  // Every branch renders the same AppShell, so its h1 stays mounted through loading and errors.
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  // "Riprova" is replaced by the loading state: the focus goes to the title, not to <body>.
+  function retry() {
+    load.retry();
+    heading.current?.focus();
+  }
 
   if (load.status === 'done') {
     const { customer } = load;
@@ -72,6 +81,7 @@ export function CustomerPage() {
       <AppShell
         title={erased ? 'Cliente cancellato' : customer.name}
         backTo={backTo}
+        headingRef={heading}
         repeatCutTitle={!erased}
         headerAction={
           erased
@@ -89,6 +99,7 @@ export function CustomerPage() {
       <AppShell
         title={PLACEHOLDER_TITLE}
         backTo={backTo}
+        headingRef={heading}
         actions={
           <ButtonLink to="/" block>
             Torna all’inizio
@@ -106,7 +117,7 @@ export function CustomerPage() {
   }
 
   return (
-    <AppShell title={PLACEHOLDER_TITLE} backTo={backTo}>
+    <AppShell title={PLACEHOLDER_TITLE} backTo={backTo} headingRef={heading}>
       {load.status === 'loading' ? (
         <StatusView kind="loading" />
       ) : (
@@ -114,7 +125,7 @@ export function CustomerPage() {
           kind="error"
           title="Scheda non caricata"
           description={loadErrorText(load.error)}
-          onRetry={load.retry}
+          onRetry={retry}
         />
       )}
     </AppShell>

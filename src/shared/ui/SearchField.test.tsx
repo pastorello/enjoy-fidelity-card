@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -23,6 +24,15 @@ describe('SearchField', () => {
     render(<SearchField label="Cerca" value="Rossi" onChange={onChange} />);
     await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
     expect(onChange).toHaveBeenCalledWith('');
+    expect(screen.getByRole('searchbox')).toHaveFocus();
+  });
+
+  it('gives its input to a ref, and the clear button still focuses it', async () => {
+    const ref = createRef<HTMLInputElement>();
+    const onChange = vi.fn<(value: string) => void>();
+    render(<SearchField ref={ref} label="Cerca" value="Rossi" onChange={onChange} />);
+    expect(ref.current).toBe(screen.getByRole('searchbox'));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
     expect(screen.getByRole('searchbox')).toHaveFocus();
   });
 });

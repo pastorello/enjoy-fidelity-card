@@ -1,3 +1,4 @@
+import { createRef } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -82,6 +83,25 @@ describe('AppShell', () => {
   it('has no footer without actions', () => {
     renderShell(<AppShell>x</AppShell>);
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+  });
+
+  it('headingRef: the h1 is given to the ref and can take the focus from script', () => {
+    const heading = createRef<HTMLHeadingElement>();
+    renderShell(
+      <AppShell title="Scheda cliente" backTo="/" headingRef={heading}>
+        x
+      </AppShell>,
+    );
+    const h1 = screen.getByRole('heading', { level: 1, name: 'Scheda cliente' });
+    expect(heading.current).toBe(h1);
+    expect(h1).toHaveAttribute('tabindex', '-1');
+    heading.current?.focus();
+    expect(h1).toHaveFocus();
+  });
+
+  it('without headingRef the h1 is not focusable', () => {
+    renderShell(<AppShell title="Scheda cliente">x</AppShell>);
+    expect(screen.getByRole('heading', { level: 1 })).not.toHaveAttribute('tabindex');
   });
 
   describe('repeatCutTitle', () => {
