@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { formatCents, formatInteger } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
@@ -12,11 +12,13 @@ import { useCustomer } from '../customers/useCustomer';
 import { useAuth } from '../identity/AuthProvider';
 import { useSettings } from '../settings/SettingsProvider';
 import type { Settings } from '../settings/types';
+import { formatMovementDate, formatSignedPoints } from './formatMovement';
 import { AmountKeypad } from './AmountKeypad';
+import { LedgerDoneView } from './LedgerDoneView';
 import { useLedgerService } from './LedgerServiceProvider';
 import styles from './PurchasePage.module.css';
 import { formatConfirmAmount, isUnusualAmount, pointsFor } from './points';
-import { LedgerError } from './types';
+import { LedgerError, type LedgerResult } from './types';
 import { useOperation } from './useOperation';
 
 const TITLE = 'Registra spesa';
@@ -73,6 +75,34 @@ function UnusualAmountWarning({ points, settings }: { points: number; settings: 
 }
 
 /**
+ * Spesa registrata (SPEC-ledger, point 3): "+12 punti a Maria Rossi", the server's balance and
+ * "12,50 € · oggi 10:42 · Giulia", all from the movement the server returned.
+ */
+function PurchaseDone({ customer, result }: { customer: CustomerSummary; result: LedgerResult }) {
+  const { movement, balance } = result;
+  const when = formatMovementDate(movement.createdAt);
+  // "oggi 10:42" / "ieri 19:10" after the amount; "8 nov 18:05" is already lower case.
+  const details = [
+    movement.amountCents === null ? null : formatCents(movement.amountCents),
+    when.charAt(0).toLocaleLowerCase('it-IT') + when.slice(1),
+    movement.operatorName,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ');
+  return (
+    <LedgerDoneView
+      title="Spesa registrata"
+      summary={`${formatSignedPoints(movement.points)} ${pointsWord(movement.points)} a ${customer.name}`}
+      balance={balance}
+      details={details}
+      customerId={customer.id}
+      customerName={customer.name}
+      cancelLabel="Annulla la spesa"
+    />
+  );
+}
+
+/**
  * The purchase being typed and its recording. Called whatever the customer's state, so the page
  * keeps one AppShell (and its heading) from the loading state to the keypad.
  */
@@ -80,7 +110,6 @@ function usePurchase(customerId: string) {
   const [amountCents, setAmountCents] = useState(0);
   const settings = useSettings();
   const service = useLedgerService();
-  const navigate = useNavigate();
   const { reportNotEnabled } = useAuth();
   const operation = useOperation((operationId) =>
     service.recordPurchase({ operationId, customerId, amountCents }),
@@ -93,14 +122,6 @@ function usePurchase(customerId: string) {
   useEffect(() => {
     if (forbidden) void reportNotEnabled();
   }, [forbidden, reportNotEnabled]);
-
-  // Until "Spesa registrata" is built on this route (tasks/ledger, task 15), a purchase recorded
-  // opens the customer page with the server's balance, in place of this one.
-  useEffect(() => {
-    if (operation.status === 'done') {
-      void navigate(`/clienti/${customerId}`, { replace: true });
-    }
-  }, [operation.status, navigate, customerId]);
 
   const points =
     settings.status === 'ready' ? pointsFor(amountCents, settings.settings.centsPerPoint) : 0;
@@ -211,6 +232,12 @@ export function PurchasePage() {
   function retrySettings() {
     if (purchase.settings.status === 'error') purchase.settings.retry();
     heading.current?.focus();
+  }
+
+  // The confirmation takes the place of the keypad on the same entry of the history: the system
+  // back from it goes where the keypad would have, never back to the keypad.
+  if (load.status === 'done' && purchase.operation.status === 'done') {
+    return <PurchaseDone customer={load.customer} result={purchase.operation.result} />;
   }
 
   let actions: ReactNode = null;

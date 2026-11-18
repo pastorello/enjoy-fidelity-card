@@ -1,6 +1,6 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
 import { createFakeCardsService } from '../../test/fakeCardsService';
 import { createTestCardReader } from '../../test/fakeCardReader';
@@ -377,5 +377,115 @@ describe('PurchasePage: common states', () => {
       await screen.findByText('Account non abilitato: chiedi a un amministratore.'),
     ).toBeInTheDocument();
     expect(ledger.movements()).toHaveLength(0);
+  });
+});
+
+async function advance(ms: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+describe('PurchasePage: Spesa registrata', () => {
+  let vibrate: ReturnType<typeof vi.fn<(pattern: VibratePattern) => boolean>>;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    Reflect.deleteProperty(navigator, 'vibrate');
+  });
+
+  /** Types 12,50 € and confirms with fake timers at 10:42 in Rome, a phone that vibrates. */
+  async function confirmPurchase() {
+    await ready();
+    await press('1', '2', '5', '0');
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-18T09:42:00.000Z'));
+    vibrate = vi.fn<(pattern: VibratePattern) => boolean>(() => true);
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Conferma +12' }));
+    await advance(0);
+  }
+
+  it('the texts of the wireframe with the server’s points and balance, the vibration, back to / after 10 s (criterion 3)', async () => {
+    const { router, ledger } = renderPurchase();
+    await ready();
+    // Another operator records 5 points in the meantime: the page still shows 120 + 12.
+    await ledger.service.recordPurchase({
+      operationId: '00000000-0000-4000-e000-0000000000aa',
+      customerId: MARIA.id,
+      amountCents: 500,
+    });
+    await confirmPurchase();
+
+    const title = screen.getByRole('heading', { level: 1, name: 'Spesa registrata' });
+    expect(title).toHaveFocus();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Tastierino numerico' })).not.toBeInTheDocument();
+    expect(screen.getByText('+12 punti a Maria Rossi')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('137 punti');
+    expect(screen.getByText('12,50 € · oggi 10:42 · Giulia Prova')).toBeInTheDocument();
+    expect(vibrate).toHaveBeenCalledWith(200);
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      'Torno alla lettura delle card tra 10 secondi',
+    );
+    expect(screen.getByRole('link', { name: 'Apri la scheda di Maria' })).toHaveAttribute(
+      'href',
+      `/clienti/${MARIA.id}`,
+    );
+
+    await advance(9000);
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/spesa`);
+    await advance(1000);
+    expect(router.state.location.pathname).toBe('/');
+    expect(ledger.movements()).toHaveLength(2);
+  });
+
+  it('a purchase worth one point: "+1 punto a Maria Rossi"', async () => {
+    renderPurchase();
+    await ready();
+    await press('1', '9', '9');
+    vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Conferma +1' }));
+    await advance(0);
+    expect(screen.getByText('+1 punto a Maria Rossi')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('121 punti');
+  });
+
+  it('the system back from the confirmation does not go back to the keypad', async () => {
+    const { router } = renderPurchase({ path: '/' });
+    await screen.findByRole('heading', { level: 1 });
+    await act(async () => {
+      await router.navigate(`/clienti/${MARIA.id}`);
+    });
+    await act(async () => {
+      await router.navigate(`/clienti/${MARIA.id}/spesa`);
+    });
+    await confirmPurchase();
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeInTheDocument();
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`);
+    expect(screen.queryByRole('group', { name: 'Tastierino numerico' })).not.toBeInTheDocument();
+    // The countdown of the confirmation left with it.
+    await advance(15_000);
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`);
+  });
+
+  it('"Leggi un’altra card" goes to / at once', async () => {
+    const { router } = renderPurchase();
+    await confirmPurchase();
+    fireEvent.click(screen.getByRole('link', { name: 'Leggi un’altra card' }));
+    await advance(0);
+    expect(router.state.location.pathname).toBe('/');
+  });
+
+  it('"Apri la scheda di Maria" opens the customer page', async () => {
+    const { router } = renderPurchase();
+    await confirmPurchase();
+    fireEvent.click(screen.getByRole('link', { name: 'Apri la scheda di Maria' }));
+    await advance(0);
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`);
   });
 });
