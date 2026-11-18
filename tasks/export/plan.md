@@ -99,7 +99,7 @@ migrazione export (task 1-2: export_customers, export_movements, privilegi)
 Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Database (rischio più alto)
-- [ ] Task 1: `app.export_customers`: ruolo sul server, anonimizzati azzerati, saldo, paginazione, privilegi; pgTAP
+- [x] Task 1: `app.export_customers`: ruolo sul server, anonimizzati azzerati, saldo, paginazione, privilegi; pgTAP
 - [ ] Task 2: `app.export_movements`: cursore `(created_at, id)`, tipo, descrizione o premio, correzioni, anonimizzati; pgTAP
 
 ### Checkpoint A: `db:test` verde; revisione `security-and-hardening` su ruolo, privilegi, anonimizzati e sola lettura

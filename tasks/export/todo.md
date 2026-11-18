@@ -16,11 +16,11 @@ dalla card con `active` del cliente; `created_by_name` dal nome dell'operatore; 
 `phone`, `notes`, `active_card_uid` restituiti `null`. `revoke execute … from public, anon`;
 `grant execute … to authenticated`.
 **Accettazione:**
-- [ ] pgTAP: l'admin riceve le colonne attese; operatore, utente senza profilo e operatore scollegato →
+- [x] pgTAP: l'admin riceve le colonne attese; operatore, utente senza profilo e operatore scollegato →
       `42501`; `anon` e `public` senza `execute` (`has_function_privilege`); `provolatile = 's'`
-- [ ] pgTAP: anonimizzato (creato e anonimizzato nel test) con `name`, `phone`, `notes`, `active_card_uid`
+- [x] pgTAP: anonimizzato (creato e anonimizzato nel test) con `name`, `phone`, `notes`, `active_card_uid`
       `null`, saldo presente; `balance_points` = somma con le correzioni, `0` senza movimenti
-- [ ] pgTAP: due pagine con `p_limit = 2` coprono tutte le righe senza duplicati; `p_limit` 0, 1001 e
+- [x] pgTAP: due pagine con `p_limit = 2` coprono tutte le righe senza duplicati; `p_limit` 0, 1001 e
       null → `22023`; `function_privileges.test.sql` verde
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** nessuna · **File:** supabase/migrations/*_export.sql, supabase/tests/export.test.sql ·
