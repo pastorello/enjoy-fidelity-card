@@ -200,9 +200,9 @@ src/features/card-input/webNfcAdapter.ts (+ .test.ts) · **Dimensione:** M
 scrittore finto della build E2E); il lettore USB non scrive mai. `useCardWriter()` restituisce `{ canWrite,
 writeUrl }` dal servizio del provider.
 **Accettazione:**
-- [ ] Unità (criterio 10): `canWrite` falso con stato `off`, `denied`, `unsupported` e con il solo lettore USB;
+- [x] Unità (criterio 10): `canWrite` falso con stato `off`, `denied`, `unsupported` e con il solo lettore USB;
       vero con `active` e `write` disponibile
-- [ ] Componente: in una pagina finta `onStep` riceve `waiting-card` → `writing` → `verifying`, e una lettura
+- [x] Componente: in una pagina finta `onStep` riceve `waiting-card` → `writing` → `verifying`, e una lettura
       durante la scrittura non arriva al consumatore della pagina
 **Verifica:** `npm test -- useCardWriter cardReader`
 **Dipendenze:** 10 · **File:** src/features/card-input/useCardWriter.ts (+ .test.tsx),

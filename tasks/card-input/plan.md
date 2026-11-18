@@ -88,7 +88,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 3: Scrittura del link
 - [x] Task 9: `writeUrl`: precondizioni, card riconosciuta, `write()` e sessione esclusiva
 - [x] Task 10: `writeUrl`: verifica, tempi, card rovinata e card scambiata
-- [ ] Task 11: `useCardWriter` e `canWrite` nello stato
+- [x] Task 11: `useCardWriter` e `canWrite` nello stato
 - [ ] Task 12: Scrittura finta per gli E2E (`__enjoyFakeCardWrites`, `__enjoyFakeCardControl`)
 
 ### Checkpoint C: tutti i casi di scrittura della spec con test di unità; revisione `security-and-hardening` (mai `makeReadOnly`, URL mai fuori dal modulo)
