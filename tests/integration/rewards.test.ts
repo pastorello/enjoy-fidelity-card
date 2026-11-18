@@ -173,6 +173,28 @@ describe('concurrent creation', () => {
     expect(resend).toEqual({ ok: true, reward: { id, name, points: 40, active: true } });
     expect(runSql(`select count(*) from app.rewards where id = :'id'::uuid;`, { id })).toBe('1');
   });
+
+  // The race is between one request's existence check and the other's insert, microseconds
+  // wide: many rounds of simultaneous resends make it happen on every run before the fix.
+  it('simultaneous resends of one id all return the row, never name-taken', async () => {
+    const ROUNDS = 25;
+    const PARALLEL = 8;
+    // Rounds run one after another, each with its own id, so every round is a fresh race.
+    const refusedFrom = async (round: number): Promise<unknown[]> => {
+      if (round === ROUNDS) return [];
+      const id = randomUUID();
+      RACE_IDS.push(id);
+      const name = `Spremuta simultanea ${SUFFIX} ${round}`;
+      const results = await Promise.all(
+        Array.from({ length: PARALLEL }, () =>
+          service.create({ id, name, points: 30, active: true }),
+        ),
+      );
+      return [...results.filter((result) => !result.ok), ...(await refusedFrom(round + 1))];
+    };
+    const refused = await refusedFrom(0);
+    expect(refused).toEqual([]);
+  });
 });
 
 describe('operator', () => {
