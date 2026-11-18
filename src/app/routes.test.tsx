@@ -1,8 +1,9 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ErrorScreen } from './ErrorScreen';
+import { createTestCardReader } from '../test/fakeCardReader';
 import { renderApp, signedInFake } from '../test/renderApp';
 import { rootRoute, routes } from './routes';
 
@@ -107,6 +108,24 @@ describe('routes', () => {
       expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: 'Enjoy Card' })).not.toBeInTheDocument();
       expect(screen.queryAllByRole('link')).toEqual([]);
+    });
+
+    // SPEC-cards point 9: on a staff phone with a session, the card link must not start a scan
+    // (it would take the NFC from Android); the home, with the same session and reader, does.
+    it('never turns the card reader on, even with an operator signed in', async () => {
+      const card = createTestCardReader({ permission: 'granted' });
+      renderApp(`/s/${CARD_TOKEN}`, signedInFake(), undefined, undefined, undefined, card);
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+      await act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
+      expect(card.activate).not.toHaveBeenCalled();
+      expect(card.nfc.scanCount()).toBe(0);
+    });
+
+    it('the same session and reader on / do turn it on (the check above can fail)', async () => {
+      const card = createTestCardReader({ permission: 'granted' });
+      renderApp('/', signedInFake(), undefined, undefined, undefined, card);
+      await waitFor(() => expect(card.activate).toHaveBeenCalled());
+      await waitFor(() => expect(card.nfc.scanCount()).toBeGreaterThan(0));
     });
 
     it("is loaded lazily, apart from the operators' screens", () => {
