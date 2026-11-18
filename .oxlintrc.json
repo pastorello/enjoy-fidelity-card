@@ -17,6 +17,12 @@
     "typescript/await-thenable": "error",
     "typescript/consistent-type-imports": "error",
     "eqeqeq": "error",
+    "no-underscore-dangle": [
+      "warn",
+      {
+        "allow": ["__enjoyFakeCard", "__enjoyFakeCardWrites", "__enjoyFakeCardControl"]
+      }
+    ],
     "no-console": [
       "warn",
       {

@@ -1,12 +1,8 @@
-/** How the USB reader of the cash-desk tablet types a card uid (`tablet-kiosk`). */
-export type UsbUidFormat = 'hex' | 'hex-reversed' | 'dec' | 'dec-reversed';
+import type { UsbUidFormat } from '../card-input/normalizeUid';
 
-export const USB_UID_FORMATS: readonly UsbUidFormat[] = [
-  'hex',
-  'hex-reversed',
-  'dec',
-  'dec-reversed',
-];
+/** How the USB reader of the cash-desk tablet types a card uid: owned by `card-input`. */
+export { USB_UID_FORMATS } from '../card-input/normalizeUid';
+export type { UsbUidFormat } from '../card-input/normalizeUid';
 
 /** The bar's configuration (`app.settings`). Amounts are integer cents. */
 export type Settings = {

@@ -4,9 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
+import { createFakeRewardsService } from '../../test/fakeRewardsService';
+import { createTestCardReader } from '../../test/fakeCardReader';
 import { ServerFaultError } from '../../lib/serverFault';
 
-const SEARCH_LABEL = 'Cerca per nome o telefono';
+/**
+ * The field is "Oppure cerca per nome o telefono" under the full card panel (wireframe Cerca cliente)
+ * and "Cerca per nome o telefono" under the compact one (wireframe Ricerca senza risultati).
+ */
+const SEARCH_LABEL = /^(Oppure cerca|Cerca) per nome o telefono$/;
 
 function customersFake() {
   return createFakeCustomerService({
@@ -673,5 +679,77 @@ describe('HomePage: status message', () => {
     });
     await screen.findByRole('searchbox', { name: SEARCH_LABEL });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
+const HOME_TITLE = 'Avvicina la card';
+const HOME_TEXT =
+  'Lettura attiva: appoggia la card sul retro del telefono. Una card nuova apre la registrazione del cliente.';
+
+async function renderWithCard(path = '/', card = createTestCardReader()) {
+  const rendered = renderApp(
+    path,
+    signedInFake(),
+    createFakeSettingsService(),
+    customersFake(),
+    createFakeRewardsService(),
+    card,
+  );
+  const field = await screen.findByRole('searchbox', { name: SEARCH_LABEL });
+  return { ...rendered, field };
+}
+
+function cardPanel() {
+  return screen.getByRole('region', { name: 'Lettura card' });
+}
+
+describe('HomePage: Lettura card', () => {
+  it('shows the full panel above "Oppure cerca per nome o telefono", as in the wireframe', async () => {
+    const { field } = await renderWithCard();
+    expect(await within(cardPanel()).findByText(HOME_TITLE)).toBeInTheDocument();
+    expect(within(cardPanel()).getByText(HOME_TEXT)).toBeInTheDocument();
+    expect(field).toHaveAccessibleName('Oppure cerca per nome o telefono');
+    // The panel comes before the field in the page.
+    expect(
+      cardPanel().compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('asks for the permission with "Attiva la lettura" above the search', async () => {
+    const card = createTestCardReader({ permission: 'prompt' });
+    const { field } = await renderWithCard('/', card);
+    await userEvent.click(await screen.findByRole('button', { name: 'Attiva la lettura' }));
+    expect(await within(cardPanel()).findByText(HOME_TITLE)).toBeInTheDocument();
+    expect(field).toHaveAccessibleName('Oppure cerca per nome o telefono');
+  });
+
+  it('shows the compact line while a search is shown, and the full panel once it is cleared', async () => {
+    const { field } = await renderWithCard();
+    await within(cardPanel()).findByText(HOME_TITLE);
+
+    await userEvent.type(field, 'rossi');
+    expect(
+      await screen.findByRole('list', { name: 'Risultati della ricerca' }),
+    ).toBeInTheDocument();
+    expect(cardPanel()).toHaveTextContent('Lettura attiva: puoi anche avvicinare la card');
+    expect(within(cardPanel()).queryByText(HOME_TITLE)).not.toBeInTheDocument();
+    expect(field).toHaveAccessibleName('Cerca per nome o telefono');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
+    expect(await within(cardPanel()).findByText(HOME_TITLE)).toBeInTheDocument();
+    expect(field).toHaveAccessibleName('Oppure cerca per nome o telefono');
+  });
+
+  it('a card read does nothing yet: no navigation and no vibration', async () => {
+    const card = createTestCardReader();
+    const { router } = await renderWithCard('/', card);
+    await within(cardPanel()).findByText(HOME_TITLE);
+
+    act(() => {
+      card.nfc.read('04:a1:b2:c3:d4:e5:f6');
+    });
+    expect(router.state.location.pathname).toBe('/');
+    expect(router.state.location.search).toBe('');
+    expect(card.vibrate).not.toHaveBeenCalled();
   });
 });

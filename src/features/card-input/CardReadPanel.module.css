@@ -1,0 +1,66 @@
+/* Wireframes "Cerca cliente", "Lettura card: primo avvio" and "Lettura card spenta". */
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  /* 24 px top and bottom, as in the wireframes. */
+  padding: calc(var(--space-3) + var(--space-2)) var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  text-align: center;
+}
+
+.icon {
+  flex-shrink: 0;
+  color: var(--color-accent-text);
+}
+
+.texts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.title {
+  font-family: var(--type-screen-title-family);
+  font-size: var(--type-screen-title-size);
+  line-height: var(--type-screen-title-line-height);
+  font-weight: var(--type-screen-title-weight);
+  letter-spacing: var(--type-screen-title-letter-spacing);
+}
+
+.description {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* Reading off: the title steps back, the instructions are what matters. */
+.panel[data-off] .icon,
+.panel[data-off] .title {
+  color: var(--color-ink-muted);
+}
+
+.panel[data-off] .description {
+  color: var(--color-ink);
+}
+
+.action {
+  margin-top: var(--space-2);
+}
+
+/* Wireframe "Ricerca senza risultati": one line above the search. */
+.compact {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  gap: calc(var(--space-2) + var(--space-1));
+  padding: 0 var(--space-3);
+  background: var(--color-surface-raised);
+}
+
+.compactText {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+}

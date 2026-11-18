@@ -68,6 +68,76 @@ staging poi produzione, mai `supabase config push`.
    accettando l'avviso del certificato autofirmato.
 3. Oppure l'anteprima Vercel della PR, già in HTTPS.
 
+### Prova manuale della lettura card (`card-input`, criteri 2, 3 e 10)
+
+Gli E2E simulano Web NFC (trappola 2): queste prove si fanno a mano, una volta per rilascio di `card-input`
+o `cards`, con l'utente. Serve: un telefono Android con Chrome aggiornato e l'NFC, l'app in HTTPS (punto 3
+sopra, oppure il punto 1), un account del seed o di staging, **un NTAG215 di prova nuovo** (mai una card
+già consegnata a un cliente) e, per il criterio 10, un iPhone XS o successivo e un secondo Android. Nei
+documenti e nelle note non si scrivono mai l'uid della card né il link scritto (contiene il token del
+cliente): basta "card di prova A".
+
+**Prima di `cards`** la home non consuma le letture (`enabled: false`): avvicinando una card in home non
+succede nulla e il telefono **non** vibra, ed è corretto. I passi marcati *(con `cards`)* si fanno quando
+l'anteprima contiene Registra spesa e Associa card.
+
+**Criterio 2 — primo avvio, permesso, lettura senza tocchi**
+
+1. Chrome → Impostazioni sito → NFC: togliere il permesso dato in passato all'indirizzo dell'app (se c'è).
+2. Aprire l'app e accedere. In home, sopra la ricerca, il riquadro mostra "Lettura delle card" e
+   "Attiva la lettura". Esito atteso: nessuna richiesta di permesso prima del tocco.
+3. Toccare "Attiva la lettura" → Chrome chiede il permesso NFC → Consenti. Il riquadro diventa
+   "Avvicina la card".
+4. Chiudere la scheda, riaprire l'app: il riquadro arriva a "Avvicina la card" **senza tocchi** (passa al
+   massimo da "Avvio della lettura…").
+5. *(con `cards`)* Appoggiare la card di prova sul retro del telefono: si apre Registra spesa (card nota) o
+   Nuovo cliente con la card (card nuova) e il telefono vibra una volta, breve. Riappoggiarla entro 2 s non
+   produce una seconda lettura.
+6. Uscire con "Esci": su `/accedi` una card appoggiata non fa nulla nell'app (Android può aprire la pagina
+   dei punti nel browser se la card ha il link, vedi criterio 10, passo 5).
+
+**Criterio 3 — NFC spento e ripresa**
+
+1. Con l'app aperta in home, spegnere l'NFC dalle impostazioni del telefono e tornare all'app (o riaprirla):
+   il riquadro mostra "Lettura card spenta", "Attiva l'NFC nelle impostazioni del telefono e torna qui…" e
+   "Riprova la lettura". La ricerca per nome resta utilizzabile.
+2. Andare nelle **impostazioni del telefono**, accendere l'NFC e tornare all'app: il riquadro torna da solo
+   ad "Avvicina la card", senza toccare nulla.
+3. Spegnere di nuovo l'NFC, poi riaccenderlo dalla **tendina delle notifiche** senza lasciare l'app: il
+   riquadro resta spento (la pagina non cambia visibilità); "Riprova la lettura" → "Avvicina la card".
+4. Chrome → Impostazioni sito → NFC → Blocca, poi tornare all'app: "Lettura card spenta" con il testo sul
+   permesso negato e "Riprova la lettura". Rimettere Consenti e tornare all'app: riparte da sola.
+5. Annotare: se al passo 1 Chrome ha dato "spento" subito o solo al primo `scan()`, e se al passo 3 la
+   lettura è ripartita comunque da sola.
+
+**Criterio 10 — scrittura del link (*con `cards`*: Associa card / consegna)**
+
+1. NTAG215 nuovo, mai formattato: associarlo a un cliente di prova tenendo la card appoggiata dopo la
+   lettura. Esito atteso: scrittura e verifica senza passaggi in più, messaggio di riuscita, una vibrazione.
+   Annotare se per la verifica Chrome ha riletto la card da solo o se è servito riavvicinarla.
+2. Ripetere allontanando la card **durante** la scrittura: esito "card non scritta" (`io`). Annotare se la
+   card resta leggibile o se dà `readingerror` (card illeggibile) e se "Scrivi comunque" la ripara.
+3. Ripetere avvicinando una seconda card di prova al posto della prima: nessuna scrittura sulla seconda
+   (`wrong-card`).
+4. Con l'app aperta in home e la lettura attiva, appoggiare la card scritta: si apre Registra spesa, **non**
+   il browser.
+5. Con l'app in background (o su `/accedi`): Android apre la pagina dei punti. Annotare se nel browser o
+   nell'app installata.
+6. Da un **iPhone XS o successivo**, schermo sbloccato e nessuna app: appare la notifica che apre il link
+   alla pagina dei punti. Da un Android di un'altra persona: si apre il browser sulla pagina dei punti.
+7. Su iPhone (Safari o Chrome) l'app non scrive card (`canWrite` falso) e la ricerca funziona; sul tablet
+   (fase 3) il lettore USB legge soltanto.
+
+**Dove annotare l'esito**: una riga nella tabella qui sotto per ogni prova (data, telefono e versione di
+Chrome, criterio e passo, esito: ok / diverso, cosa è successo). Un comportamento di Chrome diverso da
+quello atteso diventa anche una trappola nuova al §4 e, se cambia un testo, una nota per il modulo `cards`
+(SPEC-card-input, domanda aperta 15). Quando i passi di un criterio sono tutti ok, segnarlo come verificato
+nella tabella dei criteri di `tasks/card-input/plan.md`.
+
+| Data | Telefono / Chrome | Criterio.passo | Esito | Note |
+|---|---|---|---|---|
+| — | — | — | — | nessuna prova ancora eseguita |
+
 ## 2. Controllo di salute
 
 `npm run typecheck && npm run lint && npm run format:check && npm test` e, con Supabase acceso,
@@ -201,3 +271,21 @@ staging poi produzione, mai `supabase config push`.
     (la chiave primaria) è `unknown`. E un `42501` con `permission denied for …` è un privilegio mancante
     (`misconfigured`, `src/lib/serverFault.ts`), non un operatore senza ruolo di amministratore: va
     controllato prima della traduzione in `forbidden`.
+39. L'adattatore e lo scrittore finti (`window.__enjoyFakeCard*`) entrano solo nella build con `VITE_E2E=1`
+    (quella degli E2E, impostata da `playwright.config.ts`). Una build così non va **mai** pubblicata:
+    `npm run build && npm run check:bundle` fallisce se `dist/` li contiene, e gira in CI e nel
+    `buildCommand` di Vercel. Dopo un `npm run e2e`, `dist/` è quella di prova: rifare `npm run build` prima
+    di controllare o pubblicare a mano.
+40. Chromium di Playwright non ha `NDEFReader` né il permesso `nfc`: gli E2E che vogliono vedere il riquadro
+    acceso usano `stubWebNfc(page, …)` di `e2e/nfc.ts` (via `addInitScript`, prima del caricamento della
+    pagina); le letture e le scritture passano da `window.__enjoyFakeCard(uid)` e `fakeCardWrites(page)`.
+41. Il primo `scan()` di Web NFC vuole un tocco dell'operatore (permesso `prompt` → "Attiva la lettura");
+    dopo il permesso, la lettura parte da sola a ogni avvio. Accendere l'NFC dalla tendina non cambia la
+    visibilità della pagina: la lettura riparte solo con "Riprova la lettura" (dalle impostazioni del
+    telefono invece riparte da sola al ritorno).
+42. Fino al modulo `cards` la home non consuma letture: una card appoggiata in home non fa nulla e non
+    vibra. Non è un guasto.
+43. Uid e URL letti o scritti non si stampano mai (`console.*` vietato in `src/features/card-input/`) e le API
+    del browser per le card (`NDEFReader`, `navigator.vibrate`, `permissions.query`, `keydown` su
+    `document`) restano nel modulo: lo controlla `scripts/cardInputBoundary.test.ts`, che controlla anche
+    che `fakeCardAdapter` sia importato solo da `main.tsx` dentro `if (import.meta.env.VITE_E2E === '1')`.

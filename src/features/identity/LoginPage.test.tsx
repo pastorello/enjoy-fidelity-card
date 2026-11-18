@@ -125,7 +125,7 @@ describe('protected pages', () => {
   it('show the page when signed in', async () => {
     renderApp('/', signedInFake());
     expect(
-      await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' }),
+      await screen.findByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }),
     ).toBeInTheDocument();
   });
 
@@ -138,7 +138,7 @@ describe('protected pages', () => {
 
   it('tell the user when the session has expired', async () => {
     const { fake } = renderApp('/', signedInFake());
-    await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' });
+    await screen.findByRole('searchbox', { name: 'Oppure cerca per nome o telefono' });
     fake.endSession();
     expect(await screen.findByText('La sessione è scaduta: accedi di nuovo.')).toHaveRole('status');
     expect(screen.getByRole('heading', { level: 1, name: 'Accedi' })).toBeInTheDocument();
@@ -177,7 +177,7 @@ describe('protected pages', () => {
     renderApp('/', fake);
     await userEvent.click(await screen.findByRole('button', { name: 'Riprova' }));
     expect(
-      await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' }),
+      await screen.findByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }),
     ).toBeInTheDocument();
   });
 });

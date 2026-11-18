@@ -22,7 +22,7 @@ describe('routes', () => {
       await screen.findByRole('heading', { level: 1, name: 'Enjoy Card' }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('searchbox', { name: 'Cerca per nome o telefono' }),
+      screen.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }),
     ).toBeInTheDocument();
   });
 

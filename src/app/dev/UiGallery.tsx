@@ -1,6 +1,8 @@
 // Development-only showcase of the shared components (route /dev/ui).
 // Fake data only: this repository is public.
 import { useState } from 'react';
+import { CardReadPanelView } from '../../features/card-input/CardReadPanel';
+import type { NfcStatus } from '../../features/card-input/cardReader';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { ListRow } from '../../shared/ui/ListRow';
@@ -10,6 +12,18 @@ import { StatusView } from '../../shared/ui/StatusView';
 import { TextField } from '../../shared/ui/TextField';
 import { AppShell } from '../AppShell';
 import styles from './UiGallery.module.css';
+
+const HOME_TITLE = 'Avvicina la card';
+const HOME_TEXT =
+  'Lettura attiva: appoggia la card sul retro del telefono. Una card nuova apre la registrazione del cliente.';
+const NFC_STATES: NfcStatus[] = [
+  'active',
+  'starting',
+  'needs-permission',
+  'off',
+  'denied',
+  'unsupported',
+];
 
 export function UiGallery() {
   const [search, setSearch] = useState('Rossi');
@@ -131,6 +145,35 @@ export function UiGallery() {
           description="Il telefono non è connesso a internet. L’importo resta qui: riprova appena torna la rete."
           onRetry={() => {}}
           retryLabel="Riprova +12"
+        />
+      </section>
+
+      <section className={styles.section} aria-labelledby="g-card">
+        <h2 id="g-card" className={styles.group}>
+          LETTURA CARD
+        </h2>
+        {NFC_STATES.map((status) => (
+          <CardReadPanelView
+            key={status}
+            title={HOME_TITLE}
+            description={HOME_TEXT}
+            status={status}
+            onStart={() => {}}
+          />
+        ))}
+        <CardReadPanelView
+          variant="compact"
+          title={HOME_TITLE}
+          description={HOME_TEXT}
+          status="active"
+          onStart={() => {}}
+        />
+        <CardReadPanelView
+          mode="usb"
+          title="Passa la card sul lettore"
+          description="L’app riceve il codice dal lettore da sola, senza bisogno di toccare un campo. Una card nuova apre la registrazione del cliente."
+          status="unsupported"
+          onStart={() => {}}
         />
       </section>
 
