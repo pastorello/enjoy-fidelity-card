@@ -113,9 +113,9 @@ sull'`operation_id`), registro delle chiamate, rete giù e "arrivato ma risposta
 `CardsServiceProvider` / `useCardsService()`; `main.tsx` con `supabaseCardsService`; `renderApp` con un
 parametro facoltativo in coda.
 **Accettazione:**
-- [ ] Unità del finto: stessi esiti di pgTAP per i casi principali (taken, idempotenza, sostituzione)
-- [ ] `useCardsService()` fuori dal provider lancia un errore chiaro
-- [ ] Tutti i test esistenti passano senza modifiche
+- [x] Unità del finto: stessi esiti di pgTAP per i casi principali (taken, idempotenza, sostituzione)
+- [x] `useCardsService()` fuori dal provider lancia un errore chiaro
+- [x] Tutti i test esistenti passano senza modifiche
 **Verifica:** `npm test`
 **Dipendenze:** 5 · **File:** src/test/fakeCardsService.ts (+ .test.ts),
 src/features/cards/CardsServiceProvider.tsx, src/main.tsx, src/test/renderApp.tsx · **Dimensione:** M
