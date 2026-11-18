@@ -183,12 +183,12 @@ e a `visibilitychange`; timer su `turnExpiresAt`. `SettingsProvider` e `CardRead
 la guardia con `key` = cassiere (nessuna lettura card su `/cassa`). Rotta `/cassa` (segnaposto fino al task
 13): operatore → `/`.
 **Accettazione:**
-- [ ] Componente: dispositivo senza cassiere su `/` → `/cassa`; turno scaduto al cambio di rotta e all'ora
+- [x] Componente: dispositivo senza cassiere su `/` → `/cassa`; turno scaduto al cambio di rotta e all'ora
       di scadenza (timer finti) → `/cassa` con il messaggio; `reportNotEnabled()` su dispositivo → `/cassa`,
       su operatore → `/accedi` (regressione identity)
-- [ ] Componente: su `/cassa` l'adattatore USB resta spento (`usb.enabled` falso); con turno valido acceso
+- [x] Componente: su `/cassa` l'adattatore USB resta spento (`usb.enabled` falso); con turno valido acceso
       con il formato delle impostazioni (criterio 5)
-- [ ] Turno chiuso da un nuovo PIN altrove → `/cassa` alla rotta successiva (criterio 4, con il finto)
+- [x] Turno chiuso da un nuovo PIN altrove → `/cassa` alla rotta successiva (criterio 4, con il finto)
 **Verifica:** `npm test -- RequireAuth RequireCashier routes`
 **Dipendenze:** 8, 10 · **File:** src/features/tablet-kiosk/RequireCashier.tsx (+ .test.tsx),
 src/features/identity/RequireAuth.tsx (+ .test.tsx), src/app/routes.tsx · **Dimensione:** M
