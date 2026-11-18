@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { supabaseRewardsService as service } from '../../src/features/rewards/supabaseRewardsService';
-import { localSupabase, memoryClient, runSql } from './localSupabase';
+import { localSupabase, memoryClient, runSql, runSqlInBackground } from './localSupabase';
 
 // The service under test talks to whichever signed-in client the test sets here.
 const current = vi.hoisted(() => ({ client: undefined as SupabaseClient | undefined }));
@@ -20,6 +20,8 @@ const SEED_PASSWORD = 'password-di-prova';
 const SUFFIX = randomBytes(4).toString('hex');
 const NAME = `Spremuta integrazione ${SUFFIX}`;
 const ID = randomUUID();
+// Rows the concurrency tests make, removed at the end like ID.
+const RACE_IDS: string[] = [];
 
 async function signedIn(email: string): Promise<SupabaseClient> {
   const client = memoryClient(local.url, local.publishableKey);
@@ -40,6 +42,7 @@ afterAll(() => {
   // The app can never delete a reward; the database owner removes this run's row so the catalog
   // the e2e suite checks stays the seed's.
   runSql(`delete from app.rewards where id = :'id'::uuid;`, { id: ID });
+  for (const id of RACE_IDS) runSql(`delete from app.rewards where id = :'id'::uuid;`, { id });
 });
 
 describe('admin', () => {
@@ -119,6 +122,56 @@ describe('admin', () => {
       ok: true,
       reward: { id: ID, name: `${NAME} grande`, points: 120, active: true },
     });
+  });
+});
+
+describe('concurrent creation', () => {
+  const HOLD_SECONDS = '1.5';
+
+  beforeAll(() => {
+    current.client = adminClient;
+  });
+
+  /**
+   * Inserts a reward in a transaction kept open for HOLD_SECONDS and resolves once the row is
+   * inserted (the session is sleeping); `done` settles when it has committed.
+   */
+  async function holdInsert(row: { id: string; name: string; points: number }) {
+    const marker = `race-${randomUUID()}`;
+    const done = runSqlInBackground(
+      `begin;
+       insert into app.rewards (id, name, points, active, created_by, updated_by)
+       select :'id'::uuid, :'name', :'points'::int, true, o.id, o.id
+       from app.operators o where o.role = 'admin' order by o.created_at limit 1;
+       select pg_sleep(${HOLD_SECONDS}) /* ${marker} */;
+       commit;`,
+      { id: row.id, name: row.name, points: String(row.points) },
+    );
+    await vi.waitFor(
+      () => {
+        const sleeping = runSql(
+          `select count(*) from pg_stat_activity
+           where pid <> pg_backend_pid() and query like '%pg_sleep%' and query like :'pattern';`,
+          { pattern: `%${marker}%` },
+        );
+        if (sleeping !== '1') throw new Error('The held transaction has not inserted its row yet');
+      },
+      { timeout: 2000, interval: 20 },
+    );
+    return { done };
+  }
+
+  it('a resend while the first request is still open returns the first row, not an error', async () => {
+    const id = randomUUID();
+    RACE_IDS.push(id);
+    const name = `Spremuta concorrente ${SUFFIX}`;
+    const { done } = await holdInsert({ id, name, points: 40 });
+
+    const resend = await service.create({ id, name, points: 40, active: true });
+    await done;
+
+    expect(resend).toEqual({ ok: true, reward: { id, name, points: 40, active: true } });
+    expect(runSql(`select count(*) from app.rewards where id = :'id'::uuid;`, { id })).toBe('1');
   });
 });
 
