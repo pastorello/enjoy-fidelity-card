@@ -51,6 +51,16 @@ export interface UsbInputAdapter {
   stop(): void;
 }
 
+/**
+ * The Web NFC reader (`createWebNfcAdapter`): besides reads it reports its status, and `restart()`
+ * starts the scan again from an operator's tap ("Attiva la lettura", "Riprova la lettura").
+ */
+export interface NfcInputAdapter {
+  start(ports: { deliver: DeliverRaw; setStatus: (status: NfcStatus) => void }): void;
+  stop(): void;
+  restart(): Promise<void>;
+}
+
 export type CardReaderOptions = {
   now: () => number;
   /** `navigator.vibrate` bound to navigator, when the browser has it. */
@@ -58,6 +68,8 @@ export type CardReaderOptions = {
   adapters: readonly CardInputAdapter[];
   /** The USB reader (`createKeyboardWedge`), started only while active with a non-null format. */
   usb?: UsbInputAdapter | undefined;
+  /** The Web NFC reader, started and stopped with the service. */
+  nfc?: NfcInputAdapter | undefined;
 };
 
 export type CardReader = {
@@ -68,6 +80,8 @@ export type CardReader = {
   setUsbFormat(format: UsbUidFormat | null): void;
   /** Puts the consumer on top of the stack; the returned function removes exactly that entry. */
   pushConsumer(consumer: CardConsumer): () => void;
+  /** Starts the Web NFC scan again from a tap; does nothing while the service is not active. */
+  start(): Promise<void>;
   getState(): CardReaderState;
   subscribe(listener: () => void): () => void;
 };
@@ -77,7 +91,13 @@ export type CardReader = {
  * read, drops repeats and invalid uids, and delivers each read to the consumer on top of the stack only.
  * It never logs: a uid identifies a customer's card.
  */
-export function createCardReader({ now, vibrate, adapters, usb }: CardReaderOptions): CardReader {
+export function createCardReader({
+  now,
+  vibrate,
+  adapters,
+  usb,
+  nfc,
+}: CardReaderOptions): CardReader {
   // Each push gets its own entry object, so removal is by identity even if a function is pushed twice.
   const stack: { consumer: CardConsumer }[] = [];
   const lastSeen = new Map<string, number>();
@@ -90,10 +110,25 @@ export function createCardReader({ now, vibrate, adapters, usb }: CardReaderOpti
     usb: { enabled: false, format: null, lastReadAt: null, lastInvalidAt: null },
   };
 
-  function setUsbState(patch: Partial<CardReaderState['usb']>) {
-    state = { ...state, usb: { ...state.usb, ...patch } };
+  function notify() {
     for (const listener of listeners) listener();
   }
+
+  function setUsbState(patch: Partial<CardReaderState['usb']>) {
+    state = { ...state, usb: { ...state.usb, ...patch } };
+    notify();
+  }
+
+  function setNfcStatus(status: NfcStatus) {
+    if (state.nfc === status) return;
+    state = { ...state, nfc: status };
+    notify();
+  }
+
+  // A status reported by an adapter that has been stopped meanwhile is stale.
+  const reportNfcStatus = (status: NfcStatus) => {
+    if (active) setNfcStatus(status);
+  };
 
   function updateUsb() {
     const enabled = active && usbFormat !== null;
@@ -137,6 +172,7 @@ export function createCardReader({ now, vibrate, adapters, usb }: CardReaderOpti
       if (!active) {
         active = true;
         for (const adapter of adapters) adapter.start({ deliver });
+        nfc?.start({ deliver, setStatus: reportNfcStatus });
       }
       updateUsb();
     },
@@ -145,6 +181,8 @@ export function createCardReader({ now, vibrate, adapters, usb }: CardReaderOpti
       active = false;
       lastSeen.clear();
       for (const adapter of adapters) adapter.stop();
+      nfc?.stop();
+      setNfcStatus('checking');
       updateUsb();
     },
     setUsbFormat(format) {
@@ -158,6 +196,9 @@ export function createCardReader({ now, vibrate, adapters, usb }: CardReaderOpti
         const index = stack.indexOf(entry);
         if (index !== -1) stack.splice(index, 1);
       };
+    },
+    async start() {
+      if (active) await nfc?.restart();
     },
     getState: () => state,
     subscribe(listener) {

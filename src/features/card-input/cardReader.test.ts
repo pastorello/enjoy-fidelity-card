@@ -7,6 +7,8 @@ import {
   type CardRead,
   type CardReaderOptions,
   type DeliverRaw,
+  type NfcInputAdapter,
+  type NfcStatus,
   type UsbInputAdapter,
 } from './cardReader';
 
@@ -550,5 +552,75 @@ describe('createCardReader: USB adapter (point 4)', () => {
 
     expect(reader.getState().usb).toMatchObject({ lastReadAt: 5_000, lastInvalidAt: 5_010 });
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+});
+
+function nfcSetup() {
+  const ports: { setStatus?: (status: NfcStatus) => void } = {};
+  const start = vi.fn<NfcInputAdapter['start']>((given) => {
+    ports.setStatus = given.setStatus;
+  });
+  const stop = vi.fn<NfcInputAdapter['stop']>();
+  const restart = vi.fn<NfcInputAdapter['restart']>(() => Promise.resolve());
+  const reader = createCardReader({ now: () => 0, adapters: [], nfc: { start, stop, restart } });
+  return { reader, ports, start, stop, restart };
+}
+
+describe('createCardReader: Web NFC adapter (point 3)', () => {
+  it('starts with activate(), stops with deactivate() and goes back to checking', () => {
+    const { reader, ports, start, stop } = nfcSetup();
+    expect(start).not.toHaveBeenCalled();
+
+    reader.activate({ usbFormat: null });
+    ports.setStatus?.('active');
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(reader.getState().nfc).toBe('active');
+
+    reader.deactivate();
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(reader.getState().nfc).toBe('checking');
+  });
+
+  it('ignores a status reported while the service is not active', () => {
+    const { reader, ports } = nfcSetup();
+    reader.activate({ usbFormat: null });
+    reader.deactivate();
+    const listener = vi.fn<() => void>();
+    reader.subscribe(listener);
+
+    ports.setStatus?.('active');
+
+    expect(reader.getState().nfc).toBe('checking');
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('notifies only when the status changes', () => {
+    const { reader, ports } = nfcSetup();
+    reader.activate({ usbFormat: null });
+    const listener = vi.fn<() => void>();
+    reader.subscribe(listener);
+
+    ports.setStatus?.('off');
+    ports.setStatus?.('off');
+
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it('start() restarts the scan only while active', async () => {
+    const { reader, restart } = nfcSetup();
+
+    await reader.start();
+    expect(restart).not.toHaveBeenCalled();
+
+    reader.activate({ usbFormat: null });
+    await reader.start();
+    expect(restart).toHaveBeenCalledTimes(1);
+  });
+
+  it('start() without a Web NFC adapter resolves and does nothing', async () => {
+    const { reader } = setup();
+    reader.activate({ usbFormat: null });
+
+    await expect(reader.start()).resolves.toBeUndefined();
   });
 });

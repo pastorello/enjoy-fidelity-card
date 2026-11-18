@@ -1,0 +1,186 @@
+import type { DeliverRaw, NfcInputAdapter, NfcStatus } from './cardReader';
+
+export type NfcPermission = 'granted' | 'prompt' | 'denied';
+
+/** The part of `NDEFReader` the adapter uses (a real `NDEFReader` satisfies it). */
+export interface NfcReaderLike {
+  onreading: ((event: NDEFReadingEvent) => void) | null;
+  onreadingerror: ((event: Event) => void) | null;
+  scan(options: { signal: AbortSignal }): Promise<void>;
+}
+
+/** Everything the adapter needs from the browser, so tests can run it with `fakeWebNfc`. */
+export interface WebNfcApi {
+  /** True only when `NDEFReader` exists (Chrome for Android over HTTPS). */
+  isSupported: () => boolean;
+  /** The `nfc` permission, or null when the browser cannot tell. */
+  queryPermission: () => Promise<NfcPermission | null>;
+  createReader: () => NfcReaderLike;
+  /** Calls `listener` each time the page becomes visible again; returns the remover. */
+  onVisible: (listener: () => void) => () => void;
+}
+
+/** The parts of `window` the real API uses; `window` itself satisfies it. */
+export type BrowserNfcHost = {
+  readonly NDEFReader?: NDEFReaderConstructor | undefined;
+  readonly navigator: {
+    readonly permissions: {
+      query(descriptor: { name: 'nfc' }): Promise<{ readonly state: PermissionState }>;
+    };
+  };
+  readonly document: {
+    readonly visibilityState: DocumentVisibilityState;
+    addEventListener(type: 'visibilitychange', listener: () => void): void;
+    removeEventListener(type: 'visibilitychange', listener: () => void): void;
+  };
+};
+
+/** The real `WebNfcApi` over a browser window. */
+export function createBrowserWebNfcApi(win: BrowserNfcHost): WebNfcApi {
+  return {
+    isSupported: () => typeof win.NDEFReader === 'function',
+    async queryPermission() {
+      try {
+        const status = await win.navigator.permissions.query({ name: 'nfc' });
+        return status.state;
+      } catch {
+        // Browsers without Web NFC do not know the 'nfc' permission (TypeError).
+        return null;
+      }
+    },
+    createReader() {
+      const NDEFReader = win.NDEFReader;
+      if (NDEFReader === undefined) throw new ReferenceError('NDEFReader is not available');
+      return new NDEFReader();
+    },
+    onVisible(listener) {
+      const doc = win.document;
+      const onChange = () => {
+        if (doc.visibilityState === 'visible') listener();
+      };
+      doc.addEventListener('visibilitychange', onChange);
+      return () => {
+        doc.removeEventListener('visibilitychange', onChange);
+      };
+    },
+  };
+}
+
+function errorName(error: unknown): string {
+  return typeof error === 'object' && error !== null && 'name' in error ? String(error.name) : '';
+}
+
+/** What a failed `scan()` means for the panel (SPEC-card-input, point 3). */
+function statusForScanError(error: unknown): NfcStatus {
+  switch (errorName(error)) {
+    case 'NotAllowedError':
+      return 'denied';
+    case 'NotSupportedError':
+      return 'unsupported';
+    default:
+      // NotReadableError (NFC off in the phone settings) and anything unexpected.
+      return 'off';
+  }
+}
+
+/**
+ * Card reading with Web NFC (SPEC-card-input, point 3). Scans by itself only when the permission is
+ * already granted; the first `scan()` comes from a tap (`restart`). Never two scans at once, and
+ * "torna qui": back on the page after NFC was off or denied, it scans again only if the permission
+ * is granted. Never logs: a serial number identifies a customer's card.
+ */
+export function createWebNfcAdapter(api: WebNfcApi): NfcInputAdapter {
+  type Ports = { deliver: DeliverRaw; setStatus: (status: NfcStatus) => void };
+  let ports: Ports | null = null;
+  let status: NfcStatus = 'checking';
+  let scan: AbortController | null = null;
+  let stopVisibility: (() => void) | null = null;
+
+  function setStatus(next: NfcStatus) {
+    status = next;
+    ports?.setStatus(next);
+  }
+
+  function abortScan() {
+    scan?.abort();
+    scan = null;
+  }
+
+  async function readPermission(): Promise<NfcPermission | null> {
+    try {
+      return await api.queryPermission();
+    } catch {
+      return null;
+    }
+  }
+
+  /** Starts a scan, stopping the running one first. `scan()` is called synchronously (user activation). */
+  async function runScan(): Promise<void> {
+    abortScan();
+    const controller = new AbortController();
+    scan = controller;
+    setStatus('starting');
+    try {
+      const reader = api.createReader();
+      reader.onreading = (event) => {
+        if (scan === controller) ports?.deliver(event.serialNumber, 'hex', 'web-nfc');
+      };
+      // An unreadable tag (damaged NDEF message, no uid) is ignored outside a write: the operator
+      // holds the card again or searches the customer by name.
+      reader.onreadingerror = () => {};
+      await reader.scan({ signal: controller.signal });
+      if (scan === controller) setStatus('active');
+    } catch (error) {
+      if (scan !== controller) return; // Aborted by us: a newer scan or stop() owns the status.
+      scan = null;
+      setStatus(statusForScanError(error));
+    }
+  }
+
+  /** At start: scan at once only with the permission granted, otherwise wait for a tap. */
+  async function startFromPermission(owner: Ports) {
+    const permission = await readPermission();
+    // Stopped, or a tap already started a scan, while the permission was being read.
+    if (ports !== owner || status !== 'checking') return;
+    if (permission === 'granted') await runScan();
+    else setStatus(permission === 'denied' ? 'denied' : 'needs-permission');
+  }
+
+  /** "torna qui": back on the page after NFC was off or the permission denied. */
+  async function retryOnReturn(owner: Ports) {
+    if (status !== 'off' && status !== 'denied') return;
+    const permission = await readPermission();
+    if (ports !== owner || (status !== 'off' && status !== 'denied')) return;
+    if (permission === 'granted') await runScan();
+    else if (permission === 'denied') setStatus('denied');
+    else setStatus('needs-permission');
+  }
+
+  return {
+    start(given) {
+      if (ports !== null) return;
+      const owner: Ports = { deliver: given.deliver, setStatus: given.setStatus };
+      ports = owner;
+      if (!api.isSupported()) {
+        setStatus('unsupported');
+        return;
+      }
+      setStatus('checking');
+      stopVisibility = api.onVisible(() => {
+        void retryOnReturn(owner);
+      });
+      void startFromPermission(owner);
+    },
+    stop() {
+      ports = null;
+      abortScan();
+      stopVisibility?.();
+      stopVisibility = null;
+      status = 'checking';
+    },
+    async restart() {
+      if (ports === null || status === 'unsupported') return;
+      await runScan();
+    },
+  };
+}
