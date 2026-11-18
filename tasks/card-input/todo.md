@@ -184,12 +184,12 @@ src/features/card-input/cardReader.ts, src/features/card-input/web-nfc.d.ts, src
 come la card attesa. `WRITE_TIMEOUT_MS` e `VERIFY_TIMEOUT_MS` (15 000) → `abort()` e `timeout`. Successo →
 `vibrate?.(80)`. `start()` durante una scrittura → `aborted`.
 **Accettazione:**
-- [ ] Unità (criterio 10): lettura con lo stesso URL → `ok` solo dopo la verifica; URL diverso →
+- [x] Unità (criterio 10): lettura con lo stesso URL → `ok` solo dopo la verifica; URL diverso →
       `verify-failed`; nessuna verifica in 15 s → `timeout` e `abort()`
-- [ ] Unità: altro uid durante `write()` → `abort()` e `wrong-card` con `otherUid`; altro uid con lo stesso
+- [x] Unità: altro uid durante `write()` → `abort()` e `wrong-card` con `otherUid`; altro uid con lo stesso
       URL in verifica → `wrong-card` con `otherUid`, senza → ignorato; `readingerror` in attesa →
       `unreadable` senza `write()`, con `allowUnreadable` → `write()`
-- [ ] Unità: fuori da una scrittura gli URL letti e le `readingerror` non arrivano ai consumatori; nessun URL
+- [x] Unità: fuori da una scrittura gli URL letti e le `readingerror` non arrivano ai consumatori; nessun URL
       in un `CardRead` né in console
 **Verifica:** `npm test -- webNfcWriter webNfcAdapter`
 **Dipendenze:** 9 · **File:** src/features/card-input/webNfcWriter.ts (+ .test.ts),
