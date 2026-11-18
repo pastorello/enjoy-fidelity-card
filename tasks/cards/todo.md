@@ -176,11 +176,11 @@ card di un cliente già registrato?…» → `/`); `NewCustomerPage` usa `create
 ignorato; `card_taken` → cliente non creato, avviso del punto 4 e «Continua senza card» (toglie `?card`, poi
 `create` con lo stesso `operation_id`). Scrittura del link: task 18.
 **Accettazione:**
-- [ ] Componente: riquadro con uid completo; `?card` non valido → form senza card; reinvio dopo rete con lo
+- [x] Componente: riquadro con uid completo; `?card` non valido → form senza card; reinvio dopo rete con lo
       **stesso** `operation_id` (criterio 7)
-- [ ] Componente: `card_taken` → avviso, dati del form intatti, «Continua senza card»; errori del form di
+- [x] Componente: `card_taken` → avviso, dati del form intatti, «Continua senza card»; errori del form di
       `customers` invariati
-- [ ] E2E (nasce `e2e/cards.spec.ts`): card sconosciuta in home → `/clienti/nuovo?card=` con il codice →
+- [x] E2E (nasce `e2e/cards.spec.ts`): card sconosciuta in home → `/clienti/nuovo?card=` con il codice →
       Salva → `/clienti/:id/spesa` col nome; Indietro non torna al form; la stessa card riletta in home →
       spesa del nuovo cliente entro 2 s, senza tocchi, nessuna voce in `__enjoyFakeCardWrites` (criteri 1, 2, 14)
 **Verifica:** `npm test -- NewCustomer && npm run e2e -- cards`
