@@ -225,9 +225,9 @@ CustomerForm.tsx, src/app/routes.tsx · **Dimensione:** M
 rete → dialogo aperto con "Dati non cancellati: controlla la connessione e riprova."; `forbidden` → "Solo un
 amministratore può cancellare i dati di un cliente."
 **Accettazione:**
-- [ ] Componenti: operatore non vede la sezione; admin conferma → home con messaggio; rete → dialogo
+- [x] Componenti: operatore non vede la sezione; admin conferma → home con messaggio; rete → dialogo
       aperto e nuovo tentativo; `forbidden` → messaggio
-- [ ] Nessuna cancellazione senza `ConfirmDialog`
+- [x] Nessuna cancellazione senza `ConfirmDialog`
 **Verifica:** `npm test`
 **Dipendenze:** 9, 13 · **File:** src/features/customers/AnonymizeSection.tsx (+ .module.css, .test.tsx),
 EditCustomerPage.tsx · **Dimensione:** M
