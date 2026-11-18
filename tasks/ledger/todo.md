@@ -363,9 +363,9 @@ MOVIMENTI (`h2`, 4 più recenti, righe non interattive con data relativa, "· an
 "Vedi tutti" → `/clienti/:id/movimenti`; vuoto "Ancora nessun movimento"; errore "Non riesco a caricare i
 movimenti" con "Riprova"; cliente cancellato: niente pulsanti, movimenti visibili.
 **Accettazione:**
-- [ ] Componente: 4 righe nell'ordine giusto, vuota, errore, cliente cancellato
-- [ ] `CustomerPage.test.tsx` di `customers` verde; ordine delle sezioni di cross-review §2
-- [ ] Impeccable pulito; confronto con Cliente
+- [x] Componente: 4 righe nell'ordine giusto, vuota, errore, cliente cancellato
+- [x] `CustomerPage.test.tsx` di `customers` verde; ordine delle sezioni di cross-review §2
+- [x] Impeccable pulito; confronto con Cliente
 **Verifica:** `npm test -- CustomerLedgerSection CustomerPage`
 **Dipendenze:** 7, 9 · **File:** src/features/ledger/useMovements.ts,
 src/features/ledger/CustomerLedgerSection.tsx (+ .module.css, .test.tsx), src/features/customers/CustomerPage.tsx
