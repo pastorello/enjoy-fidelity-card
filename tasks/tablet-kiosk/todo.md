@@ -96,12 +96,12 @@ has_pin`, in ordine alfabetico; altrimenti `42501`). Seed: dispositivi `cassa@ex
 `cassa-blocco@example.com` (riservato all'E2E del blocco), PIN finti per gli operatori del seed e un operatore
 riservato all'E2E del PIN dal telefono; password di prova del seed.
 **Accettazione:**
-- [ ] pgTAP: identità per operatore, dispositivo con e senza cassiere, turno scaduto (cassiere null),
+- [x] pgTAP: identità per operatore, dispositivo con e senza cassiere, turno scaduto (cassiere null),
       bloccato (`lock_seconds_left` > 0 anche in una nuova transazione: criterio 3 "ricaricando"), utente
       senza profilo → null
-- [ ] pgTAP: `list_cashiers` funziona senza cassiere, rifiuta un operatore; nessuna RPC restituisce
+- [x] pgTAP: `list_cashiers` funziona senza cassiere, rifiuta un operatore; nessuna RPC restituisce
       `pin_hash`
-- [ ] `npm run db:reset` applica seed senza errori; nessun dato reale, solo `@example.com`
+- [x] `npm run db:reset` applica seed senza errori; nessun dato reale, solo `@example.com`
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 4 · **File:** supabase/migrations/*_tablet_kiosk.sql, supabase/tests/tablet_kiosk.test.sql,
 supabase/seed.sql · **Dimensione:** M
