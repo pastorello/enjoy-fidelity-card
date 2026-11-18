@@ -129,6 +129,15 @@ describe('Enjoy Display glyph coverage', () => {
     );
   });
 
+  // ESPORTA DATI: only the two buttons are in Enjoy Display (the section title is in the condensed
+  // caps, the live region in the body font), so the Button rule already covers them.
+  it('reads the export buttons', () => {
+    const exportTexts = sourceFiles('src/features/export').flatMap((path) =>
+      displayStrings(readFileSync(path, 'utf8')).map((value) => value.trim()),
+    );
+    expect(exportTexts).toEqual(expect.arrayContaining(['Clienti CSV', 'Movimenti CSV']));
+  });
+
   it('uses only characters Enjoy Display has in display text', () => {
     const offenders = sourceFiles('src').flatMap((path) =>
       displayStrings(readFileSync(path, 'utf8'))

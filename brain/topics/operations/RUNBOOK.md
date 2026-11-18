@@ -222,6 +222,55 @@ Nessun uid, token, link o nome di cliente vero nelle note.
 rete, digitazione) e diventa una nota per il modulo, non una trappola. Quando tutti i passi sono ok,
 segnare i criteri come verificati in `tasks/ledger/plan.md`.
 
+### Prova manuale dell'esportazione (`export`, criterio 10)
+
+Gli E2E scaricano e leggono i due file in Chromium desktop (`e2e/export.spec.ts`); qui si prova solo ciò
+che dipende dal telefono vero: il download da PWA installata in Chrome Android e l'apertura del file in
+Excel o Fogli Google. Una volta per rilascio di `export`, con l'utente. Stesse condizioni delle prove
+sopra: **anteprima HTTPS della PR** (staging, mai produzione), account **amministratore** di prova, solo
+**clienti di prova** con nomi inventati (mai un cliente vero). Nessun nome, telefono, uid o codice
+copiato nelle note.
+
+**Preparazione** (sullo staging, dall'app): almeno un cliente di prova con un nome accentato (per esempio
+"Niccolò Àlvarez"), uno con telefono e card attiva, uno con una nota che inizia con `=` (per esempio
+`=1+1`), una spesa con centesimi (12,50 €), un riscatto e una spesa annullata dall'amministratore; un
+cliente di prova anonimizzato (Modifica cliente → "Cancella i dati del cliente").
+
+**Passi**
+
+1. Android, Chrome, PWA installata e aperta dalla home del telefono (non dal browser). Accedere come
+   amministratore → Impostazioni → in fondo "ESPORTA DATI" con "Clienti CSV" e "Movimenti CSV".
+2. Toccare "Clienti CSV": "Preparazione del file…", poi "Clienti esportati: N." e Chrome mostra il
+   download `enjoy-clienti-AAAA-MM-GG.csv` con la data di oggi. Annotare se il file finisce in Download e
+   se compare la notifica di Chrome.
+3. Toccare "Movimenti CSV": stesso esito con `enjoy-movimenti-AAAA-MM-GG.csv`.
+4. Aprire i due file dal telefono con **Excel** (o **Fogli Google**, importando con separatore `;`), oppure
+   inviarli a un computer con Excel in italiano e aprirli con doppio clic.
+5. Da un account **operatore** di prova: la sezione "ESPORTA DATI" non c'è.
+
+**Cosa controllare nei file**
+
+- Le colonne sono separate (nessuna riga intera in una sola cella) e le intestazioni sono in italiano,
+  nell'ordine di `SPEC-export.md` punto 5.
+- Gli **accenti** si leggono giusti ("Niccolò", non "NiccolÃ²"): il BOM UTF-8 funziona.
+- **Importo €** "12,50" ed **Euro per punto** "1,00" sono numeri (allineati a destra, sommabili); i
+  **punti** negativi del riscatto e della correzione sono numeri con il segno.
+- **Telefono** con il "+" e **Card attiva** con gli zeri iniziali, come testo (non in notazione
+  scientifica).
+- **Date** in `gg/mm/aaaa hh:mm:ss`, nell'ora italiana (confrontare con l'ora della spesa di prova).
+- La nota `=1+1` compare come testo `'=1+1` o `=1+1`, **mai** come il risultato `2`.
+- Il cliente anonimizzato ha Nome, Telefono, Note e Card attiva vuoti; nei movimenti la sua colonna
+  Cliente è vuota, ma codice, saldo e movimenti restano.
+- La spesa annullata ha "Annullato da" con il codice della correzione; la correzione ha "Annulla il
+  movimento" con il codice della spesa.
+
+**Dove annotare l'esito**: nella tabella della prova di `card-input` (sopra), criterio "export.10.passo"
+(per esempio "export.10.2"), con telefono, versione di Chrome e app usata per aprire il file (Excel,
+Fogli Google). Un file che non si scarica dalla PWA o che si apre con colonne o accenti sbagliati diventa
+una trappola al §4 e una nota per il modulo. Quando tutti i passi sono ok, segnare il criterio 10 come
+verificato in `tasks/export/plan.md`. **Dopo la prova**, cancellare i due file dai Download del telefono
+(il file Clienti contiene nomi e telefoni: SPEC-export, domanda aperta 10).
+
 ## 2. Controllo di salute
 
 `npm run typecheck && npm run lint && npm run format:check && npm test` e, con Supabase acceso,
