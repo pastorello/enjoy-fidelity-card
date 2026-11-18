@@ -126,7 +126,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: quality bar completa verde; test esistenti invariati
 
 ### Fase 3: Letture
-- [ ] Task 9: Home: card attiva → segnaposto Registra spesa, sconosciuta → Nuovo cliente, avvisi
+- [x] Task 9: Home: card attiva → segnaposto Registra spesa, sconosciuta → Nuovo cliente, avvisi
 - [ ] Task 10: Nuovo cliente da card nuova (`?card=`): riquadro «Card letta», salvataggio con card, `card_taken`
 - [ ] Task 11: Sezione «Card (facoltativa)» in Nuovo cliente senza card
 

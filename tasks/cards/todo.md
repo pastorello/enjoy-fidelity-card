@@ -159,10 +159,10 @@ senza nome; «Lettura della card…» con letture ignorate; rete «Card non lett
 «Riprova»; `not_operator` → `reportNotEnabled()`. `PurchasePlaceholderPage` su `/clienti/:id/spesa`
 («Registra spesa», «Indietro», riga cliente con nome e saldo).
 **Accettazione:**
-- [ ] Componente: i quattro esiti, letture ignorate durante la ricerca, «Riprova» ripete la stessa ricerca,
+- [x] Componente: i quattro esiti, letture ignorate durante la ricerca, «Riprova» ripete la stessa ricerca,
       una nuova card sostituisce l'avviso (criterio 6)
-- [ ] Componente: il percorso card attiva → spesa non chiama `issueLink` né `writeUrl` (criterio 14)
-- [ ] `HomePage.test.tsx` di `customers` verde; segnaposto con nome e saldo (l'E2E del criterio 1 è nel task 10)
+- [x] Componente: il percorso card attiva → spesa non chiama `issueLink` né `writeUrl` (criterio 14)
+- [x] `HomePage.test.tsx` di `customers` verde; segnaposto con nome e saldo (l'E2E del criterio 1 è nel task 10)
 **Verifica:** `npm test -- HomePage useHomeCardRead`
 **Dipendenze:** 6, 8 · **File:** src/features/cards/useHomeCardRead.ts (+ .test.tsx),
 src/features/cards/PurchasePlaceholderPage.tsx, src/features/customers/HomePage.tsx, src/app/routes.tsx
