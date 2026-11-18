@@ -34,8 +34,11 @@ export function OpenOwnerLink({ owner }: { owner: CardOwner | null }) {
   if (!owner || name === null) return null;
   return (
     <ButtonLink to={`/clienti/${owner.customerId}`} variant="secondary" block>
-      Apri la scheda di{' '}
-      <span className={NOT_IN_DISPLAY.test(name) ? styles.typedName : undefined}>{name}</span>
+      {/* One flex item: the button's gap must not widen the space before the name. */}
+      <span>
+        Apri la scheda di{' '}
+        <span className={NOT_IN_DISPLAY.test(name) ? styles.typedName : undefined}>{name}</span>
+      </span>
     </ButtonLink>
   );
 }

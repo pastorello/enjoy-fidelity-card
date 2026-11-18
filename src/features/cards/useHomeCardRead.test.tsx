@@ -118,9 +118,11 @@ describe('useHomeCardRead: a card read on the home', () => {
     expect(alert).toHaveTextContent(
       'Questa card non è più attiva: era di Maria Rossi. Cerca il cliente per nome o telefono.',
     );
-    expect(
-      within(cardPanel()).getByRole('link', { name: 'Apri la scheda di Maria' }),
-    ).toHaveAttribute('href', `/clienti/${MARIA.id}`);
+    const open = within(cardPanel()).getByRole('link', { name: 'Apri la scheda di Maria' });
+    expect(open).toHaveAttribute('href', `/clienti/${MARIA.id}`);
+    // One flex item: the button's gap never adds to the space before the name.
+    expect(open.childNodes).toHaveLength(1);
+    expect(open).toHaveTextContent(/^Apri la scheda di Maria$/);
     expect(router.state.location.pathname).toBe('/');
     // The search stays usable.
     expect(screen.getByRole('searchbox')).toBeEnabled();

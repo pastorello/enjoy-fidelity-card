@@ -343,7 +343,11 @@ describe('AssociateCardPage: what the association answers (SPEC-cards, point 4)'
     const fixture = setup();
     const { router } = await renderReading(fixture);
     tap(fixture, OF_ANTONIO.read);
-    await userEvent.click(await screen.findByRole('link', { name: 'Apri la scheda di Antonio' }));
+    const open = await screen.findByRole('link', { name: 'Apri la scheda di Antonio' });
+    // One flex item: the button's gap never adds to the space before the name.
+    expect(open.childNodes).toHaveLength(1);
+    expect(open).toHaveTextContent(/^Apri la scheda di Antonio$/);
+    await userEvent.click(open);
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${ANTONIO.id}`));
   });
 

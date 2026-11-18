@@ -27,8 +27,11 @@ export function homeCardNotice(read: HomeCardRead): CardReadNotice | null {
       text: `Questa card non è più attiva: era di ${read.customerName}. Cerca il cliente per nome o telefono.`,
       action: (
         <ButtonLink to={`/clienti/${read.customerId}`} variant="secondary" block>
-          Apri la scheda di{' '}
-          <span className={NOT_IN_DISPLAY.test(name) ? styles.typedName : undefined}>{name}</span>
+          {/* One flex item: the button's gap must not widen the space before the name. */}
+          <span>
+            Apri la scheda di{' '}
+            <span className={NOT_IN_DISPLAY.test(name) ? styles.typedName : undefined}>{name}</span>
+          </span>
         </ButtonLink>
       ),
     };
