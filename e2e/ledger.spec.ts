@@ -214,3 +214,104 @@ test.describe('Spesa non salvata', () => {
     ]);
   });
 });
+
+/**
+ * A customer created by the test, with 60 points from one purchase of 60,00 € (below the
+ * confirmation threshold of the seed, 150,00 €), on Riscatta premio. The rewards are the seed's of
+ * `rewards`, never modified: Caffè 50, Cornetto e cappuccino 100, Dolce del giorno 120 (inactive).
+ */
+async function customerWithPointsOnRedeem(page: Page, prefix: string) {
+  await stubWebNfc(page);
+  await signIn(page);
+  const customer = await customerWithCard(page, prefix, freshUid());
+  await expect(page.getByRole('heading', { level: 1, name: 'Registra spesa' })).toBeVisible();
+  await typeAmount(page, '6000');
+  await page.getByRole('button', { name: 'Conferma +60' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeVisible();
+
+  await page.goto(`/clienti/${customer.id}/premi`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Riscatta premio' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'CATALOGO' })).toBeVisible();
+  return customer;
+}
+
+test.describe('Riscatta premio', () => {
+  test('Caffè from the catalog: «Premio riscattato» and the balance down by 50; the inactive reward of the seed is not there (criterion 5)', async ({
+    page,
+    request,
+  }) => {
+    const customer = await customerWithPointsOnRedeem(page, 'Maria Premi E2E');
+    const catalog = page.getByRole('group', { name: 'CATALOGO' });
+
+    // Only the active rewards; the one above the balance is there but cannot be chosen.
+    await expect(catalog.getByRole('radio')).toHaveCount(4);
+    await expect(catalog).not.toContainText('Dolce del giorno');
+    await expect(catalog.getByRole('radio', { name: /^Cornetto e cappuccino/ })).toBeDisabled();
+    await expect(catalog).toContainText('Mancano 40 punti');
+    const coffee = catalog.getByRole('radio', { name: /^Caffè/ });
+    await expect(coffee).toBeEnabled();
+
+    // Every option of CATALOGO, and Premio libero, is a target of at least 48 px.
+    const options = await catalog.locator('label').all();
+    expect(options).toHaveLength(4);
+    const heights = await Promise.all(options.map(async (option) => option.boundingBox()));
+    heights.forEach((box) => expect(box?.height).toBeGreaterThanOrEqual(48));
+    await expectTouchTargets(page, [/^Premio libero/, 'Riscatta']);
+    await expect(page.getByRole('button', { name: 'Riscatta', exact: true })).toBeDisabled();
+
+    await coffee.check();
+    await expect(page.getByText('Saldo dopo il riscatto')).toBeVisible();
+    await expect(page.getByText('10 punti', { exact: true })).toBeVisible();
+    const redeem = page.getByRole('button', { name: 'Riscatta 50 punti' });
+    expect((await redeem.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    await redeem.click();
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Premio riscattato' })).toBeVisible();
+    await expect(page.getByText(`Caffè per ${customer.name} · −50 punti`)).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Nuovo saldo' })).toContainText('10');
+    await expectTouchTargets(page, [/^Annulla il riscatto · \d+ s$/]);
+
+    // One purchase and one redemption: the balance is their sum, 60 − 50.
+    const movements = await movementsOf(request, customer.id);
+    expect(movements).toEqual(
+      expect.arrayContaining([
+        { kind: 'purchase', amount_cents: 6000, points: 60, corrects_movement_id: null },
+        { kind: 'redemption', amount_cents: null, points: -50, corrects_movement_id: null },
+      ]),
+    );
+    expect(movements).toHaveLength(2);
+  });
+
+  test('Premio libero above the balance: «Saldo insufficiente» and Riscatta disabled (criterion 5)', async ({
+    page,
+    request,
+  }) => {
+    const customer = await customerWithPointsOnRedeem(page, 'Maria Libero E2E');
+    await page.getByRole('link', { name: /^Premio libero/ }).click();
+    await expect(page).toHaveURL(`/clienti/${customer.id}/premi?libero`);
+    await expect(page.getByRole('heading', { level: 1, name: 'Premio libero' })).toBeVisible();
+
+    await page.getByRole('textbox', { name: 'Descrizione del premio' }).fill('Dolce speciale');
+    await typeAmount(page, '61');
+    const points = page.getByRole('region', { name: 'Punti da scalare' });
+    await expect(points.getByRole('status')).toHaveText('61');
+    await expect(points.getByRole('alert')).toHaveText(
+      'Saldo insufficiente: Maria ha 60 punti e il saldo non può scendere sotto zero.',
+    );
+    const redeem = page.getByRole('button', { name: 'Riscatta 61 punti' });
+    await expect(redeem).toBeDisabled();
+    expect((await redeem.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+    await expectTouchTargets(page, ['Cancella ultima cifra']);
+
+    // Within the balance the alert goes and the button can be pressed; nothing was sent.
+    await page
+      .getByRole('group', { name: 'Tastierino numerico' })
+      .getByRole('button', { name: 'Cancella ultima cifra' })
+      .click();
+    await expect(points.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Riscatta 6 punti' })).toBeEnabled();
+    expect(await movementsOf(request, customer.id)).toEqual([
+      { kind: 'purchase', amount_cents: 6000, points: 60, corrects_movement_id: null },
+    ]);
+  });
+});
