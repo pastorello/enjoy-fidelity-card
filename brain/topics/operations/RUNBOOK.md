@@ -435,4 +435,6 @@ verificato in `tasks/export/plan.md`. **Dopo la prova**, cancellare i due file d
     "Card letta" creava il cliente senza card (test instabile di `NewCustomerCardSection`, CI 44321492570).
     I test lo provano con `renderHookThenFire` (`src/test/fireAfterCommit.tsx`), che chiama nello stesso
     commit, prima di `useEffect`. Restano in `useEffect` solo i ref del segnalatore `not_operator`, la cui
-    identità cambia senza cambiare comportamento.
+    identità cambia senza cambiare comportamento. Vale anche per chi riceve le letture: `useCardRead` mette e
+    toglie il consumatore in `useLayoutEffect`, così una card passata subito dopo che «Riprova» è apparso
+    (lettura riaccesa) non va persa e una passata appena parte il salvataggio (lettura spenta) non arriva.

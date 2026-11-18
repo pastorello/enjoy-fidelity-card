@@ -280,4 +280,36 @@ describe('useCardRead: the onRead of the screen on show', () => {
     expect(before).not.toHaveBeenCalled();
     expect(after).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }));
   });
+
+  it('a read right after the render that enables reading reaches it', async () => {
+    const { nfc, reader } = setup();
+    const onRead = vi.fn<(read: CardRead) => void>();
+    const hosted = renderHookThenFire(
+      ({ enabled }: { enabled: boolean }) => useCardRead(onRead, { enabled }),
+      { enabled: false },
+      { wrapper: ({ children }) => withProvider(reader, children) },
+    );
+    await activate(reader);
+
+    // A failed save ends: the form shows «Riprova» and reads are on again; a card arrives at once.
+    hosted.rerenderAndFire({ enabled: true }, () => nfc.read(UID));
+
+    expect(onRead).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }));
+  });
+
+  it('a read right after the render that disables reading does not reach it', async () => {
+    const { nfc, reader } = setup();
+    const onRead = vi.fn<(read: CardRead) => void>();
+    const hosted = renderHookThenFire(
+      ({ enabled }: { enabled: boolean }) => useCardRead(onRead, { enabled }),
+      { enabled: true },
+      { wrapper: ({ children }) => withProvider(reader, children) },
+    );
+    await activate(reader);
+
+    // The save starts: reads are off on screen, a card arrives before `useEffect` runs.
+    hosted.rerenderAndFire({ enabled: false }, () => nfc.read(UID));
+
+    expect(onRead).not.toHaveBeenCalled();
+  });
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useSyncExternalStore } from 'react';
 import { useLatest } from '../../lib/useLatest';
 import type { CardRead, CardReaderState } from './cardReader';
 import { useCardReader } from './CardReaderProvider';
@@ -7,6 +7,9 @@ import { useCardReader } from './CardReaderProvider';
  * Receives the card reads while this consumer is on top of the stack (SPEC-card-input, point 5): the
  * last one activated (mounted with `enabled` not false, or switched from false to true). Unmounting or
  * disabling removes exactly this entry. The latest `onRead` is always used, without subscribing again.
+ * The entry follows `enabled` in the layout phase, with the DOM: a read that lands after a commit but
+ * before its passive effects already finds reading on or off as the screen shows it (with `useEffect`
+ * a card read just after a failed save showed «Riprova» was dropped; RUNBOOK §4, trap 45).
  */
 export function useCardRead(
   onRead: (read: CardRead) => void,
@@ -15,7 +18,7 @@ export function useCardRead(
   const reader = useCardReader();
   // The onRead of the screen on show, even for a read before `useEffect` runs.
   const latest = useLatest(onRead);
-  useEffect(
+  useLayoutEffect(
     () => (enabled ? reader.pushConsumer((read) => latest.current(read)) : undefined),
     [reader, enabled, latest],
   );
