@@ -617,3 +617,233 @@ describe('PurchasePage: Annulla la spesa', () => {
     expect(screen.queryByRole('button', { name: /^Annulla la spesa/ })).not.toBeInTheDocument();
   });
 });
+
+const OFFLINE_TEXT =
+  'Il telefono non è connesso a internet. L’importo resta qui: riprova appena torna la rete. La spesa non verrà registrata due volte.';
+const SERVER_TEXT =
+  'Il server non ha risposto correttamente. Riprova: la spesa non verrà registrata due volte.';
+
+/** The operation ids `recordPurchase` received, in order. */
+function purchaseIds(ledger: ReturnType<typeof createFakeLedgerService>): string[] {
+  return ledger.service.recordPurchase.mock.calls.map(([input]) => input.operationId);
+}
+
+/** Types 12,50 € and taps "Conferma +12" with fake timers; the answer is the fake's to give. */
+async function confirmWithFakeTimers() {
+  await ready();
+  await press('1', '2', '5', '0');
+  vi.useFakeTimers();
+  fireEvent.click(screen.getByRole('button', { name: 'Conferma +12' }));
+  await advance(0);
+}
+
+function failure() {
+  return screen.getByRole('alert');
+}
+
+describe('PurchasePage: Spesa non salvata', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('network down: the alert of the wireframe instead of the keypad, amount and preview still there (criterion 4)', async () => {
+    const { ledger } = renderPurchase();
+    ledger.setNetworkDown(true);
+    await confirmWithFakeTimers();
+
+    expect(within(failure()).getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Spesa non salvata',
+    );
+    expect(failure()).toHaveTextContent(OFFLINE_TEXT);
+    expect(screen.queryByRole('group', { name: 'Tastierino numerico' })).not.toBeInTheDocument();
+    expect(amount()).toHaveTextContent('12,50 €');
+    expect(screen.getByText('+12')).toBeInTheDocument();
+    expect(
+      screen.getByText('1 punto ogni 1,00 €, per difetto · nuovo saldo 132 punti'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Annulla' })).toHaveAttribute('href', '/');
+    expect(screen.queryByRole('button', { name: /^Conferma/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Riscatta premio' })).not.toBeInTheDocument();
+    expect(ledger.movements()).toHaveLength(0);
+    // Nothing is resent on its own.
+    await advance(60_000);
+    expect(purchaseIds(ledger)).toHaveLength(1);
+
+    ledger.setNetworkDown(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova +12' }));
+    await advance(0);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeInTheDocument();
+    const ids = purchaseIds(ledger);
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).toBe(ids[0]);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('answer lost after the write: "Riprova" resends the same id, a single movement (criterion 4)', async () => {
+    const { ledger } = renderPurchase();
+    ledger.failNext('recordPurchase', 'lost');
+    await confirmWithFakeTimers();
+    expect(failure()).toHaveTextContent(OFFLINE_TEXT);
+    expect(ledger.movements()).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova +12' }));
+    await advance(0);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('132 punti');
+    const ids = purchaseIds(ledger);
+    expect(ids).toEqual([ids[0], ids[0]]);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('a double tap on "Riprova" is one call, and the alert stays while it is sent', async () => {
+    const { ledger } = renderPurchase();
+    ledger.setNetworkDown(true);
+    await confirmWithFakeTimers();
+    ledger.setNetworkDown(false);
+    const held = ledger.holdNext('recordPurchase');
+    const retry = screen.getByRole('button', { name: 'Riprova +12' });
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+    await advance(0);
+
+    expect(failure()).toHaveTextContent('Spesa non salvata');
+    expect(screen.queryByRole('group', { name: 'Tastierino numerico' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Riprova \+12/ })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    await act(async () => {
+      held.release();
+    });
+    await advance(0);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeInTheDocument();
+    expect(purchaseIds(ledger)).toHaveLength(2);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('no answer within 8 s: the same alert, then "Riprova" with the same id', async () => {
+    const { ledger } = renderPurchase();
+    ledger.failNext('recordPurchase', 'timeout');
+    await confirmWithFakeTimers();
+    await advance(7999);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Conferma \+12/ })).toHaveAttribute(
+      'aria-busy',
+      'true',
+    );
+    await advance(1);
+    expect(failure()).toHaveTextContent(OFFLINE_TEXT);
+    expect(ledger.movements()).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova +12' }));
+    await advance(0);
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeInTheDocument();
+    const ids = purchaseIds(ledger);
+    expect(ids[1]).toBe(ids[0]);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it.each([
+    ['unknown', 'unknown' as const],
+    ['a server fault (503)', new ServerFaultError('unavailable')],
+  ])('%s: the server text, "Riprova" with the same id', async (_label, error) => {
+    const { ledger } = renderPurchase();
+    ledger.failNext('recordPurchase', error);
+    await confirmWithFakeTimers();
+
+    expect(within(failure()).getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Spesa non salvata',
+    );
+    expect(failure()).toHaveTextContent(SERVER_TEXT);
+    expect(screen.queryByRole('group', { name: 'Tastierino numerico' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova +12' }));
+    await advance(0);
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeInTheDocument();
+    const ids = purchaseIds(ledger);
+    expect(ids[1]).toBe(ids[0]);
+  });
+
+  it('"Annulla" goes to the home and discards the id: the next purchase has a new one', async () => {
+    const { router, ledger } = renderPurchase();
+    ledger.setNetworkDown(true);
+    await confirmWithFakeTimers();
+    ledger.setNetworkDown(false);
+    fireEvent.click(screen.getByRole('link', { name: 'Annulla' }));
+    await advance(0);
+    expect(router.state.location.pathname).toBe('/');
+    expect(ledger.movements()).toHaveLength(0);
+
+    vi.useRealTimers();
+    await act(async () => {
+      await router.navigate(`/clienti/${MARIA.id}/spesa`);
+    });
+    await ready();
+    await press('1', '2', '5', '0');
+    await userEvent.click(screen.getByRole('button', { name: 'Conferma +12' }));
+    await screen.findByRole('heading', { level: 1, name: 'Spesa registrata' });
+    const ids = purchaseIds(ledger);
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).not.toBe(ids[0]);
+  });
+
+  it.each(['invalid', 'conflict'] as const)(
+    '%s: "Spesa non registrata: dati non validi. Ricomincia.", amount cleared, a new id after',
+    async (kind) => {
+      const { ledger } = renderPurchase();
+      ledger.failNext('recordPurchase', kind);
+      await confirmWithFakeTimers();
+
+      expect(failure()).toHaveTextContent('Spesa non registrata: dati non validi. Ricomincia.');
+      expect(amount()).toHaveTextContent('0,00 €');
+      expect(keypad()).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Riprova/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Conferma +0' })).toBeDisabled();
+
+      vi.useRealTimers();
+      await press('1', '2', '5', '0');
+      await userEvent.click(screen.getByRole('button', { name: 'Conferma +12' }));
+      await screen.findByRole('heading', { level: 1, name: 'Spesa registrata' });
+      const ids = purchaseIds(ledger);
+      expect(ids).toHaveLength(2);
+      expect(ids[1]).not.toBe(ids[0]);
+      expect(ledger.movements()).toHaveLength(1);
+    },
+  );
+
+  it('a definitive refusal after a "Riprova": back to the keypad, a new id after', async () => {
+    const { ledger } = renderPurchase();
+    ledger.setNetworkDown(true);
+    await confirmWithFakeTimers();
+    ledger.setNetworkDown(false);
+    ledger.failNext('recordPurchase', 'conflict');
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova +12' }));
+    await advance(0);
+
+    expect(failure()).toHaveTextContent('Spesa non registrata: dati non validi. Ricomincia.');
+    expect(keypad()).toBeInTheDocument();
+
+    vi.useRealTimers();
+    await press('5', '0', '0');
+    await userEvent.click(screen.getByRole('button', { name: 'Conferma +5' }));
+    await screen.findByRole('heading', { level: 1, name: 'Spesa registrata' });
+    const ids = purchaseIds(ledger);
+    expect(ids).toHaveLength(3);
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[0]);
+  });
+
+  it('customer-unavailable: "Cliente non trovato" with a link to the home', async () => {
+    const { ledger } = renderPurchase();
+    ledger.failNext('recordPurchase', 'customer-unavailable');
+    await confirmWithFakeTimers();
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Cliente non trovato' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Torna all’inizio' })).toHaveAttribute('href', '/');
+    expect(screen.queryByRole('group', { name: 'Tastierino numerico' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Riprova|^Conferma/ })).not.toBeInTheDocument();
+  });
+});

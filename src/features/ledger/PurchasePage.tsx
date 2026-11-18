@@ -15,13 +15,34 @@ import type { Settings } from '../settings/types';
 import { formatMovementDate, formatSignedPoints } from './formatMovement';
 import { AmountKeypad } from './AmountKeypad';
 import { LedgerDoneView } from './LedgerDoneView';
+import { LedgerFailure } from './LedgerFailure';
 import { useLedgerService } from './LedgerServiceProvider';
 import styles from './PurchasePage.module.css';
 import { formatConfirmAmount, isUnusualAmount, pointsFor } from './points';
 import { LedgerError, type LedgerResult } from './types';
-import { useOperation } from './useOperation';
+import { isDefinitive, useOperation } from './useOperation';
 
 const TITLE = 'Registra spesa';
+
+/**
+ * Why the outcome of a purchase is uncertain (SPEC-ledger, point 4): no answer (the network, or
+ * none within 8 s, which the service turns into `network`) or a fault of the server (5xx,
+ * `unknown`, anything unexpected). Either way "Riprova" resends the same operation id.
+ */
+type Uncertain = 'network' | 'server';
+
+const FAILURE_TITLE = 'Spesa non salvata';
+const FAILURE_TEXT: Record<Uncertain, string> = {
+  network:
+    'Il telefono non è connesso a internet. L’importo resta qui: riprova appena torna la rete. La spesa non verrà registrata due volte.',
+  server:
+    'Il server non ha risposto correttamente. Riprova: la spesa non verrà registrata due volte.',
+};
+const INVALID_TEXT = 'Spesa non registrata: dati non validi. Ricomincia.';
+
+function ledgerKind(error: unknown) {
+  return error instanceof LedgerError ? error.kind : null;
+}
 
 function pointsWord(points: number): string {
   return points === 1 ? 'punto' : 'punti';
@@ -125,16 +146,37 @@ function PurchaseDone({ customer, result }: { customer: CustomerSummary; result:
  */
 function usePurchase(customerId: string) {
   const [amountCents, setAmountCents] = useState(0);
+  // Set by each answer: kept while "Riprova" is being sent, so the alert stays in place.
+  const [uncertain, setUncertain] = useState<Uncertain | null>(null);
   const settings = useSettings();
   const service = useLedgerService();
   const { reportNotEnabled } = useAuth();
-  const operation = useOperation((operationId) =>
-    service.recordPurchase({ operationId, customerId, amountCents }),
-  );
-  const forbidden =
-    operation.status === 'error' &&
-    operation.error instanceof LedgerError &&
-    operation.error.kind === 'forbidden';
+  const operation = useOperation(async (operationId) => {
+    try {
+      return await service.recordPurchase({ operationId, customerId, amountCents });
+    } catch (error) {
+      if (!isDefinitive(error)) {
+        setUncertain(ledgerKind(error) === 'network' ? 'network' : 'server');
+      } else {
+        setUncertain(null);
+        // A refusal for good of these values ("Ricomincia"): the amount starts again from 0.
+        const kind = ledgerKind(error);
+        if (kind !== 'forbidden' && kind !== 'customer-unavailable') setAmountCents(0);
+      }
+      throw error;
+    }
+  });
+  const errorKind = operation.status === 'error' ? ledgerKind(operation.error) : null;
+  const forbidden = errorKind === 'forbidden';
+  const customerUnavailable = errorKind === 'customer-unavailable';
+  // "Spesa non salvata" while the outcome is uncertain and while "Riprova" is sent.
+  const failure =
+    (operation.status === 'error' && operation.retryable) ||
+    (operation.status === 'busy' && uncertain !== null)
+      ? uncertain
+      : null;
+  const invalid =
+    operation.status === 'error' && !operation.retryable && !forbidden && !customerUnavailable;
 
   useEffect(() => {
     if (forbidden) void reportNotEnabled();
@@ -145,7 +187,18 @@ function usePurchase(customerId: string) {
   const unusual =
     settings.status === 'ready' &&
     isUnusualAmount(amountCents, settings.settings.confirmThresholdCents);
-  return { amountCents, setAmountCents, settings, operation, forbidden, points, unusual };
+  return {
+    amountCents,
+    setAmountCents,
+    settings,
+    operation,
+    forbidden,
+    customerUnavailable,
+    failure,
+    invalid,
+    points,
+    unusual,
+  };
 }
 
 type Purchase = ReturnType<typeof usePurchase>;
@@ -156,8 +209,21 @@ type Purchase = ReturnType<typeof usePurchase>;
  * and "Conferma 1.250 €", which records at once: no second dialog.
  */
 function PurchaseActions({ customerId, purchase }: { customerId: string; purchase: Purchase }) {
-  const { settings, amountCents, setAmountCents, operation, points, unusual } = purchase;
+  const { settings, amountCents, setAmountCents, operation, failure, points, unusual } = purchase;
   const busy = operation.status === 'busy';
+  if (failure) {
+    // "Annulla" leaves the page, and the operation id with it (Open Question 4).
+    return (
+      <div className={styles.actions}>
+        <ButtonLink to="/" variant="secondary" block>
+          Annulla
+        </ButtonLink>
+        <Button block busy={busy} onClick={operation.retry}>
+          Riprova +{formatInteger(points)}
+        </Button>
+      </div>
+    );
+  }
   if (unusual) {
     return (
       <div className={styles.actions}>
@@ -199,7 +265,7 @@ function PurchaseBody({
   purchase: Purchase;
   onSettingsRetry: () => void;
 }) {
-  const { settings, amountCents, setAmountCents, operation, forbidden, points, unusual } = purchase;
+  const { settings, amountCents, setAmountCents, failure, invalid, points, unusual } = purchase;
   return (
     <>
       <CustomerRowLink customer={customer} />
@@ -219,12 +285,16 @@ function PurchaseBody({
       {settings.status === 'error' && (
         <StatusView kind="error" title="Impostazioni non caricate" onRetry={onSettingsRetry} />
       )}
-      {operation.status === 'error' && !forbidden && (
+      {invalid && (
         <p role="alert" className={styles.failure}>
-          Spesa non salvata: controlla la connessione e riprova.
+          {INVALID_TEXT}
         </p>
       )}
-      <AmountKeypad value={amountCents} onChange={setAmountCents} />
+      {failure ? (
+        <LedgerFailure title={FAILURE_TITLE} text={FAILURE_TEXT[failure]} />
+      ) : (
+        <AmountKeypad value={amountCents} onChange={setAmountCents} />
+      )}
     </>
   );
 }
@@ -259,7 +329,8 @@ export function PurchasePage() {
 
   let actions: ReactNode = null;
   let body: ReactNode;
-  if (load.status === 'not-found') {
+  // A customer gone meanwhile (deleted or erased: `customer-unavailable`) reads as not found.
+  if (load.status === 'not-found' || purchase.customerUnavailable) {
     actions = (
       <ButtonLink to="/" block>
         Torna all’inizio

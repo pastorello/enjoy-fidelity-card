@@ -24,7 +24,7 @@ export type Operation<T> = OperationState<T> & {
 };
 
 /** A refusal the server gave for good: resending the same id would answer it again. */
-function isDefinitive(error: unknown): boolean {
+export function isDefinitive(error: unknown): boolean {
   return error instanceof LedgerError && error.kind !== 'network' && error.kind !== 'unknown';
 }
 
