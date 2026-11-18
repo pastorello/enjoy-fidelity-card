@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { supabaseCardsService as cards } from '../../src/features/cards/supabaseCardsService';
 import { supabaseCustomerService as customers } from '../../src/features/customers/supabaseCustomerService';
 import { supabaseLedgerService as ledger } from '../../src/features/ledger/supabaseLedgerService';
 import { supabaseExportService as service } from '../../src/features/export/supabaseExportService';
@@ -83,6 +84,16 @@ function keyRowsOf(body: string): KeyRow[] {
 }
 
 const idsOf = (body: string) => keyRowsOf(body).map((row) => row.id);
+
+/** The rows of an export body, every field as the server wrote it. */
+function rowsOf(body: string): Record<string, unknown>[] {
+  const parsed: unknown = JSON.parse(body);
+  if (!Array.isArray(parsed)) throw new Error('An export body is not an array');
+  return parsed.map((row: unknown) => {
+    if (typeof row !== 'object' || row === null) throw new Error('An export row is not an object');
+    return Object.fromEntries(Object.entries(row));
+  });
+}
 
 /** Every page of an export RPC over HTTP (1000 rows each): the raw bodies, in order. */
 async function allRawPages(fn: ExportRpc): Promise<string[]> {
@@ -221,30 +232,57 @@ describe('an anonymized customer (criterion 5)', () => {
   // Plain ASCII, so the JSON body spells them exactly like this.
   const name = `Nome Riservato Export ${SUFFIX}`;
   const notes = `Nota riservata export ${SUFFIX}`;
+  // Fake Italian mobile number and card uid, random so that runs never collide.
+  const phoneDigits = `333${String(randomBytes(4).readUInt32BE() % 10_000_000).padStart(7, '0')}`;
+  const uid = `04${randomBytes(6).toString('hex').toUpperCase()}`;
   let customerId: string;
 
   beforeAll(async () => {
     const created = await as(operatorClient, () =>
-      customers.create({ operationId: randomUUID(), name, phone: '', privacyConsent: true, notes }),
+      customers.create({
+        operationId: randomUUID(),
+        name,
+        phone: phoneDigits,
+        privacyConsent: true,
+        notes,
+      }),
     );
     customerId = created.id;
+    await as(operatorClient, () => cards.associate(customerId, uid));
     await as(operatorClient, () =>
       ledger.recordPurchase({ operationId: randomUUID(), customerId, amountCents: 1250 }),
     );
     await as(adminClient, () => customers.anonymize(customerId));
   });
 
-  it('is in both exports, but its original name and notes are in no HTTP body', async () => {
+  it('is in both exports, with every personal field null in the HTTP bodies', async () => {
     const customerBodies = await allRawPages('export_customers');
     const movementBodies = await allRawPages('export_movements');
 
-    // The rows are there: the check below is not passing because they are missing.
-    expect(customerBodies.join('')).toContain(customerId);
-    expect(movementBodies.join('')).toContain(customerId);
+    // What the export functions themselves must hide: the anonymized row still holds a
+    // placeholder name ("Cliente cancellato …") and the card uid stays bound to it.
+    const theirRows = customerBodies.flatMap(rowsOf).filter((row) => row.id === customerId);
+    expect(theirRows).toHaveLength(1);
+    expect(theirRows[0]).toMatchObject({
+      name: null,
+      phone: null,
+      notes: null,
+      active_card_uid: null,
+    });
+    const theirMovements = movementBodies
+      .flatMap(rowsOf)
+      .filter((row) => row.customer_id === customerId);
+    expect(theirMovements).toHaveLength(1);
+    expect(theirMovements[0]).toMatchObject({ customer_name: null });
+
+    const placeholder = `Cliente cancellato ${customerId.slice(0, 8)}`;
     for (const body of [...customerBodies, ...movementBodies]) {
       // Booleans, so a failure does not print every row of the stack.
       expect(body.includes(name), 'original name in an HTTP body').toBe(false);
       expect(body.includes(notes), 'original notes in an HTTP body').toBe(false);
+      expect(body.includes(phoneDigits), 'phone in an HTTP body').toBe(false);
+      expect(body.includes(uid), 'card uid in an HTTP body').toBe(false);
+      expect(body.includes(placeholder), 'anonymized placeholder name in an HTTP body').toBe(false);
     }
   });
 
