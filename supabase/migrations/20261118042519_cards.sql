@@ -576,3 +576,50 @@ $$;
 
 revoke execute on function app.confirm_card_link(uuid, text) from public, anon;
 grant execute on function app.confirm_card_link(uuid, text) to authenticated;
+
+-- card_points ----------------------------------------------------------------------------------
+-- The public page /s/<token>: the points of the card whose confirmed link is this
+-- token, for anyone (anon key, no account). The only function anon may run; it
+-- sits in public because app is closed to anon. It answers only an integer or
+-- null: never an error, never a name, id, uid or date, and the same null for a
+-- token that never existed, is only pending, belongs to a deactivated card or to
+-- an anonymized customer. It writes nothing and logs nothing.
+create function public.card_points(p_token text)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_customer_id uuid;
+  v_balance integer;
+begin
+  -- PostgREST turns this into a response header: no browser or proxy keeps it.
+  perform set_config('response.headers', '[{"Cache-Control": "no-store"}]', true);
+
+  if p_token is null or p_token !~ '^[A-Za-z0-9_-]{22}$' then
+    return null;
+  end if;
+
+  select c.customer_id into v_customer_id
+  from private.card_links l
+  join app.cards c on c.id = l.card_id and c.active
+  join app.customers cu on cu.id = c.customer_id and cu.anonymized_at is null
+  where l.token_hash = private.card_token_hash(p_token);
+  if not found then
+    return null;
+  end if;
+
+  -- The balance has one definition, private.customer_balance from the ledger
+  -- module. Until that module exists there are no movements, so it is 0.
+  if to_regprocedure('private.customer_balance(uuid)') is null then
+    return 0;
+  end if;
+  execute 'select private.customer_balance($1)::integer' into strict v_balance using v_customer_id;
+  return v_balance;
+end;
+$$;
+
+revoke execute on function public.card_points(text) from public;
+grant execute on function public.card_points(text) to anon, authenticated;
