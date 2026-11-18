@@ -1,0 +1,324 @@
+import { act, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import { createFakeCardsService } from '../../test/fakeCardsService';
+import { createTestCardReader } from '../../test/fakeCardReader';
+import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
+import { createFakeLedgerService } from '../../test/fakeLedgerService';
+import { createFakeRewardsService, fakeReward } from '../../test/fakeRewardsService';
+import { createFakeSettingsService } from '../../test/fakeSettingsService';
+import { renderApp, signedInFake } from '../../test/renderApp';
+
+const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393330004521', balance: 120 });
+const ERASED = fakeCustomer({
+  name: 'cancellato-7f3a',
+  anonymizedAt: '2026-11-17T09:00:00.000Z',
+  balance: 40,
+});
+const MISSING_ID = '00000000-0000-4000-8000-00000000dead';
+
+// The catalog of the wireframe "Riscatta premio", given out of order, plus an inactive reward.
+const COLAZIONE = fakeReward({ name: 'Colazione per due', points: 180 });
+const CAFFE = fakeReward({ name: 'Caffè', points: 50 });
+const APERITIVO = fakeReward({ name: 'Aperitivo', points: 200 });
+const CORNETTO = fakeReward({ name: 'Cornetto e cappuccino', points: 100 });
+const SPENTO = fakeReward({ name: 'Premio spento', points: 10, active: false });
+const CATALOG = [COLAZIONE, CAFFE, APERITIVO, CORNETTO, SPENTO];
+
+type Options = {
+  path?: string;
+  auth?: ReturnType<typeof signedInFake>;
+  customers?: ReturnType<typeof createFakeCustomerService>;
+  rewards?: ReturnType<typeof createFakeRewardsService>;
+};
+
+function renderRedeem({
+  path = `/clienti/${MARIA.id}/premi`,
+  auth = signedInFake(),
+  customers = createFakeCustomerService({ customers: [MARIA, ERASED] }),
+  rewards = createFakeRewardsService({ rewards: CATALOG }),
+}: Options = {}) {
+  const settings = createFakeSettingsService();
+  const ledger = createFakeLedgerService({ customers, rewards, settings });
+  const rendered = renderApp(
+    path,
+    auth,
+    settings,
+    customers,
+    rewards,
+    createTestCardReader(),
+    createFakeCardsService({ customers }),
+    ledger,
+  );
+  return { ...rendered, auth, customers, rewards, ledger };
+}
+
+function catalog() {
+  return screen.getByRole('group', { name: 'CATALOGO' });
+}
+
+async function ready() {
+  return screen.findByRole('group', { name: 'CATALOGO' });
+}
+
+function redeemButton() {
+  return screen.getByRole('button', { name: /^Riscatta/ });
+}
+
+/** The operation ids of the redemptions sent, in order. */
+function sentIds(ledger: ReturnType<typeof createFakeLedgerService>) {
+  return ledger.service.redeemReward.mock.calls.map(([input]) => input.operationId);
+}
+
+describe('RedeemPage: Riscatta premio', () => {
+  it('header, the customer row, CATALOGO with the active rewards in order and "Premio libero"', async () => {
+    renderRedeem();
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Riscatta premio' }),
+    ).toBeInTheDocument();
+    const row = await screen.findByRole('link', { name: /Maria Rossi/ });
+    expect(row).toHaveAttribute('href', `/clienti/${MARIA.id}`);
+    expect(row).toHaveTextContent('120 pt');
+
+    await ready();
+    const radios = within(catalog()).getAllByRole('radio');
+    expect(radios.map((radio) => radio.closest('label')?.textContent)).toEqual([
+      expect.stringContaining('Caffè'),
+      expect.stringContaining('Cornetto e cappuccino'),
+      expect.stringContaining('Colazione per due'),
+      expect.stringContaining('Aperitivo'),
+    ]);
+    expect(screen.queryByText('Premio spento')).not.toBeInTheDocument();
+    expect(within(catalog()).getByRole('radio', { name: /Caffè/ })).toHaveAccessibleName(
+      /50 punti/,
+    );
+    expect(within(catalog()).getByText('100 pt')).toBeInTheDocument();
+
+    const free = screen.getByRole('link', { name: /Premio libero/ });
+    expect(free).toHaveAttribute('href', `/clienti/${MARIA.id}/premi?libero`);
+    expect(free).toHaveTextContent('Descrizione e punti decisi al momento');
+  });
+
+  it('rewards above the balance stay visible but disabled, with "Mancano N punti"', async () => {
+    renderRedeem();
+    await ready();
+    expect(screen.getByRole('radio', { name: /Caffè/ })).toBeEnabled();
+    expect(screen.getByRole('radio', { name: /Cornetto e cappuccino/ })).toBeEnabled();
+    const colazione = screen.getByRole('radio', { name: /Colazione per due/ });
+    expect(colazione).toBeDisabled();
+    expect(colazione).toHaveAccessibleName(/Mancano 60 punti/);
+    const aperitivo = screen.getByRole('radio', { name: /Aperitivo/ });
+    expect(aperitivo).toBeDisabled();
+    expect(aperitivo).toHaveAccessibleName(/Mancano 80 punti/);
+    expect(screen.getAllByText(/^Mancano \d+ punti$/)).toHaveLength(2);
+  });
+
+  it('a reward worth exactly the balance can be chosen (balance after 0)', async () => {
+    const exact = fakeReward({ name: 'Esatto', points: 120 });
+    renderRedeem({ rewards: createFakeRewardsService({ rewards: [exact] }) });
+    await ready();
+    await userEvent.click(screen.getByRole('radio', { name: /Esatto/ }));
+    expect(screen.getByText('Saldo dopo il riscatto').parentElement).toHaveTextContent(
+      'Saldo dopo il riscatto0 punti',
+    );
+    expect(screen.getByRole('button', { name: 'Riscatta 120 punti' })).toBeEnabled();
+  });
+
+  it('"Riscatta" is disabled until a reward is chosen; then the balance after and "Riscatta N punti"', async () => {
+    renderRedeem();
+    await ready();
+    expect(redeemButton()).toHaveAccessibleName('Riscatta');
+    expect(redeemButton()).toBeDisabled();
+    expect(screen.queryByText('Saldo dopo il riscatto')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Cornetto e cappuccino/ }));
+    expect(screen.getByRole('radio', { name: /Cornetto e cappuccino/ })).toBeChecked();
+    expect(screen.getByText('Saldo dopo il riscatto').parentElement).toHaveTextContent(
+      'Saldo dopo il riscatto20 punti',
+    );
+    expect(screen.getByRole('button', { name: 'Riscatta 100 punti' })).toBeEnabled();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Caffè/ }));
+    expect(screen.getByText('Saldo dopo il riscatto').parentElement).toHaveTextContent(
+      'Saldo dopo il riscatto70 punti',
+    );
+    expect(screen.getByRole('button', { name: 'Riscatta 50 punti' })).toBeEnabled();
+  });
+
+  it('"Riscatta N punti" redeems the chosen reward once, then "Premio riscattato"', async () => {
+    const { ledger } = renderRedeem();
+    await ready();
+    await userEvent.click(screen.getByRole('radio', { name: /Cornetto e cappuccino/ }));
+    await userEvent.dblClick(screen.getByRole('button', { name: 'Riscatta 100 punti' }));
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Premio riscattato' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Cornetto e cappuccino per Maria Rossi · −100 punti')).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('20 punti');
+    expect(ledger.service.redeemReward).toHaveBeenCalledTimes(1);
+    expect(ledger.service.redeemReward).toHaveBeenCalledWith(
+      expect.objectContaining({ customerId: MARIA.id, rewardId: CORNETTO.id }),
+    );
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('an empty catalog: "Nessun premio nel catalogo" and "Premio libero" stays', async () => {
+    renderRedeem({ rewards: createFakeRewardsService() });
+    expect(await screen.findByText('Nessun premio nel catalogo')).toBeInTheDocument();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Premio libero/ })).toHaveAttribute(
+      'href',
+      `/clienti/${MARIA.id}/premi?libero`,
+    );
+    expect(screen.queryByRole('button', { name: /^Riscatta/ })).not.toBeInTheDocument();
+  });
+
+  it('a catalog load error: "Riprova" loads again and "Premio libero" stays available', async () => {
+    const rewards = createFakeRewardsService({ rewards: CATALOG });
+    rewards.failNext('listActive', 'network');
+    renderRedeem({ rewards });
+    expect(await screen.findByText('Catalogo non caricato')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Premio libero/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Riscatta/ })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await ready();
+    expect(screen.getAllByRole('radio')).toHaveLength(4);
+    expect(rewards.service.listActive).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('RedeemPage: refusals that reload', () => {
+  it('reward-unavailable: "Premio non più disponibile", the catalog reloads and the id is discarded', async () => {
+    const rewards = createFakeRewardsService({ rewards: CATALOG });
+    const { ledger } = renderRedeem({ rewards });
+    await ready();
+    await userEvent.click(screen.getByRole('radio', { name: /Cornetto e cappuccino/ }));
+    // Another admin switches it off meanwhile.
+    await rewards.service.setActive(CORNETTO.id, false);
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 100 punti' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Premio non più disponibile');
+    await waitFor(() =>
+      expect(screen.queryByRole('radio', { name: /Cornetto/ })).not.toBeInTheDocument(),
+    );
+    expect(rewards.service.listActive).toHaveBeenCalledTimes(2);
+    expect(redeemButton()).toBeDisabled();
+    expect(screen.queryByText('Saldo dopo il riscatto')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Caffè/ }));
+    expect(screen.queryByText('Premio non più disponibile')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 50 punti' }));
+    await screen.findByRole('heading', { level: 1, name: 'Premio riscattato' });
+
+    const ids = sentIds(ledger);
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).not.toBe(ids[0]);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('insufficient-balance: the message, the balance reloaded and the id discarded', async () => {
+    const customers = createFakeCustomerService({ customers: [MARIA, ERASED] });
+    const { ledger } = renderRedeem({ customers });
+    await ready();
+    await userEvent.click(screen.getByRole('radio', { name: /Cornetto e cappuccino/ }));
+    // Another operator spends 60 points of Maria meanwhile.
+    customers.applyMovement(MARIA.id, -60, '2026-11-18T09:00:00.000Z');
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 100 punti' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Saldo insufficiente: il saldo è cambiato, controlla e riprova.',
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('link', { name: /Maria Rossi/ })).toHaveTextContent('60 pt'),
+    );
+    const cornetto = screen.getByRole('radio', { name: /Cornetto e cappuccino/ });
+    expect(cornetto).toBeDisabled();
+    expect(cornetto).not.toBeChecked();
+    expect(cornetto).toHaveAccessibleName(/Mancano 40 punti/);
+    expect(redeemButton()).toBeDisabled();
+
+    await userEvent.click(screen.getByRole('radio', { name: /Caffè/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 50 punti' }));
+    await screen.findByRole('heading', { level: 1, name: 'Premio riscattato' });
+    const ids = sentIds(ledger);
+    expect(ids).toHaveLength(2);
+    expect(ids[1]).not.toBe(ids[0]);
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('10 punti');
+  });
+});
+
+describe('RedeemPage: common states', () => {
+  it.each([
+    ['a customer that does not exist', `/clienti/${MISSING_ID}/premi`],
+    ['an id that is not a uuid', '/clienti/abc/premi'],
+  ])('%s: "Cliente non trovato" with a link to the home', async (_, path) => {
+    renderRedeem({ path });
+    expect(await screen.findByText('Cliente non trovato')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Riscatta premio' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Torna all’inizio' })).toHaveAttribute('href', '/');
+    expect(screen.queryByRole('group', { name: 'CATALOGO' })).not.toBeInTheDocument();
+  });
+
+  it('a customer load error: the message and "Riprova"', async () => {
+    const customers = createFakeCustomerService({ customers: [MARIA] });
+    customers.failNext('get', 'network');
+    renderRedeem({ customers });
+    expect(await screen.findByText('Cliente non caricato')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await ready();
+  });
+
+  it('an erased customer: no rewards, a link to the page', async () => {
+    renderRedeem({ path: `/clienti/${ERASED.id}/premi` });
+    expect(
+      await screen.findByText('Cliente cancellato: non si registrano spese né premi.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Torna alla scheda' })).toHaveAttribute(
+      'href',
+      `/clienti/${ERASED.id}`,
+    );
+    expect(screen.queryByRole('group', { name: 'CATALOGO' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Premio libero/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('cancellato-7f3a')).not.toBeInTheDocument();
+  });
+
+  it('customer-unavailable on "Riscatta" (erased meanwhile): "Cliente non trovato"', async () => {
+    const { ledger } = renderRedeem();
+    await ready();
+    await userEvent.click(screen.getByRole('radio', { name: /Caffè/ }));
+    ledger.failNext('redeemReward', 'customer-unavailable');
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 50 punti' }));
+    expect(await screen.findByText('Cliente non trovato')).toBeInTheDocument();
+    expect(ledger.movements()).toHaveLength(0);
+  });
+
+  it('forbidden on "Riscatta": back to /accedi', async () => {
+    const auth = signedInFake();
+    const { router, ledger } = renderRedeem({ auth });
+    await ready();
+    await userEvent.click(screen.getByRole('radio', { name: /Caffè/ }));
+    ledger.failNext('redeemReward', 'forbidden');
+    auth.removeProfile();
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 50 punti' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    expect(ledger.movements()).toHaveLength(0);
+  });
+
+  it('while a redemption is sent the button is busy and the choice is locked', async () => {
+    const { ledger } = renderRedeem();
+    await ready();
+    await userEvent.click(screen.getByRole('radio', { name: /Caffè/ }));
+    const held = ledger.holdNext('redeemReward');
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 50 punti' }));
+    expect(screen.getByRole('radio', { name: /Cornetto/ })).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 50 punti' }));
+    await act(async () => {
+      held.release();
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Premio riscattato' });
+    expect(ledger.service.redeemReward).toHaveBeenCalledTimes(1);
+  });
+});

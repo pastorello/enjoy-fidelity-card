@@ -17,8 +17,11 @@ export type CustomerState =
   | { status: 'not-found' }
   | { status: 'error'; error: unknown };
 
-/** The state, and `retry` to load again at once (after an error). */
-export type CustomerLoad = CustomerState & { retry: () => void };
+/**
+ * The state, `retry` to load again at once (after an error), and `refresh` to ask the server
+ * again while the customer shown stays until the answer replaces it (a failed refresh keeps it).
+ */
+export type CustomerLoad = CustomerState & { retry: () => void; refresh: () => void };
 
 /**
  * Loads one customer, anonymized ones included. An answer for an id the page has since left is
@@ -62,9 +65,29 @@ export function useCustomer(id: string): CustomerLoad {
 
   const retry = useCallback(() => setAttempt((count) => count + 1), []);
 
+  const refresh = useCallback(() => {
+    if (!valid) return;
+    service.get(id).then(
+      (customer) => {
+        // Dropped when the page has meanwhile moved to another id or attempt.
+        setLoaded((shown) =>
+          shown?.key === key
+            ? {
+                key,
+                state: customer === null ? { status: 'not-found' } : { status: 'done', customer },
+              }
+            : shown,
+        );
+      },
+      (error: unknown) => {
+        reportNotOperator.current(error);
+      },
+    );
+  }, [service, id, valid, key]);
+
   let state: CustomerState;
   if (!valid) state = { status: 'not-found' };
   else if (loaded?.key === key) state = loaded.state;
   else state = { status: 'loading' };
-  return { ...state, retry };
+  return { ...state, retry, refresh };
 }
