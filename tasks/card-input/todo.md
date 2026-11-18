@@ -239,12 +239,12 @@ e2e/card-input.spec.ts · **Dimensione:** M
 del design system, `Icon name="nfc"`, token, regione `aria-live="polite"`. Tutti gli stati in `/dev/ui`.
 `CardReadPanel: ['title']` in `scripts/displayGlyphs.test.ts`.
 **Accettazione:**
-- [ ] Componente (criteri 2, 3 e 4): con `fakeWebNfc` in ogni stato testi giusti, pulsante presente o
+- [x] Componente (criteri 2, 3 e 4): con `fakeWebNfc` in ogni stato testi giusti, pulsante presente o
       assente, `start()` al tocco; `prompt` → "Attiva la lettura" → attivo; `NotReadableError` → "Lettura
       card spenta" e ritorno ad attivo su `visibilitychange` con `granted`; `unsupported` senza pulsante
-- [ ] Componente: regione live che annuncia il cambio; variante `usb` con i testi del consumatore e senza
+- [x] Componente: regione live che annuncia il cambio; variante `usb` con i testi del consumatore e senza
       stati di permesso; `compact` vuota fuori da `active`
-- [ ] Impeccable pulito su `src/features/card-input`; pulsanti ≥ 48 px (56 px); `displayGlyphs` verde
+- [x] Impeccable pulito su `src/features/card-input`; pulsanti ≥ 48 px (56 px); `displayGlyphs` verde
 **Verifica:** `npm test -- CardReadPanel displayGlyphs`; `/dev/ui` a 390×844
 **Dipendenze:** 5, 11 · **File:** src/features/card-input/CardReadPanel.tsx (+ .module.css, .test.tsx),
 src/app/dev/UiGallery.tsx, scripts/displayGlyphs.test.ts · **Dimensione:** M

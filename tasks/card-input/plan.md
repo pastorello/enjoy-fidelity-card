@@ -94,7 +94,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint C: tutti i casi di scrittura della spec con test di unità; revisione `security-and-hardening` (mai `makeReadOnly`, URL mai fuori dal modulo)
 
 ### Fase 4: Riquadro e home
-- [ ] Task 13: `CardReadPanel` in ogni stato, varianti `usb` e `compact`, `/dev/ui`
+- [x] Task 13: `CardReadPanel` in ogni stato, varianti `usb` e `compact`, `/dev/ui`
 - [ ] Task 14: Riquadro nella home ed E2E di `card-input`
 
 ### Checkpoint D: Impeccable pulito; confronto con i wireframe Cerca cliente, Lettura card: primo avvio, Lettura card spenta e Ricerca senza risultati a 390×844
