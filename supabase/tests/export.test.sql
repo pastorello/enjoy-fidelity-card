@@ -1,9 +1,9 @@
--- export: app.export_customers, the admin-only CSV source of the customers file
--- (SPEC-export.md, "Modello dati e regole di accesso"). Fake data only: invented
--- names, @example.com emails and uids.
+-- export: app.export_customers and app.export_movements, the admin-only CSV sources
+-- of the customers and movements files (SPEC-export.md, "Modello dati e regole di
+-- accesso"). Fake data only: invented names, @example.com emails and uids.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(32);
+select plan(64);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -88,6 +88,35 @@ end;
 $$;
 grant execute on function public.export_test_all_customer_ids(int) to authenticated;
 
+-- The same for the movements, with the (created_at, id) cursor of the last row.
+create function public.export_test_all_movement_ids(p_limit int)
+returns uuid[]
+language plpgsql
+as $$
+declare
+  v_ids uuid[] := '{}';
+  v_count int;
+  v_after_created_at timestamptz := null;
+  v_after_id uuid := null;
+  v_row record;
+begin
+  loop
+    v_count := 0;
+    for v_row in
+      select e.id, e.created_at from app.export_movements(v_after_created_at, v_after_id, p_limit) e
+    loop
+      v_ids := v_ids || v_row.id;
+      v_count := v_count + 1;
+      v_after_created_at := v_row.created_at;
+      v_after_id := v_row.id;
+    end loop;
+    exit when v_count < p_limit;
+  end loop;
+  return v_ids;
+end;
+$$;
+grant execute on function public.export_test_all_movement_ids(int) to authenticated;
+
 -- Catalogue ---------------------------------------------------------------------------
 select is(
   pg_get_function_result('app.export_customers(uuid, int)'::regprocedure),
@@ -128,6 +157,49 @@ select ok(
 select ok(
   has_function_privilege('authenticated', 'app.export_customers(uuid, int)', 'execute'),
   'authenticated can execute export_customers (the role is checked inside)'
+);
+select is(
+  pg_get_function_result('app.export_movements(timestamptz, uuid, int)'::regprocedure),
+  'TABLE(id uuid, created_at timestamp with time zone, customer_id uuid, customer_name text, '
+    'kind text, amount_cents integer, points integer, cents_per_point integer, description text, '
+    'operator_name text, corrects_movement_id uuid, corrected_by_movement_id uuid)',
+  'export_movements returns the columns of the spec, in order'
+);
+select is(
+  (select provolatile from pg_proc
+   where oid = 'app.export_movements(timestamptz, uuid, int)'::regprocedure),
+  's',
+  'export_movements is stable: it writes nothing'
+);
+select ok(
+  (select prosecdef from pg_proc
+   where oid = 'app.export_movements(timestamptz, uuid, int)'::regprocedure),
+  'export_movements is security definer'
+);
+select is(
+  (select proconfig from pg_proc
+   where oid = 'app.export_movements(timestamptz, uuid, int)'::regprocedure),
+  array['search_path=""'],
+  'export_movements pins an empty search_path'
+);
+select ok(
+  not has_function_privilege('anon', 'app.export_movements(timestamptz, uuid, int)', 'execute'),
+  'anon cannot execute export_movements'
+);
+select ok(
+  not exists (
+    select 1
+    from pg_proc p
+    cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+    where p.oid = 'app.export_movements(timestamptz, uuid, int)'::regprocedure
+      and acl.grantee = 0
+      and acl.privilege_type = 'EXECUTE'
+  ),
+  'PUBLIC has no execute on export_movements'
+);
+select ok(
+  has_function_privilege('authenticated', 'app.export_movements(timestamptz, uuid, int)', 'execute'),
+  'authenticated can execute export_movements (the role is checked inside)'
 );
 
 -- Anonymization through the RPC of customers, as an admin -------------------------------
@@ -243,6 +315,159 @@ select lives_ok(
   $$select * from app.export_customers(null, 1)$$, 'p_limit 1 is accepted'
 );
 
+-- Movements, as the admin ---------------------------------------------------------------
+-- More fixtures, written as the table owner and then back to the admin session:
+--   * Elio is renamed: the export shows the current name, not the one at the movement time;
+--   * …e300-0005 is an older catalogue redemption of Fede whose description is null, to
+--     reach the reward-name fallback. The redemption check forbids a null description
+--     today, so it is dropped inside this rolled-back transaction only.
+reset role;
+update app.customers set name = 'Elio Rinominato' where id = 'ffffffff-ffff-4fff-8fff-000000000001';
+insert into app.rewards (id, name, points, created_by, updated_by)
+select '00000000-0000-4000-e400-000000000001', 'Premio di prova', 4, o.id, o.id
+from app.operators o where o.name = 'Admin Esporta';
+alter table app.movements drop constraint movements_redemption_check;
+insert into app.movements
+  (id, operation_id, customer_id, kind, points, reward_id, description, operator_id, created_at)
+select '00000000-0000-4000-e300-000000000005', gen_random_uuid(),
+  'ffffffff-ffff-4fff-8fff-000000000002', 'redemption', -4, '00000000-0000-4000-e400-000000000001',
+  null, o.id, timestamptz '2026-07-01 10:05:00+00'
+from app.operators o where o.name = 'Admin Esporta';
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e000-000000000001","role":"authenticated"}', true);
+
+select results_eq(
+  $$select id, customer_id, customer_name, kind, amount_cents, points, cents_per_point, description,
+           operator_name, corrects_movement_id, corrected_by_movement_id
+    from app.export_movements()
+    where id::text like '00000000-0000-4000-e300-%'$$,
+  $$values
+    ('00000000-0000-4000-e300-000000000005'::uuid, 'ffffffff-ffff-4fff-8fff-000000000002'::uuid,
+     'Fede Esporta'::text, 'redemption'::text, null::int, -4, null::int, 'Premio di prova'::text,
+     'Admin Esporta'::text, null::uuid, null::uuid),
+    ('00000000-0000-4000-e300-000000000001', 'ffffffff-ffff-4fff-8fff-000000000001',
+     'Elio Rinominato', 'purchase', 1250, 12, 100, null, 'Operatore Esporta', null, null),
+    ('00000000-0000-4000-e300-000000000002', 'ffffffff-ffff-4fff-8fff-000000000001',
+     'Elio Rinominato', 'redemption', null, -5, null, 'Caffè di prova', 'Operatore Esporta', null,
+     '00000000-0000-4000-e300-000000000003'),
+    ('00000000-0000-4000-e300-000000000003', 'ffffffff-ffff-4fff-8fff-000000000001',
+     'Elio Rinominato', 'correction', null, 5, null, null, 'Operatore Esporta',
+     '00000000-0000-4000-e300-000000000002', null),
+    ('00000000-0000-4000-e300-000000000004', 'ffffffff-ffff-4fff-8fff-000000000003',
+     null, 'purchase', 300, 3, 100, null, 'Operatore Esporta', null, null)$$,
+  'the admin receives every movement in (created_at, id) order with kind, amounts, description, operator and correction links'
+);
+select is(
+  (select row(amount_cents, points, cents_per_point)::text from app.export_movements()
+   where id = '00000000-0000-4000-e300-000000000001'),
+  '(1250,12,100)',
+  'a purchase carries amount_cents, points and the cents_per_point in force'
+);
+select is(
+  (select description from app.export_movements()
+   where id = '00000000-0000-4000-e300-000000000002'),
+  'Caffè di prova',
+  'a redemption carries its own description'
+);
+select is(
+  (select description from app.export_movements()
+   where id = '00000000-0000-4000-e300-000000000005'),
+  'Premio di prova',
+  'a redemption without a description falls back to the reward name'
+);
+select is(
+  (select created_at from app.export_movements()
+   where id = '00000000-0000-4000-e300-000000000005'),
+  timestamptz '2026-07-01 10:05:00+00',
+  'created_at is the time of the movement'
+);
+select ok(
+  not exists (
+    select 1
+    from app.export_movements() e
+    left join app.export_movements() c on c.id = e.corrected_by_movement_id
+    where (e.corrected_by_movement_id is not null
+           and c.corrects_movement_id is distinct from e.id)
+       or (e.corrects_movement_id is not null
+           and (select corrected_by_movement_id from app.export_movements() t
+                where t.id = e.corrects_movement_id) is distinct from e.id)
+  ),
+  'corrected_by_movement_id and corrects_movement_id point at each other'
+);
+select is(
+  (select customer_name from app.export_movements()
+   where id = '00000000-0000-4000-e300-000000000004'),
+  null,
+  'the movement of an anonymized customer is exported with customer_name null'
+);
+select is(
+  (select points from app.export_movements()
+   where id = '00000000-0000-4000-e300-000000000004'),
+  3,
+  'the movement of an anonymized customer keeps its points'
+);
+select ok(
+  not exists (
+    select 1
+    from app.export_movements() e
+    join app.customers c on c.id = e.customer_id
+    where c.anonymized_at is not null and e.customer_name is not null
+  ),
+  'no movement of an anonymized customer carries the customer name'
+);
+
+-- Movements keyset pagination ------------------------------------------------------------
+-- …0005 is older; …0001 to …0004 share the created_at of this transaction (now()), so
+-- pages of 2 cut through equal created_at values.
+select results_eq(
+  $$select id from app.export_movements(null, null, 2)$$,
+  $$values ('00000000-0000-4000-e300-000000000005'::uuid), ('00000000-0000-4000-e300-000000000001'::uuid)$$,
+  'the first page of 2 holds the two oldest movements'
+);
+select results_eq(
+  $$select id from app.export_movements(now(), '00000000-0000-4000-e300-000000000001', 2)$$,
+  $$values ('00000000-0000-4000-e300-000000000002'::uuid), ('00000000-0000-4000-e300-000000000003'::uuid)$$,
+  'the second page continues after the cursor among movements with the same created_at'
+);
+select results_eq(
+  $$select id from app.export_movements(now(), '00000000-0000-4000-e300-000000000003', 2)$$,
+  $$values ('00000000-0000-4000-e300-000000000004'::uuid)$$,
+  'the last page is shorter than the limit'
+);
+select is(
+  (select array_agg(id order by created_at, id) from app.movements),
+  public.export_test_all_movement_ids(2),
+  'pages of 2 from the start cover every movement once, without duplicates, in (created_at, id) order'
+);
+select is(
+  (select count(*)::int from app.export_movements()),
+  least((select count(*)::int from app.movements), 1000),
+  'without arguments the movements export starts from the beginning with pages of 1000'
+);
+select throws_ok(
+  $$select * from app.export_movements(null, null, 0)$$, '22023', null,
+  'export_movements refuses p_limit 0'
+);
+select throws_ok(
+  $$select * from app.export_movements(null, null, 1001)$$, '22023', null,
+  'export_movements refuses p_limit 1001'
+);
+select throws_ok(
+  $$select * from app.export_movements(null, null, null)$$, '22023', null,
+  'export_movements refuses p_limit null'
+);
+select throws_ok(
+  $$select * from app.export_movements(now(), null, 2)$$, '22023', null,
+  'a cursor with created_at but no id is refused'
+);
+select throws_ok(
+  $$select * from app.export_movements(null, '00000000-0000-4000-e300-000000000001', 2)$$, '22023',
+  null, 'a cursor with id but no created_at is refused'
+);
+select lives_ok(
+  $$select * from app.export_movements(null, null, 1)$$, 'export_movements accepts p_limit 1'
+);
+
 -- Operator -------------------------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e000-000000000002","role":"authenticated"}', true);
 select throws_ok(
@@ -252,12 +477,23 @@ select throws_ok(
   $$select * from app.export_customers(null, 0)$$, '42501', null,
   'the role is checked before the arguments'
 );
+select throws_ok(
+  $$select * from app.export_movements()$$, '42501', null, 'an operator cannot export movements'
+);
+select throws_ok(
+  $$select * from app.export_movements(now(), null, 0)$$, '42501', null,
+  'export_movements checks the role before the arguments'
+);
 
 -- Signed-in user without a profile ---------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e000-000000000003","role":"authenticated"}', true);
 select throws_ok(
   $$select * from app.export_customers()$$, '42501', null,
   'a user without an operator profile cannot export customers'
+);
+select throws_ok(
+  $$select * from app.export_movements()$$, '42501', null,
+  'a user without an operator profile cannot export movements'
 );
 
 -- Unlinked admin (Auth user removed, old session) -------------------------------------------
@@ -266,6 +502,10 @@ select throws_ok(
   $$select * from app.export_customers()$$, '42501', null,
   'an unlinked admin profile cannot export customers'
 );
+select throws_ok(
+  $$select * from app.export_movements()$$, '42501', null,
+  'an unlinked admin profile cannot export movements'
+);
 reset role;
 
 -- anon -------------------------------------------------------------------------------------
@@ -273,11 +513,14 @@ set local role anon;
 select throws_ok(
   $$select * from app.export_customers()$$, '42501', null, 'anon cannot call export_customers'
 );
+select throws_ok(
+  $$select * from app.export_movements()$$, '42501', null, 'anon cannot call export_movements'
+);
 reset role;
 
 select is(
   (select count(*)::int from app.movements where customer_id::text like 'ffffffff-ffff-4fff-8fff-%'),
-  4,
+  5,
   'exporting wrote no movement'
 );
 
