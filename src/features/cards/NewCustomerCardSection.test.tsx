@@ -1,7 +1,8 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestCardReader } from '../../test/fakeCardReader';
+import { driveLinkWrites, type LinkWriteCall } from '../../test/fakeLinkWrites';
 import { createFakeCardsService, fakeCard } from '../../test/fakeCardsService';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
 import { createFakeRewardsService } from '../../test/fakeRewardsService';
@@ -51,6 +52,26 @@ function setup({
 }
 
 type Fixture = ReturnType<typeof setup>;
+
+/** A fixture whose link writes wait for the test (`writes`). */
+function writeSetup(options: Parameters<typeof setup>[0] = {}) {
+  const fixture = setup(options);
+  return { ...fixture, writes: driveLinkWrites(fixture.card.reader) };
+}
+
+type WriteFixture = ReturnType<typeof writeSetup>;
+
+/** The write of the link in progress (the last `writeUrl` call), once it has started. */
+async function currentWrite(fixture: WriteFixture): Promise<LinkWriteCall> {
+  await waitFor(() => expect(fixture.writes.length).toBeGreaterThan(0));
+  const write = fixture.writes.at(-1);
+  if (!write) throw new Error('no write');
+  return write;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 async function renderNew(fixture: Fixture = setup(), path = '/clienti/nuovo') {
   const rendered = renderApp(
@@ -110,8 +131,8 @@ describe('Nuovo cliente senza card: the section "Card (facoltativa)"', () => {
     expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
   });
 
-  it('an unknown card becomes "Card letta", saved with the customer; the customer page opens', async () => {
-    const fixture = setup();
+  it('an unknown card becomes "Card letta", saved with the customer; its link, then the customer page', async () => {
+    const fixture = writeSetup();
     const { router } = await renderNew(fixture);
     await activeSection();
     await fillValid();
@@ -132,6 +153,7 @@ describe('Nuovo cliente senza card: the section "Card (facoltativa)"', () => {
       expect(created).toHaveLength(1);
       return created;
     });
+    await (await currentWrite(fixture)).finish({ ok: true });
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved?.id}`));
     expect(router.state.historyAction).toBe('REPLACE');
     expect(fixture.customers.service.create).not.toHaveBeenCalled();
@@ -146,7 +168,7 @@ describe('Nuovo cliente senza card: the section "Card (facoltativa)"', () => {
   });
 
   it('a second unknown card replaces the first: the last one read is saved', async () => {
-    const fixture = setup();
+    const fixture = writeSetup();
     await renderNew(fixture);
     await activeSection();
     tap(fixture, NEW_ONE.read);
@@ -403,5 +425,194 @@ describe('Nuovo cliente senza card: the section "Card (facoltativa)"', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Questa card è di Maria Rossi.');
     await waitFor(() => expect(router.state.location.search).toBe(''));
     expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
+  });
+});
+
+function writer() {
+  return screen.getByRole('region', { name: 'Scrittura del link' });
+}
+
+/** Nuovo cliente senza card: fills the form, reads an unknown card and saves. */
+async function saveWithReadCard(fixture: WriteFixture) {
+  const rendered = await renderNew(fixture);
+  await activeSection();
+  await fillValid();
+  tap(fixture, NEW_ONE.read);
+  await screen.findByRole('region', { name: 'Card letta' });
+  save();
+  const [saved] = await waitFor(() => {
+    const created = newCustomers(fixture);
+    expect(created).toHaveLength(1);
+    return created;
+  });
+  if (!saved) throw new Error('no customer');
+  return { ...rendered, saved };
+}
+
+/** Nuovo cliente da card nuova (`?card=`): fills the form and saves. */
+async function saveFromLink(fixture: WriteFixture) {
+  const rendered = await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+  await fillValid();
+  save();
+  const [saved] = await waitFor(() => {
+    const created = newCustomers(fixture);
+    expect(created).toHaveLength(1);
+    return created;
+  });
+  if (!saved) throw new Error('no customer');
+  return { ...rendered, saved };
+}
+
+describe('Nuovo cliente: the link written after the save (SPEC-cards, points 2, 3 and 8)', () => {
+  const SKIP = 'Salta, lo scrivo più tardi';
+  const LINK = /^https?:\/\/[^/]+\/s\/[A-Za-z0-9_-]{22}$/;
+  const LINK_NOTE =
+    'Con il link, Giulia vede i suoi punti avvicinando la card al proprio telefono. Sulla card va solo il link: nessun dato personale.';
+
+  it('without ?card: «Card associata a Giulia», the write on that card, then the customer page', async () => {
+    const fixture = writeSetup();
+    const { router, saved } = await saveWithReadCard(fixture);
+
+    const status = await screen.findByText('Card associata a Giulia');
+    expect(status.closest('output')).not.toBeNull();
+    const write = await currentWrite(fixture);
+    expect(writer()).toHaveTextContent('Tieni la card appoggiata');
+    expect(screen.getByText(LINK_NOTE)).toBeInTheDocument();
+    // The form is gone: the customer is saved, only the link is left.
+    expect(screen.queryByRole('textbox', { name: NAME })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Salva cliente' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: SKIP })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute(
+      'href',
+      `/clienti/${saved.id}`,
+    );
+    // Still on Nuovo cliente until the write ends.
+    expect(router.state.location.pathname).toBe('/clienti/nuovo');
+
+    // Only the link, with a token: never the uid.
+    expect(write.options.expectedUid).toBe(NEW_ONE.uid);
+    expect(write.url).toMatch(LINK);
+    expect(write.url.toUpperCase()).not.toContain(NEW_ONE.uid);
+    const token = await fixture.cards.service.issueLink.mock.results[0]?.value;
+    expect(document.body.innerHTML).not.toContain(String(token));
+
+    await write.finish({ ok: true });
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved.id}`));
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(fixture.cards.service.confirmLink).toHaveBeenCalledOnce();
+    expect(fixture.cards.cards()).toContainEqual(
+      expect.objectContaining({ uid: NEW_ONE.uid, customerId: saved.id, linkState: 'written' }),
+    );
+  });
+
+  it('with ?card: the write, then Registra spesa in place of the form', async () => {
+    const fixture = writeSetup();
+    const { router, saved } = await saveFromLink(fixture);
+    const write = await currentWrite(fixture);
+    expect(write.options.expectedUid).toBe(NEW_ONE.uid);
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute(
+      'href',
+      `/clienti/${saved.id}/spesa`,
+    );
+    await write.finish({ ok: true });
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved.id}/spesa`));
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(fixture.cards.service.confirmLink).toHaveBeenCalledOnce();
+  });
+
+  it('with ?card, «Salta, lo scrivo più tardi»: Registra spesa, customer and card saved without the link', async () => {
+    const fixture = writeSetup();
+    const { router, saved } = await saveFromLink(fixture);
+    const write = await currentWrite(fixture);
+    await userEvent.click(screen.getByRole('button', { name: SKIP }));
+    expect(write.options.signal?.aborted).toBe(true);
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved.id}/spesa`));
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(fixture.cards.service.confirmLink).not.toHaveBeenCalled();
+    expect(fixture.cards.cards()).toContainEqual(
+      expect.objectContaining({
+        uid: NEW_ONE.uid,
+        customerId: saved.id,
+        active: true,
+        linkState: 'not-written',
+      }),
+    );
+  });
+
+  it('the card moved away too early (io): the alert of the board, then «Più tardi» opens the destination', async () => {
+    const fixture = writeSetup();
+    const { router, saved } = await saveWithReadCard(fixture);
+    await (await currentWrite(fixture)).finish({ ok: false, reason: 'io' });
+
+    const alert = await screen.findByRole('alert', { name: 'Link non scritto' });
+    expect(alert).toHaveTextContent('La card è associata a Giulia e funziona alla cassa.');
+    expect(screen.getByRole('button', { name: 'Scrivi di nuovo il link' })).toBeInTheDocument();
+    // The customer stays saved.
+    expect(newCustomers(fixture)).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Più tardi' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved.id}`));
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(fixture.cards.cards()).toContainEqual(
+      expect.objectContaining({ uid: NEW_ONE.uid, linkState: 'not-written' }),
+    );
+  });
+
+  it('reads are ignored while the link is written', async () => {
+    const fixture = writeSetup();
+    await saveWithReadCard(fixture);
+    await currentWrite(fixture);
+    const before = lookups(fixture).length;
+    tap(fixture, NEW_TWO.read);
+    expect(lookups(fixture)).toHaveLength(before);
+  });
+
+  it('a phone that does not write: saved with the card, the destination opens at once', async () => {
+    const fixture = writeSetup({ card: createTestCardReader({ writable: false }) });
+    const { router, saved } = await saveFromLink(fixture);
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved.id}/spesa`));
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(fixture.cards.service.issueLink).not.toHaveBeenCalled();
+    expect(fixture.writes).toHaveLength(0);
+    expect(fixture.cards.cards()).toContainEqual(
+      expect.objectContaining({ uid: NEW_ONE.uid, customerId: saved.id, active: true }),
+    );
+  });
+
+  it('the card saved does not load: «Riprova» loads it again and the write starts', async () => {
+    const fixture = writeSetup();
+    fixture.cards.failNext('getActiveCard', 'lost');
+    await saveFromLink(fixture);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Link non scritto');
+    expect(alert).toHaveTextContent('Controlla la connessione e riprova.');
+    expect(screen.getByRole('button', { name: 'Più tardi' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    const write = await currentWrite(fixture);
+    expect(write.options.expectedUid).toBe(NEW_ONE.uid);
+  });
+
+  it('the card saved does not load: «Più tardi» opens the destination', async () => {
+    const fixture = writeSetup();
+    fixture.cards.failNext('getActiveCard', 'lost');
+    const { router, saved } = await saveFromLink(fixture);
+    await screen.findByRole('alert');
+    await userEvent.click(screen.getByRole('button', { name: 'Più tardi' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved.id}/spesa`));
+    expect(fixture.writes).toHaveLength(0);
+  });
+
+  it('a lost answer and «Riprova» on the save: one customer, the write on its card', async () => {
+    const fixture = writeSetup();
+    await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+    await fillValid();
+    fixture.cards.failNext('createCustomerWithCard', 'lost');
+    save();
+    await screen.findByRole('alert');
+    save();
+    const write = await currentWrite(fixture);
+    expect(write.options.expectedUid).toBe(NEW_ONE.uid);
+    expect(newCustomers(fixture)).toHaveLength(1);
+    expect(fixture.cards.service.issueLink).toHaveBeenCalledOnce();
   });
 });

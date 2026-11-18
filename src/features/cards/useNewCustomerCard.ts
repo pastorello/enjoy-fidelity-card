@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { normalizeUid } from '../card-input/normalizeUid';
+import type { CustomerSummary } from '../customers/types';
 import type { SaveCustomerVia } from '../customers/useSaveCustomer';
 import { useAuth } from '../identity/AuthProvider';
 import { useCardsService } from './CardsServiceProvider';
@@ -13,6 +14,15 @@ export type NewCustomerCardLookup =
   | { status: 'reading' }
   /** The lookup failed: `retryLookup` repeats it with the same uid (a read, never a duplicate). */
   | { status: 'error'; error: unknown };
+
+/** The customer saved with the card: its link is written next, then `destination` opens. */
+export type NewCustomerSaved = {
+  customer: CustomerSummary;
+  /** Canonical uid of the card saved with the customer. */
+  uid: string;
+  /** Registra spesa with `?card`, the customer page otherwise. */
+  destination: string;
+};
 
 export type NewCustomerCard = {
   /** The canonical uid saved with the customer, or null (the form has no card). */
@@ -27,6 +37,8 @@ export type NewCustomerCard = {
   /** How Nuovo cliente saves with the card; null without one. */
   via: SaveCustomerVia | null;
   lookup: NewCustomerCardLookup;
+  /** Saved with the card: the page writes its link (SPEC-cards, point 8), then opens the destination. */
+  saved: NewCustomerSaved | null;
   /** A card read on the page (canonical uid): the last one read counts. */
   read: (uid: string) => void;
   retryLookup: () => void;
@@ -53,8 +65,9 @@ function ownerOf(found: Exclude<CardLookup, { status: 'unknown' }>): CardOwner {
  * unknown card becomes the card of the form (on `?card`, it replaces the link's card), a known one
  * (active, deactivated, of an erased customer) shows "Card già associata" and leaves the form
  * without a card. `card_taken` creates nothing: the page shows the owner; with `?card` the operator
- * continues without the card explicitly, whose save reuses the same `operation_id`. A
- * `not_operator` refusal goes to `AuthProvider`.
+ * continues without the card explicitly, whose save reuses the same `operation_id`. Once saved
+ * with the card, `saved` holds the customer and its destination: the page writes the link first.
+ * A `not_operator` refusal goes to `AuthProvider`.
  */
 export function useNewCustomerCard(): NewCustomerCard {
   const service = useCardsService();
@@ -65,6 +78,7 @@ export function useNewCustomerCard(): NewCustomerCard {
   const [readUid, setReadUid] = useState<string | null>(null);
   const [taken, setTaken] = useState<NewCustomerCard['taken']>(null);
   const [lookup, setLookup] = useState<NewCustomerCardLookup>({ status: 'idle' });
+  const [saved, setSaved] = useState<NewCustomerSaved | null>(null);
   const uid = linkUid ?? readUid;
   const source = linkUid !== null ? 'link' : readUid !== null ? 'read' : null;
 
@@ -138,10 +152,16 @@ export function useNewCustomerCard(): NewCustomerCard {
 
   const via = useMemo<SaveCustomerVia | null>(() => {
     if (uid === null) return null;
+    const destination = (customer: CustomerSummary) =>
+      linkUid !== null ? `/clienti/${customer.id}/spesa` : `/clienti/${customer.id}`;
     return {
       create: (input) => service.createCustomerWithCard({ ...input, uid }),
-      destination: (customer) =>
-        linkUid !== null ? `/clienti/${customer.id}/spesa` : `/clienti/${customer.id}`,
+      destination,
+      // The destination opens after the write of the link, which the page shows.
+      onSaved: (customer) => {
+        setSaved({ customer, uid, destination: destination(customer) });
+        return true;
+      },
       onOtherError: (error) => {
         if (error instanceof CardTakenError) {
           setTaken({ owner: error.owner });
@@ -169,6 +189,7 @@ export function useNewCustomerCard(): NewCustomerCard {
     taken,
     via,
     lookup,
+    saved,
     read,
     retryLookup,
     continueWithoutCard,

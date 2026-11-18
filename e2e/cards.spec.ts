@@ -25,7 +25,28 @@ function uniqueName(prefix: string): string {
   return `${prefix} ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-test('a new card on the home opens Nuovo cliente with it, then Registra spesa; read again, it opens the customer (criteria 1, 2, 14)', async ({
+/**
+ * After «Salva cliente» with a card, the link is written on it (SPEC-cards, point 8), then `next`
+ * opens. The fake writer writes at once only on a card tapped less than 1.5 s before (IN_FIELD_MS):
+ * when the form took longer, the write asks for the card («Avvicina la card …») and it is tapped
+ * again, as the operator would. Returns when the card was last tapped (null: not tapped here).
+ */
+async function writeAfterSave(page: Page, uid: string, next: string | RegExp) {
+  const again = page
+    .getByRole('region', { name: 'Scrittura del link' })
+    .getByText(`Avvicina la card …${uid.slice(-4)}`);
+  let lastTap: number | null = null;
+  await expect(async () => {
+    if (await again.isVisible()) {
+      lastTap = Date.now();
+      await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+    }
+    await expect(page).toHaveURL(next, { timeout: 1000 });
+  }).toPass({ timeout: 10_000 });
+  return lastTap;
+}
+
+test('a new card on the home opens Nuovo cliente with it, its link is written, then Registra spesa; read again, it opens the customer (criteria 1, 2, 10, 14)', async ({
   page,
 }) => {
   await stubWebNfc(page);
@@ -45,9 +66,19 @@ test('a new card on the home opens Nuovo cliente with it, then Registra spesa; r
   const name = uniqueName('Card Nuova E2E');
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
   await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
+  // The form takes more than 1.5 s (IN_FIELD_MS), as at the till: the card is no longer in the field.
+  await page.waitForTimeout(Math.max(0, firstRead + 1600 - Date.now()));
   await page.getByRole('button', { name: 'Salva cliente' }).click();
 
-  await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}\/spesa$/);
+  // The customer is saved with the card: the link is written on it, then Registra spesa opens.
+  // The write asks for the card again, and the operator puts it back on the phone.
+  const writer = page.getByRole('region', { name: 'Scrittura del link' });
+  await expect(writer).toContainText(`Avvicina la card …${uid.slice(-4)}`);
+  await expect(page.getByText('Card associata a Card')).toBeVisible();
+  const skip = page.getByRole('button', { name: 'Salta, lo scrivo più tardi' });
+  expect((await skip.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+  const lastTap =
+    (await writeAfterSave(page, uid, /\/clienti\/[0-9a-f-]{36}\/spesa$/)) ?? firstRead;
   const purchaseUrl = page.url();
   await expect(page.getByRole('heading', { level: 1, name: 'Registra spesa' })).toBeVisible();
   await expect(page.getByRole('link', { name: new RegExp(name) })).toBeVisible();
@@ -57,10 +88,18 @@ test('a new card on the home opens Nuovo cliente with it, then Registra spesa; r
   await expect(page).toHaveURL('/');
   await expect(panel).toContainText('Avvicina la card');
 
+  // The link written on the card: a random token, never the uid (criterion 10).
+  const written = await fakeCardWrites(page);
+  const forCard = written.filter((entry) => entry.uid === uid);
+  expect(forCard).toHaveLength(1);
+  const url = forCard[0]?.url ?? '';
+  expect(url).toMatch(/^https?:\/\/[^/]+\/s\/[A-Za-z0-9_-]{22}$/);
+  for (const form of [uid, uid.toLowerCase(), asWebNfc(uid)]) expect(url).not.toContain(form);
+
   // The same card, read again: Registra spesa of the new customer, with no tap, within 2 s. The
   // reader ignores the same uid within REPEAT_WINDOW_MS (2 s, src/features/card-input/cardReader.ts)
-  // of its last read, as a card still held: the second read comes after it, as at the till.
-  await page.waitForTimeout(Math.max(0, firstRead + 2500 - Date.now()));
+  // of its last read, as a card still held: the next read comes after it, as at the till.
+  await page.waitForTimeout(Math.max(0, lastTap + 2500 - Date.now()));
   const started = Date.now();
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
   await expect(page).toHaveURL(purchaseUrl, { timeout: 2000 });
@@ -68,7 +107,7 @@ test('a new card on the home opens Nuovo cliente with it, then Registra spesa; r
   expect(Date.now() - started).toBeLessThan(2000);
 
   // The way from the card to the purchase never writes the card (criterion 14).
-  expect(await fakeCardWrites(page)).toEqual([]);
+  expect(await fakeCardWrites(page)).toEqual(written);
 });
 
 /** Registers a customer with a new card from the home, as at the till; returns its id. */
@@ -83,7 +122,7 @@ async function customerWithCard(page: Page, prefix: string, uid: string) {
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
   await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
   await page.getByRole('button', { name: 'Salva cliente' }).click();
-  await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}\/spesa$/);
+  await writeAfterSave(page, uid, /\/clienti\/[0-9a-f-]{36}\/spesa$/);
   const id = /\/clienti\/([0-9a-f-]{36})\/spesa$/.exec(page.url())?.[1];
   if (id === undefined) throw new Error('No customer id in the URL');
   return { id, name };
@@ -220,7 +259,7 @@ test('a phone that does not write: the association is saved, «Link non scritto�
     `Card …${newCard.slice(-4)} associata. Link non scritto.`,
   );
   await expect(page.getByText(`Card attiva …${newCard.slice(-4)} · `)).toBeVisible();
-  expect(await fakeCardWrites(page)).toEqual([]);
+  expect((await fakeCardWrites(page)).filter((entry) => entry.uid === newCard)).toEqual([]);
 });
 
 test('Modifica cliente: «Disattiva card» asks first, then the section says «Nessuna card attiva» (SPEC-cards, point 5)', async ({

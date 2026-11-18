@@ -14,6 +14,11 @@ export type SaveCustomerVia = {
   destination: (customer: CustomerSummary) => string;
   /** A rejection of `create` that is not a `CustomerError`, handled by the caller (true). */
   onOtherError?: (error: unknown) => boolean;
+  /**
+   * The customer is saved: true when the caller opens `destination` itself, later (cards: after
+   * writing the link on the card); otherwise it opens at once.
+   */
+  onSaved?: (customer: CustomerSummary) => boolean;
 };
 
 /**
@@ -27,13 +32,13 @@ export function useSaveCustomer(via: SaveCustomerVia | null = null): SaveCustome
   const service = useCustomerService();
   const navigate = useNavigate();
   const operationId = useRef<string | null>(null);
-  // Where the customer of the send in progress opens: the way it was created decides it.
-  const destination = useRef<SaveCustomerVia['destination'] | null>(null);
+  // How the customer of the send in progress was created: it decides where they open.
+  const sent = useRef<SaveCustomerVia | null>(null);
 
   return useCustomerSubmit({
     request: (values) => {
       operationId.current ??= crypto.randomUUID();
-      destination.current = via?.destination ?? null;
+      sent.current = via;
       const create = via ? via.create : (input: CreateCustomerInput) => service.create(input);
       return create({
         operationId: operationId.current,
@@ -49,7 +54,8 @@ export function useSaveCustomer(via: SaveCustomerVia | null = null): SaveCustome
     // The operation_id is kept: nothing was created, so the next send may reuse it.
     onOtherError: (error) => via?.onOtherError?.(error) ?? false,
     onSaved: (customer) => {
-      const to = destination.current?.(customer) ?? `/clienti/${customer.id}`;
+      if (sent.current?.onSaved?.(customer) === true) return;
+      const to = sent.current?.destination(customer) ?? `/clienti/${customer.id}`;
       void navigate(to, { replace: true });
     },
     networkText: 'Cliente non salvato: controlla la connessione e riprova.',

@@ -2,8 +2,9 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import type { ReactNode } from 'react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestCardReader } from '../../test/fakeCardReader';
+import { driveLinkWrites, type LinkWriteCall } from '../../test/fakeLinkWrites';
 import { createFakeCardsService, fakeCard } from '../../test/fakeCardsService';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
 import { createFakeRewardsService } from '../../test/fakeRewardsService';
@@ -21,6 +22,10 @@ function renderAlone(element: ReactNode) {
   const router = createMemoryRouter([{ path: '/', element }], { initialEntries: ['/'] });
   render(<RouterProvider router={router} />);
 }
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('NewCustomerCardPanel', () => {
   it('says the card read is new and shows its full code', () => {
@@ -47,17 +52,26 @@ function setup({ customers = createFakeCustomerService() } = {}) {
 }
 
 async function renderNewFromCard(path = `/clienti/nuovo?card=${UID}`, fixture = setup()) {
+  const card = createTestCardReader();
+  // The link writes after the save wait for the test.
+  const writes = driveLinkWrites(card.reader);
   const rendered = renderApp(
     path,
     signedInFake(),
     createFakeSettingsService(),
     fixture.customers,
     createFakeRewardsService(),
-    createTestCardReader(),
+    card,
     fixture.cards,
   );
   await screen.findByRole('textbox', { name: NAME });
-  return rendered;
+  return { ...rendered, writes };
+}
+
+/** The link write after the save, ended as written. */
+async function finishWrite(writes: LinkWriteCall[]) {
+  await waitFor(() => expect(writes).toHaveLength(1));
+  await writes[0]?.finish({ ok: true });
 }
 
 async function fillValid(name = 'Maria Rossi') {
@@ -131,7 +145,7 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo?card=)', () => {
 
   it('saves customer and card together, then replaces the form with Registra spesa', async () => {
     const fixture = setup();
-    const { router } = await renderNewFromCard(undefined, fixture);
+    const { router, writes } = await renderNewFromCard(undefined, fixture);
     await fillValid();
     await userEvent.type(
       screen.getByRole('textbox', { name: 'Telefono (facoltativo)' }),
@@ -139,6 +153,7 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo?card=)', () => {
     );
     save();
 
+    await finishWrite(writes);
     const [saved] = fixture.customers.customers();
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved?.id}/spesa`));
     expect(router.state.historyAction).toBe('REPLACE');
@@ -154,18 +169,20 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo?card=)', () => {
     expect(fixture.cards.cards()).toMatchObject([
       { uid: UID, customerId: saved?.id, active: true },
     ]);
-    // Nothing writes the card yet (the link comes with task 18), nor issues a link.
-    expect(fixture.cards.service.issueLink).not.toHaveBeenCalled();
+    // The link is written on the card saved, before Registra spesa opens.
+    expect(writes[0]?.options.expectedUid).toBe(UID);
+    expect(fixture.cards.service.confirmLink).toHaveBeenCalledOnce();
   });
 
   it('network error: "Riprova" resends the same operation_id, one customer and one card', async () => {
     const fixture = setup();
-    const { router } = await renderNewFromCard(undefined, fixture);
+    const { router, writes } = await renderNewFromCard(undefined, fixture);
     await fillValid();
     fixture.cards.failNext('createCustomerWithCard', 'lost');
     save();
     expect(await screen.findByRole('alert')).toHaveTextContent(NETWORK_TEXT);
     fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await finishWrite(writes);
 
     await waitFor(() => expect(router.state.location.pathname).toMatch(/\/spesa$/));
     const [first, second] = withCardOperationIds(fixture.cards);
