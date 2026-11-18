@@ -138,11 +138,12 @@ l'elenco dei file. Logica di ricerca in una funzione con test di unità. In `.gi
 `npm run build && npm run check:bundle` prima di "E2E"; in `vercel.json` `"buildCommand": "npm run build &&
 npm run check:bundle"`.
 **Accettazione:**
-- [ ] Unità: trova l'occorrenza in un chunk e nel manifesto di precache; nessuna occorrenza → esito pulito;
+- [x] Unità: trova l'occorrenza in un chunk e nel manifesto di precache; nessuna occorrenza → esito pulito;
       `dist/` assente → errore
-- [ ] Criterio 8: `npm run build && npm run check:bundle` verde; con `VITE_E2E=1 npm run build` fallisce
+- [x] Criterio 8: `npm run build && npm run check:bundle` verde; con `VITE_E2E=1 npm run build` fallisce
       (provato una volta a mano, annotato nel commit)
-- [ ] CI verde sulla PR con il nuovo passo; il resto di `vercel.json` invariato
+- [ ] CI verde sulla PR con il nuovo passo; il resto di `vercel.json` invariato (passo aggiunto e
+      `vercel.json` cambiato solo nel `buildCommand`; manca la CI della PR, non ancora aperta)
 **Verifica:** `npm run build && npm run check:bundle`; `npm test -- checkBundle`
 **Dipendenze:** 7 · **File:** scripts/check-bundle.ts, scripts/checkBundle.test.ts, package.json,
 .github/workflows/ci.yml, vercel.json · **Dimensione:** M
