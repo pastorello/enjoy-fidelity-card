@@ -321,9 +321,9 @@ caratteri dopo il trim); PUNTI DA SCALARE (`<output>` in sezione `aria-label="Pu
 e il saldo non può scendere sotto zero." (`role="alert"`, `aria-describedby`); "Riscatta N punti"
 disabilitato con saldo insufficiente, descrizione vuota o punti 0 ("Riscatta").
 **Accettazione:**
-- [ ] Componente: saldo insufficiente con il nome proprio; pulsante disabilitato nei tre casi
-- [ ] Componente: invio con descrizione ripulita e punti; Indietro torna al catalogo
-- [ ] Impeccable pulito; confronto con Premio-libero
+- [x] Componente: saldo insufficiente con il nome proprio; pulsante disabilitato nei tre casi
+- [x] Componente: invio con descrizione ripulita e punti; Indietro torna al catalogo
+- [x] Impeccable pulito; confronto con Premio-libero
 **Verifica:** `npm test -- FreeRewardForm RedeemPage`
 **Dipendenze:** 19 · **File:** src/features/ledger/FreeRewardForm.tsx (+ .module.css, .test.tsx),
 src/features/ledger/RedeemPage.tsx · **Dimensione:** M
