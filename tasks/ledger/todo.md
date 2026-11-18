@@ -135,10 +135,10 @@ HH:MM"), gruppi per giorno (OGGI, IERI, "8 NOVEMBRE", con l'anno se diverso), te
 (50 per pagina, 4 per la scheda); `EC001`…`EC007`, `42501`, `22023` → `LedgerError`; rete e risposta oltre
 8 s → `network`; guasti da `serverFaultFor`. Guardia `scripts/ledgerErrorCodes.test.ts`.
 **Accettazione:**
-- [ ] Unità con client finto: ogni codice → l'errore giusto; timeout 8 s → `network` (timer finti); 5xx →
+- [x] Unità con client finto: ogni codice → l'errore giusto; timeout 8 s → `network` (timer finti); 5xx →
       `unknown` o `ServerFaultError`
-- [ ] Unità: il risultato restituisce i punti e il saldo del server, non quelli calcolati nel client
-- [ ] `scripts/ledgerErrorCodes.test.ts` fallisce se la migrazione solleva un codice senza traduzione
+- [x] Unità: il risultato restituisce i punti e il saldo del server, non quelli calcolati nel client
+- [x] `scripts/ledgerErrorCodes.test.ts` fallisce se la migrazione solleva un codice senza traduzione
 **Verifica:** `npm test -- supabaseLedgerService ledgerErrorCodes`
 **Dipendenze:** 5, 6 · **File:** src/features/ledger/supabaseLedgerService.ts (+ .test.ts),
 scripts/ledgerErrorCodes.test.ts · **Dimensione:** M
