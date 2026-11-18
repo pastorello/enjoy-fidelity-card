@@ -235,6 +235,48 @@ test('Modifica cliente: «Disattiva card» asks first, then the section says «N
   await expect(page).toHaveURL('/');
 });
 
+for (const width of [390, 360]) {
+  test(`Modifica cliente at ${width}px: «Sostituisci card» and «Disattiva card» side by side, one line each (wireframe)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await stubWebNfc(page);
+    await signIn(page);
+    const customer = await customerWithCard(page, `Maria Una Riga ${width} E2E`, freshUid());
+
+    await page.goto(`/clienti/${customer.id}/modifica`);
+    const section = page.getByRole('region', { name: 'CARD' });
+    const replace = section.getByRole('link', { name: 'Sostituisci card' });
+    const deactivate = section.getByRole('button', { name: 'Disattiva card' });
+    await expect(replace).toBeVisible();
+    const [left, right] = await Promise.all([replace.boundingBox(), deactivate.boundingBox()]);
+    // Side by side, as in the wireframe, each a touch target.
+    expect(left?.y).toBe(right?.y);
+    for (const box of [left, right]) expect(box?.height).toBeGreaterThanOrEqual(48);
+
+    const layouts = await Promise.all(
+      [replace, deactivate].map((button) =>
+        button.evaluate((element) => {
+          // The lines the label takes: the distinct tops of its text's boxes.
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          const tops = [...range.getClientRects()].map((rect) => Math.round(rect.top));
+          return {
+            label: element.textContent,
+            lines: new Set(tops).size,
+            // Nor cut: the label fits its button.
+            fits: element.scrollWidth <= element.clientWidth,
+          };
+        }),
+      ),
+    );
+    expect(layouts).toEqual([
+      { label: 'Sostituisci card', lines: 1, fits: true },
+      { label: 'Disattiva card', lines: 1, fits: true },
+    ]);
+  });
+}
+
 test('a link not written at the till is written later from Modifica cliente (criterion 13)', async ({
   page,
 }) => {

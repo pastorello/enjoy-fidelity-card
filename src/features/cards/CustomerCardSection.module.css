@@ -42,6 +42,21 @@
   gap: var(--space-2);
 }
 
+/*
+ * The pair of the wireframe: the label size (16px) and a 48px target, so each uppercase label stays
+ * on one line in half the width, down to a 360px phone.
+ */
+.actions > :is(a, button) {
+  min-height: var(--touch-target);
+  padding-inline: var(--space-2);
+  font-family: var(--type-label-family);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line-height);
+  font-weight: var(--type-label-weight);
+  letter-spacing: var(--type-label-letter-spacing);
+  white-space: nowrap;
+}
+
 /* The card label in the dialog title: Enjoy Display has no "…", the body font has. */
 .label {
   font-family: var(--type-body-family);
