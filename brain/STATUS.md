@@ -41,7 +41,12 @@ del modulo `identity`.
    8 criteri di successo verificati test per test (`tasks/customers/plan.md`), quality bar completa verde
    in locale. Migrazione `*_customers.sql` da applicare allo staging con `db push`. Il ramo contiene anche
    modifiche trasversali (Enjoy Display, `src/lib/serverFault.ts`, allineamento ai wireframe finali).
-   **Prossimi moduli**: `rewards`, poi gli altri nell'ordine di `CAPABILITY-MAP.md`.
+   **`rewards` completo** su `feat/rewards` (2026-11-18, PR verso `main` da unire dopo #16 e #17): catalogo
+   `app.rewards` con nome unico senza distinzione di maiuscole, RPC solo admin (`create_reward` idempotente,
+   `update_reward`, `set_reward_active`), nessuna cancellazione; GESTIONE → "Catalogo premi" in
+   `/impostazioni/premi` con Nuovo premio / Modifica premio; 9 criteri di successo verificati test per test
+   (`tasks/rewards/plan.md`), quality bar completa verde in locale. Migrazione `*_rewards.sql` da applicare
+   allo staging con `db push`. **Prossimi moduli**: gli altri nell'ordine di `CAPABILITY-MAP.md`.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -61,7 +66,7 @@ del modulo `identity`.
 ## Modifiche non pubblicate
 
 - Rami in catena non ancora in `main`: `feat/identity` (PR #13), `feat/identity-password`, `feat/settings`,
-  `feat/customers`.
+  `feat/customers`, `chore/specs-folder` (PR #17), `feat/rewards`.
 
 ## Ultima sessione
 
