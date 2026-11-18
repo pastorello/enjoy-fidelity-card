@@ -210,10 +210,10 @@ IMPORTO (`<output>` in sezione `aria-label="Importo"`, `aria-live="polite"`); "P
 Stati comuni: caricamento, errore, cliente non trovato o `:id` non uuid, cliente cancellato ("Cliente
 cancellato: non si registrano spese né premi."), `forbidden` → `reportNotEnabled()`.
 **Accettazione:**
-- [ ] Componente: 1-2-5-0 mostra "12,50 €", "+12" e il nuovo saldo; con rapporto 250 "+5" (criterio 1)
-- [ ] Componente: Conferma disabilitata a 0; settings in errore → niente Conferma; stati comuni con i testi
+- [x] Componente: 1-2-5-0 mostra "12,50 €", "+12" e il nuovo saldo; con rapporto 250 "+5" (criterio 1)
+- [x] Componente: Conferma disabilitata a 0; settings in errore → niente Conferma; stati comuni con i testi
       della spec
-- [ ] Test di `cards` che arrivano su Registra spesa (home → card attiva) verdi; Impeccable pulito
+- [x] Test di `cards` che arrivano su Registra spesa (home → card attiva) verdi; Impeccable pulito
 **Verifica:** `npm test -- PurchasePage useHomeCardRead`
 **Dipendenze:** 9, 11, 12 · **File:** src/features/ledger/PurchasePage.tsx (+ .module.css, .test.tsx),
 src/app/routes.tsx, src/features/cards/PurchasePlaceholderPage.tsx (eliminato) · **Dimensione:** M
