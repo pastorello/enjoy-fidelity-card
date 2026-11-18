@@ -38,7 +38,7 @@ describe('RequireCashier', () => {
     );
     await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Chi è alla cassa?' }),
+      await screen.findByRole('heading', { level: 2, name: 'Chi è alla cassa?' }),
     ).toBeInTheDocument();
     expect(screen.queryByText(TURN_ENDED)).not.toBeInTheDocument();
     expect(settings.service.load).not.toHaveBeenCalled();
@@ -152,7 +152,7 @@ describe('RequireCashier', () => {
         card,
       );
       await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
-      await screen.findByRole('heading', { level: 1, name: 'Chi è alla cassa?' });
+      await screen.findByRole('heading', { level: 2, name: 'Chi è alla cassa?' });
       expect(card.reader.getState().usb.enabled).toBe(false);
       expect(card.activate).not.toHaveBeenCalled();
     });
