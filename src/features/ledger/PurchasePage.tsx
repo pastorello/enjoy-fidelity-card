@@ -182,6 +182,13 @@ function usePurchase(customerId: string) {
     if (forbidden) void reportNotEnabled();
   }, [forbidden, reportNotEnabled]);
 
+  // While the answer is pending or the outcome uncertain the amount is the one tied to the
+  // operation id: "Riprova" must resend exactly what was confirmed, so the keys change nothing.
+  const locked = operation.status === 'busy' || failure !== null;
+  function changeAmount(next: number) {
+    if (!locked) setAmountCents(next);
+  }
+
   const points =
     settings.status === 'ready' ? pointsFor(amountCents, settings.settings.centsPerPoint) : 0;
   const unusual =
@@ -189,7 +196,7 @@ function usePurchase(customerId: string) {
     isUnusualAmount(amountCents, settings.settings.confirmThresholdCents);
   return {
     amountCents,
-    setAmountCents,
+    setAmountCents: changeAmount,
     settings,
     operation,
     forbidden,

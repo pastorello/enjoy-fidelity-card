@@ -724,6 +724,32 @@ describe('PurchasePage: Spesa non salvata', () => {
     expect(ledger.movements()).toHaveLength(1);
   });
 
+  it('the amount is locked while the answer is pending: "Riprova" resends the confirmed amount (criterion 4)', async () => {
+    const { ledger } = renderPurchase();
+    ledger.failNext('recordPurchase', 'lost');
+    const held = ledger.holdNext('recordPurchase');
+    await confirmWithFakeTimers();
+    // The answer is slow: the keys pressed meanwhile change nothing.
+    fireEvent.click(within(keypad()).getByRole('button', { name: '0' }));
+    await advance(0);
+    expect(amount()).toHaveTextContent('12,50 €');
+    await act(async () => {
+      held.release();
+    });
+    await advance(0);
+    expect(failure()).toHaveTextContent(OFFLINE_TEXT);
+    expect(amount()).toHaveTextContent('12,50 €');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova +12' }));
+    await advance(0);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeInTheDocument();
+    expect(screen.getByText('+12 punti a Maria Rossi')).toBeInTheDocument();
+    const amounts = ledger.service.recordPurchase.mock.calls.map(([input]) => input.amountCents);
+    expect(amounts).toEqual([1250, 1250]);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
   it('no answer within 8 s: the same alert, then "Riprova" with the same id', async () => {
     const { ledger } = renderPurchase();
     ledger.failNext('recordPurchase', 'timeout');
