@@ -237,8 +237,8 @@ src/features/customers/EditCustomerPage.tsx, e2e/cards.spec.ts · **Dimensione:*
 card», poi « · » e la parte telefono di `customers`; cliente anonimizzato: riga di `customers` senza parte
 card; messaggio `role="status"` arrivato dalla navigazione di Associa card.
 **Accettazione:**
-- [ ] Componente: card attiva, senza card, anonimizzato; stile come «Senza telefono»
-- [ ] Componente: il messaggio «Card …A1B2 associata» compare e non resta dopo un nuovo ingresso
+- [x] Componente: card attiva, senza card, anonimizzato; stile come «Senza telefono»
+- [x] Componente: il messaggio «Card …A1B2 associata» compare e non resta dopo un nuovo ingresso
 **Verifica:** `npm test -- CardSummary CustomerPage`
 **Dipendenze:** 12 · **File:** src/features/cards/CardSummary.tsx (+ .test.tsx),
 src/features/customers/CustomerPage.tsx · **Dimensione:** S
