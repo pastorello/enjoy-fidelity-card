@@ -172,10 +172,10 @@ primario. Id con `crypto.randomUUID()` all'apertura del modulo. Validazione con 
 sotto il campo e focus sul primo campo errato, nessuna chiamata. Successo: il premio compare in elenco, campi
 svuotati, nuovo id, `aria-live` "Premio aggiunto", elenco ricaricato. Disabilitato durante il caricamento.
 **Accettazione:**
-- [ ] Componenti: "Spremuta" 80 → riga tra Caffè e Cornetto e cappuccino, campi vuoti, annuncio; errori di
+- [x] Componenti: "Spremuta" 80 → riga tra Caffè e Cornetto e cappuccino, campi vuoti, annuncio; errori di
       validazione con il focus giusto e nessuna chiamata
-- [ ] Componenti: dopo un salvataggio riuscito il successivo usa un id nuovo
-- [ ] Etichette accessibili; target ≥ 48 px
+- [x] Componenti: dopo un salvataggio riuscito il successivo usa un id nuovo
+- [x] Etichette accessibili; target ≥ 48 px
 **Verifica:** `npm test`
 **Dipendenze:** 8 · **File:** src/features/rewards/RewardForm.tsx (+ .module.css, .test.tsx),
 src/features/rewards/RewardsCatalogPage.tsx · **Dimensione:** M

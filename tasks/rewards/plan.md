@@ -87,7 +87,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint C: catalogo in sola lettura e attiva/disattiva verdi; Impeccable pulito
 
 ### Fase 4: Nuovo premio e modifica
-- [ ] Task 10: Riquadro Nuovo premio: campi, validazione, aggiunta e annuncio
+- [x] Task 10: Riquadro Nuovo premio: campi, validazione, aggiunta e annuncio
 - [ ] Task 11: Errori in scrittura: nome già usato, rete e reinvio con lo stesso id, doppio tocco
 - [ ] Task 12: Modifica premio nel riquadro in basso, con ritorno alla bozza
 
