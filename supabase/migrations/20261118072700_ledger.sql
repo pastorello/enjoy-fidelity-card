@@ -519,3 +519,188 @@ $$;
 
 revoke execute on function app.cancel_movement(uuid, uuid) from public, anon;
 grant execute on function app.cancel_movement(uuid, uuid) to authenticated;
+
+-- Reads of customers with the real balance -----------------------------------------------
+-- customers created search_customers, get_customer and customers_served_today with
+-- balance 0 and no last_served_at; the bodies are replaced here (same signatures,
+-- same not_operator check first). The balance is only private.customer_balance;
+-- last_served_at is the time of the customer's last purchase or redemption of
+-- today in Europe/Rome (cancelled ones included, corrections excluded), else null.
+
+-- today_bounds: [start of today, start of tomorrow) in Europe/Rome, right across
+-- the daylight saving changes (the day is cut on the local clock).
+create function private.today_bounds(out day_start timestamptz, out day_end timestamptz)
+language sql
+stable
+set search_path = ''
+as $$
+  select (date_trunc('day', now() at time zone 'Europe/Rome')) at time zone 'Europe/Rome',
+         (date_trunc('day', now() at time zone 'Europe/Rome') + interval '1 day') at time zone 'Europe/Rome';
+$$;
+
+revoke execute on function private.today_bounds() from public, anon, authenticated;
+
+create function private.last_served_today(p_customer_id uuid)
+returns timestamptz
+language sql
+stable
+set search_path = ''
+as $$
+  select max(m.created_at)
+  from app.movements m, private.today_bounds() b
+  where m.customer_id = p_customer_id
+    and m.kind in ('purchase', 'redemption')
+    and m.created_at >= b.day_start
+    and m.created_at < b.day_end;
+$$;
+
+revoke execute on function private.last_served_today(uuid) from public, anon, authenticated;
+
+create or replace function app.search_customers(p_query text)
+returns setof app.customer_summary
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_text text := private.clean_name(left(coalesce(p_query, ''), 80));
+  v_digits text := regexp_replace(v_text, '[[:space:]+.-]', '', 'g');
+  v_patterns text[];
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  if v_digits ~ '^[0-9]+$' then
+    if length(v_digits) < 3 then
+      return;
+    end if;
+    -- A leading 00 stands for +, and the + is not among the digits searched.
+    if v_digits like '00%' then
+      v_digits := substr(v_digits, 3);
+    end if;
+    return query
+      select f.id, f.name, f.phone, f.notes, f.anonymized_at,
+             private.customer_balance(f.id), private.last_served_today(f.id)
+      from (
+        select c.id, c.name, c.phone, c.notes, c.anonymized_at, c.name_key
+        from app.customers c
+        where c.anonymized_at is null
+          and c.phone like '%' || v_digits || '%'
+        order by c.name_key, c.id
+        limit 21
+      ) f
+      order by f.name_key, f.id;
+    return;
+  end if;
+
+  if length(v_text) < 2 then
+    return;
+  end if;
+  -- One pattern per word; \, % and _ are escaped so they are searched literally.
+  select array_agg(
+    '%' || replace(replace(replace(private.customer_name_key(w), '\', '\\'), '%', '\%'), '_', '\_') || '%'
+  )
+  into v_patterns
+  from unnest(string_to_array(v_text, ' ')) as w;
+
+  -- The balance is computed only for the (at most 21) rows returned.
+  return query
+    select f.id, f.name, f.phone, f.notes, f.anonymized_at,
+           private.customer_balance(f.id), private.last_served_today(f.id)
+    from (
+      select c.id, c.name, c.phone, c.notes, c.anonymized_at, c.name_key
+      from app.customers c
+      where c.anonymized_at is null
+        and c.name_key like all (v_patterns)
+      order by c.name_key, c.id
+      limit 21
+    ) f
+    order by f.name_key, f.id;
+end;
+$$;
+
+create or replace function app.get_customer(p_customer_id uuid)
+returns setof app.customer_summary
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  return query
+    select c.id, c.name, c.phone, c.notes, c.anonymized_at,
+           private.customer_balance(c.id), private.last_served_today(c.id)
+    from app.customers c
+    where c.id = p_customer_id;
+end;
+$$;
+
+-- customers_served_today: customers not anonymized with at least one purchase or
+-- redemption today (Europe/Rome), even if cancelled later; corrections do not
+-- count. Most recent first, at most 50.
+create or replace function app.customers_served_today()
+returns setof app.customer_summary
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  return query
+    select c.id, c.name, c.phone, c.notes, c.anonymized_at,
+           private.customer_balance(c.id), s.last_served_at
+    from (
+      select m.customer_id, max(m.created_at) as last_served_at
+      from app.movements m, private.today_bounds() b
+      where m.kind in ('purchase', 'redemption')
+        and m.created_at >= b.day_start
+        and m.created_at < b.day_end
+      group by m.customer_id
+    ) s
+    join app.customers c on c.id = s.customer_id and c.anonymized_at is null
+    order by s.last_served_at desc, c.id
+    limit 50;
+end;
+$$;
+
+-- card_points: the same body as in cards, now calling the balance directly (the
+-- ledger exists) instead of looking it up at run time.
+create or replace function public.card_points(p_token text)
+returns integer
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_customer_id uuid;
+begin
+  -- PostgREST turns this into a response header: no browser or proxy keeps it.
+  perform set_config('response.headers', '[{"Cache-Control": "no-store"}]', true);
+
+  if p_token is null or p_token !~ '^[A-Za-z0-9_-]{22}$' then
+    return null;
+  end if;
+
+  select c.customer_id into v_customer_id
+  from private.card_links l
+  join app.cards c on c.id = l.card_id and c.active
+  join app.customers cu on cu.id = c.customer_id and cu.anonymized_at is null
+  where l.token_hash = private.card_token_hash(p_token);
+  if not found then
+    return null;
+  end if;
+
+  return private.customer_balance(v_customer_id);
+end;
+$$;
