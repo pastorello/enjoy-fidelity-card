@@ -181,9 +181,9 @@ autenticati), su clienti creati dal test; importi calcolati dal rapporto in vigo
 stesso id; esito ok o rifiuto definitivo → id consumato; stati `idle`/`busy`/`done`/`error`; chiamate
 ignorate mentre è `busy`; `reset()` per "Annulla"/"Correggi".
 **Accettazione:**
-- [ ] Unità: doppio `submit` = una chiamata; `retry` dopo `network` con lo stesso id; nuovo id dopo un esito
+- [x] Unità: doppio `submit` = una chiamata; `retry` dopo `network` con lo stesso id; nuovo id dopo un esito
       definitivo e dopo `reset` (criterio 4)
-- [ ] Unità: nessun reinvio automatico; nessun salvataggio in `localStorage`/`sessionStorage`
+- [x] Unità: nessun reinvio automatico; nessun salvataggio in `localStorage`/`sessionStorage`
 **Verifica:** `npm test -- useOperation`
 **Dipendenze:** 6 · **File:** src/features/ledger/useOperation.ts, src/features/ledger/useOperation.test.tsx
 · **Dimensione:** S

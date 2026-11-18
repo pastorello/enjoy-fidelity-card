@@ -120,7 +120,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: quality bar completa verde; test esistenti invariati; revisione con l'utente prima della UI
 
 ### Fase 3: Registra spesa
-- [ ] Task 11: `useOperation`: `operation_id` stabile, Riprova con lo stesso id, doppio tocco
+- [x] Task 11: `useOperation`: `operation_id` stabile, Riprova con lo stesso id, doppio tocco
 - [ ] Task 12: `AmountKeypad`: tastierino POS a centesimi
 - [ ] Task 13: `PurchasePage` sulla rotta del segnaposto: riga cliente, IMPORTO, anteprima, Conferma, stati comuni
 - [ ] Task 14: Importo insolito (strettamente sopra la soglia): avviso, Correggi, Conferma con l'importo
