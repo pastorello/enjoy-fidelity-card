@@ -502,6 +502,68 @@ describe('HomePage: SERVITI OGGI', () => {
   });
 });
 
+/** The live region under the search, on the page from the start (TalkBack ignores late ones). */
+function announcer() {
+  return screen.getByTestId('search-announcer');
+}
+
+describe('HomePage: announcements', () => {
+  it('says how a search ended in a live region that was already on the page', async () => {
+    const { field } = await renderHome();
+    const live = announcer();
+    expect(live).toHaveAttribute('aria-live', 'polite');
+    expect(live).toHaveClass('visually-hidden');
+    expect(live).toBeEmptyDOMElement();
+
+    await userEvent.type(field, 'rossi');
+    await waitFor(() => expect(live).toHaveTextContent('1 cliente trovato'));
+    expect(announcer()).toBe(live);
+
+    await userEvent.clear(field);
+    await userEvent.type(field, 'verdi');
+    await waitFor(() => expect(live).toHaveTextContent('Nessun cliente trovato'));
+    expect(announcer()).toBe(live);
+
+    await userEvent.clear(field);
+    expect(live).toBeEmptyDOMElement();
+  });
+
+  it('counts the rows, and says when there are more than shown', async () => {
+    const customers = createFakeCustomerService({
+      customers: [
+        ...Array.from({ length: 3 }, (_, index) => fakeCustomer({ name: `Tre Prova ${index}` })),
+        ...Array.from({ length: 25 }, (_, index) =>
+          fakeCustomer({ name: `Molti Prova ${String(index).padStart(2, '0')}` }),
+        ),
+      ],
+    });
+    const { field } = await renderHome('/', customers);
+    await userEvent.type(field, 'tre prova');
+    await waitFor(() => expect(announcer()).toHaveTextContent('3 clienti trovati'));
+    await userEvent.clear(field);
+    await userEvent.type(field, 'molti');
+    await waitFor(() =>
+      expect(announcer()).toHaveTextContent('Più di 20 clienti trovati: scrivi qualcosa in più'),
+    );
+  });
+
+  it('the home message is written into its status row after the row is on the page', async () => {
+    const { router } = renderApp('/impostazioni', signedInFake());
+    await screen.findByRole('heading', { level: 1, name: 'Impostazioni' });
+    await act(async () => {
+      await router.navigate('/', {
+        replace: true,
+        state: { notice: 'Dati del cliente cancellati.' },
+      });
+    });
+    // Mounted empty first: a live region that arrives with its text is not read out.
+    const status = screen.getByRole('status');
+    expect(status).toBeEmptyDOMElement();
+    await waitFor(() => expect(status).toHaveTextContent('Dati del cliente cancellati.'));
+    expect(screen.getByRole('status')).toBe(status);
+  });
+});
+
 describe('HomePage: status message', () => {
   const NOTICE = 'Dati del cliente cancellati.';
 
@@ -513,7 +575,7 @@ describe('HomePage: status message', () => {
       await router.navigate('/', { replace: true, state: { notice: NOTICE } });
     });
     const status = await screen.findByRole('status');
-    expect(status).toHaveTextContent(NOTICE);
+    await waitFor(() => expect(status).toHaveTextContent(NOTICE));
     // At the top of the content, before the search.
     const field = screen.getByRole('searchbox', { name: SEARCH_LABEL });
     expect(status.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

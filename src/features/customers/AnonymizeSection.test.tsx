@@ -93,7 +93,9 @@ describe('AnonymizeSection: Cancellazione dei dati del cliente', () => {
     await act(async () => hold.release());
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(router.state.historyAction).toBe('REPLACE');
-    expect(await screen.findByRole('status')).toHaveTextContent('Dati del cliente cancellati.');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Dati del cliente cancellati.'),
+    );
     expect(stored(customers)?.anonymizedAt).not.toBeNull();
   });
 
@@ -125,7 +127,9 @@ describe('AnonymizeSection: Cancellazione dei dati del cliente', () => {
 
     await userEvent.click(within(dialog).getByRole('button', { name: CONFIRM }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
-    expect(await screen.findByRole('status')).toHaveTextContent('Dati del cliente cancellati.');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Dati del cliente cancellati.'),
+    );
   });
 
   it('a server fault: its message in the dialog, which stays open', async () => {
