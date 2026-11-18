@@ -400,9 +400,9 @@ lo provano (`file › titolo`); `scripts/cardsCriteria.test.ts` come `rewardsCri
 ogni prova esiste). `brain/MAP.md` registra il modulo come fatto. PR da `feat/cards` su `main`, da unire
 dopo #18 e #19.
 **Accettazione:**
-- [ ] Ogni criterio 1–15 ha almeno una prova esistente; le parti manuali (10, 14) rimandano al RUNBOOK
-- [ ] Quality bar completa verde; `npm run build && npm run check:bundle` verde
-- [ ] PR aperta con base `main`
+- [x] Ogni criterio 1–15 ha almeno una prova esistente; le parti manuali (10, 14) rimandano al RUNBOOK
+- [x] Quality bar completa verde; `npm run build && npm run check:bundle` verde
+- [x] PR aperta con base `main`
 **Verifica:** `npm test -- cardsCriteria`; quality bar completa
 **Dipendenze:** 23 · **File:** tasks/cards/plan.md, tasks/cards/todo.md, scripts/cardsCriteria.test.ts,
 brain/MAP.md · **Dimensione:** S
