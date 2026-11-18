@@ -61,9 +61,12 @@ export type DeliverRaw = (
   urls?: readonly string[],
 ) => void;
 
-/** An input (Web NFC, USB keyboard wedge, E2E fake): runs only between `start` and `stop`. */
+/**
+ * An input (E2E fake): runs only between `start` and `stop`. `unreadable` reports a tag that gives no
+ * uid (a damaged one), which matters only to a running write.
+ */
 export interface CardInputAdapter {
-  start(ports: { deliver: DeliverRaw }): void;
+  start(ports: { deliver: DeliverRaw; unreadable: () => void }): void;
   stop(): void;
 }
 
@@ -94,8 +97,11 @@ export interface NfcInputAdapter {
 /**
  * Where links are written (SPEC-card-input, point 9): the browser's `WebNfcApi`, or in E2E builds the
  * fake tags of `fakeCardAdapter`. `isWriteSupported()` is false without an `NDEFReader` with `write()`.
+ * `subscribe` (the E2E fake only, `setCanWrite`) reports that `isWriteSupported()` may have changed.
  */
-export type CardWriteTarget = Pick<WebNfcApi, 'isWriteSupported' | 'createWriter'>;
+export type CardWriteTarget = Pick<WebNfcApi, 'isWriteSupported' | 'createWriter'> & {
+  subscribe?: ((listener: () => void) => () => void) | undefined;
+};
 
 /** Stands in when the service has nothing to write with: `canWrite` stays false. */
 const NO_WRITE_TARGET: CardWriteTarget = {
@@ -179,12 +185,17 @@ export function createCardReader({
   }
 
   function setNfcStatus(status: NfcStatus) {
-    if (state.nfc === status) return;
     // Writing needs the scan running (to recognize the card and verify the link) and write().
     const canWrite = status === 'active' && writeTarget.isWriteSupported();
+    if (state.nfc === status && state.canWrite === canWrite) return;
     state = { ...state, nfc: status, canWrite };
     notify();
   }
+
+  // The writer's support can change at run time (E2E fake): canWrite follows it.
+  writeTarget.subscribe?.(() => {
+    setNfcStatus(state.nfc);
+  });
 
   // A status reported by an adapter that has been stopped meanwhile is stale.
   const reportNfcStatus = (status: NfcStatus) => {
@@ -268,7 +279,7 @@ export function createCardReader({
       usbFormat = options.usbFormat;
       if (!active) {
         active = true;
-        for (const adapter of adapters) adapter.start({ deliver });
+        for (const adapter of adapters) adapter.start({ deliver, unreadable: reportUnreadable });
         nfc?.start({ deliver, setStatus: reportNfcStatus, unreadable: reportUnreadable });
       }
       updateUsb();

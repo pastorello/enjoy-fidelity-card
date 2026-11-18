@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CardRead } from './cardReader';
 import { createBrowserCardReader, type BrowserCardHost } from './browserCardReader';
+import type { NfcWriterLike } from './webNfcAdapter';
 
 // SPEC-card-input, point 2: the service main.tsx builds. Invented uids only.
 
@@ -86,6 +87,61 @@ describe('createBrowserCardReader', () => {
     expect(withoutNfc.getState()).toMatchObject({ nfc: 'unsupported', canWrite: false });
     withNfc.deactivate();
     withoutNfc.deactivate();
+  });
+
+  it('writes with the writer it is given (the E2E fake) instead of NDEFReader.write()', async () => {
+    const scanners: StubReader[] = [];
+    const nativeWrite = vi.fn<() => Promise<void>>(() => Promise.resolve());
+    class StubReader extends EventTarget {
+      onreading: NDEFReader['onreading'] = null;
+      onreadingerror: NDEFReader['onreadingerror'] = null;
+      constructor() {
+        super();
+        scanners.push(this);
+      }
+      scan() {
+        return Promise.resolve();
+      }
+      write() {
+        return nativeWrite();
+      }
+    }
+    let supported = false;
+    const write = vi.fn<NfcWriterLike['write']>(() => new Promise<void>(() => {}));
+    const reader = createBrowserCardReader(
+      {
+        NDEFReader: StubReader,
+        document,
+        navigator: { permissions: { query: () => Promise.resolve({ state: 'granted' }) } },
+      },
+      { writer: { isWriteSupported: () => supported, createWriter: () => ({ write }) } },
+    );
+    reader.activate({ usbFormat: null });
+    await settle();
+    // The given writer decides whether the phone can write, not NDEFReader.
+    expect(reader.getState()).toMatchObject({ nfc: 'active', canWrite: false });
+    reader.deactivate();
+    supported = true;
+    reader.activate({ usbFormat: null });
+    await settle();
+    expect(reader.getState()).toMatchObject({ nfc: 'active', canWrite: true });
+    const control = new AbortController();
+
+    const result = reader.writeUrl('https://example.test/p/invented-token', {
+      expectedUid: UID,
+      signal: control.signal,
+    });
+    const reading = Object.assign(new Event('reading'), {
+      serialNumber: '04:a1:b2:c3:d4:e5:f6',
+      message: { records: [] },
+    });
+    scanners.at(-1)?.onreading?.(reading);
+
+    expect(write).toHaveBeenCalledOnce();
+    expect(nativeWrite).not.toHaveBeenCalled();
+    control.abort();
+    await expect(result).resolves.toEqual({ ok: false, reason: 'aborted' });
+    reader.deactivate();
   });
 
   it('works on a browser without navigator.vibrate', async () => {

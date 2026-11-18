@@ -874,3 +874,66 @@ describe('createCardReader: canWrite (point 5, criterion 10)', () => {
     expect(target.createWriter).not.toHaveBeenCalled();
   });
 });
+
+describe('createCardReader: inputs and writers that change (E2E fake, SPEC-card-input point 7)', () => {
+  it('hands an input adapter an unreadable port that reaches only a running write session', () => {
+    let unreadable: (() => void) | undefined;
+    const adapter: CardInputAdapter = {
+      start: (ports) => {
+        unreadable = ports.unreadable;
+      },
+      stop: () => {},
+    };
+    const reader = createCardReader({ now: () => 0, adapters: [adapter] });
+    reader.activate({ usbFormat: null });
+    const onUnreadable = vi.fn<() => void>();
+
+    unreadable?.();
+    const session = reader.openWriteSession(() => {}, { onUnreadable });
+    unreadable?.();
+    session.close();
+    unreadable?.();
+
+    expect(onUnreadable).toHaveBeenCalledOnce();
+  });
+
+  it('recomputes canWrite and notifies when the writer says its write support changed', () => {
+    let supported = true;
+    const changeListeners = new Set<() => void>();
+    const target: CardWriteTarget = {
+      isWriteSupported: () => supported,
+      createWriter: () => ({ write: () => Promise.resolve() }),
+      subscribe: (listener) => {
+        changeListeners.add(listener);
+        return () => changeListeners.delete(listener);
+      },
+    };
+    let setStatus: ((status: NfcStatus) => void) | undefined;
+    const nfc: NfcInputAdapter = {
+      start: (ports) => {
+        setStatus = ports.setStatus;
+      },
+      stop: () => {},
+      restart: () => Promise.resolve(),
+    };
+    const reader = createCardReader({ now: () => 0, adapters: [], nfc, writer: target });
+    reader.activate({ usbFormat: null });
+    setStatus?.('active');
+    const listener = vi.fn<() => void>();
+    reader.subscribe(listener);
+
+    supported = false;
+    for (const notify of changeListeners) notify();
+    expect(reader.getState().canWrite).toBe(false);
+    expect(listener).toHaveBeenCalledOnce();
+
+    supported = true;
+    for (const notify of changeListeners) notify();
+    expect(reader.getState()).toMatchObject({ nfc: 'active', canWrite: true });
+
+    // Still false whatever the writer says while Web NFC is not active.
+    setStatus?.('off');
+    for (const notify of changeListeners) notify();
+    expect(reader.getState().canWrite).toBe(false);
+  });
+});

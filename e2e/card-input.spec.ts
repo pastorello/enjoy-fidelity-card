@@ -1,12 +1,6 @@
 import { signIn } from './auth';
 import { expect, test } from './fixtures';
-
-declare global {
-  interface Window {
-    /** Installed by the E2E build only (src/features/card-input/fakeCardAdapter.ts). */
-    __enjoyFakeCard?: (uid: string) => void;
-  }
-}
+import { fakeCardWrites } from './nfc';
 
 /**
  * Card reading end to end (docs/specs/SPEC-card-input.md, Testing Strategy). Web NFC does not exist
@@ -20,4 +14,18 @@ test('the E2E build exposes the fake card reader once an operator is signed in',
   expect(await page.evaluate(() => typeof window.__enjoyFakeCard)).toBe('function');
   // A read with nobody listening is dropped without errors (the fixture fails on console errors).
   await page.evaluate(() => window.__enjoyFakeCard?.('04A1B2C3D4E5F6'));
+});
+
+test('the E2E build exposes the fake writer: an empty write log and the test controls', async ({
+  page,
+}) => {
+  await signIn(page);
+  expect(await page.evaluate(() => Array.isArray(window.__enjoyFakeCardWrites))).toBe(true);
+  expect(
+    await page.evaluate(() => [
+      typeof window.__enjoyFakeCardControl?.failNextWrite,
+      typeof window.__enjoyFakeCardControl?.setCanWrite,
+    ]),
+  ).toEqual(['function', 'function']);
+  expect(await fakeCardWrites(page)).toEqual([]);
 });

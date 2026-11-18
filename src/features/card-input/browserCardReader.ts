@@ -1,4 +1,9 @@
-import { createCardReader, type CardInputAdapter, type CardReader } from './cardReader';
+import {
+  createCardReader,
+  type CardInputAdapter,
+  type CardReader,
+  type CardWriteTarget,
+} from './cardReader';
 import { createKeyboardWedge } from './keyboardWedge';
 import { createBrowserWebNfcApi, createWebNfcAdapter, type BrowserNfcHost } from './webNfcAdapter';
 
@@ -11,11 +16,12 @@ export type BrowserCardHost = BrowserNfcHost & {
 /**
  * The card-reading service of `main.tsx`: Web NFC from the browser and the USB keyboard wedge on
  * `document`. Nothing starts here: `CardReaderSession` activates it once an operator is signed in.
- * `adapters` adds inputs started and stopped with the service (the E2E fake, in E2E builds only).
+ * `adapters` adds inputs started and stopped with the service and `writer` replaces where links are
+ * written (both the E2E fake, in E2E builds only).
  */
 export function createBrowserCardReader(
   win: BrowserCardHost,
-  options: { adapters?: readonly CardInputAdapter[] } = {},
+  options: { adapters?: readonly CardInputAdapter[]; writer?: CardWriteTarget } = {},
 ): CardReader {
   const navigator = win.navigator;
   const webNfc = createBrowserWebNfcApi(win);
@@ -25,6 +31,6 @@ export function createBrowserCardReader(
     adapters: options.adapters ?? [],
     usb: createKeyboardWedge({ target: win.document, now: () => Date.now() }),
     nfc: createWebNfcAdapter(webNfc),
-    writer: webNfc,
+    writer: options.writer ?? webNfc,
   });
 }
