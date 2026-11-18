@@ -2,13 +2,9 @@
 // are for Excel, not the screen: no € sign, no thousands separator, dates assembled part by part.
 // Every date is read on the bar's clock (Europe/Rome), whatever the device's time zone.
 
+import type { ExportKind, MovementExportKind } from './types';
+
 const TIME_ZONE = 'Europe/Rome';
-
-/** Which file is being exported. */
-export type ExportKind = 'customers' | 'movements';
-
-/** The kind of a movement as the server returns it. */
-export type MovementExportKind = 'purchase' | 'redemption' | 'correction';
 
 const dateTimeFormat = new Intl.DateTimeFormat('en-GB', {
   year: 'numeric',
