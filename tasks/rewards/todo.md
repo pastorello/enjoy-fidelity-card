@@ -203,9 +203,9 @@ cambiano." La riga è evidenziata; le altre non aprono una seconda modifica. Dop
 "Annulla" il riquadro torna a "Nuovo premio" con la bozza e l'id di prima. Stessi errori del task 11
 (il reinvio di `update` è sicuro di per sé).
 **Accettazione:**
-- [ ] Componenti: modifica nome e punti → riga aggiornata e riordinata; "Annulla" → bozza Nuovo premio intatta
+- [x] Componenti: modifica nome e punti → riga aggiornata e riordinata; "Annulla" → bozza Nuovo premio intatta
       con lo stesso id; durante la modifica le altre righe non aprono la modifica
-- [ ] Componenti: nome già usato, rete, `not-found` con ricarica in modifica
+- [x] Componenti: nome già usato, rete, `not-found` con ricarica in modifica
 **Verifica:** `npm test`
 **Dipendenze:** 11 · **File:** src/features/rewards/RewardForm.tsx (+ .test.tsx), RewardRow.tsx,
 src/features/rewards/RewardsCatalogPage.tsx (+ .test.tsx) · **Dimensione:** M

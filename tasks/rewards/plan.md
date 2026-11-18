@@ -89,7 +89,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 4: Nuovo premio e modifica
 - [x] Task 10: Riquadro Nuovo premio: campi, validazione, aggiunta e annuncio
 - [x] Task 11: Errori in scrittura: nome già usato, rete e reinvio con lo stesso id, doppio tocco
-- [ ] Task 12: Modifica premio nel riquadro in basso, con ritorno alla bozza
+- [x] Task 12: Modifica premio nel riquadro in basso, con ritorno alla bozza
 
 ### Checkpoint D: tutti gli stati con test di componente; Impeccable pulito; confronto con il wireframe a 390×844
 
