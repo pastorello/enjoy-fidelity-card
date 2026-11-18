@@ -216,11 +216,11 @@ da meno di `IN_FIELD_MS` → scrittura subito e verifica sulla memoria senza un 
 `failNextWrite(reason)` (`'io'` lascia il tag rovinato: `unreadable` finché non si riscrive) e
 `setCanWrite(value)`. `e2e/nfc.ts` con l'helper `fakeCardWrites(page)`.
 **Accettazione:**
-- [ ] Unità: scrittura con la card appena appoggiata → `ok` e una voce nel registro; ogni `failNextWrite`
+- [x] Unità: scrittura con la card appena appoggiata → `ok` e una voce nel registro; ogni `failNextWrite`
       dà l'esito corrispondente; dopo `'io'` la card rovinata dà `unreadable` e si ripara con
       `allowUnreadable`; `setCanWrite(false)` → `canWrite` falso
-- [ ] E2E (criterio 8): `Array.isArray(window.__enjoyFakeCardWrites)` e `__enjoyFakeCardControl` presente
-- [ ] Tutti i nomi iniziano con `__enjoyFakeCard`; `check:bundle` verde sulla build normale
+- [x] E2E (criterio 8): `Array.isArray(window.__enjoyFakeCardWrites)` e `__enjoyFakeCardControl` presente
+- [x] Tutti i nomi iniziano con `__enjoyFakeCard`; `check:bundle` verde sulla build normale
 **Verifica:** `npm test -- fakeCardAdapter && npm run build && npm run check:bundle && npm run e2e`
 **Dipendenze:** 8, 11 · **File:** src/features/card-input/fakeCardAdapter.ts (+ .test.ts), e2e/nfc.ts,
 e2e/card-input.spec.ts · **Dimensione:** M
