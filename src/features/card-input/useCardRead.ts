@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useLatest } from '../../lib/useLatest';
 import type { CardRead, CardReaderState } from './cardReader';
 import { useCardReader } from './CardReaderProvider';
 
@@ -12,13 +13,11 @@ export function useCardRead(
   { enabled = true }: { enabled?: boolean } = {},
 ): void {
   const reader = useCardReader();
-  const latest = useRef(onRead);
-  useEffect(() => {
-    latest.current = onRead;
-  });
+  // The onRead of the screen on show, even for a read before `useEffect` runs.
+  const latest = useLatest(onRead);
   useEffect(
     () => (enabled ? reader.pushConsumer((read) => latest.current(read)) : undefined),
-    [reader, enabled],
+    [reader, enabled, latest],
   );
 }
 

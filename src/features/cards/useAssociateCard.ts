@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLatest } from '../../lib/useLatest';
 import type { CardRead } from '../card-input/cardReader';
 import { useCardRead } from '../card-input/useCardRead';
 import { useAuth } from '../identity/AuthProvider';
@@ -62,10 +63,7 @@ export function useAssociateCard(
   const busy = useRef(false);
   const lastUid = useRef<string | null>(null);
   // The active card as the page loaded it: tells "already active" from a replacement.
-  const knownActive = useRef(activeCard?.uid ?? null);
-  useEffect(() => {
-    knownActive.current = activeCard?.uid ?? null;
-  }, [activeCard]);
+  const knownActive = useLatest(activeCard?.uid ?? null);
   // An answer that arrives after the page is gone is dropped.
   const mounted = useRef(true);
   useEffect(() => {
@@ -103,7 +101,7 @@ export function useAssociateCard(
         },
       );
     },
-    [service, customerId, reportNotEnabled],
+    [service, customerId, reportNotEnabled, knownActive],
   );
 
   const reading =

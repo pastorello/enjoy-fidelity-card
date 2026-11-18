@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLatest } from '../../lib/useLatest';
 import { useCardWriter } from '../card-input/useCardWriter';
 import type { CardWriteFailure, CardWriteStep } from '../card-input/webNfcWriter';
 import { useAuth } from '../identity/AuthProvider';
@@ -84,10 +85,7 @@ export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLink
   const [state, setState] = useState<CardLinkWriteState>({ status: 'idle' });
   // The attempt in progress: aborting it drops every answer it is still waiting for.
   const attempt = useRef<AbortController | null>(null);
-  const written = useRef(onWritten);
-  useEffect(() => {
-    written.current = onWritten;
-  }, [onWritten]);
+  const written = useLatest(onWritten);
 
   // The confirmation to send again after no answer: a closure over the token, never state.
   const pendingConfirm = useRef<(() => void) | null>(null);
@@ -131,7 +129,7 @@ export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLink
         fail({ kind: 'confirm', error });
       }
     },
-    [service, cardId, fail],
+    [service, cardId, fail, written],
   );
 
   const run = useCallback(

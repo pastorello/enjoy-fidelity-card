@@ -428,3 +428,11 @@ verificato in `tasks/export/plan.md`. **Dopo la prova**, cancellare i due file d
     chiama `card_points` solo in `POST` (mai `{ get: true }`, che metterebbe il token nell'URL della
     richiesta): lo controlla `scripts/cardsBoundary.test.ts`. I titoli nuovi in Enjoy Display (costanti
     `…TITLE`, `title:` degli avvisi, `CardLinkScreen`) li controlla `scripts/displayGlyphs.test.ts`.
+45. Un ref che tiene "l'ultima" callback o l'ultimo valore per un gestore di eventi, una lettura card o la
+    risposta di una promessa si aggiorna con `useLatest` (`src/lib/useLatest.ts`, fase di layout), mai in un
+    `useEffect`: tra il commit e gli effetti passivi un tocco o una card possono arrivare (telefono lento,
+    CI carica) e vedrebbero ancora la schermata precedente. Successo davvero: "Salva cliente" subito dopo
+    "Card letta" creava il cliente senza card (test instabile di `NewCustomerCardSection`, CI 44321492570).
+    I test lo provano con `renderHookThenFire` (`src/test/fireAfterCommit.tsx`), che chiama nello stesso
+    commit, prima di `useEffect`. Restano in `useEffect` solo i ref del segnalatore `not_operator`, la cui
+    identità cambia senza cambiare comportamento.

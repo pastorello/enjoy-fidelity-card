@@ -3,6 +3,7 @@ import { StrictMode, useState } from 'react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { createFakeWebNfc, type FakeScanOutcome } from '../../test/fakeWebNfc';
+import { renderHookThenFire } from '../../test/fireAfterCommit';
 import { createCardReader, type CardRead, type CardReader } from './cardReader';
 import { CardReaderProvider, useCardReader } from './CardReaderProvider';
 import { useCardRead, useCardReaderState } from './useCardRead';
@@ -256,5 +257,27 @@ describe('useCardReaderState', () => {
 
     expect(nfc.scanCount()).toBe(1);
     expect(screen.getByTestId('nfc')).toHaveTextContent('active');
+  });
+});
+
+describe('useCardRead: the onRead of the screen on show', () => {
+  it('a read right after a render goes to the onRead of that render', async () => {
+    const { nfc, reader } = setup();
+    const before = vi.fn<(read: CardRead) => void>();
+    const after = vi.fn<(read: CardRead) => void>();
+    const hosted = renderHookThenFire(
+      ({ onRead }) => useCardRead(onRead),
+      { onRead: before },
+      {
+        wrapper: ({ children }) => withProvider(reader, children),
+      },
+    );
+    await activate(reader);
+
+    // The screen changed (e.g. a card was just looked up); a card arrives before `useEffect` runs.
+    hosted.rerenderAndFire({ onRead: after }, () => nfc.read(UID));
+
+    expect(before).not.toHaveBeenCalled();
+    expect(after).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }));
   });
 });
