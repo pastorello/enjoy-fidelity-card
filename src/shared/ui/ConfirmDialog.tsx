@@ -5,8 +5,11 @@ import { Icon } from './Icon';
 
 type ConfirmDialogProps = {
   open: boolean;
-  /** A question: "Annullare la spesa di 12,50 €?" */
-  title: string;
+  /**
+   * A question: "Annullare la spesa di 12,50 €?". Set in Enjoy Display: a part with a glyph it lacks
+   * (a card label "…E5F6", a typed name) goes in a span set in the body font.
+   */
+  title: ReactNode;
   /** The consequence, in one sentence. */
   description: ReactNode;
   /** Repeats the action: "Annulla la spesa". */

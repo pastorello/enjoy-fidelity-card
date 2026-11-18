@@ -147,3 +147,42 @@ test.describe('Associa card', () => {
     await expect(page).toHaveURL('/');
   });
 });
+
+test('Modifica cliente: «Disattiva card» asks first, then the section says «Nessuna card attiva» (SPEC-cards, point 5)', async ({
+  page,
+}) => {
+  await stubWebNfc(page);
+  await signIn(page);
+  const uid = freshUid();
+  const label = `…${uid.slice(-4)}`;
+  const customer = await customerWithCard(page, 'Maria Disattiva E2E', uid);
+
+  await page.goto(`/clienti/${customer.id}/modifica`);
+  const section = page.getByRole('region', { name: 'CARD' });
+  await expect(section).toContainText(`Card attiva ${label} · dal `);
+  const replace = section.getByRole('link', { name: 'Sostituisci card' });
+  const deactivate = section.getByRole('button', { name: 'Disattiva card' });
+  await expect(replace).toHaveAttribute('href', `/clienti/${customer.id}/card`);
+  for (const box of await Promise.all([replace.boundingBox(), deactivate.boundingBox()])) {
+    expect(box?.height).toBeGreaterThanOrEqual(48);
+  }
+
+  await deactivate.click();
+  const dialog = page.getByRole('dialog', { name: `Disattivare la card ${label}?` });
+  await expect(dialog).toContainText('I punti restano a Maria.');
+  await dialog.getByRole('button', { name: 'Disattiva card' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(section).toContainText('Nessuna card attiva');
+  const associate = section.getByRole('link', { name: 'Associa card' });
+  await expect(associate).toHaveAttribute('href', `/clienti/${customer.id}/card`);
+  expect((await associate.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+
+  // Saved on the server: the card read on the home no longer opens Registra spesa.
+  await page.goto('/');
+  const panel = page.getByRole('region', { name: 'Lettura card' });
+  await expect(panel).toContainText('Avvicina la card');
+  await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+  await expect(panel).toContainText('Card disattivata');
+  await expect(page).toHaveURL('/');
+});

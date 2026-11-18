@@ -290,6 +290,15 @@ describe('EditCustomerPage: Modifica cliente', () => {
     expect(document.activeElement).toBe(document.body);
   });
 
+  it('CARD follows the form and goes before DATI DEL CLIENTE (wireframe Modifica cliente)', async () => {
+    renderEdit(MARIA.id);
+    const card = await screen.findByRole('region', { name: 'CARD' });
+    const data = screen.getByRole('region', { name: 'DATI DEL CLIENTE' });
+    const name = screen.getByRole('textbox', { name: NAME });
+    expect(name.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(card.compareDocumentPosition(data) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('not_operator on save: back to /accedi', async () => {
     const auth = signedInFake();
     const customers = customersFake();
