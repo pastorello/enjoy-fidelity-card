@@ -270,6 +270,20 @@ export function createFakeCustomerService({
     /** For `fakeCardsService` (new customer with a card): not logged, not programmable. */
     createdFor,
     prepareCreate,
+    /**
+     * For `fakeLedgerService`: adds a movement's points to the balance and, for a purchase or a
+     * redemption (`servedAt` set), makes the customer the most recently served today. Not logged,
+     * not programmable.
+     */
+    applyMovement(customerId: string, points: number, servedAt: string | null) {
+      const customer = stored.get(customerId);
+      if (!customer) throw new Error('fakeCustomerService: a movement of a missing customer');
+      customer.balance += points;
+      if (servedAt !== null) {
+        customer.lastServedAt = servedAt;
+        servedTodayIds = [customerId, ...servedTodayIds.filter((id) => id !== customerId)];
+      }
+    },
     /** The customers served today, most recent first (until `ledger`, the server's list is empty). */
     setServedToday(ids: string[]) {
       servedTodayIds = [...ids];
