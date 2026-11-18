@@ -3,7 +3,7 @@
 -- regole di accesso"). Fake data only: invented names and @example.com emails.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(161);
+select plan(163);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -1066,6 +1066,34 @@ select results_eq(
            ('00000000-0000-4000-9300-000000000014'::uuid, 10)$$,
   'a cancellation leaves the cancelled movement as it was'
 );
+
+-- The operator cancels their own redemption just registered, within 10 s (criterion 8).
+insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
+select '00000000-0000-4000-9100-0000000000e1', 'Elena Riscatti', now(), o.id,
+  '00000000-0000-4000-9200-0000000000e1'
+from app.operators o where o.name = 'Admin Movimenti';
+insert into app.movements
+  (id, operation_id, customer_id, kind, amount_cents, points, cents_per_point, operator_id, created_at)
+values
+  ('00000000-0000-4000-9300-0000000000e1', '00000000-0000-4000-9500-0000000000e1',
+   '00000000-0000-4000-9100-0000000000e1', 'purchase', 800, 8, 100,
+   (select id from app.operators where name = 'Admin Movimenti'), now() - interval '1 hour');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000002","role":"authenticated"}', true);
+select results_eq(
+  $$select r.balance from app.redeem_free_reward('00000000-0000-4000-9800-0000000000e5',
+      '00000000-0000-4000-9100-0000000000e1', 'Caffè di prova', 5) r$$,
+  $$values (3)$$,
+  'the operator redeems 5 of Elena''s 8 points'
+);
+select results_eq(
+  $$select (r.movement).points, (r.movement).corrected_kind, (r.movement).operator_name, r.balance
+    from app.cancel_movement('00000000-0000-4000-9800-0000000000e6',
+      (select id from app.movements where operation_id = '00000000-0000-4000-9800-0000000000e5')) r$$,
+  $$values (5, 'redemption'::text, 'Operatore Movimenti'::text, 8)$$,
+  'the operator cancels their own redemption of a moment ago: the 5 points come back'
+);
+reset role;
 
 select * from finish();
 rollback;
