@@ -33,12 +33,12 @@ format, source)` interno per gli adattatori. Pila dei consumatori con rimozione 
 `try/catch`; uid non valido o nessun consumatore → scartato senza vibrazione; servizio non attivato → nessuna
 lettura. Tipi `CardRead`, `NfcStatus`, `CardReaderState` come nella spec (punto 5).
 **Accettazione:**
-- [ ] Unità (criterio 5): riceve l'ultimo attivato; togliere un consumatore non in cima non cambia chi
+- [x] Unità (criterio 5): riceve l'ultimo attivato; togliere un consumatore non in cima non cambia chi
       riceve; al rilascio di quello in cima torna il precedente; stesso uid a 1999 ms ignorato, a 2001 ms
       consegnato; uid diverso subito
-- [ ] Unità: nessun consumatore → niente vibrazione; `vibrate` assente o che lancia non rompe nulla; uid non
+- [x] Unità: nessun consumatore → niente vibrazione; `vibrate` assente o che lancia non rompe nulla; uid non
       valido scartato; prima di `activate()` e dopo `deactivate()` nessuna lettura e adattatori fermi (criterio 7)
-- [ ] Nessun `console.*` nel file
+- [x] Nessun `console.*` nel file
 **Verifica:** `npm test -- cardReader`
 **Dipendenze:** 1 · **File:** src/features/card-input/cardReader.ts (+ .test.ts) · **Dimensione:** S
 
