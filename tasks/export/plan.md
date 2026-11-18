@@ -127,7 +127,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint D: Impeccable pulito; confronto a 390×844 con il wireframe Impostazioni; revisione `security-and-hardening` del client
 
 ### Fase 5: E2E e chiusura
-- [ ] Task 13: `e2e/export.spec.ts`: download e contenuto dei due file, rete interrotta, operatore senza sezione
+- [x] Task 13: `e2e/export.spec.ts`: download e contenuto dei due file, rete interrotta, operatore senza sezione
 - [ ] Task 14: Glifi, procedura manuale nel RUNBOOK, memoria di progetto
 - [ ] Task 15: Verifica dei criteri di successo (`scripts/exportCriteria.test.ts`) e PR
 

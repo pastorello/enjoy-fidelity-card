@@ -224,10 +224,10 @@ locale): l'admin crea un cliente con nome univoco e una spesa di 12,50 € con l
 `page.route(...).abort()` → nessun download, messaggio di rete, nuovo tocco riuscito. L'operatore non vede
 la sezione.
 **Accettazione:**
-- [ ] Nomi `enjoy-clienti-<oggi a Roma>.csv` e `enjoy-movimenti-<oggi a Roma>.csv` (criterio 8); BOM,
+- [x] Nomi `enjoy-clienti-<oggi a Roma>.csv` e `enjoy-movimenti-<oggi a Roma>.csv` (criterio 8); BOM,
       intestazioni italiane, `;`; il cliente del test con il saldo e la spesa con `12,50` (criterio 3)
-- [ ] Rete interrotta e nuovo tocco (criterio 7); operatore senza sezione (criterio 1)
-- [ ] Sezione ultima con i pulsanti affiancati, "Clienti CSV" a sinistra, ≥ 48 px con icona (criterio 9);
+- [x] Rete interrotta e nuovo tocco (criterio 7); operatore senza sezione (criterio 1)
+- [x] Sezione ultima con i pulsanti affiancati, "Clienti CSV" a sinistra, ≥ 48 px con icona (criterio 9);
       nessun errore in console; nessuna richiesta a Supabase ospitato
 **Verifica:** `npm run e2e -- export`
 **Dipendenze:** 12, 8 · **File:** e2e/export.spec.ts · **Dimensione:** S
