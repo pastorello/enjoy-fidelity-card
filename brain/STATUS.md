@@ -62,7 +62,12 @@ del modulo `identity`.
    (`scripts/cardsCriteria.test.ts`), quality bar completa, build e `check:bundle` verdi in locale.
    Migrazione `*_cards.sql` da applicare allo staging con `db push`. Prima del lancio:
    `VITE_CARD_LINK_ORIGIN` su Vercel Production e prova manuale dei criteri 10 e 14 (RUNBOOK, "Prova
-   manuale del link ai punti"). **Prossimo modulo**: `ledger` (ordine di `CAPABILITY-MAP.md`).
+   manuale del link ai punti"). **`ledger` in corso** su `feat/ledger` (2026-11-18, ramo da `feat/cards`,
+   PR verso `main` da unire dopo #18, #19 e #20): `app.movements` immutabile, RPC idempotenti con saldo
+   sotto lock, Registra spesa, Riscatta premio / Premio libero, ULTIMI MOVIMENTI nella scheda, guardia del
+   confine (`scripts/ledgerBoundary.test.ts`). Mancano lo storico Movimenti con l'annullo dell'admin
+   (task 24-26 di `tasks/ledger/todo.md`), la verifica dei criteri e la PR; poi la prova manuale alla
+   cassa con l'utente (RUNBOOK, "Prova manuale alla cassa").
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -83,7 +88,7 @@ del modulo `identity`.
 
 - Rami in catena non ancora in `main`: `feat/identity` (PR #13), `feat/identity-password`, `feat/settings`,
   `feat/customers`, `chore/specs-folder` (PR #17), `feat/rewards` (PR #18), `feat/card-input` (PR #19),
-  `feat/cards`.
+  `feat/cards` (PR #20), `feat/ledger`.
 
 ## Ultima sessione
 

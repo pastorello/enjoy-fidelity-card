@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 const MISSING = /[…«»@#*×→]/;
 
 /** Components whose text is set in Enjoy Display, and the props of theirs that are. */
-const DISPLAY_CHILDREN = ['Button', 'ScreenTitle'];
+const DISPLAY_CHILDREN = ['Button', 'ButtonLink', 'ScreenTitle'];
 const DISPLAY_PROPS: Record<string, string[]> = {
   AppShell: ['title'],
   StatusView: ['title', 'retryLabel'],
@@ -16,6 +16,8 @@ const DISPLAY_PROPS: Record<string, string[]> = {
   CardReadPanel: ['title'],
   CardReadPanelView: ['title'],
   CardLinkScreen: ['title'],
+  LedgerDoneView: ['title', 'cancelLabel', 'cancelledTitle'],
+  LedgerFailure: ['title'],
 };
 
 /**
@@ -47,7 +49,8 @@ function displayStrings(text: string): string[] {
     for (const match of text.matchAll(
       new RegExp(`<${name}\\b(?:[^>{]|\\{[^}]*\\})*>([\\s\\S]*?)</${name}>`, 'g'),
     )) {
-      found.push(match[1] ?? '');
+      // A JSX comment inside the button (`{/* … */}`) is not drawn.
+      found.push((match[1] ?? '').replaceAll(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, ''));
     }
   }
   const prop = /\b(\w+)=(?:"([^"]*)"|\{\s*(['`])([^'`]*)\3\s*\})/g;
@@ -86,6 +89,44 @@ describe('Enjoy Display glyph coverage', () => {
     expect(displayStrings("const WRITING_TITLE = 'Tieni la card…';")).toEqual(['Tieni la card…']);
     expect(displayStrings("return { title: 'Card #2', text: 'x' };")).toEqual(['Card #2']);
     expect(displayStrings("const subtitle = 'a → b';")).toEqual([]);
+  });
+
+  it('catches a missing glyph in the ledger screens', () => {
+    expect(
+      displayStrings(
+        '<LedgerDoneView title="Spesa #1" cancelLabel="Annulla…" cancelledTitle="Spesa → annullata" />',
+      ),
+    ).toEqual(['Spesa #1', 'Annulla…', 'Spesa → annullata']);
+    expect(displayStrings('<LedgerFailure title="Spesa non salvata…" text="x" />')).toEqual([
+      'Spesa non salvata…',
+    ]);
+    expect(
+      displayStrings('<ButtonLink to="/x">{/* not drawn: a * b */}Apri la scheda</ButtonLink>'),
+    ).toEqual(['Apri la scheda']);
+    expect(
+      displayStrings('<ButtonLink to="/" replace block>Leggi un’altra card…</ButtonLink>'),
+    ).toEqual(['Leggi un’altra card…']);
+  });
+
+  it('reads the ledger titles, buttons and failure titles', () => {
+    const ledger = sourceFiles('src/features/ledger').flatMap((path) =>
+      displayStrings(readFileSync(path, 'utf8')),
+    );
+    expect(ledger).toEqual(
+      expect.arrayContaining([
+        'Registra spesa',
+        'Spesa registrata',
+        'Spesa annullata',
+        'Annulla la spesa',
+        'Spesa non salvata',
+        'Riscatta premio',
+        'Premio libero',
+        'Premio riscattato',
+        'Riscatto annullato',
+        'Annulla il riscatto',
+        'Riscatto non salvato',
+      ]),
+    );
   });
 
   it('uses only characters Enjoy Display has in display text', () => {

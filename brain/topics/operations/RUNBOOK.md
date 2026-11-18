@@ -188,6 +188,40 @@ curl -sI https://<anteprima>.vercel.app/s/AAAAAAAAAAAAAAAAAAAAAA | grep -iE 'cac
 Esito atteso: `cache-control: no-store` e `x-robots-tag: noindex, nofollow` (o il valore di `vercel.json`).
 Annotare l'esito nella tabella sopra (criterio "cards.10", "cards.14", "cards.curl").
 
+### Prova manuale alla cassa (`ledger`, criteri 3 e 8)
+
+Gli E2E misurano i 10 s con la card finta (`e2e/ledger.spec.ts`); qui si prova il telefono vero, una volta
+per rilascio di `ledger`, con l'utente. Stesse condizioni delle prove sopra: **anteprima HTTPS della PR**
+(staging, mai produzione), account di prova, una card di prova già associata a un **cliente di prova**
+(nome inventato, mai un cliente vero), rapporto di `/impostazioni` a 1 punto ogni 1 € (100 centesimi).
+Nessun uid, token, link o nome di cliente vero nelle note.
+
+**Criterio 3 — dalla card alla conferma in meno di 10 s (Android)**
+
+1. Home in "Avvicina la card". Far partire un cronometro nell'istante in cui la card tocca il telefono.
+2. Si apre Registra spesa del cliente di prova (una vibrazione breve, quella della lettura).
+3. Digitare 1-2-5-0 sul tastierino: "12,50 €" e "+12"; toccare "Conferma +12".
+4. Fermare il cronometro su "Spesa registrata". Esito atteso: **meno di 10 s**, una seconda vibrazione
+   (circa 0,2 s) all'arrivo della conferma, "+12 punti a …" e il nuovo saldo.
+5. Senza toccare nulla: conto alla rovescia "Torno alla lettura delle card tra …" e, dopo 10 s, ritorno
+   alla home con la lettura attiva; il cliente compare in "Serviti oggi".
+6. Ripetere con 1-5-0-0-1 (con la soglia predefinita di 150,00 €): "Importo insolito", "Conferma 150,01 €".
+7. Ripetere 3 volte di seguito; annotare il tempo peggiore e se la vibrazione è mancata (Android con
+   vibrazione disattivata nelle impostazioni: nessuna vibrazione, ed è corretto).
+
+**Criterio 8 — annullo dell'operatore e rete**
+
+1. Account **operatore**: registrare una spesa e toccare subito "Annulla la spesa · N s": "Spesa annullata",
+   nessun ritorno automatico. Una seconda spesa lasciata scadere: il pulsante sparisce dopo 10 s.
+2. Modalità aereo dopo aver digitato l'importo → "Conferma": "Spesa non salvata"; togliere la modalità
+   aereo → "Riprova": una sola spesa in Movimenti del cliente.
+3. Da operatore, in Movimenti nessun pulsante Annulla; da amministratore sì, con il dialogo di conferma.
+
+**Dove annotare l'esito**: nella tabella della prova di `card-input` (sopra), criterio "ledger.3.passo" o
+"ledger.8.passo", con il tempo misurato. Un tempo oltre i 10 s si annota con la causa (lettura lenta,
+rete, digitazione) e diventa una nota per il modulo, non una trappola. Quando tutti i passi sono ok,
+segnare i criteri come verificati in `tasks/ledger/plan.md`.
+
 ## 2. Controllo di salute
 
 `npm run typecheck && npm run lint && npm run format:check && npm test` e, con Supabase acceso,
