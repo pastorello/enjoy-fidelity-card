@@ -211,9 +211,9 @@ link alla home; errore con Riprova; cliente cancellato: titolo "Cliente cancella
 usato → "Apri la scheda" dell'altro; rete → "Modifiche non salvate: controlla la connessione e riprova." con
 "Riprova"); stati come la scheda; cliente cancellato → scheda con `replace`.
 **Accettazione:**
-- [ ] Componenti: precompilazione, errori, rete + Riprova, telefono svuotato inviato come vuoto, cliente
+- [x] Componenti: precompilazione, errori, rete + Riprova, telefono svuotato inviato come vuoto, cliente
       cancellato → redirect
-- [ ] Nessuna sezione privacy
+- [x] Nessuna sezione privacy
 **Verifica:** `npm test`
 **Dipendenze:** 11, 12 · **File:** src/features/customers/EditCustomerPage.tsx (+ .module.css, .test.tsx),
 CustomerForm.tsx, src/app/routes.tsx · **Dimensione:** M
