@@ -13,6 +13,8 @@ const DISPLAY_PROPS: Record<string, string[]> = {
   AppShell: ['title'],
   StatusView: ['title', 'retryLabel'],
   ConfirmDialog: ['title', 'confirmLabel', 'cancelLabel'],
+  CardReadPanel: ['title'],
+  CardReadPanelView: ['title'],
 };
 
 function sourceFiles(dir: string): string[] {
@@ -61,6 +63,9 @@ describe('Enjoy Display glyph coverage', () => {
     ]);
     expect(displayStrings('<StatusView kind="empty" title="Nessun #1" />')).toEqual(['Nessun #1']);
     expect(displayStrings('<ListRow title="a → b" />')).toEqual([]);
+    expect(displayStrings('<CardReadPanel title="Avvicina la card…" description="x" />')).toEqual([
+      'Avvicina la card…',
+    ]);
   });
 
   it('uses only characters Enjoy Display has in display text', () => {

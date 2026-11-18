@@ -38,6 +38,17 @@ const paths = {
       <path d="M16.37 2a20.16 20.16 0 0 1 0 20" />
     </>
   ),
+  // Lucide has no "nfc-off": the "nfc" shape crossed by the slash of the "-off" icons, as the
+  // wireframe "Lettura card spenta" draws it.
+  'nfc-off': (
+    <>
+      <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36" />
+      <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58" />
+      <path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8" />
+      <path d="M16.37 2a20.16 20.16 0 0 1 0 20" />
+      <path d="m2 2 20 20" />
+    </>
+  ),
   'wifi-off': (
     <>
       <path d="M12 20h.01" />
