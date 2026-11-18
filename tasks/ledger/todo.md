@@ -224,10 +224,10 @@ src/app/routes.tsx, src/features/cards/PurchasePlaceholderPage.tsx (eliminato) �
 Controlla di non aver digitato una cifra in più."; pulsanti "Correggi" (azzera) e "Conferma 1.250 €"
 (registra subito, nessun secondo dialogo); "Riscatta premio" assente; il tastierino resta.
 **Accettazione:**
-- [ ] Componente: soglia 150,00 €: 150,01 € → avviso e "Conferma 150,01 €"; 150,00 € → stato normale
+- [x] Componente: soglia 150,00 €: 150,01 € → avviso e "Conferma 150,01 €"; 150,00 € → stato normale
       (criterio 2)
-- [ ] Componente: "Correggi" azzera; "Conferma 1.250 €" chiama una sola volta il servizio
-- [ ] Impeccable pulito; confronto con il wireframe "Importo insolito" (Importo-alto)
+- [x] Componente: "Correggi" azzera; "Conferma 1.250 €" chiama una sola volta il servizio
+- [x] Impeccable pulito; confronto con il wireframe "Importo insolito" (Importo-alto)
 **Verifica:** `npm test -- PurchasePage`
 **Dipendenze:** 13 · **File:** src/features/ledger/PurchasePage.tsx, src/features/ledger/PurchasePage.test.tsx,
 src/features/ledger/PurchasePage.module.css · **Dimensione:** S
