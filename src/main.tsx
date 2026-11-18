@@ -5,6 +5,8 @@ import { routes } from './app/routes';
 import { createBrowserCardReader } from './features/card-input/browserCardReader';
 import type { CardInputAdapter, CardWriteTarget } from './features/card-input/cardReader';
 import { CardReaderProvider } from './features/card-input/CardReaderProvider';
+import { CardsServiceProvider } from './features/cards/CardsServiceProvider';
+import { supabaseCardsService } from './features/cards/supabaseCardsService';
 import { CustomerServiceProvider } from './features/customers/CustomerServiceProvider';
 import { supabaseCustomerService } from './features/customers/supabaseCustomerService';
 import { RewardsServiceProvider } from './features/rewards/RewardsServiceProvider';
@@ -43,9 +45,11 @@ createRoot(container).render(
       <SettingsServiceProvider service={supabaseSettingsService}>
         <CustomerServiceProvider service={supabaseCustomerService}>
           <RewardsServiceProvider service={supabaseRewardsService}>
-            <CardReaderProvider reader={cardReader}>
-              <RouterProvider router={router} />
-            </CardReaderProvider>
+            <CardsServiceProvider service={supabaseCardsService}>
+              <CardReaderProvider reader={cardReader}>
+                <RouterProvider router={router} />
+              </CardReaderProvider>
+            </CardsServiceProvider>
           </RewardsServiceProvider>
         </CustomerServiceProvider>
       </SettingsServiceProvider>
