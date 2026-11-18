@@ -254,13 +254,13 @@ dati → non si trova più; operatore crea un cliente con solo nome e consenso e
 `CLAUDE.md` se cambiano comandi; nota in `SPEC-customers.md` che `test:integration` ora esiste; verifica
 puntuale degli 8 criteri di successo; i task segnati in questo file.
 **Accettazione:**
-- [ ] Ogni criterio di successo con il test che lo prova
-- [ ] Nessun segreto né dato reale nei documenti
+- [x] Ogni criterio di successo con il test che lo prova
+- [x] Nessun segreto né dato reale nei documenti
 **Verifica:** quality bar completa verde; rilettura
 **Dipendenze:** 15 · **File:** brain/MAP.md, brain/STATUS.md, brain/topics/operations/RUNBOOK.md,
 SPEC-customers.md, tasks/customers/todo.md · **Dimensione:** S
 
 ## Checkpoint E
-- [ ] Gli 8 criteri di successo di SPEC-customers verificati
-- [ ] Quality bar completa verde in locale e in CI
-- [ ] PR pronta per `code-review-and-quality`
+- [x] Gli 8 criteri di successo di SPEC-customers verificati
+- [ ] Quality bar completa verde in locale e in CI (in locale verde il 2026-11-18; CI da vedere sulla PR)
+- [x] PR pronta per `code-review-and-quality`
