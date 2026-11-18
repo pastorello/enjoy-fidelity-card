@@ -1,12 +1,14 @@
+import { execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { localSupabase, memoryClient, runSql, runSqlInBackground } from './localSupabase';
 
-// SPEC-tablet-kiosk, criterion 3, through the API: every RPC call is its own transaction,
-// so the counter of wrong PINs must survive each answer, and concurrent attempts from one
-// tablet must not slip past the fifth. A new PIN racing an unlock never leaves a turn
-// opened with the old PIN (criterion 4).
+// SPEC-tablet-kiosk through the API. Criterion 1: with its own token and no cashier the
+// device reads 0 rows and every write is refused. Criterion 3: every RPC call is its own
+// transaction, so the counter of wrong PINs must survive each answer, and concurrent
+// attempts from one tablet must not slip past the fifth. Criterion 4: a new PIN closes the
+// turn open on the tablet, even one racing it. No answer ever carries the PIN or its hash.
 const local = localSupabase();
 const admin = memoryClient(local.url, local.secretKey);
 
@@ -141,6 +143,168 @@ afterAll(async () => {
   );
 });
 
+/** Every table and view of app, read from the catalog so a new one is covered too. */
+function appRelations(): { name: string; selectable: boolean }[] {
+  return runSql(
+    `select c.relname || '|' || has_table_privilege('authenticated', c.oid, 'select')
+     from pg_class c
+     where c.relnamespace = 'app'::regnamespace and c.relkind in ('r', 'v', 'm', 'p', 'f')
+     order by c.relname;`,
+  )
+    .split('\n')
+    .map((line) => {
+      const [name = '', selectable] = line.split('|');
+      return { name, selectable: selectable === 'true' };
+    });
+}
+
+/** What the device token reads from each table and view: a row count, or the refusal. */
+async function deviceReads(): Promise<string[]> {
+  return Promise.all(
+    appRelations().map(async ({ name }) => {
+      const { data, error } = await deviceClient.schema('app').from(name).select('*');
+      return error ? `${name}:${error.code}` : `${name}:${data.length}`;
+    }),
+  );
+}
+
+/** Rows of the tables a write would touch, counted as the database owner. */
+function writeTargets(): string {
+  return runSql(
+    `select (select count(*) from app.customers) || '|' || (select count(*) from app.movements)
+       || '|' || (select count(*) from app.cards) || '|' || (select count(*) from app.rewards)
+       || '|' || (select row(s.*)::text from app.settings s);`,
+  );
+}
+
+/** A seed row id, read as the database owner. */
+function seedId(sql: string): string {
+  const id = runSql(sql);
+  if (!id) throw new Error(`The seed has no row for: ${sql}`);
+  return id;
+}
+
+/** Write RPCs of the other modules, with the error each must answer a device without a cashier. */
+function deviceWrites(): { name: string; args: Record<string, unknown>; code: string }[] {
+  const customer = seedId(`select id from app.customers where anonymized_at is null limit 1;`);
+  const reward = seedId(`select id from app.rewards limit 1;`);
+  const movement = seedId(`select id from app.movements limit 1;`);
+  const card = seedId(`select id from app.cards limit 1;`);
+  return [
+    {
+      code: 'P0001',
+      name: 'create_customer',
+      args: {
+        p_operation_id: randomUUID(),
+        p_name: `Cassa Vuota ${run}`,
+        p_phone: null,
+        p_privacy_consent: true,
+        p_notes: null,
+      },
+    },
+    {
+      code: 'P0001',
+      name: 'update_customer',
+      args: { p_customer_id: customer, p_name: `Cassa Vuota ${run}`, p_phone: null, p_notes: null },
+    },
+    { code: 'P0001', name: 'anonymize_customer', args: { p_customer_id: customer } },
+    {
+      code: 'P0001',
+      name: 'associate_card',
+      args: { p_customer_id: customer, p_uid: 'A0B1C2D3E4F5A9' },
+    },
+    { code: 'P0001', name: 'deactivate_card', args: { p_card_id: card } },
+    { code: 'P0001', name: 'issue_card_link', args: { p_card_id: card } },
+    {
+      code: '42501',
+      name: 'record_purchase',
+      args: { p_operation_id: randomUUID(), p_customer_id: customer, p_amount_cents: 1250 },
+    },
+    {
+      code: '42501',
+      name: 'redeem_reward',
+      args: { p_operation_id: randomUUID(), p_customer_id: customer, p_reward_id: reward },
+    },
+    {
+      code: '42501',
+      name: 'cancel_movement',
+      args: { p_operation_id: randomUUID(), p_movement_id: movement },
+    },
+    {
+      code: '42501',
+      name: 'create_reward',
+      args: { p_id: randomUUID(), p_name: `Premio Cassa ${run}`, p_points: 5, p_active: true },
+    },
+    { code: '42501', name: 'set_reward_active', args: { p_id: reward, p_active: false } },
+    {
+      code: '42501',
+      name: 'update_settings',
+      args: { p_cents_per_point: 100, p_confirm_threshold_cents: 15000, p_usb_uid_format: null },
+    },
+  ];
+}
+
+describe('a device without a cashier, with its own token (criterion 1)', () => {
+  it('reads 0 rows from every table and view of app, and app.devices not at all', async () => {
+    // As the database owner every relation has rows, so 0 below means hidden, not empty.
+    const empty = appRelations().filter(
+      ({ name }) => runSql(`select count(*) from app.${name};`) === '0',
+    );
+    expect(empty).toEqual([]);
+    expect(deviceState()).toBe('0|none|none');
+
+    const expected = appRelations().map(({ name, selectable }) =>
+      selectable ? `${name}:0` : `${name}:42501`,
+    );
+    expect(await deviceReads()).toEqual(expected);
+  });
+
+  it('is refused by every write RPC and every direct write, and nothing changes', async () => {
+    const before = writeTargets();
+
+    const writes = deviceWrites();
+    const answers = await Promise.all(
+      writes.map(async ({ name, args }) => {
+        const { error } = await deviceClient.schema('app').rpc(name, args);
+        return `${name}:${error?.code ?? 'accepted'}`;
+      }),
+    );
+    // The same refusals as for a caller without an operator (pgTAP tablet_kiosk_access).
+    expect(answers).toEqual(writes.map(({ name, code }) => `${name}:${code}`));
+
+    // The API role may only select from app: direct writes are refused before RLS.
+    const directWrites = [
+      deviceClient
+        .schema('app')
+        .from('customers')
+        .insert({ name: `Diretto ${run}`, privacy_consent_at: new Date().toISOString() }),
+      deviceClient.schema('app').from('settings').update({ cents_per_point: 1 }).eq('id', true),
+      deviceClient
+        .schema('app')
+        .from('devices')
+        .update({ failed_pin_attempts: 0, locked_until: null })
+        .eq('name', device.name),
+    ];
+    for (const { error } of await Promise.all(directWrites)) expect(error?.code).toBe('42501');
+
+    expect(writeTargets()).toBe(before);
+  });
+
+  it('reads with a cashier and reads nothing again once the turn ends', async () => {
+    expect(await unlock(PIN)).toMatchObject({ status: 'ok' });
+    const during = await deviceClient.schema('app').from('customers').select('id');
+    expect(during.error).toBeNull();
+    expect(during.data?.length).toBeGreaterThan(0);
+
+    const { error } = await deviceClient.schema('app').rpc('end_cashier_turn');
+    expect(error).toBeNull();
+    expect(deviceState()).toBe('0|none|none');
+    const after = await deviceClient.schema('app').from('customers').select('id');
+    expect(after.error).toBeNull();
+    expect(after.data).toEqual([]);
+  });
+});
+
 describe('unlock_cashier through the API', () => {
   it('commits each wrong PIN with its answer', async () => {
     expect(await unlock(WRONG)).toEqual({ status: 'wrong_pin', attempts_left: 4 });
@@ -149,17 +313,19 @@ describe('unlock_cashier through the API', () => {
     expect(deviceState()).toBe('2|none|none');
   });
 
-  it('counts concurrent attempts one by one: the fifth locks, the rest find the lock', async () => {
+  it('counts 10 concurrent wrong PINs: exactly 5 counted, the fifth locks, the rest find the lock', async () => {
     runSql(`update app.devices set failed_pin_attempts = 0 where name = :'name';`, {
       name: device.name,
     });
 
-    const answers = await Promise.all(Array.from({ length: 8 }, () => unlock(WRONG)));
+    const answers = await Promise.all(Array.from({ length: 10 }, () => unlock(WRONG)));
 
+    // Four counted attempts answer one distinct count each; the fifth sets the lock and
+    // resets the counter, so a sixth counted attempt would show up as attempts_left 4 again.
     const wrong = answers.filter((a) => a.status === 'wrong_pin').map((a) => a.attempts_left);
     expect(wrong.toSorted((a = 0, b = 0) => a - b)).toEqual([1, 2, 3, 4]);
     const locked = answers.filter((a) => a.status === 'locked');
-    expect(locked).toHaveLength(4);
+    expect(locked).toHaveLength(6);
     for (const answer of locked) {
       expect(answer.lock_seconds_left).toBeGreaterThan(0);
       expect(answer.lock_seconds_left).toBeLessThanOrEqual(300);
@@ -219,5 +385,120 @@ describe('unlock_cashier through the API', () => {
     expect(held.split('\n')).toContain('ok');
     expect(error).toBeNull();
     expect(deviceState()).toBe('0|none|none');
+  });
+});
+
+describe('a new PIN from the phone (criterion 4)', () => {
+  it('ends the turn open on the tablet: the device reads and writes nothing again', async () => {
+    expect(await unlock(PIN)).toMatchObject({ status: 'ok' });
+    expect(deviceState()).toBe(`0|none|${operatorId}`);
+
+    const { error } = await operatorClient.schema('app').rpc('set_my_pin', { p_pin: PIN });
+    expect(error).toBeNull();
+
+    expect(deviceState()).toBe('0|none|none');
+    const reads = await deviceClient.schema('app').from('customers').select('id');
+    expect(reads.data).toEqual([]);
+    const customer = seedId(`select id from app.customers where anonymized_at is null limit 1;`);
+    const write = await deviceClient.schema('app').rpc('record_purchase', {
+      p_operation_id: randomUUID(),
+      p_customer_id: customer,
+      p_amount_cents: 1250,
+    });
+    expect(write.error?.code).toBe('42501');
+  });
+});
+
+/** Every key and every string value of an answer, however deep. */
+function keysAndValues(value: unknown): string[] {
+  if (Array.isArray(value)) return value.flatMap(keysAndValues);
+  if (typeof value === 'object' && value !== null) {
+    return Object.entries(value).flatMap(([key, inner]) => [key, ...keysAndValues(inner)]);
+  }
+  if (typeof value === 'string') return [value];
+  return typeof value === 'number' || typeof value === 'boolean' ? [String(value)] : [];
+}
+
+const app = (client: SupabaseClient) => client.schema('app');
+
+describe('the PIN and its hash', () => {
+  it('never appear in any answer of the API, in any state', async () => {
+    const answers: unknown[] = [];
+    const keep = (answer: { data: unknown; error: unknown }) => {
+      answers.push(answer.data, answer.error);
+      return answer;
+    };
+
+    keep(await app(operatorClient).rpc('set_my_pin', { p_pin: PIN }));
+    keep(await app(operatorClient).rpc('get_session_identity'));
+    keep(await app(operatorClient).from('operators').select('*'));
+    keep(await app(operatorClient).rpc('list_cashiers'));
+    keep(await app(deviceClient).rpc('list_cashiers'));
+    keep(await app(deviceClient).rpc('get_session_identity'));
+    keep(
+      await app(deviceClient).rpc('unlock_cashier', { p_operator_id: operatorId, p_pin: WRONG }),
+    );
+    keep(await app(deviceClient).rpc('unlock_cashier', { p_operator_id: operatorId, p_pin: '12' }));
+    keep(await app(deviceClient).rpc('unlock_cashier', { p_operator_id: operatorId, p_pin: PIN }));
+    keep(await app(deviceClient).rpc('get_session_identity'));
+    keep(await app(deviceClient).from('operators').select('*'));
+    keep(await app(deviceClient).rpc('end_cashier_turn'));
+    runSql(
+      `update app.devices set locked_until = now() + interval '5 minutes' where name = :'name';`,
+      { name: device.name },
+    );
+    keep(await app(deviceClient).rpc('unlock_cashier', { p_operator_id: operatorId, p_pin: PIN }));
+    keep(await app(deviceClient).rpc('get_session_identity'));
+    runSql(`update app.devices set locked_until = null where name = :'name';`, {
+      name: device.name,
+    });
+    keep(await app(deviceClient).from('devices').select('*'));
+    keep(await app(operatorClient).from('devices').select('*'));
+    keep(await app(operatorClient).from('operator_pins').select('*'));
+    keep(await operatorClient.schema('private').from('operator_pins').select('*'));
+    keep(await deviceClient.schema('private').from('operator_pins').select('*'));
+
+    // Precondition: the answers above are real, the cashier list and the unlock included.
+    const everything = answers.flatMap(keysAndValues);
+    expect(everything).toContain('has_pin');
+    expect(everything).toContain('ok');
+    expect(everything).toContain('locked');
+
+    expect(everything.filter((text) => /pin_hash|\$2[aby]\$/.test(text))).toEqual([]);
+    expect(everything).not.toContain(PIN);
+    expect(everything).not.toContain(WRONG);
+    // The hash is stored, and it is bcrypt of the PIN, not the PIN.
+    expect(
+      runSql(
+        `select pin_hash like '$2_$08$%' and pin_hash = extensions.crypt(:'pin', pin_hash)
+         from private.operator_pins where operator_id = :'id'::uuid;`,
+        { pin: PIN, id: operatorId },
+      ),
+    ).toBe('t');
+  });
+});
+
+/** Tracked files matching `git grep` arguments; git exits 1 when nothing matches. */
+function trackedFilesMatching(...args: string[]): string[] {
+  try {
+    return execFileSync('git', ['grep', '-l', ...args], { encoding: 'utf8' })
+      .trim()
+      .split('\n');
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'status' in error && error.status === 1) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+describe('the local secret key', () => {
+  it('is read at run time from `supabase status`, never written in a tracked file', () => {
+    expect(trackedFilesMatching('-F', local.secretKey)).toEqual([]);
+  });
+
+  it('is only used by the integration tests (E2E and the app get the publishable key only)', () => {
+    const readers = trackedFilesMatching('-F', 'secretKey');
+    expect(readers.filter((path) => !path.startsWith('tests/integration/'))).toEqual([]);
   });
 });
