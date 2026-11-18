@@ -53,7 +53,7 @@ del modulo `identity`.
    successo verificati test per test (`scripts/cardInputCriteria.test.ts`), quality bar completa e build verdi
    in locale. Resta la **prova manuale su Android** con l'utente (RUNBOOK, "Prova manuale della lettura
    card": criteri 2, 3 e 10, in parte solo dopo `cards`). **`cards` completo** su `feat/cards`
-   (2026-11-18, ramo da `feat/card-input`, PR verso `main` da unire dopo #18 e #19): `app.cards` con una
+   (2026-11-18, ramo da `feat/card-input`, PR #20 verso `main` da unire dopo #18 e #19): `app.cards` con una
    card attiva per cliente, RPC idempotenti (associa, sostituisci, disattiva, Nuovo cliente con card),
    card letta in home → Registra spesa o Nuovo cliente con la card, link ai punti con token casuale (solo
    l'impronta sul server, mai l'uid) scritto e verificato sulla card, pagina pubblica `/s/:token` con il
