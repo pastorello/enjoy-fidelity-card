@@ -4,6 +4,8 @@ import { createBrowserRouter, RouterProvider } from 'react-router';
 import { routes } from './app/routes';
 import { CustomerServiceProvider } from './features/customers/CustomerServiceProvider';
 import { supabaseCustomerService } from './features/customers/supabaseCustomerService';
+import { RewardsServiceProvider } from './features/rewards/RewardsServiceProvider';
+import { supabaseRewardsService } from './features/rewards/supabaseRewardsService';
 import { AuthProvider } from './features/identity/AuthProvider';
 import { supabaseAuthService } from './features/identity/supabaseAuthService';
 import { SettingsServiceProvider } from './features/settings/SettingsProvider';
@@ -22,7 +24,9 @@ createRoot(container).render(
     <AuthProvider service={supabaseAuthService}>
       <SettingsServiceProvider service={supabaseSettingsService}>
         <CustomerServiceProvider service={supabaseCustomerService}>
-          <RouterProvider router={router} />
+          <RewardsServiceProvider service={supabaseRewardsService}>
+            <RouterProvider router={router} />
+          </RewardsServiceProvider>
         </CustomerServiceProvider>
       </SettingsServiceProvider>
     </AuthProvider>

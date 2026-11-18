@@ -95,9 +95,9 @@ risposte ritardate, rete giù, "arrivato ma risposta persa", guasti `ServerFault
 `RewardsServiceProvider` / `useRewardsService()`; iniezione in `main.tsx` e in `renderApp` (quarto parametro
 facoltativo).
 **Accettazione:**
-- [ ] Test del finto: stesso id due volte → una riga; nome equivalente → `name-taken`; operatore →
+- [x] Test del finto: stesso id due volte → una riga; nome equivalente → `name-taken`; operatore →
       `forbidden`; "risposta persa" applica la scrittura e rifiuta con `network`
-- [ ] I test esistenti che usano `renderApp` passano senza modifiche alle chiamate
+- [x] I test esistenti che usano `renderApp` passano senza modifiche alle chiamate
 **Verifica:** `npm test`
 **Dipendenze:** 3 · **File:** src/test/fakeRewardsService.ts (+ .test.ts),
 src/features/rewards/RewardsServiceProvider.tsx, src/main.tsx, src/test/renderApp.tsx · **Dimensione:** M
