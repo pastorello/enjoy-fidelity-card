@@ -255,10 +255,10 @@ ritorno automatico; `cancel-window-expired` → "Tempo scaduto: per annullare or
 ritorno automatico da 3 s; rete → "Annullamento non riuscito: controlla la connessione e riprova." con
 "Riprova" (stesso id), conto alla rovescia fermo.
 **Accettazione:**
-- [ ] Componente: annullo riuscito → "Spesa annullata", saldo ripristinato, nessun ritorno (criterio 8)
-- [ ] Componente: tempo scaduto (`EC003` dal finto) → testo e ritorno dopo 3 s; rete → Riprova con lo
+- [x] Componente: annullo riuscito → "Spesa annullata", saldo ripristinato, nessun ritorno (criterio 8)
+- [x] Componente: tempo scaduto (`EC003` dal finto) → testo e ritorno dopo 3 s; rete → Riprova con lo
       stesso id e un solo annullo nel finto
-- [ ] Pulsante nascosto dopo 10 s
+- [x] Pulsante nascosto dopo 10 s
 **Verifica:** `npm test -- LedgerDoneView PurchasePage`
 **Dipendenze:** 15 · **File:** src/features/ledger/LedgerDoneView.tsx,
 src/features/ledger/LedgerDoneView.test.tsx, src/features/ledger/PurchasePage.test.tsx · **Dimensione:** S
