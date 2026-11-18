@@ -238,8 +238,8 @@ la sezione.
 anteprima HTTPS con lo staging, i due file scaricati e aperti in Excel o Fogli Google, colonne e accenti,
 esito da annotare). `brain/STATUS.md` aggiornato; `CAPABILITY-MAP.md` se cambia qualcosa.
 **Accettazione:**
-- [ ] La procedura indica i passi, cosa controllare nei due file e dove annotare l'esito
-- [ ] Nessun segreto né dato reale nei documenti
+- [x] La procedura indica i passi, cosa controllare nei due file e dove annotare l'esito
+- [x] Nessun segreto né dato reale nei documenti
 **Verifica:** `npm test -- displayGlyphs`; rilettura
 **Dipendenze:** 13 · **File:** scripts/displayGlyphs.test.ts, brain/topics/operations/RUNBOOK.md,
 brain/STATUS.md · **Dimensione:** S

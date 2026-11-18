@@ -128,7 +128,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 5: E2E e chiusura
 - [x] Task 13: `e2e/export.spec.ts`: download e contenuto dei due file, rete interrotta, operatore senza sezione
-- [ ] Task 14: Glifi, procedura manuale nel RUNBOOK, memoria di progetto
+- [x] Task 14: Glifi, procedura manuale nel RUNBOOK, memoria di progetto
 - [ ] Task 15: Verifica dei criteri di successo (`scripts/exportCriteria.test.ts`) e PR
 
 ### Checkpoint E: i criteri 1–9 verificati; quality bar completa verde; PR su `main` pronta per `code-review-and-quality`, da unire dopo #21; criterio 10 sul telefono con l'utente dopo la pubblicazione su staging
