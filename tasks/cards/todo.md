@@ -123,10 +123,10 @@ src/features/cards/CardsServiceProvider.tsx, src/main.tsx, src/test/renderApp.ts
 ## Task 7: Integrazione contro lo stack locale
 **Descrizione:** `tests/integration/cards.test.ts` con gli utenti del seed e la chiave anon locale.
 **Accettazione:**
-- [ ] Due `associate` concorrenti dello stesso uid a clienti diversi: una riesce, l'altra `card_taken`;
+- [x] Due `associate` concorrenti dello stesso uid a clienti diversi: una riesce, l'altra `card_taken`;
       due uid diversi allo stesso cliente in concorrenza: una sola card attiva alla fine (criterio 4)
-- [ ] `supabaseCardsService` traduce i codici reali (anche `card_inactive`, `link_token_mismatch`)
-- [ ] `card_points` via HTTP con la chiave anon: `Cache-Control: no-store`, corpo solo numero o `null`,
+- [x] `supabaseCardsService` traduce i codici reali (anche `card_inactive`, `link_token_mismatch`)
+- [x] `card_points` via HTTP con la chiave anon: `Cache-Control: no-store`, corpo solo numero o `null`,
       stessa forma per token mai esistito e di card disattivata (criterio 12)
 **Verifica:** `npm run test:integration`
 **Dipendenze:** 6 · **File:** tests/integration/cards.test.ts · **Dimensione:** S
