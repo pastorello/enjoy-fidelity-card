@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { ServerFaultError } from '../../lib/serverFault';
@@ -11,15 +11,13 @@ import { loadErrorText } from '../customers/loadErrorText';
 import type { CustomerSummary } from '../customers/types';
 import { isCustomerId, useCustomer } from '../customers/useCustomer';
 import styles from './AssociateCardPage.module.css';
-import { CardLinkWriter, CardLinkWriterActions } from './CardLinkWriter';
+import { Associated, CardLinkScreen } from './CardLinkScreen';
 import { CardTakenNotice, OpenOwnerLink } from './CardTakenNotice';
-import { NOT_IN_DISPLAY } from './customerName';
 import { CustomerRowLink } from './CustomerRowLink';
 import { formatCardLabel, shortName } from './formatCard';
 import { NetworkError, type CardSummary } from './types';
 import { useActiveCard } from './useActiveCard';
 import { associatedNotice, useAssociateCard } from './useAssociateCard';
-import { useCardLinkWriter } from './useCardLinkWriter';
 
 const TITLE = 'Associa card';
 const PANEL_TITLE = 'Avvicina la card nuova';
@@ -44,22 +42,6 @@ function AlreadyActive({ name }: { name: string }) {
   );
 }
 
-/** «Card associata a Maria», the check on green (board "Associa-link"). */
-function Associated({ name }: { name: string }) {
-  return (
-    <output className={styles.associated}>
-      <span className={styles.badge}>
-        <Icon name="check" size={18} />
-      </span>
-      <span className={styles.associatedText}>
-        Card associata a{' '}
-        {/* A typed name with a glyph Enjoy Display lacks is set in the body font. */}
-        {NOT_IN_DISPLAY.test(name) ? <span className={styles.typedName}>{name}</span> : name}
-      </span>
-    </output>
-  );
-}
-
 /**
  * The write of the link on the card just associated (SPEC-cards, points 4 and 8; boards
  * "Associa-link" and "Associa-link-errore"). Every way out goes to the customer page, in place of
@@ -73,7 +55,6 @@ function WriteLink({
 }: {
   customer: CustomerSummary;
   card: CardSummary;
-  /** What the association did, above the write: hidden with a failure, as in the boards. */
   intro: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -87,37 +68,15 @@ function WriteLink({
     },
     [navigate, customerPath, card.uid],
   );
-  const onWritten = useCallback(() => leave(true), [leave]);
-  const writing = useCardLinkWriter({ cardId: card.id, uid: card.uid, onWritten });
-  const { state, canWrite } = writing;
-
-  // iPhone, NFC off, the tablet's USB reader, or NFC lost while writing: the outcome of «Più tardi».
-  const cannotWrite = state.status === 'cannot-write' || (state.status === 'idle' && !canWrite);
-  useEffect(() => {
-    if (cannotWrite) leave(false);
-  }, [cannotWrite, leave]);
-
-  const failed = state.status === 'failed';
-  const name = shortName(customer.name);
   return (
-    <AppShell
+    <CardLinkScreen
       title={TITLE}
       backTo={customerPath}
-      actions={<CardLinkWriterActions writing={writing} onLater={() => leave(false)} />}
-    >
-      <CustomerRowLink customer={customer} />
-      {!failed && intro}
-      <CardLinkWriter writing={writing} uid={card.uid} customerName={customer.name} />
-      {!failed && (
-        <p className={styles.note}>
-          <Icon name="link" size={20} />
-          <span>
-            Con il link, {name} vede i suoi punti avvicinando la card al proprio telefono. Sulla
-            card va solo il link: nessun dato personale.
-          </span>
-        </p>
-      )}
-    </AppShell>
+      customer={customer}
+      card={card}
+      intro={intro}
+      onLeave={leave}
+    />
   );
 }
 
