@@ -54,13 +54,13 @@ caratteri, solo impronta in attesa, `link_pending_at` = `pending_issued_at`); `a
 token)` (idempotente sul token valido, promuove quello in attesa, `link_token_mismatch` altrimenti);
 trigger: ogni passaggio `active` true → false azzera lo stato del link e cancella la riga di `card_links`.
 **Accettazione:**
-- [ ] pgTAP: token di 22 caratteri `[A-Za-z0-9_-]`, due emissioni diverse; nessuna colonna di
+- [x] pgTAP: token di 22 caratteri `[A-Za-z0-9_-]`, due emissioni diverse; nessuna colonna di
       `card_links` contiene il token in chiaro; `card_not_found`, `card_inactive`, `not_operator` per `anon`
       e utente senza profilo; nessun messaggio d'errore contiene il token (criteri 8, 12)
-- [ ] pgTAP: conferma → `link_written_at/by` valorizzati e `link_pending_at` null; stesso token due volte
+- [x] pgTAP: conferma → `link_written_at/by` valorizzati e `link_pending_at` null; stesso token due volte
       idempotente; token più vecchio dopo una nuova emissione → `link_token_mismatch`; `link_pending_at`
       uguale a `pending_issued_at` dopo l'emissione (criterio 15)
-- [ ] pgTAP: sostituzione, `deactivate_card` e anonimizzazione → stato del link azzerato e riga cancellata;
+- [x] pgTAP: sostituzione, `deactivate_card` e anonimizzazione → stato del link azzerato e riga cancellata;
       riattivazione → link non scritto (criterio 11)
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1, 2 · **File:** supabase/migrations/*_cards.sql, supabase/tests/cards.test.sql

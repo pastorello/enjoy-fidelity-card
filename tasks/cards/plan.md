@@ -112,7 +112,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 1: Database (rischio più alto)
 - [x] Task 1: `app.cards`, trigger, policy, `lookup_card`, `associate_card`, `deactivate_card`, card del seed, pgTAP
 - [x] Task 2: `create_customer_with_card` tutto-o-niente e idempotente; anonimizzazione disattiva la card
-- [ ] Task 3: Link ai punti: `private.card_links`, `issue_card_link`, `confirm_card_link`, disattivazione = link morto
+- [x] Task 3: Link ai punti: `private.card_links`, `issue_card_link`, `confirm_card_link`, disattivazione = link morto
 - [ ] Task 4: `public.card_points` e allowlist delle funzioni eseguibili da `anon`
 
 ### Checkpoint A: `db:test` verde; revisione `security-and-hardening` su RLS, privilegi, token e funzione pubblica
