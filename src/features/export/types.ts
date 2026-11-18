@@ -53,3 +53,17 @@ export type ExportService = {
   fetchCustomers(): Promise<CustomerExportRow[]>;
   fetchMovements(): Promise<MovementExportRow[]>;
 };
+
+/** Why reading the export rows failed; a server fault rejects with `ServerFaultError` instead. */
+export type ExportErrorKind = 'forbidden' | 'network' | 'unknown';
+
+/** Rejected by the export service. Its message names the kind only, never a row. */
+export class ExportError extends Error {
+  readonly kind: ExportErrorKind;
+
+  constructor(kind: ExportErrorKind) {
+    super(`Export request failed (${kind})`);
+    this.name = 'ExportError';
+    this.kind = kind;
+  }
+}
