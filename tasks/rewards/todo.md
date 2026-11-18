@@ -60,9 +60,9 @@ per nome con `localeCompare` `it`); `validateReward.ts` (nome con `trim`, 1–60
 con i testi della spec ("Scrivi il nome del premio", "Il nome è troppo lungo (massimo 60 caratteri)",
 "Scrivi i punti: un numero intero maggiore di zero", "Al massimo 99.999 punti").
 **Accettazione:**
-- [ ] Unità `sortRewards`: ordine del wireframe (Dolce del giorno in fondo), parità di punti per nome,
+- [x] Unità `sortRewards`: ordine del wireframe (Dolce del giorno in fondo), parità di punti per nome,
       l'array in ingresso non cambia
-- [ ] Unità `validateReward`: 0, 1, 99 999, 100 000, "1,5", "-3", "+3", "1 000", nome vuoto, di soli spazi,
+- [x] Unità `validateReward`: 0, 1, 99 999, 100 000, "1,5", "-3", "+3", "1 000", nome vuoto, di soli spazi,
       di 60 e 61 caratteri
 **Verifica:** `npm test -- rewards`
 **Dipendenze:** nessuna · **File:** src/features/rewards/types.ts, sortRewards.ts (+ .test.ts),

@@ -72,7 +72,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: db:test verde; revisione di sicurezza su RLS, privilegi e RPC
 
 ### Fase 2: Contratto del frontend
-- [ ] Task 3: Tipi, `sortRewards`, `validateReward` (funzioni pure)
+- [x] Task 3: Tipi, `sortRewards`, `validateReward` (funzioni pure)
 - [ ] Task 4: `supabaseRewardsService`, guardia del confine, integrazione contro lo stack locale
 - [ ] Task 5: Servizio finto, `RewardsServiceProvider` in `main.tsx` e `renderApp`
 
