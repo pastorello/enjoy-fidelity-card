@@ -70,14 +70,17 @@ del modulo `identity`.
    reale in ricerca, scheda, Serviti oggi e `card_points`; 10 criteri verificati test per test
    (`scripts/ledgerCriteria.test.ts`), quality bar completa, build e `check:bundle` verdi. Migrazione
    `*_ledger.sql` da applicare allo staging con `db push`; prova manuale alla cassa con l'utente (criteri 3
-   e 8, RUNBOOK, "Prova manuale alla cassa"). **`export` quasi completo** su `feat/export` (2026-11-18,
-   ramo da `feat/ledger`, PR verso `main`, #21 già unita; task 1-14 fatti, manca il 15: criteri e PR):
+   e 8, RUNBOOK, "Prova manuale alla cassa"). **`export` completo** su `feat/export` (2026-11-18,
+   ramo da `feat/ledger`, PR #22 verso `main` con CI verde, da unire dopo #21; task 1-15 fatti, 10 criteri
+   verificati test per test in `scripts/exportCriteria.test.ts`, quality bar completa, build e
+   `check:bundle` verdi):
    RPC di sola lettura solo admin `app.export_customers` / `app.export_movements` a pagine da 1000, dati
    degli anonimizzati azzerati nella funzione SQL, CSV per Excel in italiano generato nel client (BOM, `;`,
    virgola decimale, date Europe/Rome, difesa dalle formule), sezione ESPORTA DATI in fondo a
    `/impostazioni` con "Clienti CSV" e "Movimenti CSV". Migrazione `*_export.sql` da applicare allo staging
    con `db push`; prova manuale sul telefono con l'utente (criterio 10, RUNBOOK, "Prova manuale
-   dell'esportazione"). Poi il checkpoint di lancio e `tablet-kiosk`.
+   dell'esportazione"). **Prossimo**: checkpoint di lancio (consegna delle prime 50 card), poi il modulo
+   `tablet-kiosk` (solo con lettore NFC USB).
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -97,7 +100,7 @@ del modulo `identity`.
 ## Modifiche non pubblicate
 
 - In `main` (2026-11-18): PR #13-#21 (da `identity` a `ledger`). Fuori da `main`: solo `feat/export`
-  (PR da aprire al task 15). Le migrazioni restano da applicare allo staging con `db push`.
+  (PR #22, CI verde, da unire). Le migrazioni restano da applicare allo staging con `db push`.
 
 ## Ultima sessione
 
