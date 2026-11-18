@@ -259,9 +259,9 @@ src/app/AppShell.tsx (+ .module.css) · **Dimensione:** M
 si accede una volta con l'account del bar; poi ognuno si alterna con il proprio PIN." solo nel layout tablet;
 dopo l'accesso un dispositivo va a `/cassa`, un operatore a `/` (o alla pagina richiesta) come oggi.
 **Accettazione:**
-- [ ] Componente: nota assente a 390 e presente con `matchMedia` tablet; dispositivo → `/cassa` (criterio 1)
-- [ ] Test esistenti di `LoginPage` verdi; "Password dimenticata?" invariato
-- [ ] Detector Impeccable pulito
+- [x] Componente: nota assente a 390 e presente con `matchMedia` tablet; dispositivo → `/cassa` (criterio 1)
+- [x] Test esistenti di `LoginPage` verdi; "Password dimenticata?" invariato
+- [x] Detector Impeccable pulito
 **Verifica:** `npm test -- LoginPage`
 **Dipendenze:** 11, 12 · **File:** src/features/identity/LoginPage.tsx (+ .module.css, .test.tsx)
 · **Dimensione:** S
