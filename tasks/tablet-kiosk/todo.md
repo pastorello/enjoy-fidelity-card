@@ -20,11 +20,11 @@ fallimento, trovare il passo asincrono che separa il salvataggio dall'avvio di `
 finto, navigazione, effetto, catena di promesse) e correggere la causa: nel test attendere un segnale
 deterministico (ad es. lo stato a schermo che precede la scrittura) o, se il ritardo è nel codice, toglierlo.
 **Accettazione:**
-- [ ] Fallimento riprodotto sotto carico prima della correzione, con il comando e il tasso annotati nel
+- [x] Fallimento riprodotto sotto carico prima della correzione, con il comando e il tasso annotati nel
       messaggio di commit
-- [ ] Causa spiegata nel commit; nessun timeout alzato, nessun `retry`, nessuna aspettativa tolta
-- [ ] Lo stesso comando sotto lo stesso carico passa N volte su N; gli altri test del file invariati
-- [ ] Se l'insidia vale anche altrove (altri `currentWrite`, `CardLinkWriter.test.tsx`), stessa correzione
+- [x] Causa spiegata nel commit; nessun timeout alzato, nessun `retry`, nessuna aspettativa tolta
+- [x] Lo stesso comando sotto lo stesso carico passa N volte su N; gli altri test del file invariati
+- [x] Se l'insidia vale anche altrove (altri `currentWrite`, `CardLinkWriter.test.tsx`), stessa correzione
       lì e nota in RUNBOOK §4
 **Verifica:** `npx vitest run src/features/cards --repeat 50` sotto carico; `npm test`
 **Dipendenze:** nessuna · **File:** src/features/cards/NewCustomerCardSection.test.tsx, eventualmente

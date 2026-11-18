@@ -123,7 +123,7 @@ migrazione tablet_kiosk
 Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 0: CI stabile
-- [ ] Task 1: Test instabile `NewCustomerCardSection` "an unknown card becomes «Card letta»…": causa riprodotta sotto carico e corretta
+- [x] Task 1: Test instabile `NewCustomerCardSection` "an unknown card becomes «Card letta»…": causa riprodotta sotto carico e corretta
 
 ### Fase 1: Database (rischio più alto)
 - [ ] Task 2: `app.devices`, `private.operator_pins`, `current_device_id`, `add_device` ↔ `add_operator`; pgTAP sui privilegi
