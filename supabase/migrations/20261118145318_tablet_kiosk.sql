@@ -230,3 +230,137 @@ $$;
 -- create or replace keeps the existing ACL; restated so this file alone shows it.
 revoke execute on function private.is_active_operator(), private.is_admin() from public, anon;
 grant execute on function private.is_active_operator(), private.is_admin() to authenticated;
+
+-- Kiosk RPCs: PIN, unlock, end of the turn ---------------------------------------------------
+-- Every PIN check runs here, never in the client. Wrong PINs are counted per device:
+-- the 5th in a row locks the device for 5 minutes, and while locked no PIN is even
+-- checked. unlock_cashier answers with jsonb instead of raising, so the incremented
+-- counter is committed with the answer (an exception would roll it back).
+
+-- set_my_pin: the caller's own PIN, never someone else's. A new PIN closes the
+-- caller's open turns on every tablet. No old PIN: the phone session is personal.
+create function app.set_my_pin(p_pin text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_operator_id uuid := private.current_operator_id();
+begin
+  -- A device has no operator profile, so current_operator_id() is null for it too.
+  if v_operator_id is null or private.current_device_id() is not null then
+    raise exception 'Only an operator account can set its own PIN' using errcode = '42501';
+  end if;
+  if p_pin is null or p_pin !~ '^[0-9]{4}$' then
+    raise exception 'The PIN must be 4 digits' using errcode = '22023';
+  end if;
+
+  insert into private.operator_pins (operator_id, pin_hash, updated_at)
+  values (v_operator_id, extensions.crypt(p_pin, extensions.gen_salt('bf', 8)), now())
+  on conflict (operator_id) do update
+    set pin_hash = excluded.pin_hash, updated_at = excluded.updated_at;
+
+  update app.devices
+  set cashier_operator_id = null, cashier_since = null
+  where cashier_operator_id = v_operator_id;
+end;
+$$;
+
+-- unlock_cashier: the device row is locked first (for update), so concurrent
+-- attempts from the same tablet are counted one after the other and cannot slip
+-- past the 5th. Time is read after the row lock (clock_timestamp, not the
+-- transaction start), so an attempt that waited for another one sees the lock that
+-- one set and never reports more than 300 seconds left. Order: caller, input,
+-- lock, operator, PIN.
+create function app.unlock_cashier(p_operator_id uuid, p_pin text)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_device app.devices;
+  v_operator app.operators;
+  v_hash text;
+  v_attempts int;
+  v_now timestamptz;
+begin
+  select * into v_device from app.devices
+  where user_id = (select auth.uid())
+  for update;
+  if v_device.id is null then
+    raise exception 'Only a device account can unlock a cashier' using errcode = '42501';
+  end if;
+  if p_pin is null or p_pin !~ '^[0-9]{4}$' then
+    raise exception 'The PIN must be 4 digits' using errcode = '22023';
+  end if;
+  v_now := clock_timestamp();
+
+  if v_device.locked_until > v_now then
+    return jsonb_build_object(
+      'status', 'locked',
+      'lock_seconds_left', ceil(extract(epoch from v_device.locked_until - v_now))::int);
+  end if;
+
+  select o.* into v_operator from app.operators o
+  where o.id = p_operator_id and o.user_id is not null;
+  -- for share: a concurrent set_my_pin either waits for this unlock (and then closes
+  -- the turn it opens) or commits first (and this check reads the new hash).
+  select p.pin_hash into v_hash from private.operator_pins p
+  where p.operator_id = v_operator.id
+  for share;
+  if v_hash is null then
+    return jsonb_build_object('status', 'no_pin');
+  end if;
+
+  if v_hash is distinct from extensions.crypt(p_pin, v_hash) then
+    v_attempts := v_device.failed_pin_attempts + 1;
+    if v_attempts >= 5 then
+      update app.devices
+      set failed_pin_attempts = 0, locked_until = v_now + interval '5 minutes'
+      where id = v_device.id;
+      return jsonb_build_object('status', 'locked', 'lock_seconds_left', 300);
+    end if;
+    update app.devices set failed_pin_attempts = v_attempts where id = v_device.id;
+    return jsonb_build_object('status', 'wrong_pin', 'attempts_left', 5 - v_attempts);
+  end if;
+
+  update app.devices
+  set cashier_operator_id = v_operator.id, cashier_since = v_now,
+      failed_pin_attempts = 0, locked_until = null
+  where id = v_device.id;
+  return jsonb_build_object(
+    'status', 'ok',
+    'cashier', jsonb_build_object('id', v_operator.id, 'name', v_operator.name, 'role', v_operator.role),
+    'turn_expires_at', v_now + interval '12 hours');
+end;
+$$;
+
+-- end_cashier_turn: the caller's device has no cashier any more. The counter of
+-- wrong PINs and a running lock stay as they are.
+create function app.end_cashier_turn()
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_device_id uuid := private.current_device_id();
+begin
+  if v_device_id is null then
+    raise exception 'Only a device account can end a cashier turn' using errcode = '42501';
+  end if;
+  update app.devices
+  set cashier_operator_id = null, cashier_since = null
+  where id = v_device_id;
+end;
+$$;
+
+revoke execute on function app.set_my_pin(text), app.unlock_cashier(uuid, text), app.end_cashier_turn()
+  from public, anon;
+grant execute on function app.set_my_pin(text), app.unlock_cashier(uuid, text), app.end_cashier_turn()
+  to authenticated;
