@@ -7,6 +7,7 @@ import {
   type CardRead,
   type CardReaderOptions,
   type DeliverRaw,
+  type UsbInputAdapter,
 } from './cardReader';
 
 // SPEC-card-input, points 2 and 5; success criteria 5 and 7. Invented uids only.
@@ -485,5 +486,69 @@ describe('createCardReader: state', () => {
     reader.setUsbFormat('hex');
 
     expect(listener).not.toHaveBeenCalled();
+  });
+});
+
+function usbSetup() {
+  const ports: { format: (() => string | null) | null; deliver: DeliverRaw | null } = {
+    format: null,
+    deliver: null,
+  };
+  const start = vi.fn<UsbInputAdapter['start']>((given) => {
+    ports.format = given.format;
+    ports.deliver = given.deliver;
+  });
+  const stop = vi.fn<UsbInputAdapter['stop']>();
+  const time = { now: 5_000 };
+  const reader = createCardReader({ now: () => time.now, adapters: [], usb: { start, stop } });
+  return { reader, start, stop, ports, time };
+}
+
+describe('createCardReader: USB adapter (point 4)', () => {
+  it('is not started while the format is null, nor before activate()', () => {
+    const { reader, start } = usbSetup();
+
+    reader.setUsbFormat('hex');
+    reader.activate({ usbFormat: null });
+
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it('starts once when active with a format and reads the current format', () => {
+    const { reader, start, ports } = usbSetup();
+
+    reader.activate({ usbFormat: 'dec' });
+    reader.setUsbFormat('hex-reversed');
+
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(ports.format?.()).toBe('hex-reversed');
+  });
+
+  it('stops when the format goes back to null and on deactivate()', () => {
+    const { reader, start, stop } = usbSetup();
+    reader.activate({ usbFormat: 'hex' });
+
+    reader.setUsbFormat(null);
+    expect(stop).toHaveBeenCalledTimes(1);
+
+    reader.setUsbFormat('hex');
+    reader.deactivate();
+    expect(start).toHaveBeenCalledTimes(2);
+    expect(stop).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps lastReadAt and lastInvalidAt of usb reads only, and notifies', () => {
+    const { reader, ports, time } = usbSetup();
+    const listener = vi.fn<() => void>();
+    reader.subscribe(listener);
+    reader.activate({ usbFormat: 'hex' });
+    listener.mockClear();
+
+    ports.deliver?.(UID, 'hex', 'usb');
+    time.now += 10;
+    ports.deliver?.('04A1B', 'hex', 'usb');
+
+    expect(reader.getState().usb).toMatchObject({ lastReadAt: 5_000, lastInvalidAt: 5_010 });
+    expect(listener).toHaveBeenCalledTimes(2);
   });
 });

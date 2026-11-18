@@ -42,11 +42,22 @@ export interface CardInputAdapter {
   stop(): void;
 }
 
+/**
+ * The USB keyboard-wedge reader: unlike the other adapters it runs only while a USB format is known
+ * (never with a guessed one), and reads the current format at each read.
+ */
+export interface UsbInputAdapter {
+  start(ports: { deliver: DeliverRaw; format: () => UsbUidFormat | null }): void;
+  stop(): void;
+}
+
 export type CardReaderOptions = {
   now: () => number;
   /** `navigator.vibrate` bound to navigator, when the browser has it. */
   vibrate?: ((ms: number) => unknown) | undefined;
   adapters: readonly CardInputAdapter[];
+  /** The USB reader (`createKeyboardWedge`), started only while active with a non-null format. */
+  usb?: UsbInputAdapter | undefined;
 };
 
 export type CardReader = {
@@ -66,7 +77,7 @@ export type CardReader = {
  * read, drops repeats and invalid uids, and delivers each read to the consumer on top of the stack only.
  * It never logs: a uid identifies a customer's card.
  */
-export function createCardReader({ now, vibrate, adapters }: CardReaderOptions): CardReader {
+export function createCardReader({ now, vibrate, adapters, usb }: CardReaderOptions): CardReader {
   // Each push gets its own entry object, so removal is by identity even if a function is pushed twice.
   const stack: { consumer: CardConsumer }[] = [];
   const lastSeen = new Map<string, number>();
@@ -79,11 +90,18 @@ export function createCardReader({ now, vibrate, adapters }: CardReaderOptions):
     usb: { enabled: false, format: null, lastReadAt: null, lastInvalidAt: null },
   };
 
+  function setUsbState(patch: Partial<CardReaderState['usb']>) {
+    state = { ...state, usb: { ...state.usb, ...patch } };
+    for (const listener of listeners) listener();
+  }
+
   function updateUsb() {
     const enabled = active && usbFormat !== null;
-    if (state.usb.enabled === enabled && state.usb.format === usbFormat) return;
-    state = { ...state, usb: { ...state.usb, enabled, format: usbFormat } };
-    for (const listener of listeners) listener();
+    const wasEnabled = state.usb.enabled;
+    if (enabled && !wasEnabled) usb?.start({ deliver, format: () => usbFormat });
+    if (!enabled && wasEnabled) usb?.stop();
+    if (wasEnabled === enabled && state.usb.format === usbFormat) return;
+    setUsbState({ enabled, format: usbFormat });
   }
 
   function safeVibrate() {
@@ -97,9 +115,12 @@ export function createCardReader({ now, vibrate, adapters }: CardReaderOptions):
   const deliver: DeliverRaw = (raw, format, source) => {
     if (!active) return;
     const uid = normalizeUid(raw, format);
+    const at = now();
+    // For the tablet header (tablet-kiosk): a valid read shows the reader is there, an invalid one
+    // hints at a wrong format in the settings. Only times are kept, never the text read.
+    if (source === 'usb') setUsbState(uid === null ? { lastInvalidAt: at } : { lastReadAt: at });
     if (uid === null) return;
 
-    const at = now();
     const previous = lastSeen.get(uid);
     lastSeen.set(uid, at);
     if (previous !== undefined && at - previous <= REPEAT_WINDOW_MS) return;
