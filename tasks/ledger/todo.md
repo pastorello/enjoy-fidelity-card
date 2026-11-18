@@ -53,10 +53,10 @@ inattivo → `EC005`; punti **attuali** e nome del premio letti sul server, salv
 p_points)` (descrizione 1..80 dopo il trim, punti 1..99999, altrimenti `22023`); saldo − punti < 0 → `EC001`
 controllato dopo il lock.
 **Accettazione:**
-- [ ] pgTAP: riscatto oltre il saldo → `EC001`; esattamente uguale al saldo → ok e saldo 0 (criterio 5)
-- [ ] pgTAP: premio inattivo o inesistente → `EC005`; rinominare o cambiare i punti di un premio dopo il
+- [x] pgTAP: riscatto oltre il saldo → `EC001`; esattamente uguale al saldo → ok e saldo 0 (criterio 5)
+- [x] pgTAP: premio inattivo o inesistente → `EC005`; rinominare o cambiare i punti di un premio dopo il
       riscatto lascia invariati `description` e `points` del movimento (`SPEC-rewards.md`)
-- [ ] pgTAP: premio libero con descrizione vuota, di soli spazi o di 81 caratteri, punti 0 o 100000 →
+- [x] pgTAP: premio libero con descrizione vuota, di soli spazi o di 81 caratteri, punti 0 o 100000 →
       `22023`; cliente anonimizzato → `EC006`; replay e `EC007` come nel task 2 (criterio 4)
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 2 · **File:** supabase/migrations/*_ledger.sql, supabase/tests/ledger.test.sql

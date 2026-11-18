@@ -104,7 +104,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 1: Database (rischio più alto)
 - [x] Task 1: `app.movements`, vincoli per tipo, indici, RLS, trigger che bloccano update/delete/truncate, `customer_balance`, vista `movement_history`, `ledger_result`
 - [x] Task 2: `record_purchase`: lock, idempotenza, punti per difetto col rapporto in vigore salvato
-- [ ] Task 3: `redeem_reward` e `redeem_free_reward`: premio sul server, saldo mai sotto zero
+- [x] Task 3: `redeem_reward` e `redeem_free_reward`: premio sul server, saldo mai sotto zero
 - [ ] Task 4: `cancel_movement`: correzione di segno opposto, finestra di 10 s dell'operatore, punti già spesi
 - [ ] Task 5: Saldo reale in `search_customers`, `get_customer`, `customers_served_today` e nella pagina pubblica
 
