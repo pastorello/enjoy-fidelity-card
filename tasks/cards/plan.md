@@ -132,7 +132,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 4: Associa, Modifica, Scheda
 - [x] Task 12: Associa o sostituisci card (`/clienti/:id/card`): tutti gli esiti dell'associazione
-- [ ] Task 13: Sezione CARD di Modifica cliente: card attiva, sostituisci, disattiva, nessuna card
+- [x] Task 13: Sezione CARD di Modifica cliente: card attiva, sostituisci, disattiva, nessuna card
 - [ ] Task 14: Riga card della Scheda cliente
 
 ### Checkpoint C: Impeccable pulito; confronto a 390×844 con Cerca cliente, Card sconosciuta, Nuovo cliente senza card, Associa card, Card già associata, Modifica cliente, Scheda cliente

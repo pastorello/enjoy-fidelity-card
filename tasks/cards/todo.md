@@ -225,9 +225,9 @@ punto 5, «Disattiva card» danger / «Lascia com'è»); «Nessuna card attiva»
 «Riprova» idempotente; caricamento fallito «Card non caricata» con «Riprova», resto del form usabile; la
 sezione si aggiorna senza salvare il form. Lo stato del link arriva nel task 19.
 **Accettazione:**
-- [ ] Componente: con e senza card; dialogo di disattivazione e sezione aggiornata; errore di caricamento
-- [ ] Componente: «Disattiva card» ripetuto dopo un errore di rete non dà errore (criterio 7)
-- [ ] E2E: Disattiva card → «Nessuna card attiva»; pulsanti ≥ 48 px
+- [x] Componente: con e senza card; dialogo di disattivazione e sezione aggiornata; errore di caricamento
+- [x] Componente: «Disattiva card» ripetuto dopo un errore di rete non dà errore (criterio 7)
+- [x] E2E: Disattiva card → «Nessuna card attiva»; pulsanti ≥ 48 px
 **Verifica:** `npm test -- CustomerCardSection EditCustomerPage && npm run e2e -- cards`
 **Dipendenze:** 12 · **File:** src/features/cards/CustomerCardSection.tsx (+ .module.css, .test.tsx),
 src/features/customers/EditCustomerPage.tsx, e2e/cards.spec.ts · **Dimensione:** M
