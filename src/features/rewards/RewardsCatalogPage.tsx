@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { AppShell } from '../../app/AppShell';
 import { ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
@@ -46,6 +46,11 @@ function Catalog() {
   const load = useRewards();
   // Every state renders the same AppShell, so its h1 stays mounted through loading and errors.
   const heading = useRef<HTMLHeadingElement>(null);
+  // The reward in the "Modifica premio" box. Looked up in the list, so a row no longer there
+  // (after a reload) closes the change and gives back "Nuovo premio".
+  const [editingId, setEditingId] = useState<string>();
+  const editing =
+    load.status === 'done' ? load.rewards.find((reward) => reward.id === editingId) : undefined;
 
   // "Riprova" is replaced by the loading state: the focus goes to the title, not to <body>.
   function retry() {
@@ -78,7 +83,15 @@ function Catalog() {
     content = (
       <ul className={styles.list} aria-label="Premi del catalogo">
         {load.rewards.map((reward) => (
-          <RewardRow key={reward.id} reward={reward} onSaved={load.apply} onReload={load.reload} />
+          <RewardRow
+            key={reward.id}
+            reward={reward}
+            onSaved={load.apply}
+            onReload={load.reload}
+            editing={reward.id === editing?.id}
+            editLocked={editing !== undefined && reward.id !== editing.id}
+            onEdit={() => setEditingId(reward.id)}
+          />
         ))}
       </ul>
     );
@@ -90,13 +103,27 @@ function Catalog() {
     load.reload();
   }
 
+  // A changed reward moves to its place, the box goes back to "Nuovo premio", the list is asked again.
+  function edited(reward: Reward) {
+    load.apply(reward);
+    setEditingId(undefined);
+    load.reload();
+  }
+
   return (
     <AppShell
       title={TITLE}
       backTo={BACK_TO}
       headingRef={heading}
       actions={
-        <RewardForm disabled={load.status === 'loading'} onAdded={added} onReload={load.reload} />
+        <RewardForm
+          disabled={load.status === 'loading'}
+          onAdded={added}
+          onReload={load.reload}
+          editing={editing}
+          onEdited={edited}
+          onCancelEdit={() => setEditingId(undefined)}
+        />
       }
       actionsTone="raised"
     >

@@ -4,6 +4,11 @@
   flex-direction: column;
 }
 
+/* "Nuovo premio" while "Modifica premio" takes its place: kept in the page with its draft. */
+.box[hidden] {
+  display: none;
+}
+
 .title {
   margin: 0 0 calc(var(--space-2) + var(--space-1));
   font-family: var(--type-section-title-family);
@@ -90,4 +95,19 @@
 .failure svg {
   flex-shrink: 0;
   margin-top: 2px;
+}
+
+/* The note on the history, like the hint on the points ratio in the settings. */
+.note {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* "Salva modifiche" then "Annulla", full width like ConfirmDialog: side by side the label wraps. */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }

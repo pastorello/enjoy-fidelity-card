@@ -20,16 +20,26 @@ type Failure = { text: string; network: boolean };
  * (docs/specs/SPEC-rewards.md §2): the box shows the new state and is disabled until the answer;
  * a success puts the saved row in its place (`onSaved`) and reloads the list, a failure brings
  * the box back and says why under the row. Either way the focus stays on the box, also after the
- * row moved.
+ * row moved. Name and points are one button (≥ 48 px) that opens "Modifica premio" (`onEdit`);
+ * the row being changed is highlighted, and while one is changed the others' buttons are
+ * disabled. When the change ends the focus comes back to the button, in the row's new place.
  */
 export function RewardRow({
   reward,
   onSaved,
   onReload,
+  editing,
+  editLocked,
+  onEdit,
 }: {
   reward: Reward;
   onSaved: (reward: Reward) => void;
   onReload: () => void;
+  /** This row is in the "Modifica premio" box. */
+  editing: boolean;
+  /** Another row is in the box: this one does not open a second change. */
+  editLocked: boolean;
+  onEdit: () => void;
 }) {
   const service = useRewardsService();
   const { reportNotEnabled } = useAuth();
@@ -38,7 +48,21 @@ export function RewardRow({
   // A double tap reaches the handler twice before the disabled state renders.
   const saving = useRef(false);
   const box = useRef<HTMLInputElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
   const errorId = useId();
+
+  // The box below closed (saved or cancelled) and took the focus with it: back to this row.
+  const [wasEditing, setWasEditing] = useState(editing);
+  const [editEnded, setEditEnded] = useState<object>();
+  if (editing !== wasEditing) {
+    setWasEditing(editing);
+    if (!editing) setEditEnded({});
+  }
+  useLayoutEffect(() => {
+    if (!editEnded || !editButton.current) return;
+    const current = document.activeElement;
+    if (current === null || current === document.body) editButton.current.focus();
+  }, [editEnded]);
 
   // After the answer: a disabled box, or a row React moved, may have lost the focus. It goes
   // back to the box, unless the user has meanwhile moved it somewhere else on purpose.
@@ -88,18 +112,32 @@ export function RewardRow({
   const checked = pending ?? reward.active;
 
   return (
-    <li className={styles.item} data-inactive={reward.active ? undefined : 'true'}>
+    <li
+      className={styles.item}
+      data-inactive={reward.active ? undefined : 'true'}
+      data-editing={editing ? 'true' : undefined}
+    >
       <div className={styles.main}>
-        <span className={styles.text}>
+        <button
+          ref={editButton}
+          type="button"
+          className={styles.text}
+          disabled={editLocked}
+          aria-current={editing ? 'true' : undefined}
+          onClick={() => {
+            if (!editing) onEdit();
+          }}
+        >
+          <span className="visually-hidden">Modifica</span>{' '}
           <span className={styles.name} data-reward-name>
             {reward.name}
-          </span>
+          </span>{' '}
           <span className={styles.points}>
             {reward.active
               ? pointsText(reward.points)
               : `${pointsText(reward.points)} · non visibile alla cassa né al cliente`}
           </span>
-        </span>
+        </button>
         <label className={styles.active}>
           <input
             ref={box}

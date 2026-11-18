@@ -18,12 +18,41 @@
   color: var(--color-ink-muted);
 }
 
+/* Name and points: the button that opens "Modifica premio", the whole text area, ≥ 48 px. */
 .text {
   flex: 1;
   min-width: 0;
+  min-height: var(--touch-target);
   display: flex;
   flex-direction: column;
-  padding-block: var(--space-2);
+  justify-content: center;
+  align-self: stretch;
+  margin: 0;
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.text:active:not(:disabled) {
+  background: var(--color-surface-raised);
+}
+
+/* Another row is being changed: this one does not open, but reads as usual. */
+.text:disabled {
+  cursor: default;
+}
+
+/* The row in the "Modifica premio" box, on the surface of the box itself. */
+.item[data-editing='true'] {
+  background: var(--color-surface-raised);
+  box-shadow:
+    calc(-1 * var(--space-2)) 0 0 var(--color-surface-raised),
+    var(--space-2) 0 0 var(--color-surface-raised);
 }
 
 .name {

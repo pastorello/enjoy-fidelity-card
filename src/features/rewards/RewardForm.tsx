@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { ServerFaultError } from '../../lib/serverFault';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
@@ -14,9 +14,23 @@ const EMPTY: RewardFormValues = { name: '', points: '' };
 
 /**
  * What went wrong outside the fields. `uncertain`: no answer (network, server fault), so the
- * reward may be saved already; the button says "Riprova" and resends the same id.
+ * write may be saved already; the button says "Riprova" and resends the same request.
  */
 type Failure = { text: string; uncertain: boolean; network: boolean };
+
+function failureOf(error: unknown): Failure {
+  const uncertain = error === 'network' || error instanceof ServerFaultError;
+  return { text: writeErrorText(error), uncertain, network: error === 'network' };
+}
+
+function FailureText({ failure }: { failure: Failure }) {
+  return (
+    <p role="alert" className={styles.failure}>
+      <Icon name={failure.network ? 'wifi-off' : 'circle-alert'} size={20} />
+      {failure.text}
+    </p>
+  );
+}
 
 /**
  * The "Nuovo premio" box fixed at the bottom of the catalogue (wireframe "Catalogo premi";
@@ -31,11 +45,14 @@ type Failure = { text: string; uncertain: boolean; network: boolean };
  * `not-found`/`unknown` ask the list again; `invalid`, unexpected after the app's check, is told as
  * unknown; `forbidden` is reported to AuthProvider.
  */
-export function RewardForm({
+function NewReward({
+  hidden,
   disabled,
   onAdded,
   onReload,
 }: {
+  /** While "Modifica premio" takes its place: the box stays mounted, so its draft is kept. */
+  hidden: boolean;
   /** While the catalogue loads. */
   disabled: boolean;
   onAdded: (reward: Reward) => void;
@@ -56,6 +73,13 @@ export function RewardForm({
   const nameRef = useRef<HTMLInputElement>(null);
   const pointsRef = useRef<HTMLInputElement>(null);
   const headingId = useId();
+
+  // "Premio aggiunto" belongs to the last add: it goes when the box gives way to a change.
+  const [wasHidden, setWasHidden] = useState(hidden);
+  if (hidden !== wasHidden) {
+    setWasHidden(hidden);
+    if (hidden) setAdded(false);
+  }
 
   function change(key: keyof RewardFormValues, value: string) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -93,8 +117,7 @@ export function RewardForm({
         nameRef.current?.focus();
         return;
       }
-      const uncertain = error === 'network' || error instanceof ServerFaultError;
-      setFailure({ text: writeErrorText(error), uncertain, network: error === 'network' });
+      setFailure(failureOf(error));
       // The role may have changed or the profile gone: AuthProvider checks again.
       if (error === 'forbidden') void reportNotEnabled();
       // This list is not what the server has.
@@ -110,7 +133,7 @@ export function RewardForm({
   }
 
   return (
-    <section aria-labelledby={headingId} className={styles.box}>
+    <section aria-labelledby={headingId} className={styles.box} hidden={hidden}>
       <h2 id={headingId} className={styles.title}>
         Nuovo premio
       </h2>
@@ -148,12 +171,7 @@ export function RewardForm({
               Attivo
             </label>
           </div>
-          {failure && (
-            <p role="alert" className={styles.failure}>
-              <Icon name={failure.network ? 'wifi-off' : 'circle-alert'} size={20} />
-              {failure.text}
-            </p>
-          )}
+          {failure && <FailureText failure={failure} />}
           <Button type="submit" block busy={busy}>
             {failure?.uncertain ? 'Riprova' : 'Aggiungi premio'}
           </Button>
@@ -169,5 +187,171 @@ export function RewardForm({
         )}
       </output>
     </section>
+  );
+}
+
+/**
+ * The "Modifica premio" box (docs/specs/SPEC-rewards.md §2, not in the wireframe): name and
+ * points of `reward` filled in, no Attivo box (it stays in the row), the note on the history,
+ * "Salva modifiche" and "Annulla". The focus goes to the name when it opens. Same checks and
+ * failures as "Nuovo premio"; a resend after no answer is safe as it is, since `update` sets
+ * values and adds nothing. A success hands the saved row to `onSaved`.
+ */
+function EditReward({
+  reward,
+  onSaved,
+  onCancel,
+  onReload,
+}: {
+  reward: Reward;
+  onSaved: (reward: Reward) => void;
+  onCancel: () => void;
+  onReload: () => void;
+}) {
+  const service = useRewardsService();
+  const { reportNotEnabled } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
+  const [failure, setFailure] = useState<Failure>();
+  const [values, setValues] = useState<RewardFormValues>(() => ({
+    name: reward.name,
+    points: String(reward.points),
+  }));
+  const [errors, setErrors] = useState<RewardFormErrors>({});
+  const nameRef = useRef<HTMLInputElement>(null);
+  const pointsRef = useRef<HTMLInputElement>(null);
+  const headingId = useId();
+  const noteId = useId();
+
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, []);
+
+  function change(key: keyof RewardFormValues, value: string) {
+    setValues((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (sending.current) return;
+    const checked = validateReward(values);
+    if (!checked.ok) {
+      setErrors(checked.errors);
+      (checked.errors.name !== undefined ? nameRef : pointsRef).current?.focus();
+      return;
+    }
+    setErrors({});
+    setFailure(undefined);
+    sending.current = true;
+    setBusy(true);
+    let result: RewardWriteResult | { ok: false; error: unknown };
+    try {
+      result = await service.update(reward.id, checked.reward);
+    } catch (error) {
+      result = { ok: false, error };
+    }
+    sending.current = false;
+    setBusy(false);
+
+    if (result.ok) {
+      onSaved(result.reward);
+      return;
+    }
+    const { error } = result;
+    if (error === 'name-taken') {
+      setErrors({ name: writeErrorText(error) });
+      nameRef.current?.focus();
+      return;
+    }
+    setFailure(failureOf(error));
+    if (error === 'forbidden') void reportNotEnabled();
+    else if (error === 'not-found' || error === 'unknown') onReload();
+  }
+
+  return (
+    <section aria-labelledby={headingId} className={styles.box}>
+      <h2 id={headingId} className={styles.title}>
+        Modifica premio
+      </h2>
+      <form noValidate onSubmit={(event) => void handleSubmit(event)}>
+        <fieldset className={styles.fields} aria-describedby={noteId}>
+          <TextField
+            ref={nameRef}
+            label="Nome del premio"
+            value={values.name}
+            onChange={(value) => change('name', value)}
+            error={errors.name}
+            autoComplete="off"
+            autoCapitalize="sentences"
+          />
+          <TextField
+            ref={pointsRef}
+            label="Punti richiesti"
+            inputMode="numeric"
+            value={values.points}
+            onChange={(value) => change('points', value)}
+            error={errors.points}
+            autoComplete="off"
+          />
+          <p id={noteId} className={styles.note}>
+            Nome e punti valgono per i riscatti da ora in poi: i riscatti già registrati non
+            cambiano.
+          </p>
+          {failure && <FailureText failure={failure} />}
+          <div className={styles.actions}>
+            <Button type="submit" block busy={busy}>
+              {failure?.uncertain ? 'Riprova' : 'Salva modifiche'}
+            </Button>
+            <Button variant="secondary" block onClick={onCancel}>
+              Annulla
+            </Button>
+          </div>
+        </fieldset>
+      </form>
+    </section>
+  );
+}
+
+/**
+ * The box at the bottom of the catalogue: "Nuovo premio", or "Modifica premio" while `editing`
+ * is set. The "Nuovo premio" box stays mounted meanwhile, hidden, so its draft, its id and its
+ * last failure are there again after "Salva modifiche" or "Annulla".
+ */
+export function RewardForm({
+  disabled,
+  onAdded,
+  onReload,
+  editing,
+  onEdited,
+  onCancelEdit,
+}: {
+  /** While the catalogue loads. */
+  disabled: boolean;
+  onAdded: (reward: Reward) => void;
+  /** Asks the list again after a refusal that means it is not what the server has. */
+  onReload: () => void;
+  /** The reward being changed, if any. */
+  editing: Reward | undefined;
+  onEdited: (reward: Reward) => void;
+  onCancelEdit: () => void;
+}) {
+  return (
+    <>
+      <NewReward
+        hidden={editing !== undefined}
+        disabled={disabled}
+        onAdded={onAdded}
+        onReload={onReload}
+      />
+      {editing && (
+        <EditReward
+          key={editing.id}
+          reward={editing}
+          onSaved={onEdited}
+          onCancel={onCancelEdit}
+          onReload={onReload}
+        />
+      )}
+    </>
   );
 }
