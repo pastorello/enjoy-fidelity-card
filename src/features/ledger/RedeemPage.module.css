@@ -77,6 +77,15 @@
   overflow-wrap: anywhere;
 }
 
+/* The wireframe shows the points as bold text in the row colour: grey when out of reach. */
+.optionPoints {
+  flex-shrink: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .missing,
 .freeHint {
   font-size: var(--type-body-sm-size);

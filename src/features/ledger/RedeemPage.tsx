@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
-import { formatInteger } from '../../shared/format';
+import { formatInteger, formatPoints } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
-import { PointsBadge } from '../../shared/ui/PointsBadge';
 import { StatusView } from '../../shared/ui/StatusView';
 import { CustomerRowLink } from '../cards/CustomerRowLink';
 import { loadErrorText } from '../customers/loadErrorText';
@@ -199,7 +198,12 @@ function RewardOption({ reward, redeem, name }: { reward: Reward; redeem: Redeem
           </span>
         )}
       </span>
-      <PointsBadge points={reward.points} />
+      <span className={styles.optionPoints}>
+        <span aria-hidden="true">{formatPoints(reward.points)}</span>
+        <span className="visually-hidden">
+          {formatInteger(reward.points)} {pointsWord(reward.points)}
+        </span>
+      </span>
     </label>
   );
 }

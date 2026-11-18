@@ -115,6 +115,15 @@ describe('RedeemPage: Riscatta premio', () => {
     expect(screen.getAllByText(/^Mancano \d+ punti$/)).toHaveLength(2);
   });
 
+  it('shows the points as plain text in the row colour, never the ochre badge (wireframe)', async () => {
+    renderRedeem();
+    await ready();
+    for (const points of ['180 pt', '100 pt']) {
+      const text = within(catalog()).getByText(points);
+      expect(text.closest('[class*="badge"]')).toBeNull();
+    }
+  });
+
   it('a reward worth exactly the balance can be chosen (balance after 0)', async () => {
     const exact = fakeReward({ name: 'Esatto', points: 120 });
     renderRedeem({ rewards: createFakeRewardsService({ rewards: [exact] }) });
