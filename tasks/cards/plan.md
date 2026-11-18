@@ -118,7 +118,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: `db:test` verde; revisione `security-and-hardening` su RLS, privilegi, token e funzione pubblica
 
 ### Fase 2: Servizio
-- [ ] Task 5: Tipi, `supabaseCardsService`, traduzione degli errori e guardia dei codici
+- [x] Task 5: Tipi, `supabaseCardsService`, traduzione degli errori e guardia dei codici
 - [ ] Task 6: `fakeCardsService`, `CardsServiceProvider`, `main.tsx` e `renderApp`
 - [ ] Task 7: Integrazione contro lo stack locale: concorrenza, errori, `card_points` via HTTP
 - [ ] Task 8: `formatCardLabel`, `cardLinkUrl` e controllo di `VITE_CARD_LINK_ORIGIN` nella build

@@ -98,10 +98,10 @@ proprietario, `CustomerUnavailableError`, `CardInactiveError`, `LinkTokenMismatc
 `serverFaultFor`; `not_operator` come errore riconoscibile. Guardia: ogni codice sollevato dalla migrazione
 ha una traduzione.
 **Accettazione:**
-- [ ] Unità con client finto: ogni codice d'errore → errore tipizzato; errore di rete → `NetworkError`;
+- [x] Unità con client finto: ogni codice d'errore → errore tipizzato; errore di rete → `NetworkError`;
       `LinkState` `not-written` / `unverified` / `written` dai due istanti
-- [ ] Il token non compare in nessun messaggio d'errore prodotto dal servizio
-- [ ] `scripts/cardErrorCodes.test.ts` fallisce se la migrazione solleva un codice senza traduzione
+- [x] Il token non compare in nessun messaggio d'errore prodotto dal servizio
+- [x] `scripts/cardErrorCodes.test.ts` fallisce se la migrazione solleva un codice senza traduzione
 **Verifica:** `npm test -- cards cardErrorCodes`
 **Dipendenze:** 4 · **File:** src/features/cards/types.ts, src/features/cards/supabaseCardsService.ts
 (+ .test.ts), scripts/cardErrorCodes.test.ts · **Dimensione:** M
