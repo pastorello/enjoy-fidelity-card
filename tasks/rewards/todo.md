@@ -77,13 +77,13 @@ validateReward.ts (+ .test.ts) · **Dimensione:** M
 importa, nessun `getSupabase()` altrove nel modulo, ogni `errcode` sollevato da `*_rewards.sql` ha una
 traduzione. Integrazione con le credenziali del seed.
 **Accettazione:**
-- [ ] Unità con client finto: ogni codice → l'errore giusto (anche `23505` di un altro vincolo → `unknown`,
+- [x] Unità con client finto: ogni codice → l'errore giusto (anche `23505` di un altro vincolo → `unknown`,
       `42501` "permission denied for function" → `ServerFaultError('misconfigured')`); `listActive()` chiede
       solo `active = true`
-- [ ] Integrazione: l'admin crea (nome con suffisso unico), reinvia lo stesso id e riceve la stessa riga,
+- [x] Integrazione: l'admin crea (nome con suffisso unico), reinvia lo stesso id e riceve la stessa riga,
       riprova il nome in maiuscolo → `name-taken`, disattiva e il premio esce da `listActive()`; l'operatore
       legge `listActive()` e riceve `forbidden` da ogni scrittura
-- [ ] Guardia del confine verde
+- [x] Guardia del confine verde
 **Verifica:** `npm test -- rewards && npm run test:integration`
 **Dipendenze:** 2, 3 · **File:** src/features/rewards/supabaseRewardsService.ts (+ .test.ts),
 scripts/rewardsBoundary.test.ts, tests/integration/rewards.test.ts · **Dimensione:** M

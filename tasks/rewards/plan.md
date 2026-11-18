@@ -73,7 +73,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 2: Contratto del frontend
 - [x] Task 3: Tipi, `sortRewards`, `validateReward` (funzioni pure)
-- [ ] Task 4: `supabaseRewardsService`, guardia del confine, integrazione contro lo stack locale
+- [x] Task 4: `supabaseRewardsService`, guardia del confine, integrazione contro lo stack locale
 - [ ] Task 5: Servizio finto, `RewardsServiceProvider` in `main.tsx` e `renderApp`
 
 ### Checkpoint B: unità e integrazione verdi; test esistenti invariati
