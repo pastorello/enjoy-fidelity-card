@@ -2,6 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import { routes } from './app/routes';
+import { CustomerServiceProvider } from './features/customers/CustomerServiceProvider';
+import { supabaseCustomerService } from './features/customers/supabaseCustomerService';
 import { AuthProvider } from './features/identity/AuthProvider';
 import { supabaseAuthService } from './features/identity/supabaseAuthService';
 import { SettingsServiceProvider } from './features/settings/SettingsProvider';
@@ -19,7 +21,9 @@ createRoot(container).render(
   <StrictMode>
     <AuthProvider service={supabaseAuthService}>
       <SettingsServiceProvider service={supabaseSettingsService}>
-        <RouterProvider router={router} />
+        <CustomerServiceProvider service={supabaseCustomerService}>
+          <RouterProvider router={router} />
+        </CustomerServiceProvider>
       </SettingsServiceProvider>
     </AuthProvider>
   </StrictMode>,
