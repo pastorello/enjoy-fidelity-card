@@ -83,7 +83,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint C: home verde nei test di componente; Impeccable pulito; confronto con Cerca cliente e Ricerca senza risultati
 
 ### Fase 4: Nuovo, scheda, modifica, cancellazione
-- [ ] Task 10: Modulo Nuovo cliente: campi, validazione, privacy con dialogo segnaposto
+- [x] Task 10: Modulo Nuovo cliente: campi, validazione, privacy con dialogo segnaposto
 - [ ] Task 11: Salvataggio: nome già usato, rete + Riprova con lo stesso `operation_id`, doppio tocco, `?nome=`
 - [ ] Task 12: `AppShell` `headerAction` e scheda cliente (stati, telefono, note, SALDO, cliente cancellato)
 - [ ] Task 13: Modifica cliente (precompilata, errori, Riprova, cliente cancellato → scheda)

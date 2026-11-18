@@ -170,9 +170,9 @@ l’informativa privacy (obbligatorio)" ≥ 48 px, "Mostra l’informativa" → 
 segnaposto di `privacyNotice.ts`, `PRIVACY_NOTICE_STATUS = 'draft'`). Validazione nel client con i testi
 della spec, errore sotto il campo in `danger-text`, fuoco sul primo campo errato, nessuna chiamata.
 **Accettazione:**
-- [ ] Componenti: nome vuoto, oltre 80, telefono non valido, consenso mancante → testo giusto e fuoco
-- [ ] Dialogo dell'informativa apribile e chiudibile da tastiera; nessun testo legale inventato
-- [ ] Etichette accessibili; target ≥ 48 px
+- [x] Componenti: nome vuoto, oltre 80, telefono non valido, consenso mancante → testo giusto e fuoco
+- [x] Dialogo dell'informativa apribile e chiudibile da tastiera; nessun testo legale inventato
+- [x] Etichette accessibili; target ≥ 48 px
 **Verifica:** `npm test`
 **Dipendenze:** 6 · **File:** src/features/customers/CustomerForm.tsx (+ .module.css, .test.tsx),
 NewCustomerPage.tsx, PrivacyNoticeDialog.tsx, privacyNotice.ts, src/app/routes.tsx · **Dimensione:** M
