@@ -334,8 +334,8 @@ src/features/ledger/RedeemPage.tsx · **Dimensione:** M
 errori di rete come nel task 17 con "Riscatto non salvato" / "Il telefono non è connesso a internet.
 Riprova appena torna la rete: il riscatto non verrà registrato due volte." e "Riprova" (stesso id).
 **Accettazione:**
-- [ ] Componente: testi del wireframe Premio-ok per catalogo e premio libero; vibrazione; ritorno a `/`
-- [ ] Componente: annullo del riscatto; rete → Riprova con lo stesso id, un solo riscatto nel finto
+- [x] Componente: testi del wireframe Premio-ok per catalogo e premio libero; vibrazione; ritorno a `/`
+- [x] Componente: annullo del riscatto; rete → Riprova con lo stesso id, un solo riscatto nel finto
       (criterio 4)
 **Verifica:** `npm test -- RedeemPage FreeRewardForm LedgerDoneView`
 **Dipendenze:** 16, 20 · **File:** src/features/ledger/LedgerDoneView.tsx,

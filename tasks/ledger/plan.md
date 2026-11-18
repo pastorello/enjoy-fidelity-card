@@ -135,7 +135,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 4: Riscatti
 - [x] Task 19: Riscatta premio dal catalogo: premi raggiungibili e non, saldo dopo, rifiuti che ricaricano
 - [x] Task 20: Premio libero (`?libero`): descrizione, PUNTI DA SCALARE, saldo insufficiente
-- [ ] Task 21: Premio riscattato, Annulla il riscatto, Riscatto non salvato
+- [x] Task 21: Premio riscattato, Annulla il riscatto, Riscatto non salvato
 - [ ] Task 22: E2E dei riscatti: catalogo, premio libero insufficiente, premio inattivo assente
 
 ### Checkpoint D: Impeccable pulito; confronto a 390×844 con Premi, Premio-libero, Premio-ok
