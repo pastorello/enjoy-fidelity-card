@@ -113,9 +113,9 @@ dispositivo senza cassiere legge 0 righe e non scrive; 10 `unlock_cashier` conco
 esattamente 5 contati, gli altri `locked`; `set_my_pin` dal telefono chiude il turno aperto sul dispositivo;
 nessuna risposta contiene `pin_hash` o il PIN.
 **Accettazione:**
-- [ ] Corsa sul blocco provata in parallelo (criterio 3)
-- [ ] Dispositivo senza cassiere: 0 righe e scrittura rifiutata su HTTP (criterio 1)
-- [ ] La chiave segreta locale solo nel codice di test
+- [x] Corsa sul blocco provata in parallelo (criterio 3)
+- [x] Dispositivo senza cassiere: 0 righe e scrittura rifiutata su HTTP (criterio 1)
+- [x] La chiave segreta locale solo nel codice di test
 **Verifica:** `npm run test:integration`
 **Dipendenze:** 5 · **File:** tests/integration/tablet-kiosk.test.ts · **Dimensione:** S
 
