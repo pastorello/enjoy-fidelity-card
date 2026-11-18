@@ -117,6 +117,78 @@ end;
 $$;
 grant execute on function public.export_test_all_movement_ids(int) to authenticated;
 
+-- The whole movements export, every page of 1000 read in turn. The row checks below go through
+-- it rather than app.export_movements() alone: the local database can hold more than 1000
+-- movements left by integration and E2E runs, all of them older than this transaction's
+-- fixtures, which would then fall beyond the first page.
+create function public.export_test_movements()
+returns table (
+  id uuid,
+  created_at timestamptz,
+  customer_id uuid,
+  customer_name text,
+  kind text,
+  amount_cents int,
+  points int,
+  cents_per_point int,
+  description text,
+  operator_name text,
+  corrects_movement_id uuid,
+  corrected_by_movement_id uuid
+)
+language plpgsql
+as $$
+declare
+  v_after_created_at timestamptz := null;
+  v_after_id uuid := null;
+  v_count int;
+begin
+  loop
+    return query select * from app.export_movements(v_after_created_at, v_after_id, 1000);
+    get diagnostics v_count = row_count;
+    exit when v_count < 1000;
+    select e.created_at, e.id into v_after_created_at, v_after_id
+    from app.export_movements(v_after_created_at, v_after_id, 1000) e
+    order by e.created_at desc, e.id desc
+    limit 1;
+  end loop;
+end;
+$$;
+grant execute on function public.export_test_movements() to authenticated;
+
+-- The same for the customers (the fixtures' ids sort last, past the first page of a full stack).
+create function public.export_test_customers()
+returns table (
+  id uuid,
+  name text,
+  phone text,
+  active_card_uid text,
+  balance_points int,
+  privacy_consent_at timestamptz,
+  notes text,
+  created_at timestamptz,
+  created_by_name text,
+  anonymized_at timestamptz
+)
+language plpgsql
+as $$
+declare
+  v_after uuid := null;
+  v_count int;
+begin
+  loop
+    return query select * from app.export_customers(v_after, 1000);
+    get diagnostics v_count = row_count;
+    exit when v_count < 1000;
+    select e.id into v_after
+    from app.export_customers(v_after, 1000) e
+    order by e.id desc
+    limit 1;
+  end loop;
+end;
+$$;
+grant execute on function public.export_test_customers() to authenticated;
+
 -- Catalogue ---------------------------------------------------------------------------
 select is(
   pg_get_function_result('app.export_customers(uuid, int)'::regprocedure),
@@ -268,7 +340,7 @@ select is(
 select ok(
   not exists (
     select 1
-    from app.export_customers(null, 1000) e
+    from public.export_test_customers() e
     where e.anonymized_at is not null
       and (e.name is not null or e.phone is not null or e.notes is not null
            or e.active_card_uid is not null)
@@ -339,7 +411,7 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e000-0000000
 select results_eq(
   $$select id, customer_id, customer_name, kind, amount_cents, points, cents_per_point, description,
            operator_name, corrects_movement_id, corrected_by_movement_id
-    from app.export_movements()
+    from public.export_test_movements()
     where id::text like '00000000-0000-4000-e300-%'$$,
   $$values
     ('00000000-0000-4000-e300-000000000005'::uuid, 'ffffffff-ffff-4fff-8fff-000000000002'::uuid,
@@ -358,25 +430,25 @@ select results_eq(
   'the admin receives every movement in (created_at, id) order with kind, amounts, description, operator and correction links'
 );
 select is(
-  (select row(amount_cents, points, cents_per_point)::text from app.export_movements()
+  (select row(amount_cents, points, cents_per_point)::text from public.export_test_movements()
    where id = '00000000-0000-4000-e300-000000000001'),
   '(1250,12,100)',
   'a purchase carries amount_cents, points and the cents_per_point in force'
 );
 select is(
-  (select description from app.export_movements()
+  (select description from public.export_test_movements()
    where id = '00000000-0000-4000-e300-000000000002'),
   'Caffè di prova',
   'a redemption carries its own description'
 );
 select is(
-  (select description from app.export_movements()
+  (select description from public.export_test_movements()
    where id = '00000000-0000-4000-e300-000000000005'),
   'Premio di prova',
   'a redemption without a description falls back to the reward name'
 );
 select is(
-  (select created_at from app.export_movements()
+  (select created_at from public.export_test_movements()
    where id = '00000000-0000-4000-e300-000000000005'),
   timestamptz '2026-07-01 10:05:00+00',
   'created_at is the time of the movement'
@@ -384,24 +456,24 @@ select is(
 select ok(
   not exists (
     select 1
-    from app.export_movements() e
-    left join app.export_movements() c on c.id = e.corrected_by_movement_id
+    from public.export_test_movements() e
+    left join public.export_test_movements() c on c.id = e.corrected_by_movement_id
     where (e.corrected_by_movement_id is not null
            and c.corrects_movement_id is distinct from e.id)
        or (e.corrects_movement_id is not null
-           and (select corrected_by_movement_id from app.export_movements() t
+           and (select corrected_by_movement_id from public.export_test_movements() t
                 where t.id = e.corrects_movement_id) is distinct from e.id)
   ),
   'corrected_by_movement_id and corrects_movement_id point at each other'
 );
 select is(
-  (select customer_name from app.export_movements()
+  (select customer_name from public.export_test_movements()
    where id = '00000000-0000-4000-e300-000000000004'),
   null,
   'the movement of an anonymized customer is exported with customer_name null'
 );
 select is(
-  (select points from app.export_movements()
+  (select points from public.export_test_movements()
    where id = '00000000-0000-4000-e300-000000000004'),
   3,
   'the movement of an anonymized customer keeps its points'
@@ -409,7 +481,7 @@ select is(
 select ok(
   not exists (
     select 1
-    from app.export_movements() e
+    from public.export_test_movements() e
     join app.customers c on c.id = e.customer_id
     where c.anonymized_at is not null and e.customer_name is not null
   ),
