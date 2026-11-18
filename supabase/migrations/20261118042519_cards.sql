@@ -201,10 +201,11 @@ revoke execute on function private.raise_card_taken(text) from public, anon, aut
 -- card is reactivated; otherwise a new card. Any other active card of the
 -- customer is deactivated (replacement). The customer row is locked, so two
 -- associations to the same customer run one after the other.
-create function app.associate_card(p_customer_id uuid, p_uid text)
+-- private.associate_card_to is the logic shared with create_customer_with_card;
+-- its callers check the operator first.
+create function private.associate_card_to(p_customer_id uuid, p_uid text)
 returns app.card_association
 language plpgsql
-security definer
 set search_path = ''
 as $$
 declare
@@ -213,9 +214,6 @@ declare
   v_replaced_id uuid;
   v_constraint text;
 begin
-  if not private.is_active_operator() then
-    raise exception 'not_operator' using errcode = 'P0001';
-  end if;
   if not private.is_card_uid(p_uid) then
     raise exception 'invalid_uid' using errcode = 'P0001';
   end if;
@@ -276,6 +274,22 @@ begin
 end;
 $$;
 
+revoke execute on function private.associate_card_to(uuid, text) from public, anon, authenticated;
+
+create function app.associate_card(p_customer_id uuid, p_uid text)
+returns app.card_association
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+  return private.associate_card_to(p_customer_id, p_uid);
+end;
+$$;
+
 revoke execute on function app.associate_card(uuid, text) from public, anon;
 grant execute on function app.associate_card(uuid, text) to authenticated;
 
@@ -313,3 +327,79 @@ $$;
 
 revoke execute on function app.deactivate_card(uuid) from public, anon;
 grant execute on function app.deactivate_card(uuid) to authenticated;
+
+-- create_customer_with_card -----------------------------------------------------------------
+-- New customer from an unknown card, all or nothing: create_customer (same
+-- checks, same errors, same operation_id) and then the logic of associate_card
+-- in one transaction, so any error (card_taken, invalid_uid, the customer
+-- errors) leaves neither customer nor card. A resent operation_id returns the
+-- customer the first request created without touching the cards: that request
+-- was all or nothing too.
+create function app.create_customer_with_card(
+  p_operation_id uuid,
+  p_name text,
+  p_phone text,
+  p_privacy_consent boolean,
+  p_notes text,
+  p_uid text
+)
+returns app.customer_summary
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row app.customers;
+  v_summary app.customer_summary;
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+  if p_operation_id is null then
+    raise exception 'operation_id is required' using errcode = '22023';
+  end if;
+
+  select * into v_row from app.customers where create_operation_id = p_operation_id;
+  if found then
+    return (v_row.id, v_row.name, v_row.phone, v_row.notes, v_row.anonymized_at, 0, null)
+      ::app.customer_summary;
+  end if;
+
+  if not private.is_card_uid(p_uid) then
+    raise exception 'invalid_uid' using errcode = 'P0001';
+  end if;
+
+  v_summary := app.create_customer(p_operation_id, p_name, p_phone, p_privacy_consent, p_notes);
+  perform private.associate_card_to(v_summary.id, p_uid);
+  return v_summary;
+end;
+$$;
+
+revoke execute on function app.create_customer_with_card(uuid, text, text, boolean, text, text)
+  from public, anon;
+grant execute on function app.create_customer_with_card(uuid, text, text, boolean, text, text)
+  to authenticated;
+
+-- Anonymization -------------------------------------------------------------------------------
+-- When a customer's personal data is erased, the active card stops working; the
+-- uid stays bound to that customer and is never reused (card_taken without a name).
+create function private.customers_after_anonymize()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  update app.cards
+  set active = false, deactivated_at = now()
+  where customer_id = new.id and active;
+  return null;
+end;
+$$;
+
+revoke execute on function private.customers_after_anonymize() from public, anon, authenticated;
+
+create trigger customers_after_anonymize
+  after update of anonymized_at on app.customers
+  for each row
+  when (old.anonymized_at is null and new.anonymized_at is not null)
+  execute function private.customers_after_anonymize();

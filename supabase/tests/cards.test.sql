@@ -3,7 +3,7 @@
 -- e regole di accesso"). Fake data only: invented uids and names.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(97);
+select plan(124);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -24,7 +24,7 @@ from (values
   ('00000000-0000-4000-d100-000000000004'::uuid, 'Teresa Carte', '00000000-0000-4000-d200-000000000004'::uuid)
 ) as fake (id, name, op);
 
--- Rita's card, then Rita anonymized (directly: the trigger of task 2 is not needed here).
+-- Rita's card, then Rita anonymized: the anonymization trigger deactivates the card.
 insert into app.cards (id, uid, customer_id, associated_by)
 values (
   '00000000-0000-4000-d300-000000000003', '04CCDDEEFF0003', '00000000-0000-4000-d100-000000000003',
@@ -379,7 +379,7 @@ select is(
   public.cards_test_error_detail(
     $$select * from app.associate_card('00000000-0000-4000-d100-000000000002', '04CCDDEEFF0003')$$
   )::jsonb,
-  jsonb_build_object('owner_id', '00000000-0000-4000-d100-000000000003', 'owner_name', null, 'active', true),
+  jsonb_build_object('owner_id', '00000000-0000-4000-d100-000000000003', 'owner_name', null, 'active', false),
   'card_taken gives no name for an anonymized owner'
 );
 select is(
@@ -521,6 +521,192 @@ select is(
   (select count(*) from app.cards where uid = '04CCDDEEFF0009' and associated_by = (select id from app.operators where name = 'Operatore Card')),
   1::bigint,
   'the card is recorded with the operator who associated it'
+);
+
+-- create_customer_with_card ----------------------------------------------------------------------
+select ok(
+  has_function_privilege('authenticated', 'app.create_customer_with_card(uuid, text, text, boolean, text, text)', 'execute'),
+  'authenticated can execute create_customer_with_card'
+);
+select ok(
+  not has_function_privilege('anon', 'app.create_customer_with_card(uuid, text, text, boolean, text, text)', 'execute'),
+  'anon cannot execute create_customer_with_card'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000003","role":"authenticated"}', true);
+select throws_ok(
+  $$select * from app.create_customer_with_card('00000000-0000-4000-d400-000000000009', 'Ospite Carte', null, true, null, '04CCDDEEFF0109')$$,
+  'P0001', 'not_operator', 'a user without a profile cannot create a customer with a card'
+);
+reset role;
+select is(
+  (select count(*) from app.customers where create_operation_id = '00000000-0000-4000-d400-000000000009'),
+  0::bigint,
+  'a refused caller creates no customer'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000002","role":"authenticated"}', true);
+
+select results_eq(
+  $$select name, phone, anonymized_at
+    from app.create_customer_with_card('00000000-0000-4000-d400-000000000001', '  Nuova  Carte ', null, true, null, '04CCDDEEFF0101')$$,
+  $$values ('Nuova Carte'::text, null::text, null::timestamptz)$$,
+  'create_customer_with_card creates the customer with the rules of create_customer'
+);
+select results_eq(
+  $$select c.active, c.associated_by = (select id from app.operators where name = 'Operatore Card'),
+           c.link_written_at is null, c.link_pending_at is null
+    from app.cards c join app.customers cu on cu.id = c.customer_id
+    where c.uid = '04CCDDEEFF0101' and cu.create_operation_id = '00000000-0000-4000-d400-000000000001'$$,
+  $$values (true, true, true, true)$$,
+  'the new customer gets the card, active, associated by the caller, link not written'
+);
+select is(
+  (select id from app.create_customer_with_card('00000000-0000-4000-d400-000000000001', 'Nuova Carte', null, true, null, '04CCDDEEFF0101')),
+  (select id from app.customers where create_operation_id = '00000000-0000-4000-d400-000000000001'),
+  'the same operation_id again returns the same customer'
+);
+select is(
+  (select id from app.create_customer_with_card('00000000-0000-4000-d400-000000000001', 'Altro Nome', null, true, null, '04CCDDEEFF0102')),
+  (select id from app.customers where create_operation_id = '00000000-0000-4000-d400-000000000001'),
+  'a resent operation_id returns the first customer whatever the arguments'
+);
+select results_eq(
+  $$select
+      (select count(*) from app.customers where name in ('Nuova Carte', 'Altro Nome')),
+      (select count(*) from app.cards c join app.customers cu on cu.id = c.customer_id
+        where cu.create_operation_id = '00000000-0000-4000-d400-000000000001'),
+      (select count(*) from app.cards where uid = '04CCDDEEFF0102')$$,
+  $$values (1::bigint, 1::bigint, 0::bigint)$$,
+  'a resent operation_id leaves one customer and one card and touches no card'
+);
+
+-- All or nothing.
+select throws_ok(
+  $$select * from app.create_customer_with_card('00000000-0000-4000-d400-000000000002', 'Bruno Carte', null, true, null, '04CCDDEEFF0042')$$,
+  'P0001', 'card_taken', 'a card of another customer is taken'
+);
+select is(
+  public.cards_test_error_detail(
+    $$select * from app.create_customer_with_card('00000000-0000-4000-d400-000000000002', 'Bruno Carte', null, true, null, '04CCDDEEFF0003')$$
+  )::jsonb,
+  jsonb_build_object('owner_id', '00000000-0000-4000-d100-000000000003', 'owner_name', null, 'active', false),
+  'card_taken has the same detail as associate_card'
+);
+select throws_ok(
+  $$select * from app.create_customer_with_card('00000000-0000-4000-d400-000000000002', 'Bruno Carte', null, true, null, '04ccddeeff0103')$$,
+  'P0001', 'invalid_uid', 'a lower-case uid is invalid'
+);
+select throws_ok(
+  $$select * from app.create_customer_with_card('00000000-0000-4000-d400-000000000002', 'Bruno Carte', null, true, null, null)$$,
+  'P0001', 'invalid_uid', 'a missing uid is invalid'
+);
+select throws_ok(
+  $$select * from app.create_customer_with_card('00000000-0000-4000-d400-000000000002', 'maria  carte', null, true, null, '04CCDDEEFF0104')$$,
+  'P0001', 'customer_name_taken', 'a name already used is refused'
+);
+select throws_ok(
+  $$select * from app.create_customer_with_card('00000000-0000-4000-d400-000000000002', 'Bruno Carte', null, false, null, '04CCDDEEFF0104')$$,
+  'P0001', 'consent_required', 'the privacy consent is required'
+);
+select results_eq(
+  $$select
+      (select count(*) from app.customers
+        where name = 'Bruno Carte' or create_operation_id = '00000000-0000-4000-d400-000000000002'),
+      (select count(*) from app.cards where uid in ('04CCDDEEFF0103', '04CCDDEEFF0104')),
+      (select count(*) from app.cards where uid = '04CCDDEEFF0042' and customer_id = '00000000-0000-4000-d100-000000000004')$$,
+  $$values (0::bigint, 0::bigint, 1::bigint)$$,
+  'card_taken, invalid_uid and the customer errors leave neither customer nor card'
+);
+select is(
+  (select name from app.create_customer_with_card('00000000-0000-4000-d400-000000000002', 'Bruno Carte', null, true, null, '04CCDDEEFF0105')),
+  'Bruno Carte',
+  'after a failure the same operation_id still creates the customer and the card'
+);
+select is(
+  (select cu.name from app.cards c join app.customers cu on cu.id = c.customer_id where c.uid = '04CCDDEEFF0105' and c.active),
+  'Bruno Carte',
+  'the retried creation has its card'
+);
+reset role;
+
+-- Anonymization deactivates the card --------------------------------------------------------------
+select is(
+  (select count(*) from app.cards c join app.customers cu on cu.id = c.customer_id
+    where cu.anonymized_at is not null and c.active),
+  0::bigint,
+  'no anonymized customer has an active card'
+);
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000001","role":"authenticated"}', true);
+select isnt(
+  (select anonymized_at from app.anonymize_customer(
+    (select id from app.customers where create_operation_id = '00000000-0000-4000-d400-000000000001'))),
+  null,
+  'an admin anonymizes the customer created with a card'
+);
+select results_eq(
+  $$select active, deactivated_at is not null, link_written_at is null, link_pending_at is null
+    from app.cards where uid = '04CCDDEEFF0101'$$,
+  $$values (false, true, true, true)$$,
+  'the anonymization deactivates the active card'
+);
+select results_eq(
+  $$select customer_id, customer_name, active, customer_anonymized from app.lookup_card('04CCDDEEFF0101')$$,
+  $$select id, null::text, false, true from app.customers
+    where create_operation_id = '00000000-0000-4000-d400-000000000001'$$,
+  'the uid stays bound to the anonymized customer'
+);
+select is(
+  public.cards_test_error_detail(
+    $$select * from app.associate_card('00000000-0000-4000-d100-000000000002', '04CCDDEEFF0101')$$
+  )::jsonb,
+  jsonb_build_object(
+    'owner_id', (select id from app.customers where create_operation_id = '00000000-0000-4000-d400-000000000001'),
+    'owner_name', null,
+    'active', false
+  ),
+  'associating the uid to another customer gives card_taken without a name'
+);
+select set_config(
+  'cards_test.deactivated_at',
+  (select deactivated_at from app.cards where uid = '04CCDDEEFF0101')::text,
+  true
+);
+select lives_ok(
+  $$select app.anonymize_customer(
+    (select id from app.customers where create_operation_id = '00000000-0000-4000-d400-000000000001'))$$,
+  'anonymizing again is accepted'
+);
+select is(
+  (select deactivated_at from app.cards where uid = '04CCDDEEFF0101'),
+  current_setting('cards_test.deactivated_at')::timestamptz,
+  'anonymizing again changes no card'
+);
+reset role;
+
+-- Bruno: only the active card is deactivated, an old one keeps its date; any
+-- path that sets anonymized_at fires the trigger, not only anonymize_customer.
+insert into app.cards (uid, customer_id, active, associated_at, associated_by, deactivated_at)
+select '04CCDDEEFF0106', id, false, '2026-01-10 10:00+01',
+  (select id from app.operators where name = 'Admin Card'), '2026-02-10 10:00+01'
+from app.customers where create_operation_id = '00000000-0000-4000-d400-000000000002';
+update app.customers set anonymized_at = now()
+where create_operation_id = '00000000-0000-4000-d400-000000000002';
+select results_eq(
+  $$select c.uid, c.active, c.deactivated_at = '2026-02-10 10:00+01'
+    from app.cards c join app.customers cu on cu.id = c.customer_id
+    where cu.create_operation_id = '00000000-0000-4000-d400-000000000002' order by c.uid$$,
+  $$values ('04CCDDEEFF0105'::text, false, false), ('04CCDDEEFF0106'::text, false, true)$$,
+  'only the active card of the anonymized customer is deactivated'
+);
+select is(
+  (select count(*) from app.cards c join app.customers cu on cu.id = c.customer_id
+    where cu.anonymized_at is not null and c.active),
+  0::bigint,
+  'after the anonymizations no anonymized customer has an active card'
 );
 
 -- Seed --------------------------------------------------------------------------------------------
