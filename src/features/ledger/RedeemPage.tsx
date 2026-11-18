@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { formatInteger } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
@@ -13,6 +13,7 @@ import { useCustomer, type CustomerLoad } from '../customers/useCustomer';
 import { useAuth } from '../identity/AuthProvider';
 import type { Reward } from '../rewards/types';
 import { formatMovementDate, formatSignedPoints } from './formatMovement';
+import { FreeRewardActions, FreeRewardForm, useFreeReward } from './FreeRewardForm';
 import { LedgerDoneView } from './LedgerDoneView';
 import { LedgerFailure } from './LedgerFailure';
 import { useLedgerService } from './LedgerServiceProvider';
@@ -22,6 +23,7 @@ import { useActiveRewards, type ActiveRewardsLoad } from './useActiveRewards';
 import { isDefinitive, useOperation } from './useOperation';
 
 const TITLE = 'Riscatta premio';
+const FREE_TITLE = 'Premio libero';
 
 /** No answer (network, or none within 8 s) or a fault of the server: "Riprova" resends the id. */
 type Uncertain = 'network' | 'server';
@@ -282,13 +284,58 @@ function RedeemActions({ redeem }: { redeem: Redeem }) {
 }
 
 /**
+ * What the page shows while the customer cannot take a reward: not found (or gone meanwhile:
+ * `customer-unavailable`), erased or loading. `null` once the customer is there, and on a load
+ * error, which each page shows with its own "Riprova".
+ */
+function customerStatus(
+  load: CustomerLoad,
+  unavailable: boolean,
+): { body: ReactNode; actions: ReactNode } | null {
+  if (load.status === 'not-found' || unavailable) {
+    return {
+      actions: (
+        <ButtonLink to="/" block>
+          Torna all’inizio
+        </ButtonLink>
+      ),
+      body: (
+        <StatusView
+          kind="empty"
+          icon="search"
+          title="Cliente non trovato"
+          description="Il collegamento potrebbe essere vecchio o scritto male."
+        />
+      ),
+    };
+  }
+  if (load.status === 'done' && load.customer.anonymizedAt !== null) {
+    return {
+      actions: (
+        <ButtonLink to={`/clienti/${load.customer.id}`} block>
+          Torna alla scheda
+        </ButtonLink>
+      ),
+      body: (
+        <StatusView
+          kind="empty"
+          icon="circle-alert"
+          title="Cliente cancellato: non si registrano spese né premi."
+        />
+      ),
+    };
+  }
+  if (load.status === 'loading') return { body: <StatusView kind="loading" />, actions: null };
+  return null;
+}
+
+/**
  * Riscatta premio (`/clienti/:id/premi`; SPEC-ledger, points 5 and 11; wireframe "Riscatta
  * premio"): the customer row, CATALOGO from `listActive()` with the rewards above the balance
  * visible but disabled, "Premio libero", and in the footer the balance after and "Riscatta N
  * punti". One AppShell for every state, so its heading never remounts.
  */
-export function RedeemPage() {
-  const { id = '' } = useParams();
+function CatalogRedeem({ id }: { id: string }) {
   const load = useCustomer(id);
   const rewards = useActiveRewards();
   const redeem = useRedeem(id, load, rewards);
@@ -311,31 +358,16 @@ export function RedeemPage() {
 
   let actions: ReactNode = null;
   let body: ReactNode;
-  if (load.status === 'not-found' || redeem.customerUnavailable) {
-    actions = (
-      <ButtonLink to="/" block>
-        Torna all’inizio
-      </ButtonLink>
-    );
+  const status = customerStatus(load, redeem.customerUnavailable);
+  if (status) {
+    ({ actions, body } = status);
+  } else if (load.status === 'error') {
     body = (
       <StatusView
-        kind="empty"
-        icon="search"
-        title="Cliente non trovato"
-        description="Il collegamento potrebbe essere vecchio o scritto male."
-      />
-    );
-  } else if (load.status === 'done' && load.customer.anonymizedAt !== null) {
-    actions = (
-      <ButtonLink to={`/clienti/${load.customer.id}`} block>
-        Torna alla scheda
-      </ButtonLink>
-    );
-    body = (
-      <StatusView
-        kind="empty"
-        icon="circle-alert"
-        title="Cliente cancellato: non si registrano spese né premi."
+        kind="error"
+        title="Cliente non caricato"
+        description={loadErrorText(load.error)}
+        onRetry={retryCustomer}
       />
     );
   } else if (load.status === 'done') {
@@ -358,9 +390,40 @@ export function RedeemPage() {
         </Link>
       </>
     );
-  } else if (load.status === 'loading') {
-    body = <StatusView kind="loading" />;
-  } else {
+  }
+
+  return (
+    <AppShell title={TITLE} backTo="/" backInHistory headingRef={heading} actions={actions}>
+      {body}
+    </AppShell>
+  );
+}
+
+/**
+ * Premio libero (`/clienti/:id/premi?libero`; SPEC-ledger, point 6; wireframe "Premio libero"):
+ * "Indietro" goes back to the catalog (the previous entry of the history, or a link to it when
+ * opened directly), the customer row, the form, and "Riscatta N punti" in the footer.
+ */
+function FreeRedeem({ id }: { id: string }) {
+  const load = useCustomer(id);
+  const free = useFreeReward(id, load);
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  function retryCustomer() {
+    load.retry();
+    heading.current?.focus();
+  }
+
+  if (load.status === 'done' && free.operation.status === 'done') {
+    return <RedeemDone customer={load.customer} result={free.operation.result} />;
+  }
+
+  let actions: ReactNode = null;
+  let body: ReactNode;
+  const status = customerStatus(load, free.customerUnavailable);
+  if (status) {
+    ({ actions, body } = status);
+  } else if (load.status === 'error') {
     body = (
       <StatusView
         kind="error"
@@ -369,11 +432,36 @@ export function RedeemPage() {
         onRetry={retryCustomer}
       />
     );
+  } else if (load.status === 'done') {
+    actions = <FreeRewardActions free={free} />;
+    body = (
+      <>
+        <CustomerRowLink customer={load.customer} />
+        {free.failure && <LedgerFailure title={FAILURE_TITLE} text={FAILURE_TEXT[free.failure]} />}
+        <FreeRewardForm customer={load.customer} free={free} />
+      </>
+    );
   }
 
   return (
-    <AppShell title={TITLE} backTo="/" backInHistory headingRef={heading} actions={actions}>
+    <AppShell
+      title={FREE_TITLE}
+      backTo={`/clienti/${id}/premi`}
+      backInHistory
+      headingRef={heading}
+      actions={actions}
+    >
       {body}
     </AppShell>
   );
+}
+
+/**
+ * `/clienti/:id/premi`: the catalog, or the free reward with `?libero` (Open Question 10). Two
+ * components, so going from one to the other starts each with its own state.
+ */
+export function RedeemPage() {
+  const { id = '' } = useParams();
+  const [search] = useSearchParams();
+  return search.has('libero') ? <FreeRedeem id={id} /> : <CatalogRedeem id={id} />;
 }

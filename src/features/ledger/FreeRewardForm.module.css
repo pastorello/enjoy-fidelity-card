@@ -1,0 +1,61 @@
+/* Premio libero (wireframe "Premio libero"): PUNTI DA SCALARE, the warning, the footer. */
+.points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The label on the left, the figure on the right, over a rule: red while above the balance. */
+.pointsRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 2px solid var(--color-ink);
+}
+
+.pointsRow[data-insufficient='true'] {
+  border-bottom-color: var(--color-danger);
+}
+
+.pointsLabel {
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+.pointsFigure {
+  font-family: var(--type-figure-family);
+  font-size: var(--type-figure-size);
+  line-height: var(--type-figure-line-height);
+  font-weight: var(--type-figure-weight);
+  letter-spacing: var(--type-figure-letter-spacing);
+  font-variant-numeric: lining-nums tabular-nums;
+  text-align: end;
+}
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-danger-text);
+}
+
+.alert svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* "Annulla" and "Riprova" side by side, as for a purchase not saved. */
+.buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: var(--space-2);
+}
