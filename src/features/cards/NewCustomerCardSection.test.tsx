@@ -463,6 +463,17 @@ async function saveFromLink(fixture: WriteFixture) {
   return { ...rendered, saved };
 }
 
+/** «Card non associata» for NEW_TWO, still on Nuovo cliente. */
+async function noticeOf(router: Awaited<ReturnType<typeof renderNew>>['router']) {
+  const notice = await screen.findByRole('alert', { name: 'Card non associata' });
+  expect(notice).toHaveTextContent(
+    `La card …${NEW_TWO.uid.slice(-4)} non è associata a Giulia: il cliente era già stato salvato. Associala dalla scheda.`,
+  );
+  // Still here: the operator must know before handing the card over.
+  expect(router.state.location.pathname).toBe('/clienti/nuovo');
+  return notice;
+}
+
 describe('Nuovo cliente: the link written after the save (SPEC-cards, points 2, 3 and 8)', () => {
   const SKIP = 'Salta, lo scrivo più tardi';
   const LINK = /^https?:\/\/[^/]+\/s\/[A-Za-z0-9_-]{22}$/;
@@ -614,5 +625,53 @@ describe('Nuovo cliente: the link written after the save (SPEC-cards, points 2, 
     expect(write.options.expectedUid).toBe(NEW_ONE.uid);
     expect(newCustomers(fixture)).toHaveLength(1);
     expect(fixture.cards.service.issueLink).toHaveBeenCalledOnce();
+  });
+
+  describe('a resend after a lost answer with another card: the card is not associated, and it says so', () => {
+    it('?card A saved, answer lost, card B read and «Riprova»: notice, «Associa card» opens Associa card', async () => {
+      const fixture = writeSetup();
+      const { router } = await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+      await fillValid();
+      fixture.cards.failNext('createCustomerWithCard', 'lost');
+      save();
+      await screen.findByRole('alert');
+      tap(fixture, NEW_TWO.read);
+      await screen.findByText(new RegExp(`Codice ${NEW_TWO.uid}`));
+      save();
+
+      await noticeOf(router);
+      const [saved] = newCustomers(fixture);
+      if (!saved) throw new Error('no customer');
+      expect(newCustomers(fixture)).toHaveLength(1);
+      // Neither card is written: the one saved is not the one in hand.
+      expect(fixture.writes).toHaveLength(0);
+      const associate = screen.getByRole('link', { name: 'Associa card' });
+      expect(associate).toHaveAttribute('href', `/clienti/${saved.id}/card`);
+      await userEvent.click(associate);
+      await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved.id}/card`));
+    });
+
+    it('saved without a card, answer lost, card B read and «Riprova»: notice, «Più tardi» opens the destination', async () => {
+      const fixture = writeSetup();
+      const { router } = await renderNew(fixture);
+      await activeSection();
+      await fillValid();
+      fixture.customers.failNext('create', 'lost');
+      save();
+      await screen.findByRole('alert');
+      tap(fixture, NEW_TWO.read);
+      await screen.findByRole('region', { name: 'Card letta' });
+      save();
+
+      await noticeOf(router);
+      const [saved] = newCustomers(fixture);
+      if (!saved) throw new Error('no customer');
+      expect(fixture.cards.cards()).not.toContainEqual(
+        expect.objectContaining({ uid: NEW_TWO.uid }),
+      );
+      await userEvent.click(screen.getByRole('button', { name: 'Più tardi' }));
+      await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved.id}`));
+      expect(router.state.historyAction).toBe('REPLACE');
+    });
   });
 });
