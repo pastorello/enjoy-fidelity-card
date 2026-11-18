@@ -260,5 +260,5 @@ brain/MAP.md · **Dimensione:** S
 ## Checkpoint E
 - [ ] I criteri 1–9 verificati; criterio 10 sul telefono con l'utente dopo la pubblicazione su staging
       (esito nel RUNBOOK)
-- [ ] Quality bar completa verde in CI
-- [ ] PR pronta per `code-review-and-quality`
+- [x] Quality bar completa verde in CI
+- [x] PR pronta per `code-review-and-quality`
