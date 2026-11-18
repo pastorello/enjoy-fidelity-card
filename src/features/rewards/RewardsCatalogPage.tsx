@@ -4,9 +4,11 @@ import { ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useCurrentOperator } from '../identity/AuthProvider';
+import { RewardForm } from './RewardForm';
 import { RewardRow } from './RewardRow';
 import styles from './RewardsCatalogPage.module.css';
 import { useRewards } from './RewardsServiceProvider';
+import type { Reward } from './types';
 
 const TITLE = 'Catalogo premi';
 const BACK_TO = '/impostazioni';
@@ -36,7 +38,10 @@ function AdminsOnly() {
   );
 }
 
-/** The admin's catalogue: loading, error with "Riprova", empty, or the rewards in order. */
+/**
+ * The admin's catalogue: loading, error with "Riprova", empty, or the rewards in order; the
+ * "Nuovo premio" box fixed at the bottom.
+ */
 function Catalog() {
   const load = useRewards();
   // Every state renders the same AppShell, so its h1 stays mounted through loading and errors.
@@ -79,8 +84,20 @@ function Catalog() {
     );
   }
 
+  // A new reward shows at once in its place; the list is then asked again, as after every write.
+  function added(reward: Reward) {
+    load.apply(reward);
+    load.reload();
+  }
+
   return (
-    <AppShell title={TITLE} backTo={BACK_TO} headingRef={heading}>
+    <AppShell
+      title={TITLE}
+      backTo={BACK_TO}
+      headingRef={heading}
+      actions={<RewardForm disabled={load.status === 'loading'} onAdded={added} />}
+      actionsTone="raised"
+    >
       {content}
     </AppShell>
   );

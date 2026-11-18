@@ -135,8 +135,11 @@ describe('Catalogo premi list', () => {
 
   it('gives every Attivo box a distinct accessible name', async () => {
     renderCatalog();
-    await screen.findByRole('list', { name: 'Premi del catalogo' });
-    const names = screen.getAllByRole('checkbox').map((box) => box.getAttribute('aria-label'));
+    const list = await screen.findByRole('list', { name: 'Premi del catalogo' });
+    // The rows' boxes; the "Nuovo premio" box below has its own "Attivo".
+    const names = within(list)
+      .getAllByRole('checkbox')
+      .map((box) => box.getAttribute('aria-label'));
     expect(names).toEqual([
       'Caffè attivo',
       'Cornetto e cappuccino attivo',
