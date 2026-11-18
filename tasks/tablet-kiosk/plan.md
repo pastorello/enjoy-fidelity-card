@@ -127,7 +127,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Database (rischio più alto)
 - [x] Task 2: `app.devices`, `private.operator_pins`, `current_device_id`, `add_device` ↔ `add_operator`; pgTAP sui privilegi
-- [ ] Task 3: `acting_operator_id` / `is_active_operator` / `is_admin` estese al cassiere; matrice pgTAP del dispositivo senza cassiere
+- [x] Task 3: `acting_operator_id` / `is_active_operator` / `is_admin` estese al cassiere; matrice pgTAP del dispositivo senza cassiere
 - [ ] Task 4: `set_my_pin`, `unlock_cashier` (blocco con `for update`), `end_cashier_turn`; pgTAP del blocco e della scadenza
 - [ ] Task 5: `get_session_identity`, `list_cashiers`, seed dei dispositivi e dei PIN finti
 - [ ] Task 6: Integrazione su HTTP: dispositivo senza cassiere, corsa sul blocco, hash mai esposto

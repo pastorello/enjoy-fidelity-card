@@ -58,11 +58,11 @@ vista dello schema `app` (elenco letto da `pg_catalog`) restituisce 0 righe e og
 è rifiutata con il codice già usato dal modulo; un test fallisce se compare una funzione `app.*` non
 classificata come lettura, scrittura o kiosk.
 **Accettazione:**
-- [ ] pgTAP (criterio 1): dispositivo senza cassiere → 0 righe ovunque; `record_purchase`,
+- [x] pgTAP (criterio 1): dispositivo senza cassiere → 0 righe ovunque; `record_purchase`,
       `create_customer`, `update_settings` e le altre scritture rifiutate
-- [ ] pgTAP (criterio 2): con cassiere (impostato direttamente nella riga per ora) `movements.operator_id` e
+- [x] pgTAP (criterio 2): con cassiere (impostato direttamente nella riga per ora) `movements.operator_id` e
       `customers.created_by` = cassiere; `update_settings` ok con cassiere admin, `42501` con cassiere operatore
-- [ ] pgTAP: turno oltre 12 h, cassiere con utente cancellato o senza PIN → null; per gli account operatore
+- [x] pgTAP: turno oltre 12 h, cassiere con utente cancellato o senza PIN → null; per gli account operatore
       tutti i pgTAP esistenti verdi senza modifiche
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 2 · **File:** supabase/migrations/*_tablet_kiosk.sql,
