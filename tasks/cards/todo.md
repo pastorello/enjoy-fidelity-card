@@ -73,12 +73,12 @@ trigger: ogni passaggio `active` true → false azzera lo stato del link e cance
 `token_hash` con card attiva e cliente non anonimizzato; saldo da `private.customer_balance` se esiste
 (`to_regprocedure`), altrimenti `0`. Mai errori, mai altri campi.
 **Accettazione:**
-- [ ] pgTAP come `anon`: token confermato → `0` senza movimenti; sconosciuto, malformato (21/23 caratteri,
+- [x] pgTAP come `anon`: token confermato → `0` senza movimenti; sconosciuto, malformato (21/23 caratteri,
       `+`, `/`, null), solo in attesa, di card disattivata, di cliente anonimizzato, vecchio dopo la
       rotazione → `null` senza errore (criteri 11, 12)
-- [ ] pgTAP: `anon` non legge `private.card_links` né `app.cards` e non esegue `issue_card_link` /
+- [x] pgTAP: `anon` non legge `private.card_links` né `app.cards` e non esegue `issue_card_link` /
       `confirm_card_link`; `prosecdef` vero e `search_path` vuoto (criterio 8)
-- [ ] pgTAP allowlist: in `public` l'insieme delle funzioni eseguibili da `anon` è esattamente
+- [x] pgTAP allowlist: in `public` l'insieme delle funzioni eseguibili da `anon` è esattamente
       `{card_points(text)}`; `function_privileges.test.sql` verde per `app` e `private` (criterio 12)
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 3 · **File:** supabase/migrations/*_cards.sql, supabase/tests/cards.test.sql
