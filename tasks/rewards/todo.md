@@ -188,9 +188,9 @@ già salvato con quell'id, in elenco va la riga del server; `invalid` → messag
 `not-found`/`unknown` → "Premio non salvato: riprova." e ricarica; `forbidden` → messaggio di permesso e
 `reportNotEnabled()`; guasti del server con le loro parole.
 **Accettazione:**
-- [ ] Componenti: doppio tocco = una chiamata; rete poi Riprova → due chiamate con lo stesso id e una sola
+- [x] Componenti: doppio tocco = una chiamata; rete poi Riprova → due chiamate con lo stesso id e una sola
       riga; risposta persa poi modulo cambiato e Riprova → in elenco i valori del server
-- [ ] Componenti: nome già usato con maiuscole diverse → messaggio sotto il nome; `forbidden` → permesso
+- [x] Componenti: nome già usato con maiuscole diverse → messaggio sotto il nome; `forbidden` → permesso
 **Verifica:** `npm test`
 **Dipendenze:** 10 · **File:** src/features/rewards/RewardForm.tsx (+ .test.tsx),
 src/features/rewards/RewardsCatalogPage.tsx · **Dimensione:** M
