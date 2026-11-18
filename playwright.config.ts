@@ -6,6 +6,8 @@ const PORT = 4173;
 const LOCAL_SUPABASE_URL = 'http://localhost:54321';
 /** Specs that change global state (the settings row): kept out of the parallel `phone` project. */
 const SHARED_STATE_SPECS = /settings\.spec\.ts$/;
+/** Specs of the till tablet (SPEC-tablet-kiosk): their own project at 1280×800, never at 390×844. */
+const TABLET_SPECS = /tablet.*\.spec\.ts$/;
 
 /**
  * E2E always runs against the local Supabase stack, never against the staging project that `.env`
@@ -41,7 +43,7 @@ export default defineConfig({
       name: 'phone',
       // Main target: Android phone, 390×844 (CLAUDE.md).
       use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
-      testIgnore: SHARED_STATE_SPECS,
+      testIgnore: [SHARED_STATE_SPECS, TABLET_SPECS],
     },
     {
       // Specs that change the one shared configuration row: they run after every `phone` test,
@@ -50,6 +52,12 @@ export default defineConfig({
       use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
       testMatch: SHARED_STATE_SPECS,
       dependencies: ['phone'],
+    },
+    {
+      // The till tablet: BESTTAB A20, 10,1″, 1280×800 landscape, touch, no NFC (CLAUDE.md).
+      name: 'tablet',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 }, hasTouch: true },
+      testMatch: TABLET_SPECS,
     },
   ],
   webServer: {
