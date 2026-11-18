@@ -105,8 +105,8 @@ update, anonymize; errori tipizzati); `errorCodes.ts` (elenco unico codici → t
 per `operation_id`, registro delle chiamate, risposte programmabili e ritardate, rete giù, "arrivato ma
 risposta persa"); `CustomerServiceProvider` / `useCustomerService()`; iniezione in `main.tsx` e `renderApp`.
 **Accettazione:**
-- [ ] Test del finto: nome equivalente rifiutato, stesso `operation_id` → stesso cliente, rete simulata
-- [ ] I test esistenti di `renderApp` passano senza modifiche alle chiamate (terzo parametro facoltativo)
+- [x] Test del finto: nome equivalente rifiutato, stesso `operation_id` → stesso cliente, rete simulata
+- [x] I test esistenti di `renderApp` passano senza modifiche alle chiamate (terzo parametro facoltativo)
 **Verifica:** `npm test`
 **Dipendenze:** 5 · **File:** src/test/fakeCustomerService.ts (+ .test.ts),
 src/features/customers/CustomerServiceProvider.tsx, src/main.tsx, src/test/renderApp.tsx · **Dimensione:** M
