@@ -153,9 +153,9 @@ controlla la connessione e riprova." (rete) o "Premio non salvato: riprova." (`n
 ricarica); `forbidden` → messaggio di permesso e `reportNotEnabled()`. Dopo il successo l'elenco si ricarica,
 la riga si sposta al suo posto e il focus resta sulla sua casella. Area di tocco ≥ 48 px.
 **Accettazione:**
-- [ ] Componenti: disattiva → riga in grigio in fondo con il focus sulla sua casella; riattiva → torna tra
+- [x] Componenti: disattiva → riga in grigio in fondo con il focus sulla sua casella; riattiva → torna tra
       gli attivi; casella disabilitata durante la chiamata; errore di rete → stato ripristinato e messaggio
-- [ ] Componenti: `forbidden` → "Solo per gli amministratori" e `reportNotEnabled()` chiamato
+- [x] Componenti: `forbidden` → "Solo per gli amministratori" e `reportNotEnabled()` chiamato
 **Verifica:** `npm test`
 **Dipendenze:** 8 · **File:** src/features/rewards/RewardRow.tsx (+ .module.css),
 src/features/rewards/RewardsCatalogPage.tsx (+ .test.tsx) · **Dimensione:** M
