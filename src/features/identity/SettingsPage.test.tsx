@@ -69,13 +69,15 @@ describe('settings page', () => {
     const points = screen.getByRole('region', { name: 'PUNTI E CONTROLLI' });
     const accountSection = screen.getByRole('region', { name: 'ACCOUNT' });
     const management = screen.getByRole('region', { name: 'GESTIONE' });
+    const exportSection = screen.getByRole('region', { name: 'ESPORTA DATI' });
     // account box · PUNTI E CONTROLLI (settings) · ACCOUNT (identity-password) · GESTIONE
-    // (rewards); no final note
+    // (rewards) · ESPORTA DATI (export); no final note
     expect(Array.from(screen.getByRole('main').children)).toEqual([
       account,
       points,
       accountSection,
       management,
+      exportSection,
     ]);
   });
 
