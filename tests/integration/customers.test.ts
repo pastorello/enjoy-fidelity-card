@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { supabaseCustomerService as service } from '../../src/features/customers/supabaseCustomerService';
-import { localSupabase, memoryClient, runSql } from './localSupabase';
+import { localSupabase, memoryClient, runSql, runSqlInBackground } from './localSupabase';
 
 // The service under test talks to whichever signed-in client the test sets here.
 const current = vi.hoisted(() => ({ client: undefined as SupabaseClient | undefined }));
@@ -32,12 +32,23 @@ function rowsWithOperation(operationId: string): string {
   });
 }
 
+/**
+ * Customers this run leaves in the search: erased at the end, so runs repeated without db:reset
+ * do not pile up rows ahead of the e2e searches (which show 20 rows).
+ */
+const toErase: string[] = [];
+
 let adminClient: SupabaseClient;
 let operatorClient: SupabaseClient;
 
 beforeAll(async () => {
   adminClient = await signedIn('admin@example.com');
   operatorClient = await signedIn('operatore@example.com');
+});
+
+afterAll(async () => {
+  current.client = adminClient;
+  await Promise.all(toErase.map((id) => service.anonymize(id)));
 });
 
 describe('operator', () => {
@@ -65,6 +76,7 @@ describe('operator', () => {
       balance: 0,
     });
     createdId = created.id;
+    toErase.push(created.id);
   });
 
   it('a resend with the same operation_id returns the same customer, and only one row', async () => {
@@ -167,6 +179,105 @@ describe('admin', () => {
     await expect(
       service.update({ id: created.id, name, phone: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_anonymized' });
+  });
+});
+
+/**
+ * Two phones saving at the same moment: the pre-check of the RPC does not see a row another
+ * transaction has inserted but not committed yet, so the INSERT or UPDATE waits on the unique
+ * index and then hits unique_violation. The RPC must settle it with the constraint it hit, never
+ * with a raw 23505 (which the app would show as a network error).
+ */
+describe('concurrent saves', () => {
+  const HOLD_SECONDS = '1.5';
+
+  beforeAll(() => {
+    current.client = operatorClient;
+  });
+
+  /**
+   * Inserts a customer in a transaction kept open for HOLD_SECONDS and resolves once the row is
+   * inserted (the session is sleeping); `done` settles when it has committed.
+   */
+  async function holdInsert(row: { id: string; name: string; operationId: string }) {
+    const marker = `race-${randomUUID()}`;
+    const done = runSqlInBackground(
+      `begin;
+       insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
+       values (:'id'::uuid, :'name', now(),
+               (select id from app.operators order by created_at limit 1),
+               :'op'::uuid);
+       select pg_sleep(${HOLD_SECONDS}) /* ${marker} */;
+       commit;`,
+      { id: row.id, name: row.name, op: row.operationId },
+    );
+    await vi.waitFor(
+      () => {
+        const sleeping = runSql(
+          `select count(*) from pg_stat_activity
+           where pid <> pg_backend_pid() and query like '%pg_sleep%' and query like :'pattern';`,
+          { pattern: `%${marker}%` },
+        );
+        if (sleeping !== '1') throw new Error('The held transaction has not inserted its row yet');
+      },
+      { timeout: 2000, interval: 20 },
+    );
+    return { done };
+  }
+
+  it('create: the same name committed meanwhile is customer_name_taken with its id', async () => {
+    const held = { id: randomUUID(), name: `Gara Nome ${SUFFIX}`, operationId: randomUUID() };
+    const { done } = await holdInsert(held);
+    toErase.push(held.id);
+    const attempt = service.create({
+      operationId: randomUUID(),
+      name: held.name,
+      phone: '',
+      privacyConsent: true,
+      notes: '',
+    });
+    await expect(attempt).rejects.toMatchObject({
+      kind: 'customer_name_taken',
+      existingCustomerId: held.id,
+    });
+    await done;
+  });
+
+  it('create: the same operation_id committed meanwhile returns that customer', async () => {
+    const held = { id: randomUUID(), name: `Gara Invio ${SUFFIX}`, operationId: randomUUID() };
+    const { done } = await holdInsert(held);
+    toErase.push(held.id);
+    const again = await service.create({
+      operationId: held.operationId,
+      name: `Gara Invio Doppio ${SUFFIX}`,
+      phone: '',
+      privacyConsent: true,
+      notes: '',
+    });
+    expect(again).toMatchObject({ id: held.id, name: held.name });
+    await done;
+    expect(rowsWithOperation(held.operationId)).toBe('1');
+  });
+
+  it('update: a name committed meanwhile is customer_name_taken with its id', async () => {
+    const renamed = await service.create({
+      operationId: randomUUID(),
+      name: `Gara Rinomina ${SUFFIX}`,
+      phone: '',
+      privacyConsent: true,
+      notes: '',
+    });
+    toErase.push(renamed.id);
+    const held = { id: randomUUID(), name: `Gara Presa ${SUFFIX}`, operationId: randomUUID() };
+    const { done } = await holdInsert(held);
+    toErase.push(held.id);
+    await expect(
+      service.update({ id: renamed.id, name: held.name, phone: '', notes: '' }),
+    ).rejects.toMatchObject({ kind: 'customer_name_taken', existingCustomerId: held.id });
+    await done;
+    await expect(service.get(renamed.id)).resolves.toMatchObject({
+      name: `Gara Rinomina ${SUFFIX}`,
+    });
   });
 });
 

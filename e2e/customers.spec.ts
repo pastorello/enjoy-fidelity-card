@@ -48,7 +48,8 @@ test.describe('administrator', () => {
   test.use({ expectedRefusals: [/\/rest\/v1\/rpc\/update_customer$/] });
 
   test('creates, finds, edits and erases a customer', async ({ page }) => {
-    const name = `Nicolò Prova E2E ${uniqueSuffix()}`;
+    const suffix = uniqueSuffix();
+    const name = `Nicolò Prova E2E ${suffix}`;
     await signIn(page, seedAccounts.admin.email);
 
     await createCustomer(page, name, '333 123 4521');
@@ -56,9 +57,10 @@ test.describe('administrator', () => {
     await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
     const customerUrl = page.url();
 
-    // Found without the accent, and with the last 4 digits of the phone.
+    // Found without the accent, and with the last 4 digits of the phone. The search names this
+    // run's customer in full: customers left by other runs never push it past the 20 rows shown.
     await page.goto('/');
-    await search(page, 'nicolo');
+    await search(page, `nicolo prova e2e ${suffix}`);
     await expect(resultRow(page, name)).toContainText('••• 4521');
     await search(page, '4521');
     await resultRow(page, name).click();

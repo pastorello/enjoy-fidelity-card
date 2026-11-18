@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -48,8 +48,29 @@ function databaseContainer(): string {
  * host). `vars` become psql variables: use them as :'name' so values are always quoted.
  */
 export function runSql(sql: string, vars: Record<string, string> = {}): string {
+  return execFileSync('docker', psqlArgs(vars), { input: sql, encoding: 'utf8' }).trim();
+}
+
+/**
+ * `runSql` in its own session without waiting for it: the promise settles when the session ends.
+ * Used to hold a transaction open while the code under test runs into it.
+ */
+export function runSqlInBackground(
+  sql: string,
+  vars: Record<string, string> = {},
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = execFile('docker', psqlArgs(vars), { encoding: 'utf8' }, (error, stdout) => {
+      if (error) reject(error);
+      else resolve(stdout.trim());
+    });
+    child.stdin?.end(sql);
+  });
+}
+
+function psqlArgs(vars: Record<string, string>): string[] {
   const args = ['exec', '-i', databaseContainer(), 'psql', '-U', 'postgres', '-d', 'postgres'];
   args.push('-v', 'ON_ERROR_STOP=1', '-X', '-q', '-A', '-t');
   for (const [name, value] of Object.entries(vars)) args.push('-v', `${name}=${value}`);
-  return execFileSync('docker', args, { input: sql, encoding: 'utf8' }).trim();
+  return args;
 }
