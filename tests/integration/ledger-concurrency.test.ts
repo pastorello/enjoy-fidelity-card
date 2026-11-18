@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { supabaseCustomerService as customers } from '../../src/features/customers/supabaseCustomerService';
 import { supabaseLedgerService as service } from '../../src/features/ledger/supabaseLedgerService';
 import type { LedgerResult } from '../../src/features/ledger/types';
+import { supabaseRewardsService as rewards } from '../../src/features/rewards/supabaseRewardsService';
 import { localSupabase, memoryClient, runSql, runSqlInBackground } from './localSupabase';
 
 // The service under test talks to whichever signed-in client was selected when it was called:
@@ -111,17 +112,17 @@ function expectOneWinner(settled: PromiseSettledResult<LedgerResult>[]): LedgerR
 }
 
 /**
- * Locks the customer's row in a transaction kept open for HOLD_SECONDS; resolves once the lock
- * is held. `released` settles when the transaction has committed.
+ * Runs `lock` in a transaction kept open for HOLD_SECONDS; resolves once the lock is held.
+ * `released` settles when the transaction has committed.
  */
-async function holdCustomerLock(customerId: string) {
+async function holdLock(lock: string, vars: Record<string, string>) {
   const marker = `hold-${randomUUID()}`;
   const released = runSqlInBackground(
     `begin;
-     select 1 from app.customers where id = :'id'::uuid for update;
+     ${lock};
      select pg_sleep(${HOLD_SECONDS}) /* ${marker} */;
      commit;`,
-    { id: customerId },
+    vars,
   );
   await vi.waitFor(
     () => {
@@ -135,6 +136,26 @@ async function holdCustomerLock(customerId: string) {
     { timeout: 2000, interval: 20 },
   );
   return { released };
+}
+
+/** Locks the customer's row, so the ledger writes on it queue behind it. */
+function holdCustomerLock(customerId: string) {
+  return holdLock(`select 1 from app.customers where id = :'id'::uuid for update`, {
+    id: customerId,
+  });
+}
+
+/**
+ * Locks the operator's row of the seed account `email`. A ledger insert checks the foreign key
+ * `operator_id` (a FOR KEY SHARE, after its index entries are written) once the row is in, so a
+ * write by that operator waits after its insert, before its commit.
+ */
+function holdOperatorLock(email: string) {
+  return holdLock(
+    `select 1 from app.operators o join auth.users u on u.id = o.user_id
+     where u.email = :'email' for update of o`,
+    { email },
+  );
 }
 
 /** Waits until `count` requests are blocked on a lock: proof that they are in flight together. */
@@ -179,6 +200,15 @@ const redeemOrCancel = (customer: { id: string; purchase: string }) => [
   ),
 ];
 
+/** A catalogue reward of 60 points, made by this run and deactivated at the end. */
+const REWARD_60_ID = randomUUID();
+
+/** The catalogue reward of 60 points, redeemed by `client`. */
+const redeemReward60 = (client: SupabaseClient, customerId: string) =>
+  as(client, () =>
+    service.redeemReward({ operationId: randomUUID(), customerId, rewardId: REWARD_60_ID }),
+  );
+
 /** A purchase of 12,50 € by the operator with a given operation_id. */
 const samePurchase = (operationId: string, customerId: string) =>
   as(operatorClient, () => service.recordPurchase({ operationId, customerId, amountCents: 1250 }));
@@ -186,11 +216,21 @@ const samePurchase = (operationId: string, customerId: string) =>
 beforeAll(async () => {
   adminClient = await signedIn('admin@example.com');
   operatorClient = await signedIn('operatore@example.com');
+  const created = await as(adminClient, () =>
+    rewards.create({
+      id: REWARD_60_ID,
+      name: `Premio concorrenza ${SUFFIX}`,
+      points: 60,
+      active: true,
+    }),
+  );
+  if (!created.ok) throw new Error(`The test reward was not created: ${created.error}`);
 });
 
 afterAll(async () => {
   current.client = adminClient;
   await Promise.all(toErase.map((id) => customers.anonymize(id)));
+  await rewards.setActive(REWARD_60_ID, false);
 });
 
 describe('two redemptions of 60 on a balance of 100 (criterion 5)', () => {
@@ -224,6 +264,57 @@ describe('two redemptions of 60 on a balance of 100 (criterion 5)', () => {
     await released;
     expectOneWinner(await calls);
     expect(balanceOf(customer.id)).toBe(40);
+  });
+});
+
+/** How many redemptions the customer has. */
+const redemptions = (customerId: string) =>
+  countOf(
+    `select count(*) from app.movements where customer_id = :'id'::uuid and kind = 'redemption';`,
+    customerId,
+  );
+
+describe('two catalogue redemptions of 60 on a balance of 100 (criterion 5)', () => {
+  it(`admin and operator at once, ${ROUNDS} rounds: always one wins, the balance stays >= 0`, async () => {
+    await rounds(async (index) => {
+      const customer = await customerWith100Points(`catalogo ${index}`);
+      const settled = await Promise.allSettled([
+        redeemReward60(adminClient, customer.id),
+        redeemReward60(operatorClient, customer.id),
+      ]);
+      const winner = expectOneWinner(settled);
+      expect(winner.movement.rewardId).toBe(REWARD_60_ID);
+      expect(winner.balance).toBe(40);
+      expect(balanceOf(customer.id)).toBe(40);
+      expect(redemptions(customer.id)).toBe(1);
+    });
+  });
+
+  it('both queued behind the customer lock: the second sees the first and is refused', async () => {
+    const customer = await customerWith100Points('catalogo in coda');
+    const { released } = await holdCustomerLock(customer.id);
+    const calls = Promise.allSettled([
+      redeemReward60(adminClient, customer.id),
+      redeemReward60(operatorClient, customer.id),
+    ]);
+    await waitForBlocked(2);
+    await released;
+    expectOneWinner(await calls);
+    expect(balanceOf(customer.id)).toBe(40);
+    expect(redemptions(customer.id)).toBe(1);
+  });
+
+  it(`a catalogue and a free redemption at once, ${ROUNDS} rounds: always one wins`, async () => {
+    await rounds(async (index) => {
+      const customer = await customerWith100Points(`catalogo e libero ${index}`);
+      const settled = await Promise.allSettled([
+        redeemReward60(adminClient, customer.id),
+        redeem60(operatorClient, customer.id),
+      ]);
+      expect(expectOneWinner(settled).balance).toBe(40);
+      expect(balanceOf(customer.id)).toBe(40);
+      expect(redemptions(customer.id)).toBe(1);
+    });
   });
 });
 
@@ -297,5 +388,60 @@ describe('two parallel calls with the same operation_id (criterion 4)', () => {
       ),
     ).toBe(1);
     expect(balanceOf(customer.id)).toBe(100 + Math.floor(1250 / centsPerPoint()));
+  });
+});
+
+/** How many movements carry `operationId`. */
+const withOperation = (operationId: string) =>
+  Number(
+    runSql(`select count(*) from app.movements where operation_id = :'op'::uuid;`, {
+      op: operationId,
+    }),
+  );
+
+/**
+ * Both calls pass the replay lookup (step 3) before either commits: the operator's row is held,
+ * so the first waits after its insert and the second waits on the first's operation_id in the
+ * unique index; on release the second gets unique_violation, which must become `conflict`.
+ */
+function expectOneConflict(settled: PromiseSettledResult<LedgerResult>[]) {
+  const outcomes = settled.map(outcome);
+  expect(outcomes.filter((value) => typeof value === 'string')).toEqual(['conflict']);
+  expect(outcomes.filter((value) => typeof value !== 'string')).toHaveLength(1);
+}
+
+describe('one operation_id on two customers at once: the unique index answers conflict', () => {
+  it('record_purchase on customer A and customer B', async () => {
+    const [a, b] = await Promise.all([
+      customerWith100Points('stesso id A'),
+      customerWith100Points('stesso id B'),
+    ]);
+    const operationId = randomUUID();
+    const { released } = await holdOperatorLock('operatore@example.com');
+    const calls = Promise.allSettled([
+      samePurchase(operationId, a.id),
+      samePurchase(operationId, b.id),
+    ]);
+    await waitForBlocked(2);
+    await released;
+    expectOneConflict(await calls);
+    expect(withOperation(operationId)).toBe(1);
+  });
+
+  it('cancel_movement of two movements of two customers', async () => {
+    const [a, b] = await Promise.all([
+      customerWith100Points('stesso annullo A'),
+      customerWith100Points('stesso annullo B'),
+    ]);
+    const operationId = randomUUID();
+    const { released } = await holdOperatorLock('admin@example.com');
+    const calls = Promise.allSettled([
+      as(adminClient, () => service.cancelMovement({ operationId, movementId: a.purchase })),
+      as(adminClient, () => service.cancelMovement({ operationId, movementId: b.purchase })),
+    ]);
+    await waitForBlocked(2);
+    await released;
+    expectOneConflict(await calls);
+    expect(withOperation(operationId)).toBe(1);
   });
 });
