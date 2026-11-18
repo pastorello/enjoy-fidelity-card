@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Button } from './Button';
 import styles from './ConfirmDialog.module.css';
+import { Icon } from './Icon';
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -15,6 +16,8 @@ type ConfirmDialogProps = {
   tone?: 'primary' | 'danger';
   /** The confirmed action is running: further presses are ignored. */
   busy?: boolean;
+  /** Why the confirmed action failed (network, say): the dialog stays open to try again. */
+  error?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -30,6 +33,7 @@ function OpenDialog({
   cancelLabel = 'Lascia com’è',
   tone = 'primary',
   busy = false,
+  error = null,
   onConfirm,
   onCancel,
 }: Omit<ConfirmDialogProps, 'open'>) {
@@ -69,6 +73,12 @@ function OpenDialog({
       <p id={descriptionId} className={styles.description}>
         {description}
       </p>
+      {error !== null && error !== '' && (
+        <p role="alert" className={styles.error}>
+          <Icon name="circle-alert" size={24} className={styles.errorIcon} />
+          {error}
+        </p>
+      )}
       <Button
         ref={confirmRef}
         variant={tone === 'danger' ? 'danger' : 'primary'}

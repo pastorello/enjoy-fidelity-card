@@ -2,6 +2,7 @@ import { Navigate, useParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
+import { AnonymizeSection } from './AnonymizeSection';
 import { CustomerForm } from './CustomerForm';
 import { loadErrorText } from './loadErrorText';
 import { formatPhoneForEdit } from './phone';
@@ -13,7 +14,10 @@ import { useUpdateCustomer } from './useUpdateCustomer';
 const TITLE = 'Modifica cliente';
 const FORM_ID = 'edit-customer';
 
-/** The form, filled with the customer as saved, and "Salva modifiche" (or "Riprova") below. */
+/**
+ * The form, filled with the customer as saved, and "Salva modifiche" (or "Riprova") below; then
+ * DATI DEL CLIENTE for administrators (the CARD section of `cards` goes before it).
+ */
 function EditForm({ customer }: { customer: CustomerSummary }) {
   const { save, busy, refusal, failure } = useUpdateCustomer(customer.id);
   return (
@@ -39,6 +43,7 @@ function EditForm({ customer }: { customer: CustomerSummary }) {
         refusal={refusal}
       />
       {failure && <SaveFailure text={failure.text} />}
+      <AnonymizeSection customer={customer} />
     </AppShell>
   );
 }

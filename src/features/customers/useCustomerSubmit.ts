@@ -5,8 +5,11 @@ import { customerErrorField, customerErrorText } from './errorCodes';
 import { CustomerError, type CustomerSummary } from './types';
 import { useNotOperator } from './useNotOperator';
 
-/** Why the outcome of a save is unknown: the page offers "Riprova". */
-function failureText(error: unknown, networkText: string): string {
+/**
+ * Why the outcome of a call is unknown (a server fault, or `networkText` for anything else): the
+ * page offers to try again, which is safe because every customers write is idempotent.
+ */
+export function failureText(error: unknown, networkText: string): string {
   if (error instanceof ServerFaultError) {
     return error.kind === 'misconfigured'
       ? 'Servizio non configurato: chiedi a un amministratore.'
