@@ -1,7 +1,7 @@
 # Spec: tablet-kiosk — fase 3
 
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
-Modulo: `tablet-kiosk` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `identity`, `card-input`,
+Modulo: `tablet-kiosk` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity`, `card-input`,
 `settings`, `customers`, `cards`, `rewards`, `ledger`, `export` · Fonti: specifiche ("Ruoli e account",
 "Architettura", "Fasi"), wireframe della pagina "Tablet con lettore USB" (Tablet-* e "Tablet: cambio
 operatore") con le note nt1–nt3, `CLAUDE.md`, `brain/DECISIONS.md` (account di dispositivo distinto dagli

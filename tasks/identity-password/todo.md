@@ -1,6 +1,6 @@
 # Todo: identity-password
 
-Fonte: [plan.md](plan.md) · Spec: [SPEC-identity-password.md](../../SPEC-identity-password.md). Ogni task
+Fonte: [plan.md](plan.md) · Spec: [SPEC-identity-password.md](../../docs/specs/SPEC-identity-password.md). Ogni task
 chiude con `npm run typecheck && npm run lint && npm run format:check && npm test && npm run db:test &&
 npm run test:integration && npm run e2e` verdi e un commit Conventional Commits sul branch
 `feat/identity-password`. Test prima del codice (`test-driven-development`). Stack Supabase locale con
@@ -149,12 +149,12 @@ aprire il link.
 dashboard (Site URL e Redirect URLs della tabella della spec con `<team>`, template Reset Password da
 `supabase/templates/recovery.html`, minimo 8 caratteri e OTP 3600 s, prova reale da `info@enjoygaeta.it`),
 mai `supabase config push`; la sezione V1 "reimpostare una password" rimanda al nuovo flusso. Rimandi in
-`SPEC-identity.md` e `CAPABILITY-MAP.md`; RUNBOOK (Mailpit, limiti locali, trappole trovate); `brain/MAP.md`.
+`docs/specs/SPEC-identity.md` e `CAPABILITY-MAP.md`; RUNBOOK (Mailpit, limiti locali, trappole trovate); `brain/MAP.md`.
 **Accettazione:**
 - [x] Ogni passo indica la schermata esatta della dashboard; lo staging non riceve mai l'URL di produzione
 - [x] Nessun segreto, dominio di team reale o dato personale nei documenti
 **Verifica:** rilettura; `npm run format:check`
-**Dipendenze:** 8 · **File:** docs/setup-accounts.md, SPEC-identity.md, CAPABILITY-MAP.md,
+**Dipendenze:** 8 · **File:** docs/setup-accounts.md, docs/specs/SPEC-identity.md, CAPABILITY-MAP.md,
 brain/topics/operations/RUNBOOK.md, brain/MAP.md · **Dimensione:** S
 
 ## Checkpoint C

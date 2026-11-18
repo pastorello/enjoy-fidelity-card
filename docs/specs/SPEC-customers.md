@@ -1,7 +1,7 @@
 # Spec: customers — V1
 
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
-Modulo: `customers` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `identity` ·
+Modulo: `customers` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity` ·
 Fonti: specifiche ("Nuovo cliente e consegna della card", "Sicurezza e privacy", "Modello dati"), wireframe
 Cerca cliente, Ricerca senza risultati, Nuovo cliente senza card, Nome già usato, Modifica cliente, Scheda
 cliente e note n2, n3, n6 (link in `brain/MAP.md` §5) · Decisioni: `brain/DECISIONS.md`.

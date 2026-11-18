@@ -1,7 +1,7 @@
 # Spec: settings — V1
 
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
-Modulo: `settings` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `identity` ·
+Modulo: `settings` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity` ·
 Usato da: `ledger` (rapporto e soglia), `card-input` e `tablet-kiosk` (formato del lettore USB) ·
 Fonti: specifiche ("Calcolo dei punti", "Modello dati": configurazione, "Ruoli e account"), wireframe
 Impostazioni, Impostazioni operatore, Importo insolito, Tablet: impostazioni e relative note ·

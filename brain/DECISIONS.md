@@ -89,7 +89,7 @@
   - Email predefinita di Supabase: scrive solo agli indirizzi del team, con pochi invii all'ora.
 - **Ambito**: modulo `identity`; si discosta dalle specifiche (inviti via email). Da riprendere se arriva
   un dominio.
-- **Contesto**: revisione delle Open Questions di `SPEC-identity.md`.
+- **Contesto**: revisione delle Open Questions di `docs/specs/SPEC-identity.md`.
 
 ### 2026-11-17 — Oxlint al posto di ESLint, TypeScript 7
 
@@ -116,7 +116,7 @@
   - Un solo progetto Supabase: le anteprime scriverebbero sul database di produzione.
   - Account creati dall'agente: l'agente non gestisce credenziali né accetta termini di servizio.
 - **Ambito**: modulo `platform` (deploy, ambienti).
-- **Contesto**: approvazione di `SPEC-platform.md`.
+- **Contesto**: approvazione di `docs/specs/SPEC-platform.md`.
 
 ### 2026-11-16 — Configurazione iniziale dai valori di esempio delle specifiche
 

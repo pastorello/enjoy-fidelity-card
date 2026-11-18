@@ -1,6 +1,6 @@
 # Implementation Plan: identity
 
-Source spec: [SPEC-identity.md](../../SPEC-identity.md) (approvata il 2026-11-17)
+Source spec: [SPEC-identity.md](../../docs/specs/SPEC-identity.md) (approvata il 2026-11-17)
 
 ## Overview
 

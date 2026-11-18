@@ -3,7 +3,7 @@
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3).
 Rivista il 2026-11-17 per la decisione del titolare «punti visibili al cliente con la card»: il modulo aggiunge la
 **scrittura del link** sulla card (punto 9); la lettura resta com'era.
-Modulo: `card-input` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `platform`, `settings` ·
+Modulo: `card-input` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `platform`, `settings` ·
 Fonti: specifiche (sezioni "Architettura", "Contesto e vincoli", "Nuovo cliente e consegna della card"),
 wireframe Cerca cliente, Lettura card: primo avvio, Lettura card spenta, Associa card, Tablet: cerca cliente,
 Tablet: associa card, Tablet: cambio operatore (intestazione "Lettore NFC USB collegato"), Associa-link e

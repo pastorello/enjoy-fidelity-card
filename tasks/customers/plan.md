@@ -1,6 +1,6 @@
 # Implementation Plan: customers
 
-Source spec: [SPEC-customers.md](../../SPEC-customers.md) (approvata il 2026-11-17; le Open Questions usano i
+Source spec: [SPEC-customers.md](../../docs/specs/SPEC-customers.md) (approvata il 2026-11-17; le Open Questions usano i
 default adottati)
 
 ## Overview
@@ -99,7 +99,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ## Copertura dei criteri di successo
 
-| Criterio (SPEC-customers.md) | Task |
+| Criterio (docs/specs/SPEC-customers.md) | Task |
 |---|---|
 | 1. Cliente con solo nome e consenso; senza consenso `consent_required`; utente senza profilo → `not_operator`, RLS | 1, 3, 5, 10, 11, 15 |
 | 2. "Nicolò Rossi" esistente: creare o rinominare in "nicolo rossi" rifiutato, con link alla scheda esistente | 1, 2, 11, 13, 15 |
@@ -120,7 +120,7 @@ Verifica finale del task 16 (2026-11-18), con la quality bar completa verde in l
 come `file › titolo del test` (per pgTAP la descrizione dell'asserzione); `scripts/customersCriteria.test.ts`
 controlla che ogni criterio ne abbia almeno una e che ognuna esista davvero nel file indicato.
 
-| Criterio (SPEC-customers.md) | Test che lo prova |
+| Criterio (docs/specs/SPEC-customers.md) | Test che lo prova |
 |---|---|
 | 1. Solo nome e consenso; senza consenso `consent_required`; senza profilo `not_operator`, RLS | `supabase/tests/customers.test.sql › name and consent are enough; the name is cleaned and the balance is 0`, `supabase/tests/customers.test.sql › consent false is refused`, `supabase/tests/customers.test.sql › a user without a profile reads no customers`, `supabase/tests/customers.test.sql › a user without a profile cannot create a customer`, `supabase/tests/customers.test.sql › a direct insert is denied`, `tests/integration/customers.test.ts › every call is not_operator, reads included`, `e2e/customers.spec.ts › an operator creates a customer with only the name and the consent, and cannot erase data` |
 | 2. "nicolo rossi" accanto a "Nicolò Rossi" rifiutato in creazione e rinomina, con link alla scheda esistente | `supabase/tests/customers.test.sql › an equivalent name is refused`, `supabase/tests/customers.test.sql › renaming to a name already used is refused`, `supabase/tests/customers.test.sql › the refusal carries the existing customer id in detail`, `tests/integration/customers.test.ts › an equivalent name is customer_name_taken with the existing id`, `src/features/customers/NewCustomerPage.test.tsx › name already used: the error, "Apri la scheda" to that customer and how to tell them apart`, `src/features/customers/EditCustomerPage.test.tsx › name already used: the error and "Apri la scheda" to the other customer` |

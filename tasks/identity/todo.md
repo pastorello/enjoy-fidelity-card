@@ -1,6 +1,6 @@
 # Todo: identity
 
-Fonte: [plan.md](plan.md) · Spec: [SPEC-identity.md](../../SPEC-identity.md). Ogni task chiude con
+Fonte: [plan.md](plan.md) · Spec: [SPEC-identity.md](../../docs/specs/SPEC-identity.md). Ogni task chiude con
 `npm run typecheck && npm run lint && npm test` verdi (più `db:test` ed E2E dove indicato) e un commit
 Conventional Commits sul branch del modulo. Test prima del codice (`test-driven-development`).
 

@@ -1,6 +1,6 @@
 # Implementation Plan: settings
 
-Source spec: [SPEC-settings.md](../../SPEC-settings.md) (approvata il 2026-11-17; le Open Questions usano i
+Source spec: [SPEC-settings.md](../../docs/specs/SPEC-settings.md) (approvata il 2026-11-17; le Open Questions usano i
 default adottati)
 
 ## Overview
@@ -82,7 +82,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ## Copertura dei criteri di successo
 
-| Criterio (SPEC-settings.md) | Task |
+| Criterio (docs/specs/SPEC-settings.md) | Task |
 |---|---|
 | 1. Riga unica 100 / 15000 / `'hex'` dopo `db:reset`; secondo `insert` fallisce | 1 |
 | 2. Operatore: "PUNTI" in sola lettura senza campi né Salva; `update_settings` → errore di permesso (pgTAP + integrazione) | 1, 2, 7, 10 |

@@ -1,7 +1,7 @@
 # Spec: export — V1
 
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
-Modulo: `export` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `identity`, `customers`, `cards`,
+Modulo: `export` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity`, `customers`, `cards`,
 `ledger` · Fonti: specifiche ("Ruoli e account": esportazione dati per l'amministratore; "Sicurezza e
 privacy": "Esportazione clienti e movimenti in CSV per l'amministratore", cancellazione su richiesta),
 wireframe Impostazioni (sezione ESPORTA DATI), Impostazioni operatore (nota finale), Tablet: impostazioni e

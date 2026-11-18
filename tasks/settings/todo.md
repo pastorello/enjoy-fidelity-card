@@ -1,6 +1,6 @@
 # Todo: settings
 
-Fonte: [plan.md](plan.md) · Spec: [SPEC-settings.md](../../SPEC-settings.md). Ogni task chiude con
+Fonte: [plan.md](plan.md) · Spec: [SPEC-settings.md](../../docs/specs/SPEC-settings.md). Ogni task chiude con
 `npm run typecheck && npm run lint && npm run format:check && npm test && npm run db:test &&
 npm run test:integration && npm run e2e` verdi e un commit Conventional Commits sul branch
 `feat/settings`. Test prima del codice (`test-driven-development`). Solo lo stack Supabase locale

@@ -134,7 +134,7 @@ operatore.
 
 ## 6. Email di Auth: link per scegliere una nuova password
 
-Serve a "Password dimenticata" e "Cambia password" (`SPEC-identity-password.md`, "Configurazione di Auth").
+Serve a "Password dimenticata" e "Cambia password" (`docs/specs/SPEC-identity-password.md`, "Configurazione di Auth").
 Le email partono già da `info@enjoygaeta.it` (SMTP configurato dal titolare in entrambi i progetti); qui si
 impostano gli indirizzi di ritorno, il testo dell'email e le regole della password.
 

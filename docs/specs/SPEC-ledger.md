@@ -1,7 +1,7 @@
 # Spec: ledger — V1
 
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
-Modulo: `ledger` ([CAPABILITY-MAP.md](CAPABILITY-MAP.md)) · Dipende da: `customers`, `settings`, `rewards`
+Modulo: `ledger` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `customers`, `settings`, `rewards`
 (e `cards`/`card-input` per l'arrivo dalla card: `ledger` sostituisce il segnaposto di `/clienti/:id/spesa`
 creato da `cards`) · Usato da: `export`, `tablet-kiosk` ·
 Fonti: specifiche ("Ruoli e account", "Flussi alla cassa", "Calcolo dei punti", "Premi", "Modello dati",

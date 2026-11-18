@@ -101,7 +101,7 @@ Skill di progetto in `.claude/skills/` (versioni in `skills-lock.json`).
 
 ### Ingegneria — [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
 1. `interview-me` → chiudere i punti aperti.
-2. `spec-driven-development` → una specifica per modulo (`SPEC-<id>.md` nella root), indice in `CAPABILITY-MAP.md`.
+2. `spec-driven-development` → una specifica per modulo (`docs/specs/SPEC-<id>.md`), indice in `CAPABILITY-MAP.md`.
 3. `planning-and-task-breakdown` → task piccoli e verificabili.
 4. `incremental-implementation` + `test-driven-development` → piccoli passi, test prima.
 5. `code-review-and-quality` → review prima del merge.
@@ -160,8 +160,7 @@ Deploy: Vercel da GitHub (anteprime = Supabase staging, `main` = produzione); mi
   settings.json  # hook Impeccable + plugin project-brain
 brain/           # memoria di progetto (stato, decisioni, passaggi tra sessioni)
 CAPABILITY-MAP.md # moduli, dipendenze, ordine di costruzione
-SPEC-<id>.md     # specifica di ogni modulo
-docs/            # setup-accounts.md (Supabase, Vercel); adr/ da creare
+docs/            # specs/ (SPEC-<id>.md di ogni modulo, contratti), setup-accounts.md, adr/ da creare
 design/          # token e loghi del design system "Enjoy Bar"
 src/             # app (app/, shared/ui/, lib/, styles/)
 supabase/        # migrazioni, test pgTAP, config locale

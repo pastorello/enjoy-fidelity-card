@@ -7,7 +7,7 @@
 
 ## Cosa stiamo facendo
 
-Spec-driven development: capability map e `SPEC-platform.md` approvate (2026-11-16). Piano `platform`
+Spec-driven development: capability map e `docs/specs/SPEC-platform.md` approvate (2026-11-16). Piano `platform`
 approvato; task 1-11 fatti e in `main` (PR #7, 2026-11-17; rami vecchi eliminati). Manca il
 Checkpoint C: scelta dell'hosting, account Supabase, anteprima, Lighthouse e prova su Android. Poi la spec
 del modulo `identity`.
