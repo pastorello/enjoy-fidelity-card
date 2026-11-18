@@ -310,3 +310,244 @@ describe('HomePage: Cerca cliente', () => {
     ).toBeInTheDocument();
   });
 });
+
+/** Customers served today, most recent first (times in Europe/Rome: UTC+1 in November). */
+function servedFake() {
+  const customers = createFakeCustomerService({
+    customers: [
+      fakeCustomer({
+        name: 'Antonio Esposito',
+        phone: '+393330000388',
+        balance: 45,
+        lastServedAt: '2026-11-18T09:15:00Z',
+      }),
+      fakeCustomer({
+        name: 'Lucia De Meo',
+        phone: null,
+        balance: 310,
+        lastServedAt: '2026-11-18T08:58:00Z',
+      }),
+    ],
+  });
+  customers.setServedToday(customers.customers().map((customer) => customer.id));
+  return customers;
+}
+
+function servedCalls(customers: ReturnType<typeof createFakeCustomerService>) {
+  return customers.calls.filter((call) => call.method === 'servedToday');
+}
+
+function servedSection() {
+  return screen.queryByRole('region', { name: 'SERVITI OGGI' });
+}
+
+function becomeVisible() {
+  act(() => {
+    fireEvent(document, new Event('visibilitychange'));
+  });
+}
+
+describe('HomePage: SERVITI OGGI', () => {
+  it('lists the customers served today: name, phone or "Senza telefono", time, balance', async () => {
+    const customers = servedFake();
+    const [antonio, lucia] = customers.customers();
+    await renderHome('/', customers);
+
+    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
+    expect(within(section).getByRole('heading', { level: 2, name: 'SERVITI OGGI' })).toBeVisible();
+    const rows = within(section).getAllByRole('link');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent('Antonio Esposito');
+    expect(rows[0]).toHaveTextContent('••• 0388 · 10:15');
+    expect(rows[0]).toHaveTextContent('45 punti');
+    expect(rows[0]).toHaveAttribute('href', `/clienti/${antonio?.id}`);
+    expect(rows[1]).toHaveTextContent('Lucia De Meo');
+    expect(rows[1]).toHaveTextContent('Senza telefono · 09:58');
+    expect(rows[1]).toHaveTextContent('310 punti');
+    expect(rows[1]).toHaveAttribute('href', `/clienti/${lucia?.id}`);
+    expect(servedCalls(customers)).toHaveLength(1);
+  });
+
+  it('has no section when nobody was served today', async () => {
+    const customers = customersFake();
+    await renderHome('/', customers);
+    await waitFor(() => expect(servedCalls(customers)).toHaveLength(1));
+    // Let the answer arrive before checking that nothing appeared.
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(servedSection()).not.toBeInTheDocument();
+    expect(screen.queryByText('SERVITI OGGI')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('shows nothing while the list is loading', async () => {
+    const customers = servedFake();
+    const held = customers.holdNext('servedToday');
+    await renderHome('/', customers);
+    expect(servedSection()).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    expect(await screen.findByRole('region', { name: 'SERVITI OGGI' })).toBeInTheDocument();
+  });
+
+  it('a failed load shows a compact row, and "Riprova" loads again', async () => {
+    const customers = servedFake();
+    customers.failNext('servedToday', 'network');
+    await renderHome('/', customers);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Non riesco a caricare i clienti di oggi');
+    expect(screen.queryByRole('link', { name: /Antonio Esposito/ })).not.toBeInTheDocument();
+
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
+    expect(within(section).getAllByRole('link')).toHaveLength(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(servedCalls(customers)).toHaveLength(2);
+  });
+
+  it('loads again when the page becomes visible', async () => {
+    const customers = customersFake();
+    await renderHome('/', customers);
+    await waitFor(() => expect(servedCalls(customers)).toHaveLength(1));
+    expect(servedSection()).not.toBeInTheDocument();
+
+    const [maria] = customers.customers();
+    customers.setServedToday([maria?.id ?? '']);
+    becomeVisible();
+
+    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
+    expect(within(section).getByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
+    expect(servedCalls(customers)).toHaveLength(2);
+  });
+
+  it('does not load again while the page is hidden', async () => {
+    const customers = customersFake();
+    await renderHome('/', customers);
+    await waitFor(() => expect(servedCalls(customers)).toHaveLength(1));
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    try {
+      becomeVisible();
+      expect(servedCalls(customers)).toHaveLength(1);
+    } finally {
+      visibility.mockRestore();
+    }
+  });
+
+  it('a failed reload on return keeps the list already shown', async () => {
+    const customers = servedFake();
+    await renderHome('/', customers);
+    await screen.findByRole('region', { name: 'SERVITI OGGI' });
+
+    customers.failNext('servedToday', 'network');
+    becomeVisible();
+    await waitFor(() => expect(servedCalls(customers)).toHaveLength(2));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Antonio Esposito/ })).toBeInTheDocument();
+  });
+
+  it('ignores an older answer that arrives after a newer one', async () => {
+    const customers = servedFake();
+    const [antonio] = customers.customers();
+    const first = customers.holdNext('servedToday');
+    await renderHome('/', customers);
+
+    customers.setServedToday([antonio?.id ?? '']);
+    becomeVisible();
+    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
+    expect(within(section).getAllByRole('link')).toHaveLength(1);
+
+    await act(async () => {
+      first.release();
+      await Promise.resolve();
+    });
+    expect(within(section).getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('is hidden while a search is shown, and back when the search is cleared', async () => {
+    const customers = servedFake();
+    const { field } = await renderHome('/', customers);
+    await screen.findByRole('region', { name: 'SERVITI OGGI' });
+
+    await userEvent.type(field, 'lucia');
+    expect(
+      await screen.findByRole('list', { name: 'Risultati della ricerca' }),
+    ).toBeInTheDocument();
+    expect(servedSection()).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
+    expect(await screen.findByRole('region', { name: 'SERVITI OGGI' })).toBeInTheDocument();
+  });
+
+  it('not_operator: back to /accedi with "Account non abilitato"', async () => {
+    const auth = signedInFake();
+    const customers = servedFake();
+    const { router } = renderApp('/', auth, createFakeSettingsService(), customers);
+    await screen.findByRole('region', { name: 'SERVITI OGGI' });
+    auth.removeProfile();
+    customers.failNext('servedToday', 'not_operator');
+    becomeVisible();
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    expect(
+      await screen.findByText('Account non abilitato: chiedi a un amministratore.'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('HomePage: status message', () => {
+  const NOTICE = 'Dati del cliente cancellati.';
+
+  it('shows the message passed in the navigation state, at the top, once', async () => {
+    const { router } = renderApp('/impostazioni', signedInFake());
+    await screen.findByRole('heading', { level: 1, name: 'Impostazioni' });
+
+    await act(async () => {
+      await router.navigate('/', { replace: true, state: { notice: NOTICE } });
+    });
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent(NOTICE);
+    // At the top of the content, before the search.
+    const field = screen.getByRole('searchbox', { name: SEARCH_LABEL });
+    expect(status.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The history entry no longer carries it: coming back does not show it again.
+    await waitFor(() => expect(router.state.location.state).toBeNull());
+    expect(screen.getByRole('status')).toHaveTextContent(NOTICE);
+
+    await userEvent.click(screen.getByRole('link', { name: /^Account e impostazioni/ }));
+    await screen.findByRole('heading', { level: 1, name: 'Impostazioni' });
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await screen.findByRole('searchbox', { name: SEARCH_LABEL });
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
+  });
+
+  it('keeps the search in the URL when it drops the message', async () => {
+    const { router } = renderApp('/impostazioni', signedInFake());
+    await screen.findByRole('heading', { level: 1, name: 'Impostazioni' });
+    await act(async () => {
+      await router.navigate('/?q=rossi', { state: { notice: NOTICE } });
+    });
+    expect(await screen.findByText(NOTICE)).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.state).toBeNull());
+    expect(router.state.location.search).toBe('?q=rossi');
+  });
+
+  it('shows no message without one, or with a state of another shape', async () => {
+    const { router } = renderApp('/impostazioni', signedInFake());
+    await screen.findByRole('heading', { level: 1, name: 'Impostazioni' });
+    await act(async () => {
+      await router.navigate('/', { state: { notice: 42 } });
+    });
+    await screen.findByRole('searchbox', { name: SEARCH_LABEL });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});

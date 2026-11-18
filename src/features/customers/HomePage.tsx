@@ -1,16 +1,21 @@
-import { useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { ServerFaultError } from '../../lib/serverFault';
-import { ButtonLink } from '../../shared/ui/Button';
+import { formatTime } from '../../shared/format';
+import { Button, ButtonLink } from '../../shared/ui/Button';
+import { Icon } from '../../shared/ui/Icon';
 import { ListRow } from '../../shared/ui/ListRow';
 import { PointsBadge } from '../../shared/ui/PointsBadge';
 import { SearchField } from '../../shared/ui/SearchField';
 import { StatusView } from '../../shared/ui/StatusView';
 import { useCurrentOperator } from '../identity/AuthProvider';
 import styles from './HomePage.module.css';
+import { readHomeNotice } from './homeNotice';
 import { classifyQuery, maskPhone } from './phone';
+import type { CustomerSummary } from './types';
 import { SEARCH_SHOWN_ROWS, useCustomerSearch } from './useCustomerSearch';
+import { useServedToday, type ServedToday } from './useServedToday';
 
 /**
  * The label of the button that registers the name searched without results (wireframe Ricerca
@@ -35,9 +40,80 @@ function searchErrorText(error: unknown): string {
   return 'Controlla la connessione e riprova.';
 }
 
-/** Home "Cerca cliente": search by name or phone, "Nuovo cliente". */
+/** "••• 4521" or "Senza telefono": the second line of a customer row. */
+function phoneLine(customer: CustomerSummary): string {
+  return customer.phone === null ? 'Senza telefono' : maskPhone(customer.phone);
+}
+
+/** "••• 0388 · 10:15": the phone and the time of the last purchase or redemption. */
+function servedLine(customer: CustomerSummary): string {
+  const phone = phoneLine(customer);
+  return customer.lastServedAt === null ? phone : `${phone} · ${formatTime(customer.lastServedAt)}`;
+}
+
+/**
+ * SERVITI OGGI (wireframe Cerca cliente): nothing while loading or when nobody was served today,
+ * a compact row with "Riprova" when the list cannot be loaded.
+ */
+function ServedTodaySection({ served }: { served: ServedToday }) {
+  if (served.status === 'loading') return null;
+  if (served.status === 'done' && served.customers.length === 0) return null;
+  return (
+    <section aria-labelledby="served-today" className={styles.served}>
+      <h2 id="served-today" className={styles.sectionTitle}>
+        SERVITI OGGI
+      </h2>
+      {served.status === 'error' ? (
+        <div role="alert" className={styles.servedError}>
+          <p className={styles.servedErrorText}>
+            <Icon name="circle-alert" size={20} />
+            Non riesco a caricare i clienti di oggi
+          </p>
+          <Button variant="secondary" busy={served.retrying} onClick={served.retry}>
+            Riprova
+          </Button>
+        </div>
+      ) : (
+        <ul className={styles.list}>
+          {served.customers.map((customer) => (
+            <ListRow
+              key={customer.id}
+              to={`/clienti/${customer.id}`}
+              title={customer.name}
+              subtitle={servedLine(customer)}
+              trailing={<PointsBadge points={customer.balance} />}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The one-time message of the navigation state (`homeNotice.ts`): kept for as long as the home
+ * is open, dropped at once from the history entry so "Indietro" or a reload does not show it again.
+ */
+function useHomeNotice(): string | null {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [notice] = useState(() => readHomeNotice(location.state));
+  const carried = readHomeNotice(location.state) !== null;
+  useEffect(() => {
+    if (!carried) return;
+    void navigate(
+      { pathname: location.pathname, search: location.search, hash: location.hash },
+      { replace: true, state: null },
+    );
+  }, [carried, navigate, location.pathname, location.search, location.hash]);
+  return notice;
+}
+
+/** Home "Cerca cliente": search by name or phone, SERVITI OGGI, "Nuovo cliente". */
 export function HomePage() {
   const operator = useCurrentOperator();
+  const notice = useHomeNotice();
+  const served = useServedToday();
   const [searchParams, setSearchParams] = useSearchParams();
   // The text lives in the URL too (`?q=`, replaced), so "Indietro" from a customer finds it again.
   const [text, setText] = useState(() => searchParams.get('q') ?? '');
@@ -81,6 +157,12 @@ export function HomePage() {
         )
       }
     >
+      {notice !== null && (
+        <output className={styles.notice}>
+          <Icon name="check" size={20} />
+          {notice}
+        </output>
+      )}
       {/* The card reading panel of `card-input` goes here, above the search. */}
       <SearchField
         label="Cerca per nome o telefono"
@@ -112,7 +194,7 @@ export function HomePage() {
                 key={customer.id}
                 to={`/clienti/${customer.id}`}
                 title={customer.name}
-                subtitle={customer.phone === null ? 'Senza telefono' : maskPhone(customer.phone)}
+                subtitle={phoneLine(customer)}
                 trailing={<PointsBadge points={customer.balance} />}
               />
             ))}
@@ -124,6 +206,8 @@ export function HomePage() {
           )}
         </section>
       )}
+      {/* While a search is shown, SERVITI OGGI is not. */}
+      {search.status === 'idle' && <ServedTodaySection served={served} />}
     </AppShell>
   );
 }

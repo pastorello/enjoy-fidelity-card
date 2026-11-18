@@ -33,3 +33,20 @@ export function formatPoints(points: number): string {
   assertInteger(points, 'points');
   return `${signOf(points)}${integerFormat.format(Math.abs(points))}${NBSP}pt`;
 }
+
+const timeFormat = new Intl.DateTimeFormat('it-IT', {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  // The bar's clock, whatever the device's time zone.
+  timeZone: 'Europe/Rome',
+});
+
+/** formatTime('2026-11-18T09:15:00Z') → "10:15": hours and minutes in Europe/Rome. */
+export function formatTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError(`not a date: ${iso}`);
+  }
+  return timeFormat.format(date);
+}
