@@ -163,13 +163,13 @@ scrittura in corso → `busy`; URL non assoluto, non `https:` o oltre `MAX_URL_L
 `NotSupportedError`), `aborted`. Il servizio apre una sessione esclusiva: letture solo allo scrittore,
 senza anti-ripetizione, pila ripristinata alla fine. `fakeWebNfc` impara `write()`.
 **Accettazione:**
-- [ ] Unità (criterio 10): card letta da < 1500 ms → `write()` subito con un solo record `url` e
+- [x] Unità (criterio 10): card letta da < 1500 ms → `write()` subito con un solo record `url` e
       `overwrite: true`; lettura più vecchia o un altro uid dopo → attesa; un altro uid → `wrong-card` senza
       `write()`; `makeReadOnly` mai chiamato (spia)
-- [ ] Unità: `NotAllowedError` → `not-allowed`; `NetworkError` → `io`; `signal` del chiamante → `aborted`;
+- [x] Unità: `NotAllowedError` → `not-allowed`; `NetworkError` → `io`; `signal` del chiamante → `aborted`;
       `canWrite` falso → `cannot-write` senza `write()`; seconda scrittura → `busy`; URL `http:`, relativo o
       di 201 caratteri → `TypeError`
-- [ ] Unità: durante la scrittura i consumatori non ricevono letture; alla fine sì, con la pila di prima
+- [x] Unità: durante la scrittura i consumatori non ricevono letture; alla fine sì, con la pila di prima
 **Verifica:** `npm test -- webNfcWriter cardReader`
 **Dipendenze:** 4, 5 · **File:** src/features/card-input/webNfcWriter.ts (+ .test.ts),
 src/features/card-input/cardReader.ts, src/features/card-input/web-nfc.d.ts, src/test/fakeWebNfc.ts ·
