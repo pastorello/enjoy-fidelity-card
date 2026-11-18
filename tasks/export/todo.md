@@ -104,15 +104,15 @@ buildMovementsCsv.ts (+ .test.ts) · **Dimensione:** M
 come arriva (stringa di `created_at` con i microsecondi, mai passata per `Date`); un errore a qualunque
 pagina rifiuta senza righe.
 **Accettazione:**
-- [ ] Unità: 0, 1000 (due chiamate, la seconda vuota) e 1001 righe (criterio 7); cursori passati alla
+- [x] Unità: 0, 1000 (due chiamate, la seconda vuota) e 1001 righe (criterio 7); cursori passati alla
       seconda pagina esattamente come ricevuti
-- [ ] Unità: errore alla seconda pagina → la promessa rifiuta con quell'errore, nessun risultato parziale
+- [x] Unità: errore alla seconda pagina → la promessa rifiuta con quell'errore, nessun risultato parziale
 **Verifica:** `npm test -- fetchAllPages`
 **Dipendenze:** 5 · **File:** src/features/export/fetchAllPages.ts (+ .test.ts) · **Dimensione:** S
 
 ## Checkpoint B
-- [ ] Unità del modulo verdi; test esistenti invariati
-- [ ] Revisione delle funzioni pure contro la spec (punto 4 e 5)
+- [x] Unità del modulo verdi; test esistenti invariati
+- [x] Revisione delle funzioni pure contro la spec (punto 4 e 5)
 
 ## Task 7: Servizio Supabase e guardia del confine
 **Descrizione:** `supabaseExportService.ts`: `fetchCustomers()` e `fetchMovements()` con `fetchAllPages` e
