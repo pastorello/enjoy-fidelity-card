@@ -69,11 +69,11 @@ subito, `prompt` o query assente → `needs-permission`, `denied` → `denied`; 
 prima di avviarne un'altra; "torna qui" su `visibilitychange` solo con permesso `granted`. Il servizio
 espone lo stato `nfc` e lo notifica agli abbonati. `src/test/fakeWebNfc.ts` per unità e componenti.
 **Accettazione:**
-- [ ] Unità (criteri 2 e 4): `granted` → `active` senza tocco; `prompt` → `needs-permission`, `start()` →
+- [x] Unità (criteri 2 e 4): `granted` → `active` senza tocco; `prompt` → `needs-permission`, `start()` →
       `active`; senza `NDEFReader` → `unsupported` e nessuna `scan()`
-- [ ] Unità (criterio 3): `NotReadableError` → `off`; `visibilitychange` con `granted` → nuova `scan()` e
+- [x] Unità (criterio 3): `NotReadableError` → `off`; `visibilitychange` con `granted` → nuova `scan()` e
       `active`; con `prompt` nessuna `scan()` e `needs-permission`; con `denied` resta `denied`
-- [ ] Unità: `start()` due volte → la prima scansione interrotta (`abort()`); `deactivate()` → `abort()` e
+- [x] Unità: `start()` due volte → la prima scansione interrotta (`abort()`); `deactivate()` → `abort()` e
       listener di visibilità tolto (criterio 7)
 **Verifica:** `npm test -- webNfcAdapter cardReader`
 **Dipendenze:** 2 · **File:** src/features/card-input/webNfcAdapter.ts (+ .test.ts),
