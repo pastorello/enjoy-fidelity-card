@@ -141,7 +141,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 15: `CardLinkWriter`: emissione, scrittura, conferma, esiti principali, «Salta, lo scrivo più tardi»
 - [x] Task 16: `CardLinkWriter`: rete su conferma con lo stesso token, card scambiata, card illeggibile, card non attiva
 - [x] Task 17: Scrittura in Associa card (tavole Associa-link e Associa-link-errore) ed E2E
-- [ ] Task 18: Scrittura dopo il salvataggio in Nuovo cliente (con e senza `?card`) ed E2E
+- [x] Task 18: Scrittura dopo il salvataggio in Nuovo cliente (con e senza `?card`) ed E2E
 - [ ] Task 19: `LinkState` in Modifica cliente: «Scrivi il link», «Scrivi di nuovo il link», dispositivo che non scrive
 
 ### Checkpoint D: tutti gli esiti del punto 8 con test di componente; E2E del link verdi; token mai nel DOM

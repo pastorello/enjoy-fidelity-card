@@ -298,9 +298,9 @@ e2e/cards.spec.ts · **Dimensione:** M
 `CardLinkWriter` sulla card appena associata; poi `navigate` alla destinazione (spesa con `?card`, quella di
 `customers` senza) sia a link scritto sia con «Più tardi» o scrittura non riuscita.
 **Accettazione:**
-- [ ] Componente: salvataggio → scrittura → navigazione; con «Più tardi» e con esito `io` il cliente resta
+- [x] Componente: salvataggio → scrittura → navigazione; con «Più tardi» e con esito `io` il cliente resta
       salvato e la navigazione avviene
-- [ ] E2E: card sconosciuta → Salva → «Avvicina la card …» → `__enjoyFakeCard(uid)` → scrittura finta →
+- [x] E2E: card sconosciuta → Salva → «Avvicina la card …» → `__enjoyFakeCard(uid)` → scrittura finta →
       `/clienti/:id/spesa`; voce nel registro per quell'uid (criterio 10)
 **Verifica:** `npm test -- NewCustomer && npm run e2e -- cards`
 **Dipendenze:** 11, 16 · **File:** src/features/customers/NewCustomerPage.tsx,
