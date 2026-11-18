@@ -69,7 +69,8 @@ export default defineConfig(({ command, mode }) => {
       mode === 'https' && basicSsl(),
       VitePWA({
         registerType: 'autoUpdate',
-        injectRegister: 'script', // a file, not inline: the CSP forbids inline scripts
+        // Registered by src/app/registerServiceWorker.ts, which skips the public page /s/:token.
+        injectRegister: false,
         includeAssets: ['icons/apple-touch-icon-180.png', 'icons/favicon-48.png'],
         manifest: {
           id: '/',
