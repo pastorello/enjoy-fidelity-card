@@ -105,7 +105,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: `db:test` verde; revisione `security-and-hardening` su ruolo, privilegi, anonimizzati e sola lettura
 
 ### Fase 2: Logica pura
-- [ ] Task 3: `csv.ts`: BOM, `;`, CRLF, virgolette, difesa dalle formule, `excelText`
+- [x] Task 3: `csv.ts`: BOM, `;`, CRLF, virgolette, difesa dalle formule, `excelText`
 - [ ] Task 4: `formatExport.ts`: euro da centesimi, date e nome file all'ora di Roma, etichette del tipo
 - [ ] Task 5: Tipi, `buildCustomersCsv` e `buildMovementsCsv`: colonne, ordinamento, anonimizzati vuoti
 - [ ] Task 6: `fetchAllPages`: paginazione a chiave tutto-o-niente

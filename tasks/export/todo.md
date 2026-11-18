@@ -58,10 +58,10 @@ CR o LF, virgolette interne raddoppiate), `guardFormula` (apostrofo iniziale su 
 `excelText` (`="…"` solo se il valore rispetta `^\+?[0-9A-F]{1,20}$`, altrimenti testo libero protetto),
 `toCsv(header, rows)` con `;` e CRLF. Il test contiene un parser RFC 4180 a `;` per rileggere le righe.
 **Accettazione:**
-- [ ] Unità: `;`, `"` e a capo tra virgolette; nome con `;` e `"` riletto identico dal parser (criterio 6)
-- [ ] Unità: `=SOMMA(A1)` → `'=SOMMA(A1)`; lo stesso per `+`, `-`, `@`, TAB, CR; `-12,50` e `-12` come
+- [x] Unità: `;`, `"` e a capo tra virgolette; nome con `;` e `"` riletto identico dal parser (criterio 6)
+- [x] Unità: `=SOMMA(A1)` → `'=SOMMA(A1)`; lo stesso per `+`, `-`, `@`, TAB, CR; `-12,50` e `-12` come
       numeri restano intatti
-- [ ] Unità: `excelText('+393331234567')` → `="+393331234567"` (con le virgolette raddoppiate dentro il
+- [x] Unità: `excelText('+393331234567')` → `="+393331234567"` (con le virgolette raddoppiate dentro il
       campo); valore con `"` o lettere non esadecimali → testo protetto; BOM in testa e CRLF in coda a ogni riga
 **Verifica:** `npm test -- export/csv`
 **Dipendenze:** nessuna · **File:** src/features/export/csv.ts (+ .test.ts) · **Dimensione:** S
