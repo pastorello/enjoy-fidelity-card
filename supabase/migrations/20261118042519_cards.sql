@@ -403,3 +403,176 @@ create trigger customers_after_anonymize
   for each row
   when (old.anonymized_at is null and new.anonymized_at is not null)
   execute function private.customers_after_anonymize();
+
+-- Link to the points -------------------------------------------------------------------------
+-- The card stores only https://<origin>/s/<token>. The token is 128 random bits
+-- generated here; the database keeps only its sha256 fingerprint, in a table
+-- outside the API schema that no role can read: only the security definer
+-- functions below touch it. A token is "pending" from issue_card_link until the
+-- app has read it back from the card and called confirm_card_link; only then it
+-- becomes the valid link (token_hash), replacing the previous one at once.
+create table private.card_links (
+  card_id uuid primary key references app.cards (id),
+  token_hash bytea constraint card_links_token_hash_key unique
+    constraint card_links_token_hash_check check (octet_length(token_hash) = 32),
+  pending_hash bytea constraint card_links_pending_hash_key unique
+    constraint card_links_pending_hash_check check (octet_length(pending_hash) = 32),
+  pending_issued_at timestamptz,
+  pending_issued_by uuid references app.operators (id),
+  constraint card_links_pending_check check (
+    (pending_hash is null) = (pending_issued_at is null)
+    and (pending_hash is null) = (pending_issued_by is null)
+  )
+);
+
+comment on table private.card_links is
+  'sha256 fingerprints of the card links (valid and pending). Never the token in clear.';
+
+create index card_links_pending_issued_by_idx on private.card_links (pending_issued_by);
+
+alter table private.card_links enable row level security;
+revoke all on private.card_links from public, anon, authenticated;
+
+-- The one fingerprint of a token, the same in every function that compares one.
+create function private.card_token_hash(p_token text)
+returns bytea
+language sql
+immutable
+set search_path = ''
+as $$
+  select extensions.digest(convert_to(p_token, 'UTF8'), 'sha256');
+$$;
+
+revoke execute on function private.card_token_hash(text) from public, anon, authenticated;
+
+-- Any deactivation (replacement, deactivate_card, anonymization) kills the link:
+-- cards_before_update clears the state in app.cards, this deletes the fingerprints.
+create function private.cards_after_deactivate()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  delete from private.card_links where card_id = new.id;
+  return null;
+end;
+$$;
+
+revoke execute on function private.cards_after_deactivate() from public, anon, authenticated;
+
+create trigger cards_after_deactivate
+  after update of active on app.cards
+  for each row
+  when (old.active and not new.active)
+  execute function private.cards_after_deactivate();
+
+-- issue_card_link ------------------------------------------------------------------------------
+-- A new pending token for an active card, returned in clear: the only time it
+-- leaves the server. It replaces any pending token and leaves the written link
+-- valid until the new one is confirmed. Repeating it only issues another pending
+-- token, so it needs no operation_id.
+create function app.issue_card_link(p_card_id uuid)
+returns text
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_card app.cards;
+  v_token text;
+  v_now timestamptz := now();
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  select * into v_card from app.cards where id = p_card_id for update;
+  if not found then
+    raise exception 'card_not_found' using errcode = 'P0001';
+  end if;
+  if not v_card.active then
+    raise exception 'card_inactive' using errcode = 'P0001';
+  end if;
+
+  -- 16 random bytes in base64url without padding: 22 characters [A-Za-z0-9_-].
+  v_token := rtrim(translate(encode(extensions.gen_random_bytes(16), 'base64'), '+/', '-_'), '=');
+
+  insert into private.card_links (card_id, pending_hash, pending_issued_at, pending_issued_by)
+  values (p_card_id, private.card_token_hash(v_token), v_now, private.acting_operator_id())
+  on conflict (card_id) do update
+  set pending_hash = excluded.pending_hash,
+      pending_issued_at = excluded.pending_issued_at,
+      pending_issued_by = excluded.pending_issued_by;
+
+  update app.cards set link_pending_at = v_now where id = p_card_id;
+
+  return v_token;
+end;
+$$;
+
+revoke execute on function app.issue_card_link(uuid) from public, anon;
+grant execute on function app.issue_card_link(uuid) to authenticated;
+
+-- confirm_card_link ----------------------------------------------------------------------------
+-- The app read the token back from the card: the pending token becomes the valid
+-- link and the previous one stops working in the same instant. The valid token
+-- again changes nothing (a resent request). Any other token, including one
+-- replaced by a newer issue, is link_token_mismatch. No error carries the token,
+-- its fingerprint or the uid.
+create function app.confirm_card_link(p_card_id uuid, p_token text)
+returns app.cards
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_card app.cards;
+  v_link private.card_links;
+  v_hash bytea;
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  select * into v_card from app.cards where id = p_card_id for update;
+  if not found then
+    raise exception 'card_not_found' using errcode = 'P0001';
+  end if;
+  if not v_card.active then
+    raise exception 'card_inactive' using errcode = 'P0001';
+  end if;
+
+  if p_token is null or p_token !~ '^[A-Za-z0-9_-]{22}$' then
+    raise exception 'link_token_mismatch' using errcode = 'P0001';
+  end if;
+  v_hash := private.card_token_hash(p_token);
+
+  select * into v_link from private.card_links where card_id = p_card_id for update;
+  if found and v_link.token_hash = v_hash then
+    return v_card;
+  end if;
+  if not found or v_link.pending_hash is distinct from v_hash then
+    raise exception 'link_token_mismatch' using errcode = 'P0001';
+  end if;
+
+  update private.card_links
+  set token_hash = pending_hash,
+      pending_hash = null,
+      pending_issued_at = null,
+      pending_issued_by = null
+  where card_id = p_card_id;
+
+  update app.cards
+  set link_written_at = now(),
+      link_written_by = private.acting_operator_id(),
+      link_pending_at = null
+  where id = p_card_id
+  returning * into v_card;
+
+  return v_card;
+end;
+$$;
+
+revoke execute on function app.confirm_card_link(uuid, text) from public, anon;
+grant execute on function app.confirm_card_link(uuid, text) to authenticated;
