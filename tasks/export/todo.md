@@ -137,9 +137,9 @@ da entrambe le RPC; l'admin le legge (anche a pagine con `p_limit` piccolo); un 
 anonimizzato nel test con le RPC di `customers` (`create_customer`, `anonymize_customer`): il suo nome
 originale non compare nel corpo della risposta HTTP di nessuna delle due.
 **Accettazione:**
-- [ ] Operatore rifiutato da entrambe (criterio 2)
-- [ ] Nome originale dell'anonimizzato assente dal corpo HTTP (criterio 5); saldo presente
-- [ ] Il test non lascia dati che rompano gli altri (nome univoco per esecuzione)
+- [x] Operatore rifiutato da entrambe (criterio 2)
+- [x] Nome originale dell'anonimizzato assente dal corpo HTTP (criterio 5); saldo presente
+- [x] Il test non lascia dati che rompano gli altri (nome univoco per esecuzione)
 **Verifica:** `npm run db:start && npm run test:integration -- export`
 **Dipendenze:** 2, 7 · **File:** tests/integration/export.test.ts · **Dimensione:** S
 
