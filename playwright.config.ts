@@ -56,7 +56,8 @@ export default defineConfig({
     // The production build, served with the same security headers as Vercel.
     command: `npm run build && npx vite preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,
-    env: localSupabaseEnv(),
+    // VITE_E2E installs the fake card reader (window.__enjoyFakeCard, SPEC-card-input point 7).
+    env: { ...localSupabaseEnv(), VITE_E2E: '1' },
     // Never reuse a server: it could have been built against staging.
     reuseExistingServer: false,
     timeout: 120_000,

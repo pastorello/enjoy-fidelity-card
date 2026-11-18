@@ -49,6 +49,17 @@ describe('createBrowserCardReader', () => {
     expect(burst(UID)).toBe(true);
   });
 
+  it('starts and stops the extra adapters it is given (the E2E fake) with the service', () => {
+    const extra = { start: vi.fn<() => void>(), stop: vi.fn<() => void>() };
+    const reader = createBrowserCardReader(hostWithoutNfc(), { adapters: [extra] });
+    expect(extra.start).not.toHaveBeenCalled();
+
+    reader.activate({ usbFormat: null });
+    expect(extra.start).toHaveBeenCalledOnce();
+    reader.deactivate();
+    expect(extra.stop).toHaveBeenCalledOnce();
+  });
+
   it('works on a browser without navigator.vibrate', async () => {
     const reader = createBrowserCardReader(hostWithoutNfc());
     const onRead = vi.fn<(read: CardRead) => void>();
