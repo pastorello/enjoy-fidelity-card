@@ -66,6 +66,11 @@ export type CardReadPanelProps = {
   variant?: 'full' | 'compact';
   /** Shown only in the full variant, while reading is active; the screen picks `full` meanwhile. */
   notice?: CardReadNotice | null | undefined;
+  /**
+   * The panel replaces what a tap unmounted (e.g. «Riprova con un’altra card» in Associa card):
+   * its text takes the focus when it mounts, so the focus does not fall to the page.
+   */
+  focusOnMount?: boolean | undefined;
 };
 
 type CardReadPanelViewProps = CardReadPanelProps & {
@@ -83,6 +88,7 @@ export function CardReadPanelView({
   mode = 'web-nfc',
   variant = 'full',
   notice = null,
+  focusOnMount = false,
   status,
   onStart,
 }: CardReadPanelViewProps) {
@@ -90,6 +96,10 @@ export function CardReadPanelView({
   const effective: NfcStatus = mode === 'usb' ? 'active' : status;
   const texts = useRef<HTMLDivElement>(null);
   const action = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    if (focusOnMount) texts.current?.focus();
+  }, [focusOnMount]);
   // Set when the button is pressed while focused, until the tap has an outcome: the button unmounts
   // with the state change, so focus must not fall to the page (SPEC-card-input, point 6).
   const keepFocus = useRef(false);

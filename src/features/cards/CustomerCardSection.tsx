@@ -287,7 +287,8 @@ function CardLinkWrite({
   const writing = useCardLinkWriter({ cardId: card.id, uid: card.uid, onWritten: onDone });
   return (
     <>
-      <CardLinkWriter writing={writing} uid={card.uid} customerName={customer.name} />
+      {/* Opened by «Scrivi il link», which unmounts: the focus goes to the write. */}
+      <CardLinkWriter writing={writing} uid={card.uid} customerName={customer.name} focusOnMount />
       <div className={styles.writeActions}>
         <CardLinkWriterActions writing={writing} onLater={onDone} />
       </div>

@@ -582,3 +582,51 @@ describe('CardLinkWriter: the token never reaches the logs (criterion 10)', () =
     }
   });
 });
+
+/** Where the focus is, as the test reads it: the live text of «Scrittura del link», or elsewhere. */
+function focusedText(): string {
+  const focused = document.activeElement;
+  if (focused === null || focused === document.body) return 'the page';
+  if (!region().contains(focused)) return 'outside the writer';
+  return focused.getAttribute('aria-live') === 'polite'
+    ? 'the live text'
+    : 'elsewhere in the writer';
+}
+
+describe('CardLinkWriter: the focus when a tap unmounts its button', () => {
+  it('«Scrivi di nuovo il link»: on the new write', async () => {
+    const fixture = await setup();
+    await act(async () => (await currentWrite(fixture)).finish({ ok: false, reason: 'io' }));
+    await settle();
+    await userEvent.click(screen.getByRole('button', { name: WRITE_AGAIN }));
+    await waitFor(() => expect(fixture.writes).toHaveLength(2));
+    expect(focusedText()).toBe('the live text');
+  });
+
+  it('«Riprova» on the confirmation: on its outcome', async () => {
+    const fixture = await setup({ program: (cards) => cards.failNext('confirmLink', 'network') });
+    await act(async () => (await currentWrite(fixture)).finish({ ok: true }));
+    await settle();
+    await userEvent.click(screen.getByRole('button', { name: RETRY }));
+    await settle();
+    expect(focusedText()).toBe('the live text');
+  });
+
+  it('«Scrivi comunque»: on the new write', async () => {
+    const fixture = await setup();
+    await act(async () =>
+      (await currentWrite(fixture)).finish({ ok: false, reason: 'unreadable' }),
+    );
+    await settle();
+    await userEvent.click(screen.getByRole('button', { name: WRITE_ANYWAY }));
+    await waitFor(() => expect(fixture.writes).toHaveLength(2));
+    expect(focusedText()).toBe('the live text');
+  });
+
+  it('a failure without a tap does not take the focus', async () => {
+    const fixture = await setup();
+    await act(async () => (await currentWrite(fixture)).finish({ ok: false, reason: 'io' }));
+    await settle();
+    expect(screen.getByRole('alert').contains(document.activeElement)).toBe(false);
+  });
+});

@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 import { ServerFaultError } from '../../lib/serverFault';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
@@ -106,6 +106,8 @@ type CardLinkWriterProps = {
   uid: string;
   /** The customer's full name: the alerts call them by first name. */
   customerName: string;
+  /** The write opens from a tap on a button that unmounts (Modifica cliente): focus its text. */
+  focusOnMount?: boolean;
 };
 
 /**
@@ -113,9 +115,32 @@ type CardLinkWriterProps = {
  * steps of the write, live, then the outcome. Its buttons are `CardLinkWriterActions`, which the
  * screen puts in its footer.
  */
-export function CardLinkWriter({ writing, uid, customerName }: CardLinkWriterProps) {
+export function CardLinkWriter({
+  writing,
+  uid,
+  customerName,
+  focusOnMount = false,
+}: CardLinkWriterProps) {
   const titleId = useId();
   const { state, canWrite } = writing;
+  const texts = useRef<HTMLDivElement>(null);
+  const previous = useRef(state.status);
+  const wantsFocus = useRef(focusOnMount);
+
+  useLayoutEffect(() => {
+    const was = previous.current;
+    previous.current = state.status;
+    // «Scrivi di nuovo il link», «Riprova» or «Scrivi comunque» unmounted with the alert: the focus
+    // fell to the page, so it goes to the live text of the new state.
+    const focused = document.activeElement;
+    if (was === 'failed' && (focused === null || focused === document.body)) {
+      wantsFocus.current = true;
+    }
+    if (wantsFocus.current && texts.current !== null) {
+      texts.current.focus();
+      wantsFocus.current = false;
+    }
+  }, [state.status]);
 
   if (state.status === 'stopped') return null;
 
@@ -179,7 +204,7 @@ export function CardLinkWriter({ writing, uid, customerName }: CardLinkWriterPro
         size={64}
         className={off ? styles.iconOff : styles.icon}
       />
-      <div aria-live="polite" className={styles.texts}>
+      <div ref={texts} tabIndex={-1} aria-live="polite" className={styles.texts}>
         {body}
       </div>
     </section>
@@ -238,8 +263,10 @@ export function CardLinkWriterActions({ writing, onLater }: CardLinkWriterAction
       </Button>
     );
   }
+  // Keyed: the button of a failure is never reused as «Salta», so its tap leaves no focus on a
+  // button that changed meaning (CardLinkWriter moves it to the new state).
   return (
-    <Button variant="secondary" block onClick={later}>
+    <Button key="skip" variant="secondary" block onClick={later}>
       Salta, lo scrivo più tardi
     </Button>
   );

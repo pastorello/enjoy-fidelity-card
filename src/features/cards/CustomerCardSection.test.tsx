@@ -321,6 +321,18 @@ describe('CustomerCardSection: the link to the points (SPEC-cards, point 5; crit
     expect(document.body).not.toHaveTextContent(token);
   });
 
+  it('"Scrivi il link": the button unmounts, the focus goes to the write, never to the page', async () => {
+    const fixture = setupLink('not-written');
+    renderLink(fixture);
+    const section = await cardSection();
+    await userEvent.click(await within(section).findByRole('button', { name: WRITE }));
+    await currentWrite(fixture);
+    const writer = within(section).getByRole('region', { name: 'Scrittura del link' });
+    expect(document.activeElement).not.toBe(document.body);
+    expect(writer.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toHaveAttribute('aria-live', 'polite');
+  });
+
   it('a write that fails, then «Più tardi», leaves the link unverified, never written (criterion 15)', async () => {
     const fixture = setupLink('written');
     renderLink(fixture);

@@ -90,6 +90,8 @@ function AssociateCard({
 }) {
   // «Scrivi di nuovo il link» on the card already active, whose link is written.
   const [rewrite, setRewrite] = useState(false);
+  // «Riprova con un’altra card» unmounts with the notice: the reading panel takes the focus.
+  const [focusReading, setFocusReading] = useState(false);
   const association = useAssociateCard(customer.id, activeCard, { writing: rewrite });
   const name = shortName(customer.name);
   const editPath = `/clienti/${customer.id}/modifica`;
@@ -128,7 +130,13 @@ function AssociateCard({
         backTo={editPath}
         actions={
           <>
-            <Button block onClick={association.readAgain}>
+            <Button
+              block
+              onClick={() => {
+                setFocusReading(true);
+                association.readAgain();
+              }}
+            >
               Riprova con un’altra card
             </Button>
             <OpenOwnerLink owner={association.owner} />
@@ -168,6 +176,7 @@ function AssociateCard({
         title={PANEL_TITLE}
         description={association.status === 'associating' ? PANEL_SAVING : PANEL_TEXT}
         notice={notice}
+        focusOnMount={focusReading}
       />
       {association.status === 'already' ? (
         <>

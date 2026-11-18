@@ -327,6 +327,18 @@ describe('AssociateCardPage: what the association answers (SPEC-cards, point 4)'
     ]);
   });
 
+  it('«Riprova con un’altra card»: the notice unmounts, the focus goes to the reading panel', async () => {
+    const fixture = setup();
+    await renderReading(fixture);
+    tap(fixture, OF_ANTONIO.read);
+    await screen.findByRole('alert');
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova con un’altra card' }));
+    const panel = await screen.findByRole('region', { name: 'Lettura card' });
+    expect(document.activeElement).not.toBe(document.body);
+    expect(panel.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toHaveTextContent(PANEL_TEXT);
+  });
+
   it('"Apri la scheda di Antonio" opens his customer page', async () => {
     const fixture = setup();
     const { router } = await renderReading(fixture);
