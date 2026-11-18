@@ -1,0 +1,118 @@
+/* Boards "Saldo-punti" and "Saldo-card-non-attiva": paper page, logo, full-width panel, footer. */
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  /* 24px between the blocks, as on the boards. */
+  gap: calc(var(--space-3) + var(--space-2));
+}
+
+.brand {
+  display: flex;
+  justify-content: center;
+  padding: calc(var(--space-4) + var(--space-3)) 0 var(--space-3);
+}
+
+/* The official badge in enjoy-green (rendered by `npm run icons`), 120px high as on the boards. */
+.logo {
+  display: block;
+  height: 120px;
+  width: auto;
+}
+
+.pointsPanel,
+.inactivePanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(var(--space-4) + var(--space-2)) var(--space-3);
+  text-align: center;
+}
+
+.pointsPanel {
+  gap: var(--space-3);
+  background: var(--color-enjoy-green);
+  color: var(--color-on-green);
+}
+
+.pointsTitle {
+  font-family: var(--type-spaced-caps-condensed-family);
+  /* 20px on the board: larger than the token's 16px, the only title of the page. */
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-on-green-muted);
+}
+
+.balance {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.figure {
+  font-family: var(--type-figure-family);
+  font-size: var(--type-figure-size);
+  line-height: var(--type-figure-line-height);
+  font-weight: var(--type-figure-weight);
+  letter-spacing: var(--type-figure-letter-spacing);
+  overflow-wrap: anywhere;
+}
+
+.unit,
+.hint {
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  text-align: center;
+}
+
+.status {
+  padding: 0 var(--space-3);
+}
+
+.note,
+.footer {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+.inactivePanel {
+  gap: var(--space-2);
+  background: var(--color-surface-raised);
+}
+
+.inactiveIcon {
+  color: var(--color-ink-muted);
+}
+
+.inactiveTitle {
+  font-family: var(--type-screen-title-family);
+  font-size: var(--type-screen-title-size);
+  line-height: var(--type-screen-title-line-height);
+  font-weight: var(--type-screen-title-weight);
+  letter-spacing: var(--type-screen-title-letter-spacing);
+}
+
+.footer {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-3) calc(var(--space-4) + env(safe-area-inset-bottom));
+  text-align: center;
+}

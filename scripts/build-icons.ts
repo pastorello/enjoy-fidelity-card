@@ -1,6 +1,8 @@
 // Usage: npm run icons
 // Renders the PWA icons from the official badge (design system "Enjoy Bar"):
 // white ENJOY ring on an enjoy-green square. Needs Playwright's Chromium.
+// Also renders the badge in enjoy-green on a transparent ground (public/brand/), the logo of the
+// customer's points page on paper.
 import { readFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
@@ -32,4 +34,20 @@ await Promise.all(
     console.log(`Wrote public/icons/${file}`);
   }),
 );
+// 2× the 120 px of the points page; the badge is 897×863.
+const BADGE_HEIGHT = 240;
+const BADGE_WIDTH = Math.round((BADGE_HEIGHT * 897) / 863);
+const badgePage = await browser.newPage({
+  viewport: { width: BADGE_WIDTH, height: BADGE_HEIGHT },
+});
+await badgePage.setContent(
+  `<body style="margin:0;background:transparent">
+     <div style="width:${BADGE_WIDTH}px;height:${BADGE_HEIGHT}px;background:${GREEN};
+       mask:url(data:image/png;base64,${badge}) center / contain no-repeat"></div>
+   </body>`,
+);
+await badgePage.screenshot({ path: 'public/brand/enjoy-badge-green.png', omitBackground: true });
+await badgePage.close();
+console.log('Wrote public/brand/enjoy-badge-green.png');
+
 await browser.close();

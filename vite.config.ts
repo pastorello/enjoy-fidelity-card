@@ -34,6 +34,11 @@ function productionHeaders(): Record<string, string> {
   return Object.fromEntries(global.headers.map(({ key, value }) => [key, value]));
 }
 
+/** A build file name without "supabase" in it (see `chunkFileNames`). */
+function neutralName(name: string): string {
+  return name.replaceAll(/supabase/gi, 'shared');
+}
+
 /** Local Supabase API used by E2E (see playwright.config.ts). Preview CSP only, never vercel.json. */
 const LOCAL_SUPABASE_URL = 'http://localhost:54321';
 
@@ -100,6 +105,18 @@ export default defineConfig(({ command, mode }) => {
         },
       }),
     ],
+    build: {
+      rolldownOptions: {
+        output: {
+          // A chunk shared by the app and the lazy public page (/s/:token) can take the name of
+          // its first module, lib/supabase. A neutral name keeps "supabase" out of the precache
+          // list of the service worker, which the PWA E2E keeps free of anything Supabase.
+          chunkFileNames: (chunk) => `assets/${neutralName(chunk.name)}-[hash].js`,
+          assetFileNames: (asset) =>
+            `assets/${neutralName(asset.names[0]?.replace(/\.[^.]*$/, '') ?? 'asset')}-[hash][extname]`,
+        },
+      },
+    },
     server: mode === 'https' ? { host: true } : {},
     preview: { headers: previewHeaders() },
     test: {

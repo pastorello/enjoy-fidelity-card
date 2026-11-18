@@ -6,6 +6,17 @@ import { ErrorScreen } from './ErrorScreen';
 import { renderApp, signedInFake } from '../test/renderApp';
 import { rootRoute, routes } from './routes';
 
+// The public points page (/s/:token) calls Supabase directly: a client that never answers.
+vi.mock('../lib/supabase', () => ({
+  getSupabase: () => ({
+    schema: () => ({
+      rpc: () => ({ abortSignal: () => new Promise<never>(() => {}) }),
+    }),
+  }),
+}));
+
+const CARD_TOKEN = 'Zq3_x-9KpL2mN8vR4tY6wA';
+
 function Boom(): never {
   throw new Error('boom');
 }
@@ -74,6 +85,35 @@ describe('routes', () => {
     it('does not forward from other paths', async () => {
       const { router } = renderApp('/impostazioni?token_hash=abc&type=recovery');
       await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    });
+  });
+
+  describe('public points page /s/:token', () => {
+    it('opens without an account, never sending to /accedi', async () => {
+      const { router } = renderApp(`/s/${CARD_TOKEN}`);
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(`/s/${CARD_TOKEN}`);
+    });
+
+    it('does not wait for the session check', async () => {
+      const fake = signedInFake();
+      fake.service.currentUserId.mockReturnValue(new Promise<never>(() => {}));
+      renderApp(`/s/${CARD_TOKEN}`, fake);
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+    });
+
+    it("stays outside the operators' shell even with a session", async () => {
+      renderApp(`/s/${CARD_TOKEN}`, signedInFake());
+      expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Enjoy Card' })).not.toBeInTheDocument();
+      expect(screen.queryAllByRole('link')).toEqual([]);
+    });
+
+    it("is loaded lazily, apart from the operators' screens", () => {
+      const root = routes[0];
+      const page = root?.children?.find((route) => route.path === 's/:token');
+      expect(page?.lazy).toBeTypeOf('function');
+      expect(page?.Component).toBeUndefined();
     });
   });
 
