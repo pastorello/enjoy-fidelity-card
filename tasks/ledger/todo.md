@@ -36,11 +36,11 @@ dopo il lock, validazione, insert): legge `cents_per_point` da `app.settings` ne
 `points = p_amount_cents / cents_per_point`, restituisce `app.ledger_result` col saldo attuale. `execute`
 revocato a `public`/`anon`, concesso ad `authenticated`.
 **Accettazione:**
-- [ ] pgTAP: 1250 c con 100 → 12 pt; 199 → 1; 99 → 0 (registrata); con 250 → 5 e il movimento salva 250;
+- [x] pgTAP: 1250 c con 100 → 12 pt; 199 → 1; 99 → 0 (registrata); con 250 → 5 e il movimento salva 250;
       cambiare poi `settings` non altera lo storico (criterio 1)
-- [ ] pgTAP: importo 0, negativo, null, 10.000.000 → `22023`; cliente inesistente o anonimizzato → `EC006`;
+- [x] pgTAP: importo 0, negativo, null, 10.000.000 → `22023`; cliente inesistente o anonimizzato → `EC006`;
       utente senza profilo → `42501`; `anon` senza `execute` (`has_function_privilege`)
-- [ ] pgTAP: stesso `operation_id` due volte → una riga e lo stesso movimento; stesso id con importo o
+- [x] pgTAP: stesso `operation_id` due volte → una riga e lo stesso movimento; stesso id con importo o
       cliente diverso → `EC007` (criterio 4)
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1 · **File:** supabase/migrations/*_ledger.sql, supabase/tests/ledger.test.sql
