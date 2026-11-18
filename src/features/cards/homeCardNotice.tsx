@@ -2,17 +2,10 @@ import { ServerFaultError } from '../../lib/serverFault';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import type { CardReadNotice } from '../card-input/CardReadPanel';
 import { loadErrorText } from '../customers/loadErrorText';
+import { firstName, NOT_IN_DISPLAY } from './customerName';
 import styles from './homeCardNotice.module.css';
 import { NetworkError } from './types';
 import type { HomeCardRead } from './useHomeCardRead';
-
-/** Characters Enjoy Display lacks (scripts/displayGlyphs.test.ts): a typed name with one uses the body font. */
-const NOT_IN_DISPLAY = /[…«»@#*×→]/;
-
-/** "Maria" of "Maria Rossi": the button names the customer as the operator calls them. */
-function firstName(name: string): string {
-  return name.trim().split(/\s+/)[0] ?? name;
-}
 
 function errorText(error: unknown): string {
   if (error instanceof ServerFaultError) return `Card non letta. ${loadErrorText(error)}`;
