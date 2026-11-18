@@ -274,14 +274,15 @@ spesa → nel movimento c'è il cassiere; "Cambia" → `/cassa`; card passata su
 5 PIN errati con `cassa-blocco@example.com` → bloccato anche dopo il ricaricamento, 6° giusto rifiutato;
 cronometro dalla lettura alla conferma < 10 s.
 **Accettazione:**
-- [ ] Criteri 1, 2, 3, 5 e 6 provati in E2E; il progetto `phone` esegue gli stessi test di prima
-- [ ] Helper di accesso del dispositivo in `e2e/auth.ts`; nessun account reale
+- [x] Criteri 1, 2, 3, 5 e 6 provati in E2E; il progetto `phone` esegue gli stessi test di prima
+- [x] Helper di accesso del dispositivo in `e2e/auth.ts`; nessun account reale
 **Verifica:** `npm run e2e`
-**Dipendenze:** 13, 14, 15 · **File:** playwright.config.ts, e2e/tablet.spec.ts, e2e/auth.ts
+**Dipendenze:** 13, 14, 15 · **File:** playwright.config.ts, e2e/tablet.spec.ts, e2e/auth.ts,
+e2e/db.ts (psql nel container locale: le righe di `app.devices` non passano dall'API)
 · **Dimensione:** M
 
 ## Checkpoint C
-- [ ] Flusso cassa → PIN → card → spesa → Cambia verde in E2E
+- [x] Flusso cassa → PIN → card → spesa → Cambia verde in E2E
 - [ ] Detector Impeccable pulito; screenshot 1280×800 confrontato con "Tablet: cambio operatore"
 
 ## Task 17: PIN dal proprio telefono

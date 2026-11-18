@@ -148,7 +148,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 13: `/cassa` "Chi è alla cassa?": selezione, invio alla 4ª cifra, tasti fisici fermati, stati
 - [x] Task 14: `CashierChip` nell'intestazione: "Alla cassa: <nome> · Cambia" → `end_cashier_turn` → `/cassa`
 - [x] Task 15: Accesso sul tablet: nota del layout tablet, dispositivo → `/cassa`
-- [ ] Task 16: E2E tablet di base (progetto `tablet` 1280×800): PIN → card USB → spesa del cassiere, Cambia, blocco, card su `/cassa`, < 10 s
+- [x] Task 16: E2E tablet di base (progetto `tablet` 1280×800): PIN → card USB → spesa del cassiere, Cambia, blocco, card su `/cassa`, < 10 s
 
 ### Checkpoint C: flusso della cassa verde in E2E; detector Impeccable pulito; confronto con "Tablet: cambio operatore"
 
