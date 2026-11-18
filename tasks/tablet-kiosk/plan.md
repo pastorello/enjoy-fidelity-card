@@ -146,7 +146,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 3: Cassa
 - [x] Task 12: `PinPad` (tasti da 88 px) e `useTabletLayout`
 - [x] Task 13: `/cassa` "Chi è alla cassa?": selezione, invio alla 4ª cifra, tasti fisici fermati, stati
-- [ ] Task 14: `CashierChip` nell'intestazione: "Alla cassa: <nome> · Cambia" → `end_cashier_turn` → `/cassa`
+- [x] Task 14: `CashierChip` nell'intestazione: "Alla cassa: <nome> · Cambia" → `end_cashier_turn` → `/cassa`
 - [ ] Task 15: Accesso sul tablet: nota del layout tablet, dispositivo → `/cassa`
 - [ ] Task 16: E2E tablet di base (progetto `tablet` 1280×800): PIN → card USB → spesa del cassiere, Cambia, blocco, card su `/cassa`, < 10 s
 

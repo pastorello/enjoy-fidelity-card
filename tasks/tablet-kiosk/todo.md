@@ -246,10 +246,10 @@ delle schermate tablet con intestazione; pulsante account con `aria-label` "Acco
 "Cambia" → `endTurn()` → `/cassa` anche se la chiamata fallisce. `AppShell` riceve il chip solo in una
 sessione di dispositivo; sul telefono invariato.
 **Accettazione:**
-- [ ] Componente: testo e etichette; "Cambia" chiama `endTurn` e porta a `/cassa` (criterio 2), anche con
+- [x] Componente: testo e etichette; "Cambia" chiama `endTurn` e porta a `/cassa` (criterio 2), anche con
       rete giù
-- [ ] `AppShell.test.tsx` esistente verde senza modifiche alle aspettative
-- [ ] Detector Impeccable pulito; target ≥ 48 px
+- [x] `AppShell.test.tsx` esistente verde senza modifiche alle aspettative
+- [x] Detector Impeccable pulito; target ≥ 48 px
 **Verifica:** `npm test -- CashierChip AppShell`
 **Dipendenze:** 13 · **File:** src/features/tablet-kiosk/CashierChip.tsx (+ .module.css, .test.tsx),
 src/app/AppShell.tsx (+ .module.css) · **Dimensione:** M
