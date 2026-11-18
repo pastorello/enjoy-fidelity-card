@@ -91,11 +91,11 @@ src/features/card-input/web-nfc.d.ts, src/test/fakeWebNfc.ts, src/features/card-
 `useCardRead(onRead, { enabled })` con il callback più recente in un ref (spec, "Code Style");
 `useCardReaderState()` con `useSyncExternalStore` sullo stato del servizio più `start()`.
 **Accettazione:**
-- [ ] Componente (criterio 5): due consumatori annidati → riceve solo quello in cima; smontare quello in cima
+- [x] Componente (criterio 5): due consumatori annidati → riceve solo quello in cima; smontare quello in cima
       ridà le letture all'altro; `enabled: false` → `true` lo rimette in cima; ordine invariato in `StrictMode`
-- [ ] Componente: il callback cambiato fra un render e l'altro riceve la lettura senza risottoscrivere;
+- [x] Componente: il callback cambiato fra un render e l'altro riceve la lettura senza risottoscrivere;
       montare il provider non chiama `activate()`
-- [ ] `useCardReaderState` si aggiorna quando cambia lo stato `nfc`
+- [x] `useCardReaderState` si aggiorna quando cambia lo stato `nfc`
 **Verifica:** `npm test -- CardReaderProvider`
 **Dipendenze:** 2, 4 · **File:** src/features/card-input/CardReaderProvider.tsx (+ .test.tsx),
 src/features/card-input/useCardRead.ts · **Dimensione:** S
