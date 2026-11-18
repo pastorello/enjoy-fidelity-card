@@ -1,0 +1,162 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCardWriter } from '../card-input/useCardWriter';
+import type { CardWriteFailure, CardWriteStep } from '../card-input/webNfcWriter';
+import { useAuth } from '../identity/AuthProvider';
+import { cardLinkUrl } from './cardLinkUrl';
+import { useCardsService } from './CardsServiceProvider';
+import { CardsError, type CardSummary } from './types';
+
+/** Why the link is not on the card: the write's own outcome, or no (good) answer from the server. */
+export type CardLinkFailure =
+  | {
+      kind: 'write';
+      reason: Exclude<CardWriteFailure, 'aborted' | 'cannot-write'>;
+      otherUid?: string | undefined;
+    }
+  | { kind: 'issue'; error: unknown }
+  | { kind: 'confirm'; error: unknown };
+
+/** Where the writing of the link stands (SPEC-cards, point 8). */
+export type CardLinkWriteState =
+  /** Before the first answer: the first attempt starts as soon as the phone can write. */
+  | { status: 'idle' }
+  /** `issue_card_link` is on its way. */
+  | { status: 'issuing' }
+  /** `writeUrl` is running, at this step. */
+  | { status: 'writing'; step: CardWriteStep }
+  /** Written and verified: `confirm_card_link` is on its way. */
+  | { status: 'confirming' }
+  | { status: 'written'; card: CardSummary }
+  | { status: 'failed'; failure: CardLinkFailure }
+  /** The phone stopped being able to write (NFC off, permission revoked) while writing. */
+  | { status: 'cannot-write' }
+  /** «Salta» or «Più tardi»: nothing more happens. */
+  | { status: 'stopped' };
+
+export type CardLinkWriting = {
+  state: CardLinkWriteState;
+  /** False on iPhone, with NFC off or denied, on the tablet: the link cannot be written here. */
+  canWrite: boolean;
+  /** «Scrivi di nuovo il link»: from the start, with a new token (the pending one stops counting). */
+  writeAgain: () => void;
+  /** «Salta, lo scrivo più tardi» / «Più tardi»: aborts the write in progress through its signal. */
+  stop: () => void;
+};
+
+type Options = {
+  cardId: string;
+  /** Canonical uid of the card: the only card the link may be written on. */
+  uid: string;
+  /** The link is written, verified and confirmed: the card as the server now has it. */
+  onWritten?: ((card: CardSummary) => void) | undefined;
+};
+
+/**
+ * Writes the link to the points on a card just associated (SPEC-cards, point 8): `issueLink` →
+ * `writeUrl(cardLinkUrl(token), { expectedUid, signal })` → `confirmLink` with the same token. It
+ * starts by itself once the phone can write. The token lives only in the closure of one attempt:
+ * never in state, the DOM, storage or logs. Unmounting aborts the write in progress.
+ */
+export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLinkWriting {
+  const service = useCardsService();
+  const { canWrite, writeUrl } = useCardWriter();
+  const { reportNotEnabled } = useAuth();
+  const [state, setState] = useState<CardLinkWriteState>({ status: 'idle' });
+  // The attempt in progress: aborting it drops every answer it is still waiting for.
+  const attempt = useRef<AbortController | null>(null);
+  const written = useRef(onWritten);
+  useEffect(() => {
+    written.current = onWritten;
+  }, [onWritten]);
+
+  // Set once the first attempt has started (by itself, see below).
+  const started = useRef(false);
+  useEffect(
+    () => () => {
+      attempt.current?.abort();
+      // A remount (StrictMode in development) starts again instead of waiting on an aborted attempt.
+      started.current = false;
+    },
+    [],
+  );
+
+  const fail = useCallback(
+    (failure: CardLinkFailure) => {
+      if (failure.kind !== 'write' && failure.error instanceof CardsError) {
+        if (failure.error.kind === 'not_operator') void reportNotEnabled();
+      }
+      setState({ status: 'failed', failure });
+    },
+    [reportNotEnabled],
+  );
+
+  const run = useCallback(
+    async (signal: AbortSignal) => {
+      let token: string;
+      try {
+        token = await service.issueLink(cardId);
+      } catch (error) {
+        if (!signal.aborted) fail({ kind: 'issue', error });
+        return;
+      }
+      if (signal.aborted) return;
+      const result = await writeUrl(cardLinkUrl(token), {
+        expectedUid: uid,
+        signal,
+        onStep: (step) => {
+          if (!signal.aborted) setState({ status: 'writing', step });
+        },
+      });
+      if (signal.aborted) return;
+      if (!result.ok) {
+        if (result.reason === 'aborted') return;
+        if (result.reason === 'cannot-write') {
+          setState({ status: 'cannot-write' });
+          return;
+        }
+        fail({ kind: 'write', reason: result.reason, otherUid: result.otherUid });
+        return;
+      }
+      // The card holds the link and it was read back: the confirmation goes on even after «Salta».
+      setState({ status: 'confirming' });
+      try {
+        const card = await service.confirmLink(cardId, token);
+        if (signal.aborted) return;
+        setState({ status: 'written', card });
+        written.current?.(card);
+      } catch (error) {
+        if (!signal.aborted) fail({ kind: 'confirm', error });
+      }
+    },
+    [service, cardId, uid, writeUrl, fail],
+  );
+
+  const begin = useCallback(() => {
+    attempt.current?.abort();
+    const controller = new AbortController();
+    attempt.current = controller;
+    void run(controller.signal);
+  }, [run]);
+
+  // The first attempt starts as soon as the phone can write; until its first answer the state stays
+  // `idle`, which the section shows like `issuing`.
+  useEffect(() => {
+    if (!canWrite || started.current) return;
+    started.current = true;
+    begin();
+  }, [canWrite, begin]);
+
+  const writeAgain = useCallback(() => {
+    started.current = true;
+    setState({ status: 'issuing' });
+    begin();
+  }, [begin]);
+
+  const stop = useCallback(() => {
+    attempt.current?.abort();
+    attempt.current = null;
+    setState({ status: 'stopped' });
+  }, []);
+
+  return { state, canWrite, writeAgain, stop };
+}
