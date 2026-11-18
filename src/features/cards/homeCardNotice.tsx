@@ -7,7 +7,8 @@ import styles from './homeCardNotice.module.css';
 import { NetworkError } from './types';
 import type { HomeCardRead } from './useHomeCardRead';
 
-function errorText(error: unknown): string {
+/** Why a card read was not looked up: shared by every screen that reads cards. */
+export function cardReadErrorText(error: unknown): string {
   if (error instanceof ServerFaultError) return `Card non letta. ${loadErrorText(error)}`;
   if (error instanceof NetworkError) return 'Card non letta: controlla la connessione.';
   return 'Card non letta: riprova.';
@@ -39,7 +40,7 @@ export function homeCardNotice(read: HomeCardRead): CardReadNotice | null {
     };
   }
   return {
-    text: errorText(read.error),
+    text: cardReadErrorText(read.error),
     action: (
       <Button variant="secondary" block onClick={read.retry}>
         Riprova

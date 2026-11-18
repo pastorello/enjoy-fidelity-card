@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button } from '../../shared/ui/Button';
+import { useCardRead } from '../card-input/useCardRead';
 import { CardTakenNotice } from '../cards/CardTakenNotice';
 import { NewCustomerCardPanel, RegisteredCustomerHint } from '../cards/NewCustomerCardPanel';
+import { NewCustomerCardBelowForm } from '../cards/NewCustomerCardSection';
 import { useNewCustomerCard } from '../cards/useNewCustomerCard';
 import { CustomerForm, nameFromQuery } from './CustomerForm';
 import { SaveFailure } from './SaveFailure';
@@ -23,6 +25,10 @@ export function NewCustomerPage() {
   const [initialName] = useState(() => nameFromQuery(searchParams.get('nome')));
   const card = useNewCustomerCard();
   const { save, busy, refusal, failure } = useSaveCustomer(card.via);
+  useCardRead((read) => card.read(read.uid), {
+    enabled: !busy && card.lookup.status !== 'reading',
+  });
+  const fromLink = card.source === 'link';
 
   return (
     <AppShell
@@ -34,15 +40,16 @@ export function NewCustomerPage() {
         </Button>
       }
     >
-      {card.taken ? (
-        <CardTakenNotice owner={card.taken.owner}>
-          <Button variant="secondary" block onClick={card.continueWithoutCard}>
-            Continua senza card
-          </Button>
-        </CardTakenNotice>
-      ) : (
-        card.uid !== null && <NewCustomerCardPanel uid={card.uid} />
-      )}
+      {fromLink &&
+        (card.taken ? (
+          <CardTakenNotice owner={card.taken.owner}>
+            <Button variant="secondary" block onClick={card.continueWithoutCard}>
+              Continua senza card
+            </Button>
+          </CardTakenNotice>
+        ) : (
+          card.uid !== null && <NewCustomerCardPanel uid={card.uid} />
+        ))}
       <CustomerForm
         id={FORM_ID}
         withPrivacy
@@ -50,8 +57,9 @@ export function NewCustomerPage() {
         onSubmit={save}
         refusal={refusal}
       />
+      <NewCustomerCardBelowForm card={card} />
       {failure && <SaveFailure text={failure.text} />}
-      {card.uid !== null && !card.taken && <RegisteredCustomerHint />}
+      {fromLink && !card.taken && <RegisteredCustomerHint />}
     </AppShell>
   );
 }
