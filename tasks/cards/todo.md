@@ -360,13 +360,13 @@ vite.config.ts · **Dimensione:** M
 contesto del browser **senza accesso**. `vercel.json` aggiunge per `/s/(.*)` `Cache-Control: no-store` e
 `X-Robots-Tag: noindex, nofollow` (in locale non valgono: le prova `scripts/vercelHeaders.test.ts`).
 **Accettazione:**
-- [ ] Link nuovo → «ENJOY YOUR POINTS» e `0`, nessun nome; Sostituisci card → link della vecchia «Card non
+- [x] Link nuovo → «ENJOY YOUR POINTS» e `0`, nessun nome; Sostituisci card → link della vecchia «Card non
       attiva», della nuova il saldo; token inventato → messaggio neutro (criteri 10, 11)
-- [ ] Le sole richieste a Supabase sono `rpc/card_points` in `POST` e nessuna URL contiene il token;
+- [x] Le sole richieste a Supabase sono `rpc/card_points` in `POST` e nessuna URL contiene il token;
       nessuna registrazione di service worker su `/s/…`
-- [ ] Card nota → Registra spesa non produce voci in `__enjoyFakeCardWrites` né chiamate a
+- [x] Card nota → Registra spesa non produce voci in `__enjoyFakeCardWrites` né chiamate a
       `issue_card_link` (criteri 1, 14)
-- [ ] `vercelHeaders.test.ts` trova le due intestazioni per `/s/(.*)`; CSP e intestazioni esistenti invariate
+- [x] `vercelHeaders.test.ts` trova le due intestazioni per `/s/(.*)`; CSP e intestazioni esistenti invariate
 **Verifica:** `npm test -- vercelHeaders && npm run e2e -- card-points cards`
 **Dipendenze:** 17, 21 · **File:** e2e/card-points.spec.ts, e2e/nfc.ts, vercel.json,
 scripts/vercelHeaders.test.ts · **Dimensione:** M
