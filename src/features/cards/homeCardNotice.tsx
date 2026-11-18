@@ -1,0 +1,56 @@
+import { ServerFaultError } from '../../lib/serverFault';
+import { Button, ButtonLink } from '../../shared/ui/Button';
+import type { CardReadNotice } from '../card-input/CardReadPanel';
+import { loadErrorText } from '../customers/loadErrorText';
+import styles from './homeCardNotice.module.css';
+import { NetworkError } from './types';
+import type { HomeCardRead } from './useHomeCardRead';
+
+/** Characters Enjoy Display lacks (scripts/displayGlyphs.test.ts): a typed name with one uses the body font. */
+const NOT_IN_DISPLAY = /[…«»@#*×→]/;
+
+/** "Maria" of "Maria Rossi": the button names the customer as the operator calls them. */
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] ?? name;
+}
+
+function errorText(error: unknown): string {
+  if (error instanceof ServerFaultError) return `Card non letta. ${loadErrorText(error)}`;
+  if (error instanceof NetworkError) return 'Card non letta: controlla la connessione.';
+  return 'Card non letta: riprova.';
+}
+
+/**
+ * What the card panel of the home says about the last card read (SPEC-cards, point 1), or null when
+ * it shows its own text. "Lettura della card…" is the panel's description instead (see HomePage).
+ */
+export function homeCardNotice(read: HomeCardRead): CardReadNotice | null {
+  if (read.status === 'idle' || read.status === 'reading') return null;
+  if (read.status === 'inactive') {
+    const name = firstName(read.customerName);
+    return {
+      title: 'Card disattivata',
+      text: `Questa card non è più attiva: era di ${read.customerName}. Cerca il cliente per nome o telefono.`,
+      action: (
+        <ButtonLink to={`/clienti/${read.customerId}`} variant="secondary" block>
+          Apri la scheda di{' '}
+          <span className={NOT_IN_DISPLAY.test(name) ? styles.typedName : undefined}>{name}</span>
+        </ButtonLink>
+      ),
+    };
+  }
+  if (read.status === 'anonymized') {
+    return {
+      title: 'Card non più valida',
+      text: 'I dati del cliente di questa card sono stati cancellati. Usa un’altra card.',
+    };
+  }
+  return {
+    text: errorText(read.error),
+    action: (
+      <Button variant="secondary" block onClick={read.retry}>
+        Riprova
+      </Button>
+    ),
+  };
+}

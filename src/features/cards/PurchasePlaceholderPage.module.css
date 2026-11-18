@@ -1,0 +1,27 @@
+/* Wireframe "Registra spesa (aperta dalla card)": the customer row right under the header, full width. */
+.customer {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-2) + var(--space-1));
+  min-height: 56px;
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  text-decoration: none;
+  touch-action: manipulation;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  /* Semibold, as the wireframe row: the weight of the large labels. */
+  font-weight: var(--type-label-lg-weight);
+  overflow-wrap: anywhere;
+}
+
+.chevron {
+  flex-shrink: 0;
+}

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import type { NfcStatus } from './cardReader';
@@ -44,6 +44,17 @@ function contentFor(status: NfcStatus, title: string, description: string): Cont
   return contents[status];
 }
 
+/**
+ * What the screen says about the last card it read (e.g. "Card disattivata" on the home): shown in
+ * place of the active state's text, as an alert, while reading is active.
+ */
+export type CardReadNotice = {
+  title?: string | undefined;
+  text: string;
+  /** A button or link under the text (e.g. "Riprova"). */
+  action?: ReactNode;
+};
+
 export type CardReadPanelProps = {
   /** Title of the active state, from the screen that reads cards. */
   title: string;
@@ -53,6 +64,8 @@ export type CardReadPanelProps = {
   mode?: 'web-nfc' | 'usb';
   /** `compact`: one line, only while reading is active (a search is on screen). */
   variant?: 'full' | 'compact';
+  /** Shown only in the full variant, while reading is active; the screen picks `full` meanwhile. */
+  notice?: CardReadNotice | null | undefined;
 };
 
 type CardReadPanelViewProps = CardReadPanelProps & {
@@ -69,6 +82,7 @@ export function CardReadPanelView({
   description,
   mode = 'web-nfc',
   variant = 'full',
+  notice = null,
   status,
   onStart,
 }: CardReadPanelViewProps) {
@@ -114,6 +128,18 @@ export function CardReadPanelView({
   }
 
   const content = contentFor(effective, title, description);
+  if (notice !== null && effective === 'active') {
+    return (
+      <section aria-label="Lettura card" className={styles.panel}>
+        <Icon name="nfc" size={48} className={styles.icon} />
+        <div ref={texts} tabIndex={-1} role="alert" className={styles.texts}>
+          {notice.title !== undefined && <p className={styles.title}>{notice.title}</p>}
+          <p className={styles.noticeText}>{notice.text}</p>
+        </div>
+        {notice.action !== undefined && <div className={styles.action}>{notice.action}</div>}
+      </section>
+    );
+  }
   return (
     <section aria-label="Lettura card" className={styles.panel} data-off={content.off || undefined}>
       <Icon name={content.off ? 'nfc-off' : 'nfc'} size={48} className={styles.icon} />

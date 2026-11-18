@@ -36,6 +36,13 @@
   color: var(--color-ink-muted);
 }
 
+/* A notice of the screen about the last card read: the message itself, in full ink. */
+.noticeText {
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-ink);
+}
+
 /* Reading off: the title steps back, the instructions are what matters. */
 .panel[data-off] .icon,
 .panel[data-off] .title {
@@ -47,6 +54,7 @@
 }
 
 .action {
+  align-self: stretch;
   margin-top: var(--space-2);
 }
 
