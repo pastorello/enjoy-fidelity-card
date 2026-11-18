@@ -163,17 +163,19 @@ src/features/export/ExportServiceProvider.tsx, src/main.tsx, src/test/renderApp.
 chiama il download con `exportFileName(kind, now)` e restituisce `{ status: 'ok', count }` oppure
 `forbidden` / `network` / `unknown`; `busy`; `run()` ignorato mentre è in corso.
 **Accettazione:**
-- [ ] Hook: due `run()` di fila → una sola chiamata al servizio; `busy` vero durante e falso dopo
-- [ ] Hook (criterio 7): errore di rete alla seconda pagina → `network`, download mai chiamato; nuovo
+- [x] Hook: due `run()` di fila → una sola chiamata al servizio; `busy` vero durante e falso dopo
+- [x] Hook (criterio 7): errore di rete alla seconda pagina → `network`, download mai chiamato; nuovo
       `run()` riuscito
-- [ ] Hook (criterio 8): nome del file con la data di Roma; `downloadFile` con jsdom: tipo del `Blob`,
+- [x] Hook (criterio 8): nome del file con la data di Roma; `downloadFile` con jsdom: tipo del `Blob`,
       attributo `download`, revoca dopo il clic, non prima
+- Nota: `downloadFile.ts` era già nel Task 9; qui `useExport.ts` (+ `.test.tsx`). Un `run()` durante
+  l'esportazione non ne avvia un'altra e risponde con l'esito di quella in corso.
 **Verifica:** `npm test -- useExport downloadFile`
 **Dipendenze:** 9 · **File:** src/features/export/downloadFile.ts (+ .test.ts), useExport.ts
 (+ .test.tsx) · **Dimensione:** M
 
 ## Checkpoint C
-- [ ] Quality bar completa verde
+- [x] Quality bar completa verde
 - [ ] Revisione con l'utente prima della UI
 
 ## Task 11: Sezione ESPORTA DATI nelle Impostazioni
