@@ -15,12 +15,12 @@ input non valido (spec, punto 1). `USB_UID_FORMATS` e `UsbUidFormat` si spostano
 legge `supabase/migrations/20261117230100_settings.sql` e confronta la lista della CHECK su
 `usb_uid_format` con `USB_UID_FORMATS`.
 **Accettazione:**
-- [ ] Unità (criterio 1): `('04:a1:b2:c3:d4:e5:f6','hex')`, `('1303689068602870','dec')`,
+- [x] Unità (criterio 1): `('04:a1:b2:c3:d4:e5:f6','hex')`, `('1303689068602870','dec')`,
       `('69495546249912580','dec-reversed')`, `('F6E5D4C3B2A104','hex-reversed')` → `04A1B2C3D4E5F6`;
       separatori `-` e spazio, cifre consecutive, 4/7/10 byte, `('0012345678','dec')` → `00BC614E`
-- [ ] Unità: `null` per vuoto, solo spazi, `"04:a1:b"`, `"4:a1:b2:c3"`, `"0g"`, cifre dispari, 3 e 11 byte,
+- [x] Unità: `null` per vuoto, solo spazi, `"04:a1:b"`, `"4:a1:b2:c3"`, `"0g"`, cifre dispari, 3 e 11 byte,
       tutto zero, decimale con segno o punto, decimale oltre 10 byte, formato sconosciuto
-- [ ] `usbFormats.test.ts` fallisce se la CHECK e `USB_UID_FORMATS` differiscono; test di `settings` invariati
+- [x] `usbFormats.test.ts` fallisce se la CHECK e `USB_UID_FORMATS` differiscono; test di `settings` invariati
 **Verifica:** `npm test -- card-input settings`
 **Dipendenze:** nessuna · **File:** src/features/card-input/normalizeUid.ts (+ .test.ts),
 src/features/card-input/usbFormats.test.ts, src/features/settings/types.ts · **Dimensione:** M
