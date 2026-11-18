@@ -272,10 +272,10 @@ verrà registrata due volte.". Rifiuti definitivi: `customer-unavailable` → "C
 `invalid`/`conflict` → "Spesa non registrata: dati non validi. Ricomincia." con importo azzerato;
 `forbidden` → `reportNotEnabled()`.
 **Accettazione:**
-- [ ] Componente: rete giù → avviso; Riprova con lo **stesso** id; "risposta persa" + Riprova = un solo
+- [x] Componente: rete giù → avviso; Riprova con lo **stesso** id; "risposta persa" + Riprova = un solo
       movimento nel finto; doppio tocco = una chiamata (criterio 4)
-- [ ] Componente: timeout 8 s, errore del server, rifiuti definitivi (nuovo id dopo)
-- [ ] Impeccable pulito; confronto con Errore-rete
+- [x] Componente: timeout 8 s, errore del server, rifiuti definitivi (nuovo id dopo)
+- [x] Impeccable pulito; confronto con Errore-rete
 **Verifica:** `npm test -- PurchasePage`
 **Dipendenze:** 13 · **File:** src/features/ledger/PurchasePage.tsx, src/features/ledger/PurchasePage.test.tsx,
 src/features/ledger/LedgerFailure.tsx (+ .module.css) · **Dimensione:** M
