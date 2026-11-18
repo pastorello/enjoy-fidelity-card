@@ -44,9 +44,9 @@ export function fakeReward(overrides: Partial<Reward> = {}): Reward {
   };
 }
 
-/** `btrim(name)`: Postgres trims only plain spaces. */
-function btrim(name: string): string {
-  return name.replace(/^ +| +$/g, '');
+/** `private.trim_spaces(name)`: the server trims every outer Unicode space, as `\s` does. */
+function trimSpaces(name: string): string {
+  return name.replace(/^\s+|\s+$/g, '');
 }
 
 /** The key of the `rewards_name_key` index, `lower(name)`. */
@@ -156,7 +156,7 @@ export function createFakeRewardsService({
         // A resent request returns what the first one created, before any check of the values.
         const existing = stored.get(input.id);
         if (existing) return { ok: true, reward: copy(existing) };
-        const name = btrim(input.name);
+        const name = trimSpaces(input.name);
         if (input.id === '' || !validName(name) || !validPoints(input.points)) {
           return refused('invalid');
         }
@@ -170,7 +170,7 @@ export function createFakeRewardsService({
       write('update', [id, input], () => {
         const reward = stored.get(id);
         if (!reward) return refused('not-found');
-        const name = btrim(input.name);
+        const name = trimSpaces(input.name);
         if (!validName(name) || !validPoints(input.points)) return refused('invalid');
         if (nameTaken(name, id)) return refused('name-taken');
         Object.assign(reward, { name, points: input.points });

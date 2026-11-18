@@ -2,7 +2,7 @@
 -- (SPEC-rewards.md, "Modello dati e regole di accesso"). Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(110);
+select plan(118);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -365,6 +365,18 @@ select results_eq(
   $$values (99999)$$,
   '99 999 points are accepted'
 );
+-- Outer whitespace is any Unicode space, as String.trim() in the app: no-break spaces
+-- (U+00A0, U+202F) come with names pasted from chats.
+select results_eq(
+  $$select name from app.create_reward('00000000-0000-4000-d100-000000000014', 'Cornetto' || chr(160), 40, true)$$,
+  $$values ('Cornetto'::text)$$,
+  'a trailing no-break space is not saved'
+);
+select results_eq(
+  $$select name from app.create_reward('00000000-0000-4000-d100-000000000015', chr(9) || 'Tramezzino' || chr(8239), 60, true)$$,
+  $$values ('Tramezzino'::text)$$,
+  'a leading tab and a trailing narrow no-break space are not saved'
+);
 
 -- Duplicate names ---------------------------------------------------------------------------------
 select throws_ok(
@@ -378,6 +390,18 @@ select throws_ok(
   '23505',
   null,
   'a duplicate name with leading and trailing spaces is refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000023', chr(160) || 'Spremuta' || chr(160), 80, true)$$,
+  '23505', null, 'a duplicate name between no-break spaces is refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000024', 'spremuta' || chr(8239), 80, true)$$,
+  '23505', null, 'a duplicate name ending in a narrow no-break space is refused'
+);
+select throws_ok(
+  $$select app.create_reward('00000000-0000-4000-d100-000000000025', chr(9) || 'SPREMUTA' || chr(9), 80, true)$$,
+  '23505', null, 'a duplicate name between tabs is refused'
 );
 select is(
   public.rewards_test_error_constraint(
@@ -436,6 +460,13 @@ select is(
   'refused values add no reward'
 );
 
+select throws_ok(
+  $$insert into app.rewards (id, name, points, created_by, updated_by)
+    select '00000000-0000-4000-d100-000000000016', 'Riga' || chr(160), 10, id, id
+    from app.operators where name = 'Admin Premi'$$,
+  '23514', null, 'the table refuses a name with an outer no-break space'
+);
+
 -- Authors ---------------------------------------------------------------------------------------------
 select results_eq(
   $$select created_by, updated_by from app.rewards where id = '00000000-0000-4000-d100-000000000010'$$,
@@ -479,6 +510,15 @@ select results_eq(
   $$select name from app.update_reward('00000000-0000-4000-d100-000000000010', 'SPREMUTA GRANDE', 90)$$,
   $$values ('SPREMUTA GRANDE'::text)$$,
   'a reward can be renamed to its own name in a different case'
+);
+select results_eq(
+  $$select name from app.update_reward('00000000-0000-4000-d100-000000000012', chr(9) || 'Ghiacciolo' || chr(8239), 1)$$,
+  $$values ('Ghiacciolo'::text)$$,
+  'update_reward saves the name without outer tabs and no-break spaces'
+);
+select throws_ok(
+  $$select app.update_reward('00000000-0000-4000-d100-000000000012', chr(160) || 'dolce premi' || chr(160), 1)$$,
+  '23505', null, 'renaming to a name already used, between no-break spaces, is refused'
 );
 
 -- Refused updates

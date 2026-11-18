@@ -67,6 +67,17 @@ describe('createFakeRewardsService', () => {
     expect(rewards()).toHaveLength(2);
   });
 
+  it('trims outer Unicode spaces like the server, so they neither stay nor dodge name-taken', async () => {
+    const { service, rewards } = createFakeRewardsService();
+    await expect(
+      service.create(newReward({ name: '\tSpremuta\u202f', points: 80 })),
+    ).resolves.toMatchObject({ ok: true, reward: { name: 'Spremuta' } });
+    await expect(
+      service.create(newReward({ id: ID_2, name: '\u00a0spremuta\u00a0' })),
+    ).resolves.toEqual({ ok: false, error: 'name-taken' });
+    expect(rewards()).toHaveLength(1);
+  });
+
   it('refuses values outside the limits with invalid', async () => {
     const { service, rewards } = createFakeRewardsService();
     const results = await Promise.all(
