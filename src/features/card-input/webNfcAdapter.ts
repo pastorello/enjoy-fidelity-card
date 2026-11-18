@@ -9,6 +9,17 @@ export interface NfcReaderLike {
   scan(options: { signal: AbortSignal }): Promise<void>;
 }
 
+/**
+ * The part of `NDEFReader` the writer uses (a real `NDEFReader` satisfies it). `makeReadOnly()` is
+ * deliberately missing: cards stay writable (SPEC-card-input, point 3).
+ */
+export interface NfcWriterLike {
+  write(
+    message: NDEFMessageInit,
+    options: { overwrite: boolean; signal: AbortSignal },
+  ): Promise<void>;
+}
+
 /** Everything the adapter needs from the browser, so tests can run it with `fakeWebNfc`. */
 export interface WebNfcApi {
   /** True only when `NDEFReader` exists (Chrome for Android over HTTPS). */
@@ -16,6 +27,8 @@ export interface WebNfcApi {
   /** The `nfc` permission, or null when the browser cannot tell. */
   queryPermission: () => Promise<NfcPermission | null>;
   createReader: () => NfcReaderLike;
+  /** A fresh `NDEFReader` used only to write (SPEC-card-input, point 9). */
+  createWriter: () => NfcWriterLike;
   /** Calls `listener` each time the page becomes visible again; returns the remover. */
   onVisible: (listener: () => void) => () => void;
 }
@@ -49,6 +62,11 @@ export function createBrowserWebNfcApi(win: BrowserNfcHost): WebNfcApi {
       }
     },
     createReader() {
+      const NDEFReader = win.NDEFReader;
+      if (NDEFReader === undefined) throw new ReferenceError('NDEFReader is not available');
+      return new NDEFReader();
+    },
+    createWriter() {
       const NDEFReader = win.NDEFReader;
       if (NDEFReader === undefined) throw new ReferenceError('NDEFReader is not available');
       return new NDEFReader();

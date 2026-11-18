@@ -27,6 +27,13 @@ export type CardReaderState = {
 export type CardConsumer = (read: CardRead) => void;
 
 /**
+ * A write in progress (SPEC-card-input, point 9): until `close()` every valid read goes only to the
+ * writer, without the repeat window. `lastRead` is the latest valid read before the session opened,
+ * delivered or not, so the writer can tell whether the card is still on the phone.
+ */
+export type WriteSession = { readonly lastRead: CardRead | null; close(): void };
+
+/**
  * How an adapter hands a raw uid to the service. `format` is a plain string at run time (it can come
  * from the saved settings): anything `normalizeUid` rejects is discarded.
  */
@@ -80,6 +87,8 @@ export type CardReader = {
   setUsbFormat(format: UsbUidFormat | null): void;
   /** Puts the consumer on top of the stack; the returned function removes exactly that entry. */
   pushConsumer(consumer: CardConsumer): () => void;
+  /** Opens the exclusive write session; one at a time (a second one is a programming error). */
+  openWriteSession(onRead: CardConsumer): WriteSession;
   /** Starts the Web NFC scan again from a tap; does nothing while the service is not active. */
   start(): Promise<void>;
   getState(): CardReaderState;
@@ -102,6 +111,8 @@ export function createCardReader({
   const stack: { consumer: CardConsumer }[] = [];
   const lastSeen = new Map<string, number>();
   const listeners = new Set<() => void>();
+  let lastRead: CardRead | null = null;
+  let session: { onRead: CardConsumer } | null = null;
   let active = false;
   let usbFormat: UsbUidFormat | null = null;
   let state: CardReaderState = {
@@ -156,14 +167,22 @@ export function createCardReader({
     if (source === 'usb') setUsbState(uid === null ? { lastInvalidAt: at } : { lastReadAt: at });
     if (uid === null) return;
 
+    const read: CardRead = { uid, source, at };
     const previous = lastSeen.get(uid);
+    // Reads during a write still count for the repeat window: the card just written, still on the
+    // phone, is not a new read for the screen once the write ends.
     lastSeen.set(uid, at);
+    lastRead = read;
+    if (session !== null) {
+      session.onRead(read);
+      return;
+    }
     if (previous !== undefined && at - previous <= REPEAT_WINDOW_MS) return;
 
     const top = stack.at(-1);
     if (top === undefined) return;
     safeVibrate();
-    top.consumer({ uid, source, at });
+    top.consumer(read);
   };
 
   return {
@@ -180,6 +199,7 @@ export function createCardReader({
       if (!active) return;
       active = false;
       lastSeen.clear();
+      lastRead = null;
       for (const adapter of adapters) adapter.stop();
       nfc?.stop();
       setNfcStatus('checking');
@@ -195,6 +215,17 @@ export function createCardReader({
       return () => {
         const index = stack.indexOf(entry);
         if (index !== -1) stack.splice(index, 1);
+      };
+    },
+    openWriteSession(onRead) {
+      if (session !== null) throw new Error('A card write session is already open.');
+      const entry = { onRead };
+      session = entry;
+      return {
+        lastRead,
+        close() {
+          if (session === entry) session = null;
+        },
       };
     },
     async start() {

@@ -1,8 +1,27 @@
-import type { NfcPermission, NfcReaderLike, WebNfcApi } from '../features/card-input/webNfcAdapter';
+import type {
+  NfcPermission,
+  NfcReaderLike,
+  NfcWriterLike,
+  WebNfcApi,
+} from '../features/card-input/webNfcAdapter';
 
 /** How the next `scan()` ends: `'ok'` resolves, any other value rejects with a DOMException of that name. */
 export type FakeScanOutcome =
   'ok' | 'NotAllowedError' | 'NotSupportedError' | 'NotReadableError' | 'InvalidStateError';
+
+/**
+ * How the next `write()` ends: `'ok'` resolves, `'pending'` waits like Chrome with no card in the field
+ * (it rejects with `AbortError` once its signal aborts), any other value rejects with a DOMException of
+ * that name.
+ */
+export type FakeWriteOutcome =
+  'ok' | 'pending' | 'NotAllowedError' | 'NetworkError' | 'NotReadableError' | 'NotSupportedError';
+
+/** One `write()` call as the page made it. */
+export type FakeWrite = {
+  readonly message: NDEFMessageInit;
+  readonly options: { overwrite: boolean; signal: AbortSignal };
+};
 
 type FakeWebNfcOptions = {
   /** False simulates iPhone or a desktop browser: no `NDEFReader`. Default true. */
@@ -11,7 +30,13 @@ type FakeWebNfcOptions = {
   permission?: NfcPermission | null;
   /** Outcomes of the next `scan()` calls, in order; then every scan succeeds. */
   scanOutcomes?: FakeScanOutcome[];
+  /** Outcomes of the next `write()` calls, in order; then every write succeeds. */
+  writeOutcomes?: FakeWriteOutcome[] | undefined;
 };
+
+function abortError() {
+  return new DOMException('The write was aborted.', 'AbortError');
+}
 
 type FakeScan = { readonly reader: NfcReaderLike; readonly signal: AbortSignal; active: boolean };
 
@@ -28,6 +53,34 @@ export function createFakeWebNfc(options: FakeWebNfcOptions = {}) {
   const scans: FakeScan[] = [];
   const visibilityListeners = new Set<() => void>();
   let permissionQueries = 0;
+  const writeOutcomes = [...(options.writeOutcomes ?? [])];
+  const writes: FakeWrite[] = [];
+  let makeReadOnlyCalls = 0;
+
+  // Like NDEFReader, the writer also has makeReadOnly(): counted, so tests prove it is never called.
+  function createWriter(): NfcWriterLike & { makeReadOnly(): Promise<void> } {
+    return {
+      write(message, writeOptions) {
+        writes.push({ message, options: writeOptions });
+        const outcome = writeOutcomes.shift() ?? 'ok';
+        const { signal } = writeOptions;
+        if (signal.aborted) return Promise.reject(abortError());
+        if (outcome === 'ok') return Promise.resolve();
+        if (outcome === 'pending') {
+          return new Promise<void>((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              reject(abortError());
+            });
+          });
+        }
+        return Promise.reject(new DOMException('Fake write failure.', outcome));
+      },
+      makeReadOnly() {
+        makeReadOnlyCalls += 1;
+        return Promise.resolve();
+      },
+    };
+  }
 
   function createReader(): NfcReaderLike {
     const reader: NfcReaderLike = {
@@ -65,6 +118,10 @@ export function createFakeWebNfc(options: FakeWebNfcOptions = {}) {
       if (!supported) throw new ReferenceError('NDEFReader is not defined');
       return createReader();
     },
+    createWriter: () => {
+      if (!supported) throw new ReferenceError('NDEFReader is not defined');
+      return createWriter();
+    },
     onVisible(listener) {
       visibilityListeners.add(listener);
       return () => {
@@ -82,6 +139,14 @@ export function createFakeWebNfc(options: FakeWebNfcOptions = {}) {
     abortedCount: () => scans.filter((scan) => scan.signal.aborted).length,
     activeScans: () => scans.filter((scan) => scan.active).length,
     permissionQueries: () => permissionQueries,
+    /** Every `write()` call so far, oldest first. */
+    writes,
+    /** How many times `makeReadOnly()` was called: must stay 0 (cards stay writable). */
+    makeReadOnlyCalls: () => makeReadOnlyCalls,
+    /** Queues the outcome of the next `write()`. */
+    queueWrite(outcome: FakeWriteOutcome) {
+      writeOutcomes.push(outcome);
+    },
     /** Changes the permission, as the site settings of Chrome would. */
     setPermission(value: NfcPermission | null) {
       permission = value;

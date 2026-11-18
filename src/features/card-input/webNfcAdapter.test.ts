@@ -418,6 +418,13 @@ describe('createBrowserWebNfcApi', () => {
     expect(() => createBrowserWebNfcApi(fakeHost().host).createReader()).toThrow(ReferenceError);
   });
 
+  it('creates a writer from NDEFReader only when it exists', () => {
+    expect(
+      createBrowserWebNfcApi(fakeHost({ NDEFReader: StubReader }).host).createWriter(),
+    ).toBeInstanceOf(StubReader);
+    expect(() => createBrowserWebNfcApi(fakeHost().host).createWriter()).toThrow(ReferenceError);
+  });
+
   it('calls back only when the page becomes visible, until removed', () => {
     const { host, show } = fakeHost();
     const listener = vi.fn<() => void>();

@@ -624,3 +624,107 @@ describe('createCardReader: Web NFC adapter (point 3)', () => {
     await expect(reader.start()).resolves.toBeUndefined();
   });
 });
+
+describe('createCardReader: exclusive write session (SPEC point 9)', () => {
+  it('sends every read only to the session: no consumer, no vibration, no repeat window', () => {
+    const { reader, card, vibrate, time } = setup();
+    reader.activate({ usbFormat: null });
+    const consumer = vi.fn<CardConsumer>();
+    reader.pushConsumer(consumer);
+    const onRead = vi.fn<(read: CardRead) => void>();
+
+    reader.openWriteSession(onRead);
+    card.read(UID);
+    card.read(UID); // same uid at once: still delivered to the writer
+
+    expect(onRead).toHaveBeenCalledTimes(2);
+    expect(onRead).toHaveBeenLastCalledWith({ uid: UID, source: 'web-nfc', at: time() });
+    expect(consumer).not.toHaveBeenCalled();
+    expect(vibrate).not.toHaveBeenCalled();
+  });
+
+  it('after close gives the reads back to the consumer stack as it was', () => {
+    const { reader, card, advance } = setup();
+    reader.activate({ usbFormat: null });
+    const below = vi.fn<CardConsumer>();
+    const top = vi.fn<CardConsumer>();
+    reader.pushConsumer(below);
+    reader.pushConsumer(top);
+    const onRead = vi.fn<(read: CardRead) => void>();
+
+    const session = reader.openWriteSession(onRead);
+    card.read(UID);
+    session.close();
+    advance(REPEAT_WINDOW_MS + 1);
+    card.read(UID);
+
+    expect(onRead).toHaveBeenCalledTimes(1);
+    expect(top).toHaveBeenCalledTimes(1);
+    expect(below).not.toHaveBeenCalled();
+  });
+
+  it('a read during the session still counts for the repeat window after it', () => {
+    const { reader, card, advance } = setup();
+    reader.activate({ usbFormat: null });
+    const consumer = vi.fn<CardConsumer>();
+    reader.pushConsumer(consumer);
+
+    const session = reader.openWriteSession(() => {});
+    card.read(UID);
+    session.close();
+    advance(500);
+    card.read(UID); // the card just written, still on the phone: not a new read
+
+    expect(consumer).not.toHaveBeenCalled();
+  });
+
+  it('reports no last read before any card was read', () => {
+    const { reader } = setup();
+    reader.activate({ usbFormat: null });
+
+    expect(reader.openWriteSession(() => {}).lastRead).toBeNull();
+  });
+
+  it('lastRead is the latest valid read, even one dropped for lack of a consumer or by the repeat window', () => {
+    const { reader, card, time, advance } = setup();
+    reader.activate({ usbFormat: null });
+
+    card.read(OTHER_UID);
+    card.read(UID);
+    advance(100);
+    card.read(UID); // ignored by the repeat window, still the latest read
+    card.read('zz'); // invalid: not a read
+
+    const session = reader.openWriteSession(() => {});
+    expect(session.lastRead).toEqual({ uid: UID, source: 'web-nfc', at: time() });
+    session.close();
+  });
+
+  it('forgets the last read when deactivated', () => {
+    const { reader, card } = setup();
+    reader.activate({ usbFormat: null });
+    card.read(UID);
+
+    reader.deactivate();
+    reader.activate({ usbFormat: null });
+
+    expect(reader.openWriteSession(() => {}).lastRead).toBeNull();
+  });
+
+  it('refuses a second session while one is open; close is idempotent', () => {
+    const { reader, card } = setup();
+    reader.activate({ usbFormat: null });
+    const first = reader.openWriteSession(() => {});
+
+    expect(() => reader.openWriteSession(() => {})).toThrow(Error);
+
+    first.close();
+    const onRead = vi.fn<(read: CardRead) => void>();
+    const second = reader.openWriteSession(onRead);
+    first.close(); // a stale close does not end the newer session
+    card.read(UID);
+
+    expect(onRead).toHaveBeenCalledTimes(1);
+    second.close();
+  });
+});
