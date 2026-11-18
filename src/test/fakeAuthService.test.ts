@@ -26,6 +26,17 @@ describe('createFakeAuthService: session identity', () => {
     });
   });
 
+  it('an operator whose PIN follows a source, such as the kiosk fake', async () => {
+    const kiosk = createFakeKioskService({
+      account: { kind: 'operator', operatorId: 'op-9' },
+      cashiers: [{ id: 'op-9', name: 'Marco Prova', role: 'operator', pin: null }],
+    });
+    const fake = createFakeAuthService({ userId: 'user-1', hasPin: () => kiosk.hasPin('op-9') });
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({ hasPin: false });
+    await kiosk.service.setMyPin('2468');
+    await expect(fake.service.loadIdentity()).resolves.toMatchObject({ hasPin: true });
+  });
+
   it('no profile: null, as for a removed account', async () => {
     const fake = createFakeAuthService({ userId: 'user-1', operator: null });
     await expect(fake.service.loadIdentity()).resolves.toBeNull();

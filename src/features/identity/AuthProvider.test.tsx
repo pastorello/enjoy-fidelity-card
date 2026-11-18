@@ -760,6 +760,20 @@ describe('AuthProvider', () => {
       expect(device()).toHaveTextContent('|120');
     });
 
+    it('an operator session carries whether a PIN is set, read again by refreshIdentity', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      const auth = renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent(`in:${fakeOperator.name}`));
+      const hasPin = () => {
+        const current = auth().state;
+        return current.status === 'signed-in' ? current.hasPin : undefined;
+      };
+      expect(hasPin()).toBe(false);
+      fake.setHasPin(true);
+      await act(() => auth().refreshIdentity());
+      expect(hasPin()).toBe(true);
+    });
+
     it('refreshIdentity does nothing when signed out', async () => {
       const fake = createFakeAuthService();
       const auth = renderDevice(fake);

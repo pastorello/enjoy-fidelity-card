@@ -32,8 +32,11 @@ type FakeOptions = {
   userId?: string | null;
   /** The profile of an operator account; ignored while `device` is set. */
   operator?: Operator | null;
-  /** Whether the operator has set a PIN for the till. */
-  hasPin?: boolean;
+  /**
+   * Whether the operator has set a PIN for the till, or a source read on every load (such as
+   * `() => kiosk.hasPin(id)`, so a PIN saved through the kiosk fake shows as on the server).
+   */
+  hasPin?: boolean | (() => boolean);
   /** A device account instead of an operator one, without a cashier unless `cashier` is set. */
   device?: Device;
   /** The device's cashier, with a 12-hour turn starting now. */
@@ -84,7 +87,7 @@ export function createFakeAuthService({
 }: FakeOptions = {}) {
   let currentUser = userId;
   let profile = operator;
-  let pinSet = hasPin;
+  let pinSet: boolean | (() => boolean) = hasPin;
   /** The device account, when the session is one; its state is static or read from a source. */
   let deviceAccount: { device: Device; state: FakeDeviceState | (() => FakeDeviceState) } | null =
     device
@@ -118,7 +121,8 @@ export function createFakeAuthService({
   /** As `app.get_session_identity()`: an ended turn has no cashier and no end. */
   function identity(): SessionIdentity | null {
     if (!deviceAccount) {
-      return profile ? { kind: 'operator', operator: profile, hasPin: pinSet } : null;
+      const pin = typeof pinSet === 'function' ? pinSet() : pinSet;
+      return profile ? { kind: 'operator', operator: profile, hasPin: pin } : null;
     }
     const { state } = deviceAccount;
     const current = typeof state === 'function' ? state() : state;

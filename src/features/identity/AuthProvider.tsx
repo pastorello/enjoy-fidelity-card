@@ -20,7 +20,8 @@ export type AuthState =
    */
   | { status: 'error'; fault?: ServerFault }
   | { status: 'signed-out'; reason?: SignedOutReason }
-  | { status: 'signed-in'; operator: Operator }
+  /** An operator account; `hasPin`: whether they have set their till PIN (SPEC-tablet-kiosk, 7). */
+  | { status: 'signed-in'; operator: Operator; hasPin: boolean }
   /**
    * A device account (the till tablet, SPEC-tablet-kiosk): its cashier while the turn lasts (null
    * when there is none or it has ended), the end of that turn and the PIN lock, as the server said
@@ -94,7 +95,9 @@ type AuthContextValue = {
 /** The state of a session with this identity, or null when the account is not enabled. */
 function stateOf(identity: SessionIdentity | null): ActiveState | null {
   if (!identity) return null;
-  if (identity.kind === 'operator') return { status: 'signed-in', operator: identity.operator };
+  if (identity.kind === 'operator') {
+    return { status: 'signed-in', operator: identity.operator, hasPin: identity.hasPin };
+  }
   const { device, cashier, turnExpiresAt, lockSecondsLeft } = identity;
   return { status: 'device', device, cashier, turnExpiresAt, lockSecondsLeft };
 }
@@ -109,7 +112,7 @@ function sameOperator(a: Operator | null, b: Operator | null): boolean {
 /** Whether a fresh read changes nothing, so the screens keep the same state object. */
 function sameState(a: AuthState, b: ActiveState): boolean {
   if (a.status === 'signed-in' && b.status === 'signed-in') {
-    return sameOperator(a.operator, b.operator);
+    return sameOperator(a.operator, b.operator) && a.hasPin === b.hasPin;
   }
   if (a.status === 'device' && b.status === 'device') {
     return (

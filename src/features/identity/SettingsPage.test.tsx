@@ -45,6 +45,31 @@ describe('settings page', () => {
     expect(router.state.location.state).toBeNull();
   });
 
+  it.each([
+    ['administrators', 'admin', false, 'Da impostare'],
+    ['operators', 'operator', false, 'Da impostare'],
+    ['administrators', 'admin', true, 'Impostato'],
+    ['operators', 'operator', true, 'Impostato'],
+  ] as const)(
+    'offers "PIN della cassa" to %s, under "Cambia password" (PIN set: %s)',
+    async (_, role, hasPin, status) => {
+      const { router } = renderApp(
+        '/impostazioni',
+        signedInFake({ operator: { id: 'op-2', name: 'Marco Prova', role }, hasPin }),
+      );
+      const section = await screen.findByRole('region', { name: 'ACCOUNT' });
+      const rows = within(section).getAllByRole('link');
+      expect(rows.map((row) => row.getAttribute('href'))).toEqual([
+        '/password-dimenticata',
+        '/impostazioni/pin',
+      ]);
+      const row = within(section).getByRole('link', { name: /PIN della cassa/ });
+      expect(row).toHaveTextContent(status);
+      await userEvent.click(row);
+      expect(router.state.location.pathname).toBe('/impostazioni/pin');
+    },
+  );
+
   it('keeps the single section order of cross-review.md §1 for operators', async () => {
     renderApp(
       '/impostazioni',

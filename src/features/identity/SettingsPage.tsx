@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button } from '../../shared/ui/Button';
 import { ListRow } from '../../shared/ui/ListRow';
+import { NavigationNotice } from '../customers/NavigationNotice';
 import { ExportSection } from '../export/ExportSection';
 import { RewardsSettingsSection } from '../rewards/RewardsSettingsSection';
 import { OperatorFinalNote, PointsSettingsSection } from '../settings/PointsSettingsSection';
@@ -17,7 +18,7 @@ import styles from './SettingsPage.module.css';
  */
 export function SettingsPage() {
   const operator = useCurrentOperator();
-  const { signOut } = useAuth();
+  const { state, signOut } = useAuth();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
 
@@ -53,7 +54,17 @@ export function SettingsPage() {
             title="Cambia password"
             subtitle="Ricevi un link via email"
           />
+          {/* Only an operator's own phone sets a PIN: never on the till tablet (SPEC-tablet-kiosk, 7). */}
+          {state.status === 'signed-in' && (
+            <ListRow
+              to="/impostazioni/pin"
+              title="PIN della cassa"
+              subtitle={state.hasPin ? 'Impostato' : 'Da impostare'}
+            />
+          )}
         </ul>
+        {/* "PIN salvato." after /impostazioni/pin, once, inside the section (cross-review §1 order). */}
+        <NavigationNotice />
       </section>
       <RewardsSettingsSection />
       <ExportSection />
