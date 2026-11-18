@@ -1,6 +1,6 @@
-import { screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createFakeCardsService } from '../../test/fakeCardsService';
 import { createTestCardReader } from '../../test/fakeCardReader';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
@@ -19,7 +19,7 @@ function renderFree(path = FREE_PATH) {
   });
   const settings = createFakeSettingsService();
   const ledger = createFakeLedgerService({ customers, rewards, settings });
-  renderApp(
+  const rendered = renderApp(
     path,
     signedInFake(),
     settings,
@@ -29,7 +29,7 @@ function renderFree(path = FREE_PATH) {
     createFakeCardsService({ customers }),
     ledger,
   );
-  return { ledger };
+  return { ...rendered, ledger };
 }
 
 async function ready() {
@@ -210,6 +210,115 @@ describe('FreeRewardForm: Premio libero', () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Riscatta 100 punti' })).toBeDisabled();
+    expect(ledger.movements()).toHaveLength(1);
+  });
+});
+
+async function advance(ms: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+/** Types "Dolce del giorno" and 100 points, then redeems with fake timers at 10:45 in Rome. */
+async function redeemDolce() {
+  await userEvent.type(await ready(), 'Dolce del giorno');
+  await typePoints('100');
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-11-18T09:45:00.000Z'));
+  fireEvent.click(screen.getByRole('button', { name: 'Riscatta 100 punti' }));
+  await advance(0);
+}
+
+/** The operation ids of the free redemptions sent, in order. */
+function freeIds(ledger: ReturnType<typeof createFakeLedgerService>) {
+  return ledger.service.redeemFreeReward.mock.calls.map(([input]) => input.operationId);
+}
+
+describe('FreeRewardForm: Premio riscattato', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    Reflect.deleteProperty(navigator, 'vibrate');
+  });
+
+  it('the texts of the wireframe Premio-ok with the description, the vibration, back to / after 10 s', async () => {
+    const vibrate = vi.fn<(pattern: VibratePattern) => boolean>(() => true);
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    const { ledger, router } = renderFree();
+    await redeemDolce();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Premio riscattato' })).toHaveFocus();
+    expect(screen.getByText('Dolce del giorno per Maria Rossi · −100 punti')).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('20 punti');
+    expect(screen.getByText('Oggi 10:45 · Giulia Prova')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Annulla il riscatto · 10 s' })).toBeEnabled();
+    expect(vibrate).toHaveBeenCalledWith(200);
+
+    await advance(10_000);
+    expect(router.state.location.pathname).toBe('/');
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('"Annulla il riscatto": "Riscatto annullato" and the balance back to 120', async () => {
+    const { ledger } = renderFree();
+    await redeemDolce();
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla il riscatto · 10 s' }));
+    await advance(0);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Riscatto annullato' })).toHaveFocus();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('120 punti');
+    expect(ledger.movements().map((movement) => movement.points)).toEqual([-100, 100]);
+  });
+});
+
+describe('FreeRewardForm: Riscatto non salvato', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('network down: the alert, the values kept, "Riprova" with the same id (criterion 4)', async () => {
+    const { ledger } = renderFree();
+    ledger.setNetworkDown(true);
+    await redeemDolce();
+
+    const alert = screen.getByRole('alert');
+    expect(within(alert).getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Riscatto non salvato',
+    );
+    expect(alert).toHaveTextContent(
+      'Il telefono non è connesso a internet. Riprova appena torna la rete: il riscatto non verrà registrato due volte.',
+    );
+    expect(screen.getByRole('textbox', { name: 'Descrizione del premio' })).toHaveValue(
+      'Dolce del giorno',
+    );
+    expect(screen.getByRole('link', { name: 'Annulla' })).toHaveAttribute('href', '/');
+    expect(ledger.movements()).toHaveLength(0);
+
+    ledger.setNetworkDown(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova 100 punti' }));
+    await advance(0);
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Premio riscattato' }),
+    ).toBeInTheDocument();
+    const ids = freeIds(ledger);
+    expect(ids).toEqual([ids[0], ids[0]]);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('answer lost after the write: "Riprova" gives the first result, a single redemption (criterion 4)', async () => {
+    const { ledger } = renderFree();
+    ledger.failNext('redeemFreeReward', 'lost');
+    await redeemDolce();
+    expect(screen.getByRole('alert')).toHaveTextContent('Riscatto non salvato');
+    expect(ledger.movements()).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova 100 punti' }));
+    await advance(0);
+
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('20 punti');
+    const ids = freeIds(ledger);
+    expect(ids).toEqual([ids[0], ids[0]]);
     expect(ledger.movements()).toHaveLength(1);
   });
 });

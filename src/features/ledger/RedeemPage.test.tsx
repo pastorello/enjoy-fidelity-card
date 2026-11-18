@@ -1,6 +1,8 @@
-import { act, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ServerFaultError } from '../../lib/serverFault';
+import { fakeOperator } from '../../test/fakeAuthService';
 import { createFakeCardsService } from '../../test/fakeCardsService';
 import { createTestCardReader } from '../../test/fakeCardReader';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
@@ -320,5 +322,186 @@ describe('RedeemPage: common states', () => {
     });
     await screen.findByRole('heading', { level: 1, name: 'Premio riscattato' });
     expect(ledger.service.redeemReward).toHaveBeenCalledTimes(1);
+  });
+});
+
+async function advance(ms: number) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+/** Chooses "Cornetto e cappuccino" and redeems it with fake timers at 10:45 in Rome. */
+async function redeemCornetto() {
+  await ready();
+  await userEvent.click(screen.getByRole('radio', { name: /Cornetto e cappuccino/ }));
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-11-18T09:45:00.000Z'));
+  fireEvent.click(screen.getByRole('button', { name: 'Riscatta 100 punti' }));
+  await advance(0);
+}
+
+describe('RedeemPage: Premio riscattato', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    Reflect.deleteProperty(navigator, 'vibrate');
+  });
+
+  it('the texts of the wireframe Premio-ok, the vibration, back to / after 10 s', async () => {
+    const vibrate = vi.fn<(pattern: VibratePattern) => boolean>(() => true);
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    const { router, ledger } = renderRedeem();
+    await redeemCornetto();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Premio riscattato' })).toHaveFocus();
+    expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+    expect(screen.getByText('Cornetto e cappuccino per Maria Rossi · −100 punti')).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('20 punti');
+    expect(screen.getByText('Oggi 10:45 · Giulia Prova')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Annulla il riscatto · 10 s' })).toBeEnabled();
+    expect(vibrate).toHaveBeenCalledWith(200);
+    expect(screen.getByRole('timer')).toHaveTextContent(
+      'Torno alla lettura delle card tra 10 secondi',
+    );
+    expect(screen.getByRole('link', { name: 'Leggi un’altra card' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Apri la scheda di Maria' })).toHaveAttribute(
+      'href',
+      `/clienti/${MARIA.id}`,
+    );
+
+    await advance(2000);
+    expect(screen.getByRole('button', { name: 'Annulla il riscatto · 8 s' })).toBeInTheDocument();
+    await advance(7000);
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/premi`);
+    await advance(1000);
+    expect(router.state.location.pathname).toBe('/');
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('"Annulla il riscatto": "Riscatto annullato", the points back from the server, no return', async () => {
+    const { router, ledger } = renderRedeem();
+    // A waiter cancelling their own redemption within the window.
+    ledger.setOperator({ ...fakeOperator, role: 'operator' });
+    await redeemCornetto();
+    await advance(3000);
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla il riscatto · 7 s' }));
+    await advance(0);
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Riscatto annullato' })).toHaveFocus();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('120 punti');
+    const [redemption, correction] = ledger.movements();
+    expect(ledger.movements()).toHaveLength(2);
+    expect(correction).toMatchObject({
+      kind: 'correction',
+      points: 100,
+      correctsMovementId: redemption?.id,
+    });
+    expect(correction?.operationId).not.toBe(redemption?.operationId);
+    expect(screen.queryByRole('button', { name: /^Annulla il riscatto/ })).not.toBeInTheDocument();
+
+    await advance(30_000);
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/premi`);
+  });
+
+  it('the cancellation without an answer: "Riprova" resends the same id, a single correction', async () => {
+    const { ledger } = renderRedeem();
+    await redeemCornetto();
+    ledger.failNext('cancelMovement', 'lost');
+    fireEvent.click(screen.getByRole('button', { name: 'Annulla il riscatto · 10 s' }));
+    await advance(0);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Annullamento non riuscito: controlla la connessione e riprova.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await advance(0);
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Riscatto annullato' }),
+    ).toBeInTheDocument();
+    const cancels = ledger.calls.filter((call) => call.method === 'cancelMovement');
+    expect(cancels).toHaveLength(2);
+    expect(cancels[1]?.args).toEqual(cancels[0]?.args);
+    expect(ledger.movements().filter((m) => m.kind === 'correction')).toHaveLength(1);
+  });
+});
+
+const REDEEM_OFFLINE_TEXT =
+  'Il telefono non è connesso a internet. Riprova appena torna la rete: il riscatto non verrà registrato due volte.';
+
+describe('RedeemPage: Riscatto non salvato', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('network down: the alert, "Annulla" to / and "Riprova 100 punti" with the same id (criterion 4)', async () => {
+    const { ledger } = renderRedeem();
+    ledger.setNetworkDown(true);
+    await redeemCornetto();
+
+    const alert = screen.getByRole('alert');
+    expect(within(alert).getByRole('heading', { level: 2 })).toHaveTextContent(
+      'Riscatto non salvato',
+    );
+    expect(alert).toHaveTextContent(REDEEM_OFFLINE_TEXT);
+    expect(screen.getByRole('link', { name: 'Annulla' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('radio', { name: /Cornetto e cappuccino/ })).toBeDisabled();
+    expect(ledger.movements()).toHaveLength(0);
+    // Nothing is resent on its own.
+    await advance(60_000);
+    expect(sentIds(ledger)).toHaveLength(1);
+
+    ledger.setNetworkDown(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova 100 punti' }));
+    await advance(0);
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Premio riscattato' }),
+    ).toBeInTheDocument();
+    const ids = sentIds(ledger);
+    expect(ids).toEqual([ids[0], ids[0]]);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('answer lost after the write: "Riprova" gives the first result, a single redemption (criterion 4)', async () => {
+    const { ledger } = renderRedeem();
+    ledger.failNext('redeemReward', 'lost');
+    await redeemCornetto();
+    expect(screen.getByRole('alert')).toHaveTextContent(REDEEM_OFFLINE_TEXT);
+    expect(ledger.movements()).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova 100 punti' }));
+    await advance(0);
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Premio riscattato' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('20 punti');
+    const ids = sentIds(ledger);
+    expect(ids).toEqual([ids[0], ids[0]]);
+    expect(ledger.movements()).toHaveLength(1);
+  });
+
+  it('no answer within 8 s, or a fault of the server: the alert and "Riprova"', async () => {
+    const { ledger } = renderRedeem();
+    ledger.failNext('redeemReward', 'timeout');
+    await redeemCornetto();
+    await advance(8000);
+    expect(screen.getByRole('alert')).toHaveTextContent(REDEEM_OFFLINE_TEXT);
+
+    ledger.failNext('redeemReward', new ServerFaultError('unavailable'));
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova 100 punti' }));
+    await advance(0);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Il server non ha risposto correttamente. Riprova: il riscatto non verrà registrato due volte.',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Riprova 100 punti' }));
+    await advance(0);
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Premio riscattato' }),
+    ).toBeInTheDocument();
+    const ids = sentIds(ledger);
+    expect(ids).toEqual([ids[0], ids[0], ids[0]]);
+    expect(ledger.movements()).toHaveLength(1);
   });
 });
