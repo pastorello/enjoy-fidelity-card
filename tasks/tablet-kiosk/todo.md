@@ -77,12 +77,12 @@ contatore, al 5° `locked_until = now() + 5 min` e contatore a 0; giusto → cas
 contatore a 0; restituisce `jsonb`, non solleva dopo l'incremento; PIN non di 4 cifre → `22023` senza
 contare), `app.end_cashier_turn()` (solo dispositivi, idempotente). Privilegi espliciti.
 **Accettazione:**
-- [ ] pgTAP (criterio 3): 5 errori → `locked`; il 6° con PIN giusto → `locked` finché `locked_until` non è
+- [x] pgTAP (criterio 3): 5 errori → `locked`; il 6° con PIN giusto → `locked` finché `locked_until` non è
       passato (spostato nel test); contatore riletto dopo un errore in una nuova transazione; successo azzera
-- [ ] pgTAP (criterio 4): `set_my_pin` rifiuta dispositivi (`42501`) e PIN non validi (`22023`); salva solo
+- [x] pgTAP (criterio 4): `set_my_pin` rifiuta dispositivi (`42501`) e PIN non validi (`22023`); salva solo
       un hash `$2a$`/`$2b$` diverso dal PIN; chiude i turni di quella persona; un operatore e `anon` non
       eseguono `unlock_cashier` né `end_cashier_turn`
-- [ ] pgTAP: `end_cashier_turn` azzera il cassiere (criterio 2) e ripetuto non fallisce;
+- [x] pgTAP: `end_cashier_turn` azzera il cassiere (criterio 2) e ripetuto non fallisce;
       `function_privileges.test.sql` verde
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 3 · **File:** supabase/migrations/*_tablet_kiosk.sql, supabase/tests/tablet_kiosk.test.sql
