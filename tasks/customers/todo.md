@@ -137,10 +137,10 @@ Open Question 1 di plan.md); per una ricerca per telefono resta "Nuovo cliente".
 riuscita" + "Controlla la connessione e riprova." con "Riprova". `not_operator` da qualunque chiamata del
 modulo → `useAuth().reportNotEnabled()`.
 **Accettazione:**
-- [ ] Componenti: nessun risultato per nome → pulsante con il testo e link precompilato; per telefono →
+- [x] Componenti: nessun risultato per nome → pulsante con il testo e link precompilato; per telefono →
       "Nuovo cliente" senza `?nome=`; errore → Riprova rifà la ricerca
-- [ ] `not_operator` → `/accedi` con "Account non abilitato: chiedi a un amministratore."
-- [ ] `displayGlyphs.test.ts` verde
+- [x] `not_operator` → `/accedi` con "Account non abilitato: chiedi a un amministratore."
+- [x] `displayGlyphs.test.ts` verde
 **Verifica:** `npm test`
 **Dipendenze:** 7 · **File:** src/features/customers/HomePage.tsx (+ .test.tsx), useCustomerSearch.ts,
 src/features/customers/useNotOperator.ts · **Dimensione:** S
