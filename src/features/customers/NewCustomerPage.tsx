@@ -1,26 +1,47 @@
+import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button } from '../../shared/ui/Button';
-import { CustomerForm } from './CustomerForm';
+import { Icon } from '../../shared/ui/Icon';
+import { CustomerForm, nameFromQuery } from './CustomerForm';
+import styles from './NewCustomerPage.module.css';
+import { useSaveCustomer } from './useSaveCustomer';
 
 const FORM_ID = 'new-customer';
 
 /**
- * Nuovo cliente (`/clienti/nuovo`, wireframe Nuovo cliente senza card): the form, checked in the
- * app, and "Salva cliente" in the footer. Saving (and `?nome=`) comes with the next task of the
- * plan (tasks/customers/todo.md, Task 11); for now a valid form goes nowhere.
+ * Nuovo cliente (`/clienti/nuovo`, `?nome=` optional; wireframes Nuovo cliente senza card and Nome
+ * già usato): the form, checked in the app, and "Salva cliente" in the footer, busy while sending.
+ * When the outcome is unknown the footer offers "Riprova", which sends the same operation again.
  */
 export function NewCustomerPage() {
+  const [searchParams] = useSearchParams();
+  const [initialName] = useState(() => nameFromQuery(searchParams.get('nome')));
+  const { save, busy, refusal, failure } = useSaveCustomer();
+
   return (
     <AppShell
       title="Nuovo cliente"
       backTo="/"
       actions={
-        <Button type="submit" form={FORM_ID} block>
-          Salva cliente
+        <Button type="submit" form={FORM_ID} block busy={busy}>
+          {failure?.uncertain ? 'Riprova' : 'Salva cliente'}
         </Button>
       }
     >
-      <CustomerForm id={FORM_ID} withPrivacy onSubmit={() => undefined} />
+      <CustomerForm
+        id={FORM_ID}
+        withPrivacy
+        initialValues={{ name: initialName }}
+        onSubmit={save}
+        refusal={refusal}
+      />
+      {failure && (
+        <p role="alert" className={styles.failure}>
+          <Icon name="circle-alert" size={24} className={styles.failureIcon} />
+          {failure.text}
+        </p>
+      )}
     </AppShell>
   );
 }

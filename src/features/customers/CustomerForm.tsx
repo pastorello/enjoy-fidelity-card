@@ -1,4 +1,5 @@
-import { useId, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type RefObject } from 'react';
+import { Link } from 'react-router';
 import { Icon } from '../../shared/ui/Icon';
 import { TextField } from '../../shared/ui/TextField';
 import styles from './CustomerForm.module.css';
@@ -34,6 +35,26 @@ function characters(text: string): number {
 }
 
 /**
+ * The name given in `?nome=` (from "Nuovo cliente «q»" on the home): cleaned like the server does
+ * and cut to 80 characters, so the field never starts with a name the server would refuse.
+ */
+export function nameFromQuery(text: string | null): string {
+  return Array.from(cleanName(text ?? ''))
+    .slice(0, NAME_MAX)
+    .join('')
+    .trimEnd();
+}
+
+/** What the server refused on save: one field's message, or the name already used. */
+export type CustomerRefusal =
+  | { kind: 'field'; field: CustomerField; text: string }
+  /** `existingCustomerId`: the customer that has the name, when the server says. */
+  | { kind: 'name_taken'; existingCustomerId: string | null };
+
+const NAME_TAKEN_HINT =
+  'Se è un’altra persona, aggiungi un dettaglio al nome, per esempio «Maria Rossi Serapo».';
+
+/**
  * The checks the server makes too (SPEC-customers, "Errori del modulo"), done in the app first so
  * a wrong form costs no call. A name already used is known only to the server.
  */
@@ -56,6 +77,21 @@ export function validateCustomerForm(
   return errors;
 }
 
+/** "Esiste già un cliente con questo nome." and, when the server says who, "Apri la scheda". */
+function NameTakenError({ existingCustomerId }: { existingCustomerId: string | null }) {
+  return (
+    <>
+      {customerErrorText('customer_name_taken')}
+      {existingCustomerId !== null && (
+        <>
+          {' '}
+          <Link to={`/clienti/${existingCustomerId}`}>Apri la scheda</Link>
+        </>
+      )}
+    </>
+  );
+}
+
 type CustomerFormProps = {
   /** The form's id: the page's "Salva cliente" in the footer submits it with `form={id}`. */
   id: string;
@@ -64,6 +100,8 @@ type CustomerFormProps = {
   initialValues?: Partial<CustomerFormValues>;
   /** Called only with a valid form. */
   onSubmit: (values: CustomerFormValues) => void;
+  /** The server's refusal of the last save, shown under its field until the next save. */
+  refusal?: CustomerRefusal | null;
 };
 
 /**
@@ -71,7 +109,13 @@ type CustomerFormProps = {
  * name, phone, help text, PRIVACY, notes at the end. Errors go under their field and the first
  * wrong one gets the focus.
  */
-export function CustomerForm({ id, withPrivacy, initialValues, onSubmit }: CustomerFormProps) {
+export function CustomerForm({
+  id,
+  withPrivacy,
+  initialValues,
+  onSubmit,
+  refusal = null,
+}: CustomerFormProps) {
   const [values, setValues] = useState<CustomerFormValues>(() => ({
     ...EMPTY,
     ...initialValues,
@@ -89,6 +133,20 @@ export function CustomerForm({ id, withPrivacy, initialValues, onSubmit }: Custo
     consent: consentRef,
     notes: notesRef,
   };
+
+  // A new refusal of the server moves the focus to its field, like the checks of the app.
+  useEffect(() => {
+    if (!refusal) return;
+    const field = refusal.kind === 'name_taken' ? 'name' : refusal.field;
+    const target = { name: nameRef, phone: phoneRef, consent: consentRef, notes: notesRef }[field];
+    target.current?.focus();
+  }, [refusal]);
+
+  // The app's own checks win; when they pass, the server's refusal of the last save is shown.
+  const ownErrors = Object.keys(errors).length > 0;
+  const shown: CustomerFormErrors =
+    !ownErrors && refusal?.kind === 'field' ? { [refusal.field]: refusal.text } : errors;
+  const nameTaken = !ownErrors && refusal?.kind === 'name_taken' ? refusal : null;
 
   function change<K extends keyof CustomerFormValues>(key: K, value: CustomerFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -114,7 +172,14 @@ export function CustomerForm({ id, withPrivacy, initialValues, onSubmit }: Custo
         placeholder="Es. Maria Rossi"
         value={values.name}
         onChange={(value) => change('name', value)}
-        error={errors.name}
+        error={
+          nameTaken ? (
+            <NameTakenError existingCustomerId={nameTaken.existingCustomerId} />
+          ) : (
+            shown.name
+          )
+        }
+        errorHint={nameTaken ? NAME_TAKEN_HINT : undefined}
         autoComplete="off"
         autoCapitalize="words"
       />
@@ -125,14 +190,17 @@ export function CustomerForm({ id, withPrivacy, initialValues, onSubmit }: Custo
         placeholder="Numero di cellulare"
         value={values.phone}
         onChange={(value) => change('phone', value)}
-        error={errors.phone}
+        error={shown.phone}
         autoComplete="off"
         inputMode="tel"
       />
-      <p className={styles.help}>
-        Il nome identifica il cliente: non può essere già di un altro. Il telefono serve solo a
-        trovarlo più in fretta.
-      </p>
+      {/* With the name already used, the suggestion under the name takes its place (wireframe). */}
+      {!nameTaken && (
+        <p className={styles.help}>
+          Il nome identifica il cliente: non può essere già di un altro. Il telefono serve solo a
+          trovarlo più in fretta.
+        </p>
+      )}
       {withPrivacy && (
         <fieldset className={styles.privacy}>
           <legend className={styles.legend}>PRIVACY</legend>
@@ -143,18 +211,18 @@ export function CustomerForm({ id, withPrivacy, initialValues, onSubmit }: Custo
               className={styles.checkbox}
               checked={values.privacyConsent}
               onChange={(event) => change('privacyConsent', event.target.checked)}
-              aria-invalid={errors.consent ? true : undefined}
-              aria-describedby={errors.consent ? consentErrorId : undefined}
+              aria-invalid={shown.consent ? true : undefined}
+              aria-describedby={shown.consent ? consentErrorId : undefined}
             />
             <span>
               Ha letto l’informativa privacy{' '}
               <span className={styles.mandatory}>(obbligatorio)</span>
             </span>
           </label>
-          {errors.consent && (
+          {shown.consent && (
             <p id={consentErrorId} className={styles.error}>
               <Icon name="circle-alert" size={18} />
-              {errors.consent}
+              {shown.consent}
             </p>
           )}
           <button type="button" className={styles.noticeLink} onClick={() => setNoticeOpen(true)}>
@@ -167,7 +235,7 @@ export function CustomerForm({ id, withPrivacy, initialValues, onSubmit }: Custo
         label="Note (facoltative)"
         value={values.notes}
         onChange={(value) => change('notes', value)}
-        error={errors.notes}
+        error={shown.notes}
         maxLength={NOTES_MAX}
         autoComplete="off"
       />

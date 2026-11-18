@@ -90,3 +90,12 @@
   min-height: 48px;
   text-align: right;
 }
+
+/*
+ * A link inside an error ("Apri la scheda"): inline in the sentence, as in the wireframe (link colour from the base styles), with
+ * the touch area grown to 48 px by vertical padding, which leaves the line height unchanged.
+ */
+.error a {
+  padding-block: calc((var(--touch-target) - 1lh) / 2);
+  touch-action: manipulation;
+}
