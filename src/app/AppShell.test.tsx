@@ -1,8 +1,18 @@
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Button } from '../shared/ui/Button';
 import { AppShell } from './AppShell';
+
+/** jsdom has no layout: a title longer than `fits` characters overflows its two lines. */
+function fakeLayout(fits: number) {
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(50);
+  vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    return (this.textContent ?? '').length > fits ? 125 : 50;
+  });
+}
 
 function renderShell(ui: React.ReactElement) {
   return render(<MemoryRouter>{ui}</MemoryRouter>);
@@ -72,5 +82,48 @@ describe('AppShell', () => {
   it('has no footer without actions', () => {
     renderShell(<AppShell>x</AppShell>);
     expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
+  });
+
+  describe('repeatCutTitle', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    const LONG = 'Maria Giovanna Esposito De Laurentiis Serapo Formia Lungomare Caboto Ventitre';
+
+    it('repeats a title cut by the header in full as the first line of the content', () => {
+      fakeLayout(26);
+      renderShell(
+        <AppShell title={LONG} backTo="/" repeatCutTitle>
+          <p>contenuto</p>
+        </AppShell>,
+      );
+      const main = screen.getByRole('main');
+      const first = main.firstElementChild;
+      expect(first).toHaveTextContent(LONG);
+      expect(first).toHaveAttribute('aria-hidden', 'true');
+      // Screen readers hear the heading only once.
+      expect(screen.getByRole('heading', { level: 1, name: LONG })).toBeInTheDocument();
+    });
+
+    it('does not repeat a title that fits', () => {
+      fakeLayout(26);
+      renderShell(
+        <AppShell title="Maria Rossi" backTo="/" repeatCutTitle>
+          <p>contenuto</p>
+        </AppShell>,
+      );
+      expect(screen.getByRole('main')).not.toHaveTextContent('Maria Rossi');
+    });
+
+    it('without the prop, a cut title is not repeated', () => {
+      fakeLayout(26);
+      renderShell(
+        <AppShell title={LONG} backTo="/">
+          <p>contenuto</p>
+        </AppShell>,
+      );
+      expect(screen.getByRole('main')).not.toHaveTextContent(LONG);
+    });
   });
 });

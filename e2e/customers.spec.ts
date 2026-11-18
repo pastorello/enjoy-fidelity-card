@@ -126,6 +126,35 @@ test('an operator creates a customer with only the name and the consent, and can
   await expect(page.getByRole('button', { name: 'Cancella i dati del cliente' })).toHaveCount(0);
 });
 
+test('Scheda cliente: an 80-character name cut by the header is shown in full in the page', async ({
+  page,
+}) => {
+  const suffix = uniqueSuffix();
+  const name = `Maria Giovanna Esposito De Laurentiis Serapo Formia Lungomare ${suffix}`.padEnd(
+    80,
+    'x',
+  );
+  expect(name).toHaveLength(80);
+  await signIn(page);
+  await createCustomer(page, name);
+  const main = page.getByRole('main');
+  await expect(main.getByText(name, { exact: true })).toBeVisible();
+  // The whole name fits in the page: nothing of it is clipped or runs off the screen.
+  const line = main.getByText(name, { exact: true });
+  expect(await line.evaluate((element) => getComputedStyle(element).overflow)).toBe('visible');
+  const box = await line.boundingBox();
+  const width = page.viewportSize()?.width ?? 0;
+  expect((box?.x ?? Infinity) + (box?.width ?? 0)).toBeLessThanOrEqual(width);
+});
+
+test('Scheda cliente: a short name is not repeated under the header', async ({ page }) => {
+  const name = `Breve ${uniqueSuffix()}`;
+  await signIn(page);
+  await createCustomer(page, name);
+  await expect(page.getByText('Senza telefono')).toBeVisible();
+  await expect(page.getByRole('main').getByText(name, { exact: true })).toHaveCount(0);
+});
+
 test('Nuovo cliente: touch targets are at least 48 px and the notice opens and closes', async ({
   page,
 }) => {

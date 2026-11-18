@@ -72,6 +72,7 @@ export function CustomerPage() {
       <AppShell
         title={erased ? 'Cliente cancellato' : customer.name}
         backTo={backTo}
+        repeatCutTitle={!erased}
         headerAction={
           erased
             ? undefined

@@ -1,6 +1,6 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
@@ -21,8 +21,13 @@ const ERASED = fakeCustomer({
   balance: 120,
 });
 
+/** 80 characters, the longest name allowed: two header lines show only its start. */
+const LONG_NAME =
+  'Maria Giovanna Esposito De Laurentiis Serapo Formia Lungomare Caboto Ventitre 12';
+const LONG = fakeCustomer({ name: LONG_NAME, phone: '+393331234521', notes: null, balance: 0 });
+
 function customersFake() {
-  return createFakeCustomerService({ customers: [MARIA, ROSA, ERASED] });
+  return createFakeCustomerService({ customers: [MARIA, ROSA, ERASED, LONG] });
 }
 
 type Fake = ReturnType<typeof createFakeCustomerService>;
@@ -179,5 +184,27 @@ describe('CustomerPage: Scheda cliente', () => {
     await userEvent.click(await screen.findByRole('link', { name: /Maria Rossi/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
     expect(await screen.findByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/');
+  });
+});
+
+describe('CustomerPage: a long name', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('an 80-character name cut by the header is shown in full above the phone', async () => {
+    expect(LONG_NAME).toHaveLength(80);
+    // jsdom has no layout: anything longer than two header lines (about 26 capitals) overflows.
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(50);
+    vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return (this.textContent ?? '').length > 26 ? 125 : 50;
+    });
+    renderCustomer(`/clienti/${LONG.id}`);
+    await screen.findByRole('heading', { level: 1, name: LONG_NAME });
+    const main = screen.getByRole('main');
+    expect(main.firstElementChild).toHaveTextContent(LONG_NAME);
+    expect(main.firstElementChild?.nextElementSibling).toHaveTextContent('Tel. 333 ••• 4521');
   });
 });

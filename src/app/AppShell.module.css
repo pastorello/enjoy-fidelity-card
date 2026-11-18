@@ -53,6 +53,18 @@
   letter-spacing: var(--type-section-title-letter-spacing);
 }
 
+/* A title cut by the header, repeated in full at the top of the content in the body font. */
+.fullTitle {
+  margin: 0;
+  font-family: var(--type-body-lg-family);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: var(--type-body-lg-weight);
+  letter-spacing: var(--type-body-lg-letter-spacing);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
 .iconButton {
   flex-shrink: 0;
   display: flex;

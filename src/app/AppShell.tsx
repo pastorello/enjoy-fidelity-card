@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Link } from 'react-router';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import styles from './AppShell.module.css';
@@ -14,7 +14,40 @@ type AppShellProps = {
   account?: { name: string; to: string };
   /** Main actions of the screen, in the footer. */
   actions?: ReactNode;
+  /**
+   * When the title does not fit in the header's two lines, repeat it in full as the first line of
+   * the content (a customer's name, whose last words may tell namesakes apart).
+   */
+  repeatCutTitle?: boolean;
 };
+
+/**
+ * Whether `text`, shown in the element, overflows its clamped box. Measured again when the text
+ * changes, on resize and once the fonts have loaded; `undefined` text is never cut.
+ */
+function useIsCut(ref: RefObject<HTMLElement | null>, text: string | undefined) {
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    let live = true;
+    function measure() {
+      const element = ref.current;
+      if (live) {
+        setCut(
+          text !== undefined && element !== null && element.scrollHeight > element.clientHeight + 1,
+        );
+      }
+    }
+    measure();
+    window.addEventListener('resize', measure);
+    // The display font loads after the first paint and changes how many words fit.
+    void document.fonts?.ready.then(measure);
+    return () => {
+      live = false;
+      window.removeEventListener('resize', measure);
+    };
+  }, [ref, text]);
+  return text !== undefined && cut;
+}
 
 /** Common screen frame from the wireframes: green header, content, footer actions. */
 export function AppShell({
@@ -24,8 +57,11 @@ export function AppShell({
   headerAction,
   account,
   actions,
+  repeatCutTitle = false,
 }: AppShellProps) {
   const hasBack = title !== undefined && backTo !== undefined;
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const titleCut = useIsCut(titleRef, repeatCutTitle ? title : undefined);
 
   return (
     <div className={styles.shell}>
@@ -45,7 +81,9 @@ export function AppShell({
               height={28}
             />
           ) : (
-            <span className={styles.title}>{title}</span>
+            <span ref={titleRef} className={styles.title}>
+              {title}
+            </span>
           )}
         </h1>
         {headerAction && (
@@ -65,7 +103,15 @@ export function AppShell({
           </Link>
         )}
       </header>
-      <main className={styles.main}>{children}</main>
+      <main className={styles.main}>
+        {/* The heading already gives screen readers the whole title: this copy is for the eyes. */}
+        {titleCut && (
+          <p className={styles.fullTitle} aria-hidden="true">
+            {title}
+          </p>
+        )}
+        {children}
+      </main>
       {actions && <footer className={styles.footer}>{actions}</footer>}
     </div>
   );
