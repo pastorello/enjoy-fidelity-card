@@ -1,4 +1,5 @@
 import type { RouteObject } from 'react-router';
+import { EditCustomerPage } from '../features/customers/EditCustomerPage';
 import { CustomerPage } from '../features/customers/CustomerPage';
 import { HomePage } from '../features/customers/HomePage';
 import { NewCustomerPage } from '../features/customers/NewCustomerPage';
@@ -32,6 +33,7 @@ export const routes: RouteObject[] = [
           { index: true, Component: HomePage },
           { path: 'clienti/nuovo', Component: NewCustomerPage },
           { path: 'clienti/:id', Component: CustomerPage },
+          { path: 'clienti/:id/modifica', Component: EditCustomerPage },
           { path: 'impostazioni', Component: SettingsPage },
         ],
       },

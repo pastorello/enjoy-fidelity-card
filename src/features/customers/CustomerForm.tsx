@@ -97,6 +97,8 @@ type CustomerFormProps = {
   id: string;
   /** New customer: the PRIVACY section and its mandatory consent. Edit: none. */
   withPrivacy: boolean;
+  /** The help text under the phone (Nuovo cliente); the wireframe Modifica cliente has none. */
+  withHelp?: boolean;
   initialValues?: Partial<CustomerFormValues>;
   /** Called only with a valid form. */
   onSubmit: (values: CustomerFormValues) => void;
@@ -112,6 +114,7 @@ type CustomerFormProps = {
 export function CustomerForm({
   id,
   withPrivacy,
+  withHelp = true,
   initialValues,
   onSubmit,
   refusal = null,
@@ -195,7 +198,7 @@ export function CustomerForm({
         inputMode="tel"
       />
       {/* With the name already used, the suggestion under the name takes its place (wireframe). */}
-      {!nameTaken && (
+      {withHelp && !nameTaken && (
         <p className={styles.help}>
           Il nome identifica il cliente: non può essere già di un altro. Il telefono serve solo a
           trovarlo più in fretta.

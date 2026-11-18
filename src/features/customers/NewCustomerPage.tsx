@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button } from '../../shared/ui/Button';
-import { Icon } from '../../shared/ui/Icon';
 import { CustomerForm, nameFromQuery } from './CustomerForm';
-import styles from './NewCustomerPage.module.css';
+import { SaveFailure } from './SaveFailure';
 import { useSaveCustomer } from './useSaveCustomer';
 
 const FORM_ID = 'new-customer';
@@ -36,12 +35,7 @@ export function NewCustomerPage() {
         onSubmit={save}
         refusal={refusal}
       />
-      {failure && (
-        <p role="alert" className={styles.failure}>
-          <Icon name="circle-alert" size={24} className={styles.failureIcon} />
-          {failure.text}
-        </p>
-      )}
+      {failure && <SaveFailure text={failure.text} />}
     </AppShell>
   );
 }
