@@ -426,3 +426,96 @@ $$;
 
 revoke execute on function app.redeem_free_reward(uuid, uuid, text, int) from public, anon;
 grant execute on function app.redeem_free_reward(uuid, uuid, text, int) to authenticated;
+
+-- cancel_movement ------------------------------------------------------------------------------
+-- Cancels a purchase or a redemption by inserting a correction of opposite sign that
+-- points at it: the cancelled movement is never changed. The customer of the movement
+-- is locked even if anonymized (the only exception to step 2, Open Question 14), so an
+-- admin can still cancel from the history. A correction is never cancelled (EC004), a
+-- movement is cancelled at most once (EC002). Operators cancel only their own movement
+-- within 10 seconds (EC003); admins any. A purchase whose points are already spent
+-- cannot be cancelled (EC001): the balance never goes below zero.
+create function app.cancel_movement(p_operation_id uuid, p_movement_id uuid)
+returns app.ledger_result
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_operator uuid;
+  v_target app.movements;
+  v_existing app.movements;
+  v_id uuid;
+  v_constraint text;
+begin
+  -- (1) who cancels
+  v_operator := private.acting_operator_id();
+  if v_operator is null then
+    raise exception 'No acting operator for this write' using errcode = '42501';
+  end if;
+
+  -- (2) the movement, then a lock on its customer (anonymized included). Movements are
+  -- never updated, so the row read before the lock is still the row after it.
+  select * into v_target from app.movements m where m.id = p_movement_id;
+  if not found then
+    raise exception 'movement unavailable' using errcode = 'EC006';
+  end if;
+  perform 1 from app.customers c where c.id = v_target.customer_id for update;
+
+  -- (3) replay or conflict, after the lock; a replay returns the first correction even
+  -- after the 10-second window
+  select * into v_existing from app.movements where operation_id = p_operation_id;
+  if found then
+    if v_existing.kind = 'correction' and v_existing.corrects_movement_id = p_movement_id then
+      return private.ledger_result_for(v_existing.id);
+    end if;
+    raise exception 'operation_id already used for another operation' using errcode = 'EC007';
+  end if;
+
+  -- (4) validate, check, insert
+  if p_operation_id is null then
+    raise exception 'operation_id is required' using errcode = '22023';
+  end if;
+
+  if v_target.kind = 'correction' then
+    raise exception 'a correction cannot be cancelled' using errcode = 'EC004';
+  end if;
+
+  if exists (select 1 from app.movements m where m.corrects_movement_id = v_target.id) then
+    raise exception 'movement already cancelled' using errcode = 'EC002';
+  end if;
+
+  -- clock_timestamp(), not now(): the time of this check, not of the transaction start
+  if not private.is_admin()
+     and (v_target.operator_id <> v_operator
+          or clock_timestamp() - v_target.created_at > interval '10 seconds') then
+    raise exception 'cancel window expired' using errcode = 'EC003';
+  end if;
+
+  if v_target.kind = 'purchase'
+     and private.customer_balance(v_target.customer_id) - v_target.points < 0 then
+    raise exception 'insufficient balance' using errcode = 'EC001';
+  end if;
+
+  begin
+    insert into app.movements
+      (operation_id, customer_id, kind, points, operator_id, corrects_movement_id)
+    values
+      (p_operation_id, v_target.customer_id, 'correction', -v_target.points, v_operator, v_target.id)
+    returning id into v_id;
+  exception when unique_violation then
+    get stacked diagnostics v_constraint = constraint_name;
+    if v_constraint = 'movements_corrects_movement_id_key' then
+      -- unreachable while the customer lock holds; kept as the database's last word
+      raise exception 'movement already cancelled' using errcode = 'EC002';
+    end if;
+    -- a concurrent request used the same operation_id on another customer
+    raise exception 'operation_id already used for another operation' using errcode = 'EC007';
+  end;
+
+  return private.ledger_result_for(v_id);
+end;
+$$;
+
+revoke execute on function app.cancel_movement(uuid, uuid) from public, anon;
+grant execute on function app.cancel_movement(uuid, uuid) to authenticated;

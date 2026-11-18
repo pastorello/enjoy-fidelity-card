@@ -3,7 +3,7 @@
 -- regole di accesso"). Fake data only: invented names and @example.com emails.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(133);
+select plan(161);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -831,6 +831,238 @@ select is(
   (select count(*) from app.movements where customer_id = '00000000-0000-4000-9100-000000000004'),
   0::bigint,
   'nothing was recorded for the anonymized customer'
+);
+
+-- cancel_movement ----------------------------------------------------------------------------
+select ok(
+  has_function_privilege('authenticated', 'app.cancel_movement(uuid, uuid)', 'execute'),
+  'authenticated executes cancel_movement'
+);
+select ok(
+  not has_function_privilege('anon', 'app.cancel_movement(uuid, uuid)', 'execute')
+    and not exists (
+      select 1
+      from pg_proc p
+      cross join lateral aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+      where p.oid = 'app.cancel_movement(uuid, uuid)'::regprocedure
+        and acl.grantee = 0 and acl.privilege_type = 'EXECUTE'
+    ),
+  'neither anon nor PUBLIC execute cancel_movement'
+);
+select ok(
+  (select prosecdef and proconfig = array['search_path=""']
+     and prorettype = 'app.ledger_result'::regtype
+   from pg_proc where oid = 'app.cancel_movement(uuid, uuid)'::regprocedure),
+  'cancel_movement is security definer, pins an empty search_path and returns app.ledger_result'
+);
+
+-- Fabio: a purchase of the operator 11 s ago, one of the admin 2 s ago (inserted as
+-- postgres, so their age is exact), then a purchase of the operator 5 s ago.
+insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
+select '00000000-0000-4000-9100-000000000006', 'Fabio Annulli', now(), o.id,
+  '00000000-0000-4000-9200-000000000006'
+from app.operators o where o.name = 'Admin Movimenti';
+insert into app.movements
+  (id, operation_id, customer_id, kind, amount_cents, points, cents_per_point, operator_id, created_at)
+values
+  ('00000000-0000-4000-9300-000000000011', '00000000-0000-4000-9500-000000000011',
+   '00000000-0000-4000-9100-000000000006', 'purchase', 1000, 10, 100,
+   (select id from app.operators where name = 'Operatore Movimenti'),
+   clock_timestamp() - interval '11 seconds'),
+  ('00000000-0000-4000-9300-000000000012', '00000000-0000-4000-9500-000000000012',
+   '00000000-0000-4000-9100-000000000006', 'purchase', 300, 3, 100,
+   (select id from app.operators where name = 'Admin Movimenti'),
+   clock_timestamp() - interval '2 seconds'),
+  ('00000000-0000-4000-9300-000000000013', '00000000-0000-4000-9500-000000000013',
+   '00000000-0000-4000-9100-000000000006', 'purchase', 500, 5, 100,
+   (select id from app.operators where name = 'Operatore Movimenti'),
+   clock_timestamp() - interval '5 seconds');
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000002","role":"authenticated"}', true);
+
+-- The operator cancels only their own movement, within 10 s (criterion 8).
+select results_eq(
+  $$select (r.movement).kind, (r.movement).customer_id, (r.movement).points,
+      (r.movement).corrects_movement_id, (r.movement).corrected_kind, (r.movement).operator_name,
+      (r.movement).operation_id, (r.movement).amount_cents, (r.movement).reward_id, r.balance
+    from app.cancel_movement('00000000-0000-4000-9800-000000000001',
+      '00000000-0000-4000-9300-000000000013') r$$,
+  $$values ('correction'::text, '00000000-0000-4000-9100-000000000006'::uuid, -5,
+      '00000000-0000-4000-9300-000000000013'::uuid, 'purchase'::text, 'Operatore Movimenti'::text,
+      '00000000-0000-4000-9800-000000000001'::uuid, null::int, null::uuid, 13)$$,
+  'the operator cancels their own purchase of 5 s ago: a correction of -5 points, balance 13'
+);
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(), '00000000-0000-4000-9300-000000000011')$$,
+  'EC003', null, 'the operator cannot cancel their own purchase of 11 s ago'
+);
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(), '00000000-0000-4000-9300-000000000012')$$,
+  'EC003', null, 'the operator cannot cancel a movement of another operator, even a recent one'
+);
+
+-- Replay (criterion 4): the same correction; another movement with the same id is EC007.
+select results_eq(
+  $$select (r.movement).id, (r.movement).points, r.balance
+    from app.cancel_movement('00000000-0000-4000-9800-000000000001',
+      '00000000-0000-4000-9300-000000000013') r$$,
+  $$select id, -5, 13 from app.movements where operation_id = '00000000-0000-4000-9800-000000000001'$$,
+  'a resent cancellation returns the first correction'
+);
+select throws_ok(
+  $$select app.cancel_movement('00000000-0000-4000-9800-000000000001',
+      '00000000-0000-4000-9300-000000000011')$$,
+  'EC007', null, 'the same operation_id on another movement is a conflict'
+);
+select throws_ok(
+  $$select app.cancel_movement('00000000-0000-4000-9500-000000000013',
+      '00000000-0000-4000-9300-000000000013')$$,
+  'EC007', null, 'the operation_id of a purchase is a conflict for a cancellation'
+);
+
+-- Already cancelled, corrections, unknown movements.
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(), '00000000-0000-4000-9300-000000000013')$$,
+  'EC002', null, 'a movement already cancelled cannot be cancelled again'
+);
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(),
+      (select id from app.movements where operation_id = '00000000-0000-4000-9800-000000000001'))$$,
+  'EC004', null, 'a correction cannot be cancelled'
+);
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(), '00000000-0000-4000-9300-0000000000ff')$$,
+  'EC006', null, 'a movement that does not exist is unavailable'
+);
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(), null)$$,
+  'EC006', null, 'a null movement is unavailable'
+);
+select throws_ok(
+  $$select app.cancel_movement(null, '00000000-0000-4000-9300-000000000011')$$,
+  '22023', null, 'a cancellation without operation_id is invalid'
+);
+
+-- A signed-in user without an operator profile, and anon.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000003","role":"authenticated"}', true);
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(), '00000000-0000-4000-9300-000000000012')$$,
+  '42501', null, 'a user without an operator profile cannot cancel a movement'
+);
+reset role;
+set local role anon;
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(), '00000000-0000-4000-9300-000000000012')$$,
+  '42501', null, 'anon cannot cancel a movement'
+);
+reset role;
+
+-- The admin cancels any movement, at any age (criterion 8).
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000001","role":"authenticated"}', true);
+
+select results_eq(
+  $$select (r.movement).points, (r.movement).corrects_movement_id, (r.movement).operator_name, r.balance
+    from app.cancel_movement('00000000-0000-4000-9800-000000000002',
+      '00000000-0000-4000-9300-000000000011') r$$,
+  $$values (-10, '00000000-0000-4000-9300-000000000011'::uuid, 'Admin Movimenti'::text, 3)$$,
+  'the admin cancels the operator''s purchase of 11 s ago: -10 points, balance 3'
+);
+select results_eq(
+  $$select cancelled_by_id, cancelled_at from app.movement_history
+    where id = '00000000-0000-4000-9300-000000000011'$$,
+  $$select operator_id, created_at from app.movements
+    where operation_id = '00000000-0000-4000-9800-000000000002'$$,
+  'the history shows who cancelled the purchase and when (criterion 6)'
+);
+
+-- Cancelling a redemption gives the points back.
+select results_eq(
+  $$select r.balance from app.redeem_free_reward('00000000-0000-4000-9800-000000000003',
+      '00000000-0000-4000-9100-000000000006', 'Cornetto di prova', 3) r$$,
+  $$values (0)$$,
+  'Fabio redeems his 3 points'
+);
+select results_eq(
+  $$select (r.movement).points, (r.movement).corrected_kind, r.balance
+    from app.cancel_movement('00000000-0000-4000-9800-000000000004',
+      (select id from app.movements where operation_id = '00000000-0000-4000-9800-000000000003')) r$$,
+  $$values (3, 'redemption'::text, 3)$$,
+  'cancelling a redemption gives the 3 points back'
+);
+
+-- Points already spent (criterion 7): the purchase cannot be cancelled.
+select results_eq(
+  $$select r.balance from app.redeem_free_reward(gen_random_uuid(),
+      '00000000-0000-4000-9100-000000000006', 'Cornetto di prova', 1) r$$,
+  $$values (2)$$,
+  'Fabio spends 1 of the 3 points of the admin''s purchase'
+);
+select throws_ok(
+  $$select app.cancel_movement(gen_random_uuid(), '00000000-0000-4000-9300-000000000012')$$,
+  'EC001', null, 'a purchase whose points are already spent cannot be cancelled'
+);
+select results_eq(
+  $$select r.balance from app.record_purchase(gen_random_uuid(),
+      '00000000-0000-4000-9100-000000000006', 100) r$$,
+  $$values (3)$$,
+  'Fabio buys 1 more point'
+);
+select results_eq(
+  $$select (r.movement).points, r.balance
+    from app.cancel_movement(gen_random_uuid(), '00000000-0000-4000-9300-000000000012') r$$,
+  $$values (-3, 0)$$,
+  'a purchase whose points are all still there can be cancelled, leaving 0'
+);
+reset role;
+select results_eq(
+  $$select private.customer_balance('00000000-0000-4000-9100-000000000006'),
+      (select sum(points)::int from app.movements
+       where customer_id = '00000000-0000-4000-9100-000000000006'),
+      (select count(*) from app.movements
+       where customer_id = '00000000-0000-4000-9100-000000000006' and kind = 'correction')$$,
+  $$values (0, 0, 4::bigint)$$,
+  'the balance is the sum of every movement, cancelled ones and corrections included (criterion 6)'
+);
+
+-- The admin cancels a movement of an anonymized customer (Open Question 14).
+insert into app.movements
+  (id, operation_id, customer_id, kind, amount_cents, points, cents_per_point, operator_id, created_at)
+values
+  ('00000000-0000-4000-9300-000000000014', '00000000-0000-4000-9500-000000000014',
+   '00000000-0000-4000-9100-000000000004', 'purchase', 1000, 10, 100,
+   (select id from app.operators where name = 'Operatore Movimenti'), now() - interval '1 day');
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-9000-000000000001","role":"authenticated"}', true);
+
+select results_eq(
+  $$select (r.movement).customer_id, (r.movement).points, r.balance
+    from app.cancel_movement('00000000-0000-4000-9800-000000000005',
+      '00000000-0000-4000-9300-000000000014') r$$,
+  $$values ('00000000-0000-4000-9100-000000000004'::uuid, -10, 0)$$,
+  'the admin cancels a movement of an anonymized customer'
+);
+select results_eq(
+  $$select (r.movement).id, r.balance
+    from app.cancel_movement('00000000-0000-4000-9800-000000000005',
+      '00000000-0000-4000-9300-000000000014') r$$,
+  $$select id, 0 from app.movements where operation_id = '00000000-0000-4000-9800-000000000005'$$,
+  'a resent cancellation on an anonymized customer returns the first correction'
+);
+reset role;
+
+-- No update or delete happened: the cancelled movements are unchanged.
+select results_eq(
+  $$select id, points from app.movements
+    where id in ('00000000-0000-4000-9300-000000000011', '00000000-0000-4000-9300-000000000012',
+                 '00000000-0000-4000-9300-000000000013', '00000000-0000-4000-9300-000000000014')
+    order by id$$,
+  $$values ('00000000-0000-4000-9300-000000000011'::uuid, 10),
+           ('00000000-0000-4000-9300-000000000012'::uuid, 3),
+           ('00000000-0000-4000-9300-000000000013'::uuid, 5),
+           ('00000000-0000-4000-9300-000000000014'::uuid, 10)$$,
+  'a cancellation leaves the cancelled movement as it was'
 );
 
 select * from finish();
