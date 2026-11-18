@@ -165,6 +165,22 @@ describe('RedeemPage: Riscatta premio', () => {
     expect(ledger.movements()).toHaveLength(1);
   });
 
+  it('the reward’s points changed meanwhile: the confirmation shows the server’s points', async () => {
+    const { rewards } = renderRedeem();
+    await ready();
+    await userEvent.click(screen.getByRole('radio', { name: /Cornetto e cappuccino/ }));
+    // An admin raises the reward to 110 points after the catalog was loaded.
+    await rewards.service.update(CORNETTO.id, { name: CORNETTO.name, points: 110 });
+    await userEvent.click(screen.getByRole('button', { name: 'Riscatta 100 punti' }));
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Premio riscattato' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Cornetto e cappuccino per Maria Rossi · −110 punti')).toBeVisible();
+    expect(screen.queryByText(/−100 punti/)).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('10 punti');
+  });
+
   it('an empty catalog: "Nessun premio nel catalogo" and "Premio libero" stays', async () => {
     renderRedeem({ rewards: createFakeRewardsService() });
     expect(await screen.findByText('Nessun premio nel catalogo')).toBeInTheDocument();

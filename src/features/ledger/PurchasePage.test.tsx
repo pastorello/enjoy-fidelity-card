@@ -441,6 +441,21 @@ describe('PurchasePage: Spesa registrata', () => {
     expect(ledger.movements()).toHaveLength(2);
   });
 
+  it('the ratio changed meanwhile: the confirmation shows the server’s points, not the preview', async () => {
+    const { settings } = renderPurchase();
+    await ready();
+    await press('1', '2', '5', '0');
+    expect(screen.getByText('+12')).toBeInTheDocument();
+    // Another admin sets 2,50 € per point while the keypad is open: the server's ratio wins.
+    settings.changeElsewhere({ centsPerPoint: 250 });
+    await userEvent.click(screen.getByRole('button', { name: 'Conferma +12' }));
+
+    await screen.findByRole('heading', { level: 1, name: 'Spesa registrata' });
+    expect(screen.getByText('+5 punti a Maria Rossi')).toBeInTheDocument();
+    expect(screen.queryByText(/\+12 punti/)).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Nuovo saldo' })).toHaveTextContent('125 punti');
+  });
+
   it('a purchase worth one point: "+1 punto a Maria Rossi"', async () => {
     renderPurchase();
     await ready();
