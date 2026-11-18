@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { StatusView } from '../../shared/ui/StatusView';
+import { CardReaderSession } from '../card-input/CardReaderSession';
 import { SettingsProvider } from '../settings/SettingsProvider';
 import { useAuth } from './AuthProvider';
 import styles from './RequireAuth.module.css';
@@ -15,7 +16,8 @@ export type SignInLocationState = { from?: string };
 
 /**
  * Layout route: its pages need a signed-in operator, otherwise /accedi. It also mounts
- * <SettingsProvider>, so the configuration loads once per session and never without an operator.
+ * <SettingsProvider>, so the configuration loads once per session and never without an operator,
+ * and <CardReaderSession>, so cards are read only with an operator (SPEC-card-input, point 2).
  */
 export function RequireAuth() {
   const { state, retry } = useAuth();
@@ -47,6 +49,7 @@ export function RequireAuth() {
   // Keyed by operator: another user signing in on this device loads the configuration again.
   return (
     <SettingsProvider key={state.operator.id}>
+      <CardReaderSession />
       <Outlet />
     </SettingsProvider>
   );

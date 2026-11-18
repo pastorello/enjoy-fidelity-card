@@ -2,6 +2,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import { routes } from './app/routes';
+import { createBrowserCardReader } from './features/card-input/browserCardReader';
+import { CardReaderProvider } from './features/card-input/CardReaderProvider';
 import { CustomerServiceProvider } from './features/customers/CustomerServiceProvider';
 import { supabaseCustomerService } from './features/customers/supabaseCustomerService';
 import { RewardsServiceProvider } from './features/rewards/RewardsServiceProvider';
@@ -18,6 +20,8 @@ const container = document.getElementById('root');
 if (!container) throw new Error('Missing #root element');
 
 const router = createBrowserRouter(routes);
+// One card reader for the whole app; it reads only once CardReaderSession activates it.
+const cardReader = createBrowserCardReader(window);
 
 createRoot(container).render(
   <StrictMode>
@@ -25,7 +29,9 @@ createRoot(container).render(
       <SettingsServiceProvider service={supabaseSettingsService}>
         <CustomerServiceProvider service={supabaseCustomerService}>
           <RewardsServiceProvider service={supabaseRewardsService}>
-            <RouterProvider router={router} />
+            <CardReaderProvider reader={cardReader}>
+              <RouterProvider router={router} />
+            </CardReaderProvider>
           </RewardsServiceProvider>
         </CustomerServiceProvider>
       </SettingsServiceProvider>
