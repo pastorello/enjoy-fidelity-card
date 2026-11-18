@@ -97,7 +97,8 @@ select ok(
 );
 select is(
   (select prosrc from pg_proc where oid = 'private.acting_operator_id()'::regprocedure),
-  E'\n  select private.current_operator_id();\n',
+  -- The common body as tablet-kiosk last redefines it (cross-review §2.1).
+  E'\n  select coalesce(private.current_operator_id(), private.valid_cashier_id());\n',
   'acting_operator_id keeps the common body'
 );
 select ok(

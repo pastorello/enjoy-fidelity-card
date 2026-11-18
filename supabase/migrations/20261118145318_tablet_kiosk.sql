@@ -161,3 +161,72 @@ $$;
 -- create or replace keeps the existing ACL; restated so this file alone shows it.
 revoke execute on function private.add_operator(text, text, text)
   from public, anon, authenticated, service_role;
+
+-- Access helpers extended to the cashier --------------------------------------------------
+-- An operator account acts as itself, exactly as before. A device account acts as
+-- its cashier only while the turn is valid: a cashier is set, the unlock is less
+-- than 12 hours old, and that operator still has an account and a PIN. Otherwise
+-- a device is nobody: every policy hides every row and every write RPC refuses it
+-- with the code its module already uses for "no operator".
+
+-- valid_cashier_id: the cashier of the caller's device while the turn is valid.
+-- Only the security definer helpers below call it (as their owner).
+create function private.valid_cashier_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select d.cashier_operator_id
+  from app.devices d
+  join app.operators o on o.id = d.cashier_operator_id
+  where d.user_id = (select auth.uid())
+    and d.cashier_since > now() - interval '12 hours'
+    and o.user_id is not null
+    and exists (select 1 from private.operator_pins p where p.operator_id = o.id);
+$$;
+
+revoke execute on function private.valid_cashier_id() from public, anon, authenticated;
+
+-- Same signature and attributes as in ledger (the last redefinition before this one).
+create or replace function private.acting_operator_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(private.current_operator_id(), private.valid_cashier_id());
+$$;
+
+revoke execute on function private.acting_operator_id() from public, anon, authenticated;
+
+-- Same signatures and attributes as in identity. For an operator account the
+-- answer is unchanged: user_id is unique, so "a profile linked to me exists" and
+-- "current_operator_id() is not null" are the same question.
+create or replace function private.is_active_operator()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select private.acting_operator_id() is not null;
+$$;
+
+create or replace function private.is_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1 from app.operators where id = private.acting_operator_id() and role = 'admin'
+  );
+$$;
+
+-- create or replace keeps the existing ACL; restated so this file alone shows it.
+revoke execute on function private.is_active_operator(), private.is_admin() from public, anon;
+grant execute on function private.is_active_operator(), private.is_admin() to authenticated;
