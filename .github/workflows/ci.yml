@@ -39,6 +39,8 @@ jobs:
         run: ./scripts/reload-auth-templates.sh
       - name: Integration (Vitest against the local stack)
         run: npm run test:integration
+      - name: Production build has no E2E fake card reader (SPEC-card-input criterion 8)
+        run: npm run build && npm run check:bundle
       - name: E2E (builds the app and serves it with production headers)
         run: npm run e2e
       - name: Show Auth and gateway logs
