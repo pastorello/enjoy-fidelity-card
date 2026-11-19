@@ -21,7 +21,7 @@ npm run test:integration                    # Vitest contro lo stack locale (tes
 npx supabase migration new <nome> </dev/null   # nuova migrazione (vedi trappola 5)
 npm run tokens                              # rigenera src/styles/tokens.css da design/tokens.json
 npm run icons                               # rigenera le icone PWA da design/enjoy-badge-solo-negative.png
-npm run e2e                                 # Playwright sulla build, 390×844, contro Supabase locale (deve essere acceso)
+npm run e2e                                 # Playwright sulla build: telefono 390×844 e tablet 1280×800, contro Supabase locale (deve essere acceso)
 npm run dev:https                           # HTTPS sulla rete locale (certificato autofirmato), per il telefono
 npx impeccable detect src/                  # scansione design (anche su URL del dev server)
 npx skills add <owner>/<repo> --skill <nome> --agent claude-code   # aggiungere una skill di progetto
@@ -32,6 +32,12 @@ Account finti del seed (solo locale): `admin@example.com` (amministratore "Admin
 `operatore@example.com` (operatore "Operatore Prova"), password `password-di-prova`.
 `recupero@example.com` ("Recupero Prova", operatore) è riservato a `e2e/password.spec.ts`, che ne cambia
 la password a ogni esecuzione: non usarlo altrove (`npm run db:reset` lo riporta a `password-di-prova`).
+Tablet della cassa (`tablet-kiosk`, stessa password): `cassa@example.com` ("Tablet cassa", il dispositivo
+di `e2e/tablet.spec.ts`), `cassa-blocco@example.com` ("Tablet blocco", riservato al test dei 5 PIN errati) e
+`cassa-pin@example.com` ("Tablet cambio PIN", riservato a `e2e/tablet-pin.spec.ts`) e
+`cassa-layout@example.com` ("Tablet layout", riservato a `e2e/tablet-layout.spec.ts`); `pin@example.com`
+("Pin Prova", operatore senza PIN, riservato allo stesso test). PIN finti del seed: Admin Prova `2468`,
+Operatore Prova `1357`, Recupero Prova `8024`.
 
 Stack locale minimo per E2E e integrazione (Postgres, Auth, API REST, Mailpit: lo stesso della CI):
 
@@ -271,6 +277,33 @@ una trappola al §4 e una nota per il modulo. Quando tutti i passi sono ok, segn
 verificato in `tasks/export/plan.md`. **Dopo la prova**, cancellare i due file dai Download del telefono
 (il file Clienti contiene nomi e telefoni: SPEC-export, domanda aperta 10).
 
+### Tablet della cassa (`tablet-kiosk`, fase 3)
+
+Procedura completa per chi prepara il tablet: `docs/setup-tablet.md` (installazione della PWA, accesso con
+l'account del bar, PIN dal proprio telefono, densità reale dello schermo, prova del lettore e del formato
+dell'uid, "Mostra tastiera virtuale"). Creare, controllare, togliere e rimettere l'account del bar:
+`docs/setup-accounts.md` §4, "Tablet della cassa (account di dispositivo)" (**Authentication → Users →
+Create new user**, poi nello SQL Editor `select private.add_device('<email>', '<nome del tablet>');`).
+
+Gli E2E (progetti Playwright `tablet` e `tablet-settings`, 1280×800) provano tutto con il lettore USB
+simulato da `page.keyboard` e con la card finta; qui si prova solo ciò che dipende dal tablet e dal lettore
+veri, una volta all'acquisto del lettore e a ogni rilascio di `tablet-kiosk`, con l'utente. Condizioni:
+**anteprima HTTPS della PR** (staging), account del bar di staging, account di prova con il PIN impostato,
+card di prova associate a clienti di prova; mai uid, link, PIN o nomi veri nelle note.
+
+1. `docs/setup-tablet.md` §2–§3: installazione e accesso → `/cassa`.
+2. §5: densità. Annotare `innerWidth`, `innerHeight`, `devicePixelRatio` e se il layout è quello del tablet.
+3. §6: formato del lettore. Annotare modello del lettore e formato scelto (mai il codice letto).
+4. §7: "Mostra tastiera virtuale" attiva; la ricerca per nome funziona con il lettore collegato.
+5. Criterio 6 della spec: cronometro dalla card appoggiata sul lettore (home) a "Spesa registrata", come
+   nella prova alla cassa di `ledger`: meno di 10 s.
+6. Card appoggiata su `/cassa` durante l'inserimento del PIN: nessun cambio di schermata, nessuna cifra.
+
+**Dove annotare l'esito**: nella tabella della prova di `card-input` (sopra), criterio "tablet.passo" (per
+esempio "tablet.2"), con modello del tablet, versione di Android e di Chrome. Un comportamento diverso
+diventa una trappola al §4. Densità sotto 1024×600 o un lettore che non funziona in nessuno dei 4 formati:
+fermarsi e avvisare (domanda aperta 10 della spec).
+
 ## 2. Controllo di salute
 
 `npm run typecheck && npm run lint && npm run format:check && npm test` e, con Supabase acceso,
@@ -290,6 +323,11 @@ verificato in `tasks/export/plan.md`. **Dopo la prova**, cancellare i due file d
 | In locale l'email di recupero non arriva | Mailpit acceso? http://127.0.0.1:54324 (`npx supabase status`) | riavviare lo stack senza `mailpit` tra gli esclusi (`-x`); dopo modifiche a `config.toml`: `npx supabase stop && npm run db:start` |
 | Online: il link dell'email apre "Il link è scaduto o è già stato usato." | Template "Reset password" ancora quello predefinito (`#error_code=…` nell'URL)? | `docs/setup-accounts.md` §6 passo 2; link davvero usato o più vecchio di un'ora |
 | Online: il link apre la home e non `/imposta-password` | Redirect URLs del progetto | `docs/setup-accounts.md` §6 passo 1 (l'app inoltra comunque a `/imposta-password`) |
+| Tablet: dopo l'accesso si apre la home e non `/cassa` | Si è entrati con un account personale | `docs/setup-tablet.md` §3 |
+| Tablet: "Account non abilitato" con l'account del bar | `select name, user_id is not null as collegato from app.devices;` | `private.add_device` (`docs/setup-accounts.md` §4, "Tablet della cassa") |
+| Tablet: la card apre Nuovo cliente per un cliente che ha già la card, o "Codice non riconosciuto…" | Formato del lettore (Impostazioni → LETTORE CARD, solo con un amministratore alla cassa) | `docs/setup-tablet.md` §6, trappola 50 |
+| Tablet: "Troppi tentativi" e nessuno ricorda il PIN | Aspettare i 5 minuti; chi ha dimenticato il PIN ne sceglie uno nuovo dal telefono | Solo se si è certi che nessuno stia provando PIN a caso, nello SQL Editor: `update app.devices set failed_pin_attempts = 0, locked_until = null where name = '<nome del tablet>';` |
+| Tablet: nessuna tastiera a schermo | Lettore USB collegato | "Mostra tastiera virtuale" (`docs/setup-tablet.md` §7) |
 
 ## 4. Trappole (numerate, solo aggiunte)
 
@@ -428,3 +466,44 @@ verificato in `tasks/export/plan.md`. **Dopo la prova**, cancellare i due file d
     chiama `card_points` solo in `POST` (mai `{ get: true }`, che metterebbe il token nell'URL della
     richiesta): lo controlla `scripts/cardsBoundary.test.ts`. I titoli nuovi in Enjoy Display (costanti
     `…TITLE`, `title:` degli avvisi, `CardLinkScreen`) li controlla `scripts/displayGlyphs.test.ts`.
+45. Un ref che tiene "l'ultima" callback o l'ultimo valore per un gestore di eventi, una lettura card o la
+    risposta di una promessa si aggiorna con `useLatest` (`src/lib/useLatest.ts`, fase di layout), mai in un
+    `useEffect`: tra il commit e gli effetti passivi un tocco o una card possono arrivare (telefono lento,
+    CI carica) e vedrebbero ancora la schermata precedente. Successo davvero: "Salva cliente" subito dopo
+    "Card letta" creava il cliente senza card (test instabile di `NewCustomerCardSection`, CI 44321492570).
+    I test lo provano con `renderHookThenFire` (`src/test/fireAfterCommit.tsx`), che chiama nello stesso
+    commit, prima di `useEffect`. Restano in `useEffect` solo i ref del segnalatore `not_operator`, la cui
+    identità cambia senza cambiare comportamento. Vale anche per chi riceve le letture: `useCardRead` mette e
+    toglie il consumatore in `useLayoutEffect`, così una card passata subito dopo che «Riprova» è apparso
+    (lettura riaccesa) non va persa e una passata appena parte il salvataggio (lettura spenta) non arriva.
+46. `app.devices` e `private.operator_pins` non sono leggibili né scrivibili da nessun ruolo dell'API
+    (nemmeno con il token del tablet): i test che devono vedere il cassiere salvato o azzerare il blocco lo
+    fanno con `psql` dentro il container del database locale (`e2e/db.ts`, come
+    `tests/integration/localSupabase.ts`), mai contro un progetto online. Nello SQL Editor online si
+    leggono come `postgres`; il PIN in chiaro non esiste da nessuna parte (solo l'hash bcrypt).
+47. Il cassiere sta sulla riga del dispositivo: due test che sbloccano lo stesso tablet in parallelo si
+    sostituiscono il cassiere a vicenda. Per questo il seed ha quattro tablet: `cassa@example.com`
+    (`e2e/tablet.spec.ts`), `cassa-blocco@example.com` (i 5 PIN errati: il test ne azzera prima il blocco
+    con `e2e/db.ts`, così si riesegue entro i 5 minuti), `cassa-pin@example.com` (`e2e/tablet-pin.spec.ts`)
+    e `cassa-layout@example.com` (`e2e/tablet-layout.spec.ts`).
+    Un E2E tablet nuovo che sblocca un cassiere usa un dispositivo suo nel seed, o uno di questi in serie.
+48. Progetti Playwright: `tablet` (1280×800, touch, `tablet*.spec.ts`; il progetto `phone` li ignora) e
+    `tablet-settings` (`tablet-settings.spec.ts`, cambia `usb_uid_format` nella riga condivisa di
+    `app.settings`: in serie, dopo `phone-settings`, e rimette `'hex'`). `phone-settings` dipende anche da
+    `tablet`, perché le spese del tablet contano i punti con il rapporto iniziale. Una spec tablet che
+    cambia `app.settings` va in `TABLET_SHARED_STATE_SPECS` (come la trappola 30).
+49. Su un tablet a turno finito (12 ore, "Cambia", PIN cambiato dal telefono, cassiere senza account) le
+    letture restituiscono **0 righe, non un errore** (RLS): una lista vuota non vuol dire "nessun dato". Il
+    client rilegge `get_session_identity()` a ogni cambio di rotta, al ritorno in primo piano e a ogni
+    rifiuto "nessun operatore", e torna a `/cassa`; `reportNotEnabled()` in una sessione di dispositivo
+    porta a `/cassa`, non ad `/accedi`.
+50. Formato del lettore sbagliato: un uid esadecimale fatto di sole cifre è anche un decimale valido (e
+    ogni decimale è un esadecimale valido), e i byte invertiti danno un altro uid valido. L'errore quindi non
+    sempre dà "Codice non riconosciuto": spesso apre **Nuovo cliente** con una card "nuova". Durante la prova
+    del formato non si salva mai quel cliente (`docs/setup-tablet.md` §6).
+51. Con un lettore USB collegato Android nasconde la tastiera a schermo (lo vede come tastiera fisica): sul
+    tablet va attivata "Mostra tastiera virtuale" (Sistema → Lingue e immissione → Tastiera fisica),
+    altrimenti non si cerca per nome. Va ricontrollata dopo aver ricollegato il lettore.
+52. Il layout del tablet dipende dalla finestra in punti CSS (almeno 1024×600, `useTabletLayout`), non
+    dall'account né dai pixel fisici: con la densità di Android un 1280×800 fisico può dare il layout del
+    telefono. Si misura sul tablet vero (`docs/setup-tablet.md` §5); negli E2E vale il viewport del progetto.

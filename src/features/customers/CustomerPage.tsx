@@ -5,7 +5,12 @@ import { formatDate, formatInteger } from '../../shared/format';
 import { ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
 import { CardSummary } from '../cards/CardSummary';
-import { CustomerLedgerSection } from '../ledger/CustomerLedgerSection';
+import {
+  CustomerLastMovements,
+  CustomerLedgerActions,
+  CustomerLedgerSection,
+} from '../ledger/CustomerLedgerSection';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import styles from './CustomerPage.module.css';
 import { customerBackTo } from './customerBack';
 import { loadErrorText } from './loadErrorText';
@@ -32,21 +37,11 @@ function BalanceBox({ points }: { points: number }) {
   );
 }
 
-/**
- * The customer's details. The first line is `cards`' CardSummary ("Card attiva …E5F6 · ") with the
- * phone part of this module; `ledger` mounts its `CustomerLedgerSection` (Registra spesa, Riscatta premio, ULTIMI
- * MOVIMENTI) below the SALDO block.
- */
-function CustomerDetails({ customer }: { customer: CustomerSummary }) {
+/** The lines under the title: the card and the phone, the notes, or "Dati cancellati il …". */
+function CustomerLines({ customer }: { customer: CustomerSummary }) {
   if (customer.anonymizedAt !== null) {
     // The technical name of an erased customer is never shown, and there is nothing to edit.
-    return (
-      <>
-        <p className={styles.meta}>Dati cancellati il {formatDate(customer.anonymizedAt)}</p>
-        <BalanceBox points={customer.balance} />
-        <CustomerLedgerSection customer={customer} />
-      </>
-    );
+    return <p className={styles.meta}>Dati cancellati il {formatDate(customer.anonymizedAt)}</p>;
   }
   return (
     <>
@@ -57,9 +52,44 @@ function CustomerDetails({ customer }: { customer: CustomerSummary }) {
         }
       />
       {customer.notes !== null && <p className={styles.notes}>{customer.notes}</p>}
+    </>
+  );
+}
+
+/**
+ * The customer's details. The first line is `cards`' CardSummary ("Card attiva …E5F6 · ") with the
+ * phone part of this module; `ledger` mounts its `CustomerLedgerSection` (Registra spesa, Riscatta premio, ULTIMI
+ * MOVIMENTI) below the SALDO block.
+ */
+function CustomerDetails({ customer }: { customer: CustomerSummary }) {
+  return (
+    <>
+      <NavigationNotice />
+      <CustomerLines customer={customer} />
       <BalanceBox points={customer.balance} />
       <CustomerLedgerSection customer={customer} />
     </>
+  );
+}
+
+/**
+ * The same details at 1280×800 (wireframe "Tablet: scheda cliente", SPEC-tablet-kiosk point 10):
+ * the lines, SALDO and the actions in a 560 px column on the left, near the top and far from the
+ * bottom edge; ULTIMI MOVIMENTI on the right.
+ */
+function TabletCustomerDetails({ customer }: { customer: CustomerSummary }) {
+  return (
+    <div className={styles.tabletLayout} data-tablet="true">
+      <div className={styles.customerColumn} data-tablet-column="customer">
+        <NavigationNotice />
+        <CustomerLines customer={customer} />
+        <BalanceBox points={customer.balance} />
+        <CustomerLedgerActions customer={customer} />
+      </div>
+      <div className={styles.movementsColumn} data-tablet-column="movements">
+        <CustomerLastMovements customer={customer} />
+      </div>
+    </div>
   );
 }
 
@@ -74,6 +104,8 @@ export function CustomerPage() {
   const location = useLocation();
   const backTo = customerBackTo(location.state);
   const load = useCustomer(id);
+  // 1280×800: SALDO and the actions on the left, ULTIMI MOVIMENTI on the right.
+  const tablet = useTabletLayout();
   // Every branch renders the same AppShell, so its h1 stays mounted through loading and errors.
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -98,8 +130,11 @@ export function CustomerPage() {
             : { label: 'Modifica cliente', icon: 'pencil', to: `/clienti/${customer.id}/modifica` }
         }
       >
-        <NavigationNotice />
-        <CustomerDetails customer={customer} />
+        {tablet ? (
+          <TabletCustomerDetails customer={customer} />
+        ) : (
+          <CustomerDetails customer={customer} />
+        )}
       </AppShell>
     );
   }

@@ -1,0 +1,111 @@
+/* LETTORE CARD (no wireframe): the section look of PUNTI E CONTROLLI, the radio rows of Riscatta premio. */
+.section {
+  margin-top: var(--space-2);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--space-1);
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* One format: the whole row is the radio's label, 64 px tall like the rewards of Riscatta premio. */
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-ink-muted);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+/* The chosen format: green border, raised surface, semibold name. */
+.option:has(:checked) {
+  border: 2px solid var(--color-enjoy-green);
+  padding: calc(var(--space-2) - 1px) calc(var(--space-3) - 1px);
+  background: var(--color-surface-raised);
+}
+
+.option:has(:checked) .optionName {
+  font-weight: var(--type-label-lg-weight);
+}
+
+.radio {
+  flex-shrink: 0;
+  width: var(--icon);
+  height: var(--icon);
+  margin: 0;
+  accent-color: var(--color-enjoy-green);
+}
+
+.optionName {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* Save failures, as in PUNTI E CONTROLLI. */
+.failure {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  border: 2px solid var(--color-danger);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-danger-text);
+}
+
+.failure svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* The live region stays in the page while empty; it takes space only with its message. */
+.saved {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-accent-text);
+}
+
+.saved:not(:empty) {
+  margin-top: var(--space-2);
+}
+
+.saved svg {
+  flex-shrink: 0;
+}

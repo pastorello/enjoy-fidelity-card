@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { useLatest } from '../../lib/useLatest';
 import { formatCents, formatInteger, formatTime } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { failureText } from '../customers/useCustomerSubmit';
@@ -63,10 +64,7 @@ export function CancelMovementDialog({
   const operation = useOperation((operationId) =>
     service.cancelMovement({ operationId, movementId: movement.id }),
   );
-  const settled = useRef(onSettled);
-  useEffect(() => {
-    settled.current = onSettled;
-  }, [onSettled]);
+  const settled = useLatest(onSettled);
 
   let outcome: CancelOutcome | null = null;
   if (operation.status === 'done') outcome = 'cancelled';
@@ -78,7 +76,7 @@ export function CancelMovementDialog({
     if (outcome === null) return;
     if (outcome === 'forbidden') void reportNotEnabled();
     settled.current(outcome);
-  }, [outcome, reportNotEnabled]);
+  }, [outcome, reportNotEnabled, settled]);
 
   const busy = operation.status === 'busy';
   const error =

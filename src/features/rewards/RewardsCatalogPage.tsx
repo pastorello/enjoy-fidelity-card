@@ -4,6 +4,8 @@ import { ButtonLink } from '../../shared/ui/Button';
 import { StatusView } from '../../shared/ui/StatusView';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useCurrentOperator } from '../identity/AuthProvider';
+import { TabletColumns } from '../tablet-kiosk/TabletColumns';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { RewardForm } from './RewardForm';
 import { RewardRow } from './RewardRow';
 import styles from './RewardsCatalogPage.module.css';
@@ -46,6 +48,7 @@ function Catalog() {
   const load = useRewards();
   // Every state renders the same AppShell, so its h1 stays mounted through loading and errors.
   const heading = useRef<HTMLHeadingElement>(null);
+  const tablet = useTabletLayout();
   // The reward in the "Modifica premio" box. Looked up in the list, so a row no longer there
   // (after a reload) closes the change and gives back "Nuovo premio".
   const [editingId, setEditingId] = useState<string>();
@@ -110,21 +113,35 @@ function Catalog() {
     load.reload();
   }
 
+  const form = (
+    <RewardForm
+      disabled={load.status === 'loading'}
+      onAdded={added}
+      onReload={load.reload}
+      editing={editing}
+      onEdited={edited}
+      onCancelEdit={() => setEditingId(undefined)}
+    />
+  );
+
+  if (tablet) {
+    // Wireframe "Tablet: catalogo premi" (SPEC-tablet-kiosk, point 10): the list on the left, the
+    // "Nuovo premio" box in the 480 px column on the right, from the top.
+    return (
+      <AppShell title={TITLE} backTo={BACK_TO} headingRef={heading}>
+        <TabletColumns column="new-reward" width={480} aside={form}>
+          {content}
+        </TabletColumns>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell
       title={TITLE}
       backTo={BACK_TO}
       headingRef={heading}
-      actions={
-        <RewardForm
-          disabled={load.status === 'loading'}
-          onAdded={added}
-          onReload={load.reload}
-          editing={editing}
-          onEdited={edited}
-          onCancelEdit={() => setEditingId(undefined)}
-        />
-      }
+      actions={form}
       actionsTone="raised"
     >
       {content}

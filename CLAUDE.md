@@ -74,6 +74,14 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
   "Password dimenticata" arriva con una spec aggiuntiva dopo la V1 (`brain/DECISIONS.md` 2026-11-17).
   Sessione persistente sul telefono; sul tablet condiviso: account di dispositivo + cambio operatore con
   PIN di 4 cifre verificato sul server (blocco temporaneo dopo 5 errori).
+- **Tablet della cassa** (`tablet-kiosk`, `docs/specs/SPEC-tablet-kiosk.md`): account del bar creato con
+  `private.add_device` (`docs/setup-accounts.md` §4), mai collegato a un operatore; rotta `/cassa` ("Chi è
+  alla cassa?") e, sul telefono, `/impostazioni/pin`, dove ognuno imposta il proprio PIN (rotta in più
+  rispetto a `docs/specs/contract.md`). Il PIN è solo un hash bcrypt in `private.operator_pins`, non una
+  colonna di `app.operators` come diceva `SPEC-identity.md`. `acting_operator_id()` e `is_admin()` valgono
+  per il cassiere con turno valido (12 ore); senza cassiere il dispositivo non legge né scrive nulla.
+  Stesse rotte del telefono con layout tablet da 1024×600 punti. Preparazione del tablet:
+  `docs/setup-tablet.md`.
 
 ## Privacy (GDPR)
 - Consenso privacy obbligatorio alla registrazione; testi da far verificare al consulente del bar.
@@ -124,6 +132,10 @@ Altre quando pertinenti: `frontend-ui-engineering`, `api-and-interface-design`, 
 ### Test E2E — [webapp-testing](https://github.com/anthropics/skills/tree/main/skills/webapp-testing)
 - Viewport principale: **telefono 390×844**; tablet **1280×800** solo per la fase tablet.
 - Web NFC non è disponibile in Playwright: simulare la lettura card con un adattatore finto.
+- Tablet: progetto `tablet` (1280×800, touch, solo `e2e/tablet*.spec.ts`, ignorati da `phone`) e
+  `tablet-settings` (spec tablet che cambiano `app.settings`, in serie dopo `phone-settings`); lettore USB
+  simulato con `page.keyboard`. Ogni test che sblocca un cassiere usa un dispositivo del seed riservato
+  (RUNBOOK §4, trappola 47).
 - Le spec che cambiano la configurazione condivisa (`app.settings`) stanno nel progetto `phone-settings`
   (`SHARED_STATE_SPECS` in `playwright.config.ts`): in serie, dopo gli altri, e ripristinano i valori iniziali.
 
@@ -140,7 +152,7 @@ npm run dev                 # app in sviluppo; vetrina componenti su /dev/ui
 npm run dev:https           # HTTPS sulla rete locale, per il telefono
 npm run typecheck && npm run lint && npm run format:check && npm test   # controlli prima di ogni commit
 npm run format              # Prettier
-npm run e2e                 # Playwright sulla build (390×844), contro Supabase locale
+npm run e2e                 # Playwright sulla build (390×844 e tablet 1280×800), contro Supabase locale
 npm run build               # build di produzione
 npm run check:bundle        # dopo build: fallisce se dist/ contiene la card finta degli E2E (__enjoyFakeCard)
 npm run db:start / db:stop  # Supabase locale (Docker)
@@ -161,7 +173,7 @@ Deploy: Vercel da GitHub (anteprime = Supabase staging, `main` = produzione); mi
   settings.json  # hook Impeccable + plugin project-brain
 brain/           # memoria di progetto (stato, decisioni, passaggi tra sessioni)
 CAPABILITY-MAP.md # moduli, dipendenze, ordine di costruzione
-docs/            # specs/ (SPEC-<id>.md di ogni modulo, contratti), setup-accounts.md, adr/ da creare
+docs/            # specs/ (SPEC-<id>.md di ogni modulo, contratti), setup-accounts.md, setup-tablet.md, adr/ da creare
 design/          # token e loghi del design system "Enjoy Bar"
 src/             # app (app/, shared/ui/, lib/, styles/)
 supabase/        # migrazioni, test pgTAP, config locale

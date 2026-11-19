@@ -1,0 +1,187 @@
+/* "Chi è alla cassa?" (wireframe "Tablet: cambio operatore"): the operators on the left, the PIN in
+   a 480 px cream column on the right, edge to edge under the header. On a narrow screen the two
+   stack. */
+.layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  /* Edge to edge: the shell's main pads its content by space-3. */
+  margin: calc(-1 * var(--space-3));
+}
+
+.layout[data-tablet='true'] {
+  flex-direction: row;
+}
+
+.chooser {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-3);
+}
+
+.layout[data-tablet='true'] .chooser {
+  padding: var(--space-4);
+}
+
+.pageTitle {
+  margin: 0;
+  font-family: var(--type-headline-family);
+  font-size: var(--type-headline-size);
+  line-height: var(--type-headline-line-height);
+  font-weight: var(--type-headline-weight);
+  letter-spacing: var(--type-headline-letter-spacing);
+}
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+.operators {
+  display: grid;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.layout[data-tablet='true'] .operators {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.operator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--touch-target);
+  padding: 24px var(--space-3);
+  border: 1px solid var(--color-ink-muted);
+  border-radius: var(--radius-none);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.operator[aria-pressed='true'] {
+  /* 2 px instead of 1: the padding loses the extra pixel so the box keeps its size. */
+  padding: 23px calc(var(--space-3) - 1px);
+  border: 2px solid var(--color-enjoy-green);
+  background: var(--color-surface-raised);
+}
+
+.operator:disabled {
+  color: var(--color-ink-muted);
+  cursor: default;
+}
+
+.operator:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  font-family: var(--type-screen-title-family);
+  font-size: var(--type-screen-title-size);
+  line-height: var(--type-screen-title-line-height);
+  font-weight: var(--type-screen-title-weight);
+  letter-spacing: var(--type-screen-title-letter-spacing);
+}
+
+.name {
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+  overflow-wrap: anywhere;
+}
+
+.role {
+  font-family: var(--type-body-sm-family);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+.explanation {
+  margin: 0;
+  max-width: 560px;
+  font-family: var(--type-body-lg-family);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  color: var(--color-ink-muted);
+}
+
+.pinPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-surface-raised);
+}
+
+.layout[data-tablet='true'] .pinPanel {
+  flex: 0 0 480px;
+  gap: 24px;
+  padding: var(--space-4);
+}
+
+.pinTitle {
+  margin: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+  overflow-wrap: anywhere;
+}
+
+/* A typed name with a character Enjoy Display lacks is set in the body font (displayGlyphs.test.ts). */
+.name[data-body-font='true'],
+.initial[data-body-font='true'],
+.pinTitle[data-body-font='true'] {
+  font-family: var(--type-body-family);
+  letter-spacing: normal;
+}
+
+.message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  font-weight: 600;
+}
+
+.message[role='alert'] {
+  color: var(--color-danger-text);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}

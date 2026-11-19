@@ -75,13 +75,16 @@ export const supabaseSettingsService: SettingsService = {
     return settings;
   },
 
-  async update({ centsPerPoint, confirmThresholdCents }) {
+  async update({ centsPerPoint, confirmThresholdCents, usbUidFormat }) {
     try {
-      // No p_usb_uid_format: the server keeps the reader format unchanged.
-      const answer: Answer = await getSupabase().schema('app').rpc('update_settings', {
-        p_cents_per_point: centsPerPoint,
-        p_confirm_threshold_cents: confirmThresholdCents,
-      });
+      // Without p_usb_uid_format the server keeps the reader format unchanged.
+      const answer: Answer = await getSupabase()
+        .schema('app')
+        .rpc('update_settings', {
+          p_cents_per_point: centsPerPoint,
+          p_confirm_threshold_cents: confirmThresholdCents,
+          ...(usbUidFormat === undefined ? {} : { p_usb_uid_format: usbUidFormat }),
+        });
       return updateResultFor(answer);
     } catch {
       return { status: 'network' };

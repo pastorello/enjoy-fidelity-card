@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ServerFaultError } from '../../lib/serverFault';
+import { useLatest } from '../../lib/useLatest';
 import type { CustomerFormValues, CustomerRefusal } from './CustomerForm';
 import { customerErrorField, customerErrorText } from './errorCodes';
 import { CustomerError, type CustomerSummary } from './types';
@@ -57,11 +58,8 @@ export type CustomerSubmitOptions = {
  */
 export function useCustomerSubmit(options: CustomerSubmitOptions): CustomerSubmit {
   const notOperator = useNotOperator();
-  // The latest callbacks, so `save` keeps its identity.
-  const latest = useRef(options);
-  useEffect(() => {
-    latest.current = options;
-  });
+  // The callbacks of the screen on show, so `save` keeps its identity (see `useLatest`).
+  const latest = useLatest(options);
   // Set synchronously, so a second tap in the same frame is ignored before `busy` renders.
   const sending = useRef(false);
   const [busy, setBusy] = useState(false);
@@ -101,7 +99,7 @@ export function useCustomerSubmit(options: CustomerSubmitOptions): CustomerSubmi
       sending.current = false;
       setBusy(false);
     },
-    [notOperator],
+    [notOperator, latest],
   );
 
   const save = useCallback(

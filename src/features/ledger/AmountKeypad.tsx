@@ -14,6 +14,8 @@ type AmountKeypadProps = {
   value: number;
   onChange: (next: number) => void;
   variant?: KeypadVariant;
+  /** `tablet`: the larger keys of the till tablet's keypad column (SPEC-tablet-kiosk, point 10). */
+  size?: 'tablet' | undefined;
 };
 
 const DIGIT_ROWS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
@@ -23,7 +25,7 @@ const DIGIT_ROWS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
  * buttons only, so the system keyboard never opens. Every key goes through the pure reducers of
  * `points.ts` (digits on the right, limits, leading zeros).
  */
-export function AmountKeypad({ value, onChange, variant = 'amount' }: AmountKeypadProps) {
+export function AmountKeypad({ value, onChange, variant = 'amount', size }: AmountKeypadProps) {
   function press(key: AmountKey) {
     const next =
       variant === 'amount'
@@ -35,7 +37,12 @@ export function AmountKeypad({ value, onChange, variant = 'amount' }: AmountKeyp
   }
 
   return (
-    <fieldset aria-label="Tastierino numerico" data-variant={variant} className={styles.keypad}>
+    <fieldset
+      aria-label="Tastierino numerico"
+      data-variant={variant}
+      data-size={size}
+      className={styles.keypad}
+    >
       {DIGIT_ROWS.map((digit) => (
         <button key={digit} type="button" className={styles.key} onClick={() => press(digit)}>
           {digit}

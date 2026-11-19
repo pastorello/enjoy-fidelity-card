@@ -438,14 +438,14 @@ describe('save errors and reloads for administrators', () => {
     const auth = signedInFake();
     const settings = createFakeSettingsService({ updateResults: ['forbidden', 'ok'] });
     const { section, ratio, save } = await openAdminSection(settings, auth);
-    const checksBefore = auth.service.loadOperator.mock.calls.length;
+    const checksBefore = auth.service.loadIdentity.mock.calls.length;
     await replace(ratio, '2');
     await userEvent.click(save);
 
     expect(await within(section).findByRole('alert')).toHaveTextContent(forbiddenMessage);
     expect(save).toBeDisabled();
     expect(ratio).toHaveValue('2');
-    await waitFor(() => expect(auth.service.loadOperator.mock.calls.length).toBe(checksBefore + 1));
+    await waitFor(() => expect(auth.service.loadIdentity.mock.calls.length).toBe(checksBefore + 1));
 
     // Still disabled after the re-check confirms the admin role, and after editing again.
     await userEvent.type(ratio, '5');

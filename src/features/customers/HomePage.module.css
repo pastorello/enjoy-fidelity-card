@@ -71,3 +71,69 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* Wireframe "Tablet: cerca cliente" (SPEC-tablet-kiosk, point 10): edge to edge under the header,
+   the reader column (440 px) on the left, the search and SERVITI OGGI on the right. */
+.tabletLayout {
+  flex: 1;
+  display: flex;
+  /* Edge to edge: the shell's main pads its content by space-3. */
+  margin: calc(-1 * var(--space-3));
+}
+
+/* The reader stays in view while the list scrolls: as tall as the screen under the 64 px header. */
+.readerColumn {
+  position: sticky;
+  top: 64px;
+  align-self: flex-start;
+  flex: 0 0 440px;
+  box-sizing: border-box;
+  height: calc(100dvh - 64px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  /* 48 px top and bottom, 32 px at the sides, as in the wireframe. */
+  padding: calc(var(--space-4) + var(--space-3)) var(--space-4);
+  background: var(--color-surface-raised);
+}
+
+.tabletContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  /* 24 px between blocks, 32 px around, as in the wireframe. */
+  gap: calc(var(--space-3) + var(--space-2));
+  padding: var(--space-4);
+}
+
+/* The search and "Nuovo cliente" on one line, bottoms aligned. */
+.searchRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.searchCell {
+  flex: 1;
+  min-width: 0;
+}
+
+/* "Nuovo cliente «<testo>»" with a long name wraps instead of squeezing the search field. */
+.tabletAction {
+  flex: 0 1 auto;
+  max-width: 50%;
+}
+
+/* The "+" keeps its size next to a label that wraps. */
+.tabletAction svg {
+  flex-shrink: 0;
+}
+
+/* SERVITI OGGI in two columns, as in the wireframe. */
+.tabletContent .served .list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-4);
+}

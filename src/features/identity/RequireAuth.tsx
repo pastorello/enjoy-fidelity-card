@@ -1,7 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { StatusView } from '../../shared/ui/StatusView';
-import { CardReaderSession } from '../card-input/CardReaderSession';
-import { SettingsProvider } from '../settings/SettingsProvider';
 import { useAuth } from './AuthProvider';
 import styles from './RequireAuth.module.css';
 
@@ -15,9 +13,10 @@ const errorDescriptions = {
 export type SignInLocationState = { from?: string };
 
 /**
- * Layout route: its pages need a signed-in operator, otherwise /accedi. It also mounts
- * <SettingsProvider>, so the configuration loads once per session and never without an operator,
- * and <CardReaderSession>, so cards are read only with an operator (SPEC-card-input, point 2).
+ * Layout route: its pages need a signed-in account (an operator, or a device such as the till
+ * tablet), otherwise /accedi. Inside it, `RequireCashier` guards the pages that also need an
+ * operator at work (on a device, its cashier) and mounts the settings and the card reader; /cassa,
+ * where the cashier is chosen, stays outside that guard.
  */
 export function RequireAuth() {
   const { state, retry } = useAuth();
@@ -46,11 +45,5 @@ export function RequireAuth() {
     const from = `${location.pathname}${location.search}`;
     return <Navigate to="/accedi" replace state={{ from } satisfies SignInLocationState} />;
   }
-  // Keyed by operator: another user signing in on this device loads the configuration again.
-  return (
-    <SettingsProvider key={state.operator.id}>
-      <CardReaderSession />
-      <Outlet />
-    </SettingsProvider>
-  );
+  return <Outlet />;
 }

@@ -16,3 +16,16 @@
 .check {
   color: var(--color-accent-text);
 }
+
+/* Till tablet (wireframe "Tablet: associa card"): one 560 px column in the middle, 24 px between
+   the reader, the note and "Annulla". */
+.tabletColumn {
+  flex: 1;
+  align-self: center;
+  width: 560px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--space-3) + var(--space-2));
+}

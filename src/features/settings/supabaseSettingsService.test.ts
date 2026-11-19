@@ -121,6 +121,18 @@ describe('update', () => {
     });
   });
 
+  it('sends the USB reader format only when it is given (tablet-kiosk, LETTORE CARD)', async () => {
+    db.rpc.mockResolvedValue({ data: row, error: null, status: 200 });
+    await expect(
+      supabaseSettingsService.update({ ...input, usbUidFormat: 'dec-reversed' }),
+    ).resolves.toEqual({ status: 'ok', settings });
+    expect(db.rpc).toHaveBeenCalledWith('update_settings', {
+      p_cents_per_point: 200,
+      p_confirm_threshold_cents: 20000,
+      p_usb_uid_format: 'dec-reversed',
+    });
+  });
+
   it('42501 (not an admin) is forbidden', async () => {
     db.rpc.mockResolvedValue(pgError('42501', 403));
     await expect(supabaseSettingsService.update(input)).resolves.toEqual({ status: 'forbidden' });

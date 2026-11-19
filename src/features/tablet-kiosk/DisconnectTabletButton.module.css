@@ -1,0 +1,4 @@
+/* A row of its own under the cashier, the name and "Esci" in the account box. */
+.button {
+  flex-basis: 100%;
+}

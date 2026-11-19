@@ -6,6 +6,7 @@ import type {
   AuthService,
   Operator,
   ResetRequestResult,
+  SessionIdentity,
   SignInResult,
   UpdatePasswordResult,
   VerifyRecoveryResult,
@@ -59,6 +60,72 @@ function isRole(value: unknown): value is Operator['role'] {
   return value === 'admin' || value === 'operator';
 }
 
+function record(data: unknown): Record<string, unknown> | null {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return null;
+  return { ...data };
+}
+
+const isString = (value: unknown): value is string => typeof value === 'string';
+
+/** A timestamptz as PostgREST writes it, microseconds included. */
+const TIMESTAMP = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,6})?(Z|[+-]\d{2}(:\d{2})?)$/;
+
+/** The instant of a timestamptz, or null when it is not one. Microseconds are dropped. */
+function toDate(value: unknown): Date | null {
+  if (!isString(value)) return null;
+  const parts = TIMESTAMP.exec(value);
+  if (!parts) return null;
+  const [, seconds = '', fraction = '', zone = ''] = parts;
+  const date = new Date(`${seconds}${fraction.slice(0, 4)}${zone}`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toOperator(data: unknown): Operator | null {
+  const row = record(data);
+  if (!row) return null;
+  const { id, name, role } = row;
+  if (!isString(id) || !isString(name) || !isRole(role)) return null;
+  return { id, name, role };
+}
+
+/**
+ * Maps the jsonb answer of `app.get_session_identity()`. `undefined` when its shape is unexpected:
+ * nothing is guessed (a cashier without the end of the turn is not a cashier).
+ */
+function toIdentity(data: unknown): SessionIdentity | null | undefined {
+  if (data === null) return null;
+  const identity = record(data);
+  if (!identity) return undefined;
+  if (identity.kind === 'operator') {
+    const operator = toOperator(identity.operator);
+    const hasPin = record(identity.operator)?.has_pin;
+    if (!operator || typeof hasPin !== 'boolean') return undefined;
+    return { kind: 'operator', operator, hasPin };
+  }
+  if (identity.kind !== 'device') return undefined;
+  const device = record(identity.device);
+  const { lock_seconds_left: lockSecondsLeft } = identity;
+  if (!device || !isString(device.id) || !isString(device.name)) return undefined;
+  if (typeof lockSecondsLeft !== 'number' || !Number.isInteger(lockSecondsLeft)) return undefined;
+  if (lockSecondsLeft < 0) return undefined;
+  let cashier: Operator | null = null;
+  let turnExpiresAt: Date | null = null;
+  if (identity.cashier !== null) {
+    cashier = toOperator(identity.cashier);
+    turnExpiresAt = toDate(identity.turn_expires_at);
+    if (!cashier || !turnExpiresAt) return undefined;
+  } else if (identity.turn_expires_at !== null) {
+    return undefined;
+  }
+  return {
+    kind: 'device',
+    device: { id: device.id, name: device.name },
+    cashier,
+    turnExpiresAt,
+    lockSecondsLeft,
+  };
+}
+
 export const supabaseAuthService: AuthService = {
   async currentUserId() {
     const { data, error } = await getSupabase().auth.getSession();
@@ -84,25 +151,17 @@ export const supabaseAuthService: AuthService = {
     await getSupabase().auth.signOut({ scope: 'local' });
   },
 
-  async loadOperator(userId) {
-    const { data, error, status } = await getSupabase()
-      .schema('app')
-      .from('operators')
-      .select('id, name, role')
-      .eq('user_id', userId)
-      .maybeSingle();
+  async loadIdentity() {
+    const { data, error, status } = await getSupabase().schema('app').rpc('get_session_identity');
     if (error) {
-      // Status 0: no answer arrived (network). Any answer with an error means the server
-      // could not serve a plain read of the own profile: a fault, not a missing connection.
-      if (status === 0) throw new Error(`Cannot load the operator profile: ${error.message}`);
+      // Status 0: no answer arrived (network). Any answer with an error means the server could
+      // not tell who is signed in: a fault, not a missing connection.
+      if (status === 0) throw new Error(`Cannot load the session identity: ${error.message}`);
       throw new ServerFaultError(serverFaultFor(error, status) ?? 'misconfigured');
     }
-    if (!data) return null;
-    const row: { id: unknown; name: unknown; role: unknown } = data;
-    if (typeof row.id !== 'string' || typeof row.name !== 'string' || !isRole(row.role)) {
-      throw new Error('Unexpected operator profile shape');
-    }
-    return { id: row.id, name: row.name, role: row.role };
+    const identity = toIdentity(data);
+    if (identity === undefined) throw new Error('Unexpected session identity shape');
+    return identity;
   },
 
   onAuthChange(listener) {

@@ -1,10 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useEffect } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { Component, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
-import { createFakeAuthService, fakeOperator } from '../../test/fakeAuthService';
-import type { Operator } from './types';
-import { AuthProvider, useAuth, useCurrentOperator } from './AuthProvider';
+import { createFakeAuthService, fakeDevice, fakeOperator } from '../../test/fakeAuthService';
+import type { Operator, SessionIdentity } from './types';
+import { AuthProvider, useAuth, useCurrentOperator, useDevice } from './AuthProvider';
 
 function Probe() {
   const auth = useAuth();
@@ -77,6 +78,68 @@ function setVisibility(value: DocumentVisibilityState) {
   Object.defineProperty(document, 'visibilityState', { configurable: true, value });
 }
 
+/** What a device session shows: device, cashier (as the current operator) and lock. */
+function DeviceProbe() {
+  const device = useDevice();
+  if (!device) return <p data-testid="device">-</p>;
+  return (
+    <p data-testid="device">
+      {device.device.name}|{device.cashier ? <CurrentOperator /> : 'nessuno'}|
+      {device.turnExpiresAt?.toISOString() ?? '-'}|{device.lockSecondsLeft}
+    </p>
+  );
+}
+
+function CurrentOperator() {
+  const operator = useCurrentOperator();
+  return (
+    <>
+      {operator.name}:{operator.role}
+    </>
+  );
+}
+
+function renderDevice(fake: ReturnType<typeof createFakeAuthService>) {
+  const captured: { auth?: ReturnType<typeof useAuth> } = {};
+  function Capture() {
+    const auth = useAuth();
+    useEffect(() => {
+      captured.auth = auth;
+    });
+    return null;
+  }
+  render(
+    <AuthProvider service={fake.service}>
+      <Probe />
+      <DeviceProbe />
+      <Capture />
+    </AuthProvider>,
+  );
+  return () => {
+    if (!captured.auth) throw new Error('useAuth not rendered');
+    return captured.auth;
+  };
+}
+
+const device = () => screen.getByTestId('device');
+
+/** Renders "refused" when its child throws, as an error boundary does. */
+class Refused extends Component<{ children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  override render() {
+    return this.state.failed ? <p data-testid="current">refused</p> : this.props.children;
+  }
+}
+
+function Current() {
+  return <p data-testid="current">{useCurrentOperator().name}</p>;
+}
+
 describe('AuthProvider', () => {
   it('starts loading, then signed out when no session is saved', async () => {
     renderWith(createFakeAuthService());
@@ -88,7 +151,7 @@ describe('AuthProvider', () => {
     const fake = createFakeAuthService({ userId: 'user-1' });
     renderWith(fake);
     await waitFor(() => expect(state()).toHaveTextContent(`in:${fakeOperator.name}`));
-    expect(fake.service.loadOperator).toHaveBeenCalledWith('user-1');
+    expect(fake.service.loadIdentity).toHaveBeenCalledOnce();
   });
 
   it('ends a saved session whose user has no profile', async () => {
@@ -100,7 +163,7 @@ describe('AuthProvider', () => {
 
   it('shows an error state when the profile cannot be loaded, and retries', async () => {
     const fake = createFakeAuthService({ userId: 'user-1' });
-    fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+    fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
     const auth = renderWith(fake);
     await waitFor(() => expect(state()).toHaveTextContent('error'));
     await act(() => auth().retry());
@@ -130,7 +193,7 @@ describe('AuthProvider', () => {
 
   it('ends the new session and reports a network failure when the profile cannot be loaded', async () => {
     const fake = createFakeAuthService();
-    fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+    fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
     const auth = renderWith(fake);
     await waitFor(() => expect(state()).toHaveTextContent('out:-'));
     let result: string | undefined;
@@ -146,7 +209,7 @@ describe('AuthProvider', () => {
     'reports a %s server, not a network failure, when the profile cannot be loaded',
     async (kind) => {
       const fake = createFakeAuthService();
-      fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+      fake.service.loadIdentity.mockRejectedValueOnce(new ServerFaultError(kind));
       const auth = renderWith(fake);
       await waitFor(() => expect(state()).toHaveTextContent('out:-'));
       let result: string | undefined;
@@ -207,7 +270,7 @@ describe('AuthProvider', () => {
     const other: Operator = { id: 'op-2', name: 'Marco Prova', role: 'operator' };
     act(() => fake.switchUser('user-2', other));
     await waitFor(() => expect(state()).toHaveTextContent('in:Marco Prova'));
-    expect(fake.service.loadOperator).toHaveBeenLastCalledWith('user-2');
+    expect(fake.service.loadIdentity).toHaveBeenCalledTimes(2);
   });
 
   it('ends a switched session whose user has no profile', async () => {
@@ -225,7 +288,7 @@ describe('AuthProvider', () => {
     await waitFor(() => expect(state()).toHaveTextContent(`in:${fakeOperator.name}`));
     act(() => fake.switchUser('user-1', fakeOperator));
     expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
-    expect(fake.service.loadOperator).toHaveBeenCalledOnce();
+    expect(fake.service.loadIdentity).toHaveBeenCalledOnce();
   });
 
   describe('password recovery', () => {
@@ -253,7 +316,7 @@ describe('AuthProvider', () => {
       expect(fake.service.verifyRecovery).toHaveBeenCalledWith('token-abc');
       expect(fake.service.updatePassword).toHaveBeenCalledWith('nuova-password');
       expect(fake.service.signOutOtherDevices).toHaveBeenCalledOnce();
-      expect(fake.service.loadOperator).toHaveBeenLastCalledWith('user-2');
+      expect(fake.service.loadIdentity).toHaveBeenCalledOnce();
       expect(state()).toHaveTextContent('in:Marco Prova');
     });
 
@@ -417,7 +480,7 @@ describe('AuthProvider', () => {
       expect(await complete(auth)).toBe('save-network');
       await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
       expect(state()).toHaveTextContent('out:-');
-      expect(fake.service.loadOperator).toHaveBeenCalledOnce();
+      expect(fake.service.loadIdentity).toHaveBeenCalledOnce();
     });
 
     it('switches to the link operator without a session-expired message', async () => {
@@ -449,7 +512,7 @@ describe('AuthProvider', () => {
       const fake = createFakeAuthService({ recoveryUser: linkUser });
       const auth = renderWith(fake);
       await waitFor(() => expect(state()).toHaveTextContent('out:-'));
-      fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+      fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
       expect(await complete(auth)).toBe('ok');
       expect(state()).toHaveTextContent('error');
       expect(fake.service.signOut).not.toHaveBeenCalled();
@@ -496,7 +559,7 @@ describe('AuthProvider', () => {
       act(() => {
         fireEvent(document, new Event('visibilitychange'));
       });
-      expect(fake.service.loadOperator).toHaveBeenCalledOnce();
+      expect(fake.service.loadIdentity).toHaveBeenCalledOnce();
     });
 
     it('stays signed in when the profile is still there', async () => {
@@ -506,8 +569,7 @@ describe('AuthProvider', () => {
       act(() => {
         fireEvent.focus(window);
       });
-      await waitFor(() => expect(fake.service.loadOperator).toHaveBeenCalledTimes(2));
-      expect(fake.service.loadOperator).toHaveBeenLastCalledWith('user-1');
+      await waitFor(() => expect(fake.service.loadIdentity).toHaveBeenCalledTimes(2));
       expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
       expect(fake.service.signOut).not.toHaveBeenCalled();
     });
@@ -529,11 +591,11 @@ describe('AuthProvider', () => {
       const fake = createFakeAuthService({ userId: 'user-1' });
       renderWith(fake);
       await waitFor(() => expect(state()).toHaveTextContent('in:'));
-      fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+      fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
       act(() => {
         fireEvent.focus(window);
       });
-      await waitFor(() => expect(fake.service.loadOperator).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(fake.service.loadIdentity).toHaveBeenCalledTimes(2));
       await act(() => Promise.resolve());
       expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
       expect(fake.service.signOut).not.toHaveBeenCalled();
@@ -546,7 +608,7 @@ describe('AuthProvider', () => {
       act(() => {
         fireEvent.focus(window);
       });
-      expect(fake.service.loadOperator).not.toHaveBeenCalled();
+      expect(fake.service.loadIdentity).not.toHaveBeenCalled();
     });
 
     it('stops listening after unmount', async () => {
@@ -559,7 +621,7 @@ describe('AuthProvider', () => {
       await waitFor(() => expect(state()).toHaveTextContent('in:'));
       unmount();
       fireEvent.focus(window);
-      expect(fake.service.loadOperator).toHaveBeenCalledOnce();
+      expect(fake.service.loadIdentity).toHaveBeenCalledOnce();
     });
   });
 
@@ -584,7 +646,7 @@ describe('AuthProvider', () => {
       await act(() => auth().reportNotEnabled());
       expect(role()).toHaveTextContent('operator');
       expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
-      expect(fake.service.loadOperator).toHaveBeenLastCalledWith('user-1');
+      expect(fake.service.loadIdentity).toHaveBeenCalledTimes(2);
       expect(fake.service.signOut).not.toHaveBeenCalled();
     });
 
@@ -593,7 +655,7 @@ describe('AuthProvider', () => {
       const auth = renderWith(fake);
       await waitFor(() => expect(role()).toHaveTextContent('admin'));
       fake.setProfile(asOperator);
-      fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+      fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
       await act(() => auth().reportNotEnabled());
       expect(state()).toHaveTextContent(`in:${fakeOperator.name}`);
       expect(role()).toHaveTextContent('admin');
@@ -605,7 +667,7 @@ describe('AuthProvider', () => {
       const auth = renderWith(fake);
       await waitFor(() => expect(state()).toHaveTextContent('out:-'));
       await act(() => auth().reportNotEnabled());
-      expect(fake.service.loadOperator).not.toHaveBeenCalled();
+      expect(fake.service.loadIdentity).not.toHaveBeenCalled();
       expect(state()).toHaveTextContent('out:-');
     });
 
@@ -614,17 +676,161 @@ describe('AuthProvider', () => {
       const auth = renderWith(fake);
       await waitFor(() => expect(role()).toHaveTextContent('admin'));
       // The foreground check reads the profile before the role changes and answers late.
-      const stale = deferred<Operator | null>();
-      fake.service.loadOperator.mockReturnValueOnce(stale.promise);
+      const stale = deferred<SessionIdentity | null>();
+      fake.service.loadIdentity.mockReturnValueOnce(stale.promise);
       act(() => {
         fireEvent.focus(window);
       });
       fake.setProfile(asOperator);
       await act(() => auth().reportNotEnabled());
-      expect(fake.service.loadOperator).toHaveBeenCalledTimes(3);
+      expect(fake.service.loadIdentity).toHaveBeenCalledTimes(3);
       expect(role()).toHaveTextContent('operator');
-      await act(async () => stale.resolve(fakeOperator));
+      await act(async () =>
+        stale.resolve({ kind: 'operator', operator: fakeOperator, hasPin: false }),
+      );
       expect(role()).toHaveTextContent('operator');
+    });
+  });
+
+  describe('device session', () => {
+    const cashier: Operator = { id: 'op-2', name: 'Marco Prova', role: 'operator' };
+
+    it('restores a device session without a cashier', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice });
+      renderDevice(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('device'));
+      expect(device()).toHaveTextContent(`${fakeDevice.name}|nessuno|-|0`);
+      expect(fake.service.signOut).not.toHaveBeenCalled();
+    });
+
+    it('makes the cashier the current operator, with the end of the turn', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice, cashier });
+      renderDevice(fake);
+      await waitFor(() => expect(device()).toHaveTextContent(`${cashier.name}:operator`));
+      const identity = await fake.service.loadIdentity.mock.results[0]?.value;
+      if (identity?.kind !== 'device' || !identity.turnExpiresAt) throw new Error('no turn');
+      expect(device()).toHaveTextContent(identity.turnExpiresAt.toISOString());
+    });
+
+    it('has no device in an operator session', async () => {
+      renderDevice(createFakeAuthService({ userId: 'user-1' }));
+      await waitFor(() => expect(state()).toHaveTextContent(`in:${fakeOperator.name}`));
+      expect(device()).toHaveTextContent('-');
+    });
+
+    it('has no current operator on a device without a cashier', async () => {
+      // React logs the error caught by the boundary.
+      const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+      onTestFinished(() => logged.mockRestore());
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice });
+      render(
+        <AuthProvider service={fake.service}>
+          <Probe />
+          <Refused>
+            <Current />
+          </Refused>
+        </AuthProvider>,
+      );
+      await waitFor(() => expect(state()).toHaveTextContent('device'));
+      expect(screen.getByTestId('current')).toHaveTextContent('refused');
+    });
+
+    it('is a device session right after signing in with a device account', async () => {
+      const fake = createFakeAuthService({ device: fakeDevice });
+      const auth = renderDevice(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('out:-'));
+      let result: string | undefined;
+      await act(async () => {
+        result = await auth().signIn('cassa@example.com', 'password-di-prova');
+      });
+      expect(result).toBe('ok');
+      expect(state()).toHaveTextContent('device');
+      expect(device()).toHaveTextContent(`${fakeDevice.name}|nessuno`);
+      expect(fake.service.signOut).not.toHaveBeenCalled();
+    });
+
+    it('refreshIdentity picks up a new cashier and the lock from the server', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice });
+      const auth = renderDevice(fake);
+      await waitFor(() => expect(device()).toHaveTextContent('nessuno'));
+      fake.setCashier(cashier);
+      fake.setLock(120);
+      await act(() => auth().refreshIdentity());
+      expect(device()).toHaveTextContent(`${fakeDevice.name}|${cashier.name}:operator`);
+      expect(device()).toHaveTextContent('|120');
+    });
+
+    it('an operator session carries whether a PIN is set, read again by refreshIdentity', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1' });
+      const auth = renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent(`in:${fakeOperator.name}`));
+      const hasPin = () => {
+        const current = auth().state;
+        return current.status === 'signed-in' ? current.hasPin : undefined;
+      };
+      expect(hasPin()).toBe(false);
+      fake.setHasPin(true);
+      await act(() => auth().refreshIdentity());
+      expect(hasPin()).toBe(true);
+    });
+
+    it('refreshIdentity does nothing when signed out', async () => {
+      const fake = createFakeAuthService();
+      const auth = renderDevice(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('out:-'));
+      await act(() => auth().refreshIdentity());
+      expect(fake.service.loadIdentity).not.toHaveBeenCalled();
+    });
+
+    it('reportNotEnabled ends the turn on the device instead of signing out', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice, cashier });
+      const auth = renderDevice(fake);
+      await waitFor(() => expect(device()).toHaveTextContent(cashier.name));
+      fake.expireTurn();
+      await act(() => auth().reportNotEnabled());
+      expect(state()).toHaveTextContent('device');
+      expect(device()).toHaveTextContent(`${fakeDevice.name}|nessuno|-`);
+      expect(fake.service.signOut).not.toHaveBeenCalled();
+    });
+
+    it('reportNotEnabled keeps the cashier when the check fails offline', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice, cashier });
+      const auth = renderDevice(fake);
+      await waitFor(() => expect(device()).toHaveTextContent(cashier.name));
+      fake.expireTurn();
+      fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
+      await act(() => auth().reportNotEnabled());
+      expect(device()).toHaveTextContent(cashier.name);
+    });
+
+    it('reportNotEnabled signs out as not enabled when the device account is gone', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice, cashier });
+      const auth = renderDevice(fake);
+      await waitFor(() => expect(device()).toHaveTextContent(cashier.name));
+      fake.removeProfile();
+      await act(() => auth().reportNotEnabled());
+      expect(state()).toHaveTextContent('out:not-enabled');
+      expect(fake.service.signOut).toHaveBeenCalledOnce();
+    });
+
+    it('ends the turn when the app comes back to the foreground after it expired', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice, cashier });
+      renderDevice(fake);
+      await waitFor(() => expect(device()).toHaveTextContent(cashier.name));
+      fake.expireTurn();
+      act(() => {
+        fireEvent.focus(window);
+      });
+      await waitFor(() => expect(device()).toHaveTextContent('nessuno'));
+    });
+
+    it('signs out without a reason from a device session ("Disconnetti il tablet")', async () => {
+      const fake = createFakeAuthService({ userId: 'user-1', device: fakeDevice, cashier });
+      const auth = renderDevice(fake);
+      await waitFor(() => expect(device()).toHaveTextContent(cashier.name));
+      await act(() => auth().signOut());
+      expect(state()).toHaveTextContent('out:-');
+      expect(device()).toHaveTextContent('-');
     });
   });
 });

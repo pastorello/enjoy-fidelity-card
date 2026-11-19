@@ -4,8 +4,8 @@ import { useCardReader } from './CardReaderProvider';
 
 /**
  * Turns card reading on while an operator is signed in (SPEC-card-input, point 2): mounted by
- * `RequireAuth` inside `SettingsProvider`, it activates the service on mount and deactivates it on
- * unmount, so nothing is read on /accedi or after "Esci". The USB reader gets the saved format only
+ * `RequireCashier` inside `SettingsProvider`, it activates the service on mount and deactivates it on
+ * unmount, so nothing is read on /accedi, on /cassa or after "Esci". The USB reader gets the saved format only
  * once the settings are `ready`: while they load, or if loading fails, it stays off (`null`).
  */
 export function CardReaderSession() {

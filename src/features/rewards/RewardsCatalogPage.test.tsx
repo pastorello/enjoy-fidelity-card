@@ -357,7 +357,7 @@ describe('Catalogo premi: the Attivo box of a row', () => {
       rewards,
     );
     const list = await screen.findByRole('list', { name: 'Premi del catalogo' });
-    const checksBefore = auth.service.loadOperator.mock.calls.length;
+    const checksBefore = auth.service.loadIdentity.mock.calls.length;
     rewards.failNext('setActive', 'forbidden');
     const box = screen.getByRole('checkbox', { name: 'Caffè attivo' });
     await userEvent.click(box);
@@ -365,7 +365,7 @@ describe('Catalogo premi: the Attivo box of a row', () => {
     const alert = await within(rowOf(list, 'Caffè')).findByRole('alert');
     expect(alert).toHaveTextContent('Solo per gli amministratori');
     expect(box).toBeChecked();
-    await waitFor(() => expect(auth.service.loadOperator.mock.calls.length).toBe(checksBefore + 1));
+    await waitFor(() => expect(auth.service.loadIdentity.mock.calls.length).toBe(checksBefore + 1));
   });
 
   it('forbidden after the role became operator: the page shows the permission message', async () => {

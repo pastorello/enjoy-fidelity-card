@@ -5,7 +5,17 @@ const PORT = 4173;
 // Same origin as LOCAL_SUPABASE_URL in vite.config.ts (allowed by the preview CSP).
 const LOCAL_SUPABASE_URL = 'http://localhost:54321';
 /** Specs that change global state (the settings row): kept out of the parallel `phone` project. */
-const SHARED_STATE_SPECS = /settings\.spec\.ts$/;
+const SHARED_STATE_SPECS = /[\\/]settings\.spec\.ts$/;
+/** Specs of the till tablet (SPEC-tablet-kiosk): their own project at 1280×800, never at 390×844. */
+const TABLET_SPECS = /tablet.*\.spec\.ts$/;
+/** Tablet specs that change the settings row (the USB reader format): serial, after all the rest. */
+const TABLET_SHARED_STATE_SPECS = /tablet-settings\.spec\.ts$/;
+/** The till tablet: BESTTAB A20, 10,1″, 1280×800 landscape, touch, no NFC (CLAUDE.md). */
+const TABLET_DEVICE = {
+  ...devices['Desktop Chrome'],
+  viewport: { width: 1280, height: 800 },
+  hasTouch: true,
+};
 
 /**
  * E2E always runs against the local Supabase stack, never against the staging project that `.env`
@@ -41,7 +51,7 @@ export default defineConfig({
       name: 'phone',
       // Main target: Android phone, 390×844 (CLAUDE.md).
       use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
-      testIgnore: SHARED_STATE_SPECS,
+      testIgnore: [SHARED_STATE_SPECS, TABLET_SPECS],
     },
     {
       // Specs that change the one shared configuration row: they run after every `phone` test,
@@ -49,7 +59,22 @@ export default defineConfig({
       name: 'phone-settings',
       use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
       testMatch: SHARED_STATE_SPECS,
-      dependencies: ['phone'],
+      // After the tablet too: its purchases count points with the initial ratio.
+      dependencies: ['phone', 'tablet'],
+    },
+    {
+      name: 'tablet',
+      use: TABLET_DEVICE,
+      testMatch: TABLET_SPECS,
+      testIgnore: TABLET_SHARED_STATE_SPECS,
+    },
+    {
+      // The USB reader format is in the same shared row: after `phone-settings`, one at a time,
+      // and the initial `hex` is put back (SPEC-tablet-kiosk, point 9).
+      name: 'tablet-settings',
+      use: TABLET_DEVICE,
+      testMatch: TABLET_SHARED_STATE_SPECS,
+      dependencies: ['phone-settings'],
     },
   ],
   webServer: {

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useLatest } from '../../lib/useLatest';
 import { LedgerError } from './types';
 
 /** Where a ledger write stands (SPEC-ledger, points 3, 4 and 7). */
@@ -37,34 +38,35 @@ export function isDefinitive(error: unknown): boolean {
  */
 export function useOperation<T>(run: (operationId: string) => Promise<T>): Operation<T> {
   const [state, setState] = useState<OperationState<T>>({ status: 'idle' });
-  const latestRun = useRef(run);
-  useEffect(() => {
-    latestRun.current = run;
-  }, [run]);
+  // The run of the screen on show (its amount), even for a tap before `useEffect` runs.
+  const latestRun = useLatest(run);
   // Refs, set synchronously, so two taps in the same tick start a single call.
   const busy = useRef(false);
   const pendingId = useRef<string | null>(null);
   // Bumped by reset: an answer of an older attempt is dropped.
   const attempt = useRef(0);
 
-  const send = useCallback(async (operationId: string) => {
-    busy.current = true;
-    const mine = ++attempt.current;
-    setState({ status: 'busy' });
-    try {
-      const result = await latestRun.current(operationId);
-      if (mine !== attempt.current) return;
-      pendingId.current = null;
-      setState({ status: 'done', result });
-    } catch (error) {
-      if (mine !== attempt.current) return;
-      const retryable = !isDefinitive(error);
-      if (!retryable) pendingId.current = null;
-      setState({ status: 'error', error, retryable });
-    } finally {
-      if (mine === attempt.current) busy.current = false;
-    }
-  }, []);
+  const send = useCallback(
+    async (operationId: string) => {
+      busy.current = true;
+      const mine = ++attempt.current;
+      setState({ status: 'busy' });
+      try {
+        const result = await latestRun.current(operationId);
+        if (mine !== attempt.current) return;
+        pendingId.current = null;
+        setState({ status: 'done', result });
+      } catch (error) {
+        if (mine !== attempt.current) return;
+        const retryable = !isDefinitive(error);
+        if (!retryable) pendingId.current = null;
+        setState({ status: 'error', error, retryable });
+      } finally {
+        if (mine === attempt.current) busy.current = false;
+      }
+    },
+    [latestRun],
+  );
 
   const submit = useCallback(async () => {
     if (busy.current) return;

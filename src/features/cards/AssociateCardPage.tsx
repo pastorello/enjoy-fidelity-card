@@ -18,12 +18,17 @@ import { formatCardLabel, shortName } from './formatCard';
 import { NetworkError, type CardSummary } from './types';
 import { useActiveCard } from './useActiveCard';
 import { associatedNotice, useAssociateCard } from './useAssociateCard';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
+import { useUsbCardInput } from '../tablet-kiosk/useUsbCardInput';
 
 const TITLE = 'Associa card';
 const PANEL_TITLE = 'Avvicina la card nuova';
 // The wireframe says «non ci scrive nulla»: superseded by the decision of 2026-11-17 (SPEC-cards, point 4).
 const PANEL_TEXT = 'L’app legge il codice della card e ci scrive il link per vedere i punti.';
 const PANEL_SAVING = 'Associazione in corso…';
+/** On the till tablet (wireframe "Tablet: associa card"): the USB reader reads, and never writes. */
+const USB_PANEL_TITLE = 'Passa la card nuova sul lettore';
+const USB_PANEL_TEXT = 'L’app legge solo il codice della card: non ci scrive nulla.';
 
 /** Why the association got no answer, or an unexpected one. */
 function associateErrorText(error: unknown): string {
@@ -93,6 +98,8 @@ function AssociateCard({
   // «Riprova con un’altra card» unmounts with the notice: the reading panel takes the focus.
   const [focusReading, setFocusReading] = useState(false);
   const association = useAssociateCard(customer.id, activeCard, { writing: rewrite });
+  const usb = useUsbCardInput();
+  const tablet = useTabletLayout();
   const name = shortName(customer.name);
   const editPath = `/clienti/${customer.id}/modifica`;
 
@@ -161,20 +168,19 @@ function AssociateCard({
         }
       : null;
 
-  return (
-    <AppShell
-      title={TITLE}
-      backTo={editPath}
-      actions={
-        <ButtonLink to={editPath} variant="secondary" block>
-          Annulla
-        </ButtonLink>
-      }
-    >
-      <CustomerRowLink customer={customer} />
+  const cancelLink = (
+    <ButtonLink to={editPath} variant="secondary" block>
+      Annulla
+    </ButtonLink>
+  );
+  const reading = (
+    <>
       <CardReadPanel
-        title={PANEL_TITLE}
-        description={association.status === 'associating' ? PANEL_SAVING : PANEL_TEXT}
+        mode={usb ? 'usb' : 'web-nfc'}
+        title={usb ? USB_PANEL_TITLE : PANEL_TITLE}
+        description={
+          association.status === 'associating' ? PANEL_SAVING : usb ? USB_PANEL_TEXT : PANEL_TEXT
+        }
         notice={notice}
         focusOnMount={focusReading}
       />
@@ -196,6 +202,27 @@ function AssociateCard({
           </p>
         )
       )}
+    </>
+  );
+
+  if (tablet) {
+    // Wireframe "Tablet: associa card" (SPEC-tablet-kiosk, point 10): one 560 px column in the
+    // middle, "Annulla" in it rather than in a footer at the bottom edge.
+    return (
+      <AppShell title={TITLE} backTo={editPath}>
+        <CustomerRowLink customer={customer} />
+        <div className={styles.tabletColumn} data-tablet-column="associate">
+          {reading}
+          {cancelLink}
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell title={TITLE} backTo={editPath} actions={cancelLink}>
+      <CustomerRowLink customer={customer} />
+      {reading}
     </AppShell>
   );
 }

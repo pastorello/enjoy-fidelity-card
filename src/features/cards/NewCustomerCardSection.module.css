@@ -73,3 +73,12 @@
   font-size: var(--type-body-size);
   line-height: var(--type-body-line-height);
 }
+
+/* In the Card column of the till tablet (wireframe "Tablet: nuovo cliente"): the mark above the
+   texts, centred, on the column's own raised surface. */
+[data-tablet-column='card'] .section {
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  text-align: center;
+}

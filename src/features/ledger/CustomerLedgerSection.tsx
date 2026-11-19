@@ -51,36 +51,49 @@ function LastMovementsBody({ customerId }: { customerId: string }) {
   );
 }
 
+/** "Registra spesa" and "Riscatta premio" side by side (not for an erased customer). */
+export function CustomerLedgerActions({ customer }: { customer: CustomerSummary }) {
+  if (customer.anonymizedAt !== null) return null;
+  return (
+    <div className={styles.actions}>
+      <ButtonLink to={`/clienti/${customer.id}/spesa`} block>
+        Registra spesa
+      </ButtonLink>
+      <ButtonLink to={`/clienti/${customer.id}/premi`} variant="secondary" block>
+        Riscatta premio
+      </ButtonLink>
+    </div>
+  );
+}
+
+/** ULTIMI MOVIMENTI with the 4 newest movements (rows that are not interactive) and "Vedi tutti". */
+export function CustomerLastMovements({ customer }: { customer: CustomerSummary }) {
+  return (
+    <section aria-labelledby="last-movements" className={styles.section}>
+      <div className={styles.header}>
+        <h2 id="last-movements" className={styles.title}>
+          ULTIMI MOVIMENTI
+        </h2>
+        <Link to={`/clienti/${customer.id}/movimenti`} className={styles.all}>
+          Vedi tutti
+        </Link>
+      </div>
+      <LastMovementsBody customerId={customer.id} />
+    </section>
+  );
+}
+
 /**
  * The ledger part of the Scheda cliente (SPEC-ledger point 8), mounted below the SALDO block:
  * "Registra spesa" and "Riscatta premio" (not for an erased customer), then ULTIMI MOVIMENTI with
- * the 4 newest movements (rows that are not interactive) and "Vedi tutti" to Movimenti.
+ * the 4 newest movements and "Vedi tutti" to Movimenti. On the till tablet the Scheda places the
+ * two parts in their own columns (SPEC-tablet-kiosk, point 10).
  */
 export function CustomerLedgerSection({ customer }: { customer: CustomerSummary }) {
-  const erased = customer.anonymizedAt !== null;
   return (
     <>
-      {!erased && (
-        <div className={styles.actions}>
-          <ButtonLink to={`/clienti/${customer.id}/spesa`} block>
-            Registra spesa
-          </ButtonLink>
-          <ButtonLink to={`/clienti/${customer.id}/premi`} variant="secondary" block>
-            Riscatta premio
-          </ButtonLink>
-        </div>
-      )}
-      <section aria-labelledby="last-movements" className={styles.section}>
-        <div className={styles.header}>
-          <h2 id="last-movements" className={styles.title}>
-            ULTIMI MOVIMENTI
-          </h2>
-          <Link to={`/clienti/${customer.id}/movimenti`} className={styles.all}>
-            Vedi tutti
-          </Link>
-        </div>
-        <LastMovementsBody customerId={customer.id} />
-      </section>
+      <CustomerLedgerActions customer={customer} />
+      <CustomerLastMovements customer={customer} />
     </>
   );
 }

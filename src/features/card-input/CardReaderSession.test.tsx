@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { rootRoute } from '../../app/routes';
 import { AuthProvider } from '../identity/AuthProvider';
 import { RequireAuth } from '../identity/RequireAuth';
+import { RequireCashier } from '../tablet-kiosk/RequireCashier';
 import { SettingsServiceProvider } from '../settings/SettingsProvider';
 import type { Settings } from '../settings/types';
 import { createTestCardReader, type TestCardReader } from '../../test/fakeCardReader';
@@ -48,7 +49,7 @@ function Sheet({ onRead }: { onRead: (name: string, read: CardRead) => void }) {
   return <p>Foglio aperto</p>;
 }
 
-/** The app's providers around RequireAuth with one fake page behind it. */
+/** The app's providers around RequireAuth and RequireCashier with one fake page behind them. */
 function renderFakePage(
   page: ReactNode,
   {
@@ -61,7 +62,12 @@ function renderFakePage(
     [
       {
         ...rootRoute,
-        children: [{ Component: RequireAuth, children: [{ index: true, element: page }] }],
+        children: [
+          {
+            Component: RequireAuth,
+            children: [{ Component: RequireCashier, children: [{ index: true, element: page }] }],
+          },
+        ],
       },
     ],
     { initialEntries: ['/'] },

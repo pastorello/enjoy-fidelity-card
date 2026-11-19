@@ -4,8 +4,10 @@ import { ServerFaultError } from '../../lib/serverFault';
 import type { ServerFault } from '../../lib/serverFault';
 import type {
   AuthService,
+  Device,
   Operator,
   ResetRequestResult,
+  SessionIdentity,
   SignedOutReason,
   SignInResult,
 } from './types';
@@ -18,7 +20,25 @@ export type AuthState =
    */
   | { status: 'error'; fault?: ServerFault }
   | { status: 'signed-out'; reason?: SignedOutReason }
-  | { status: 'signed-in'; operator: Operator };
+  /** An operator account; `hasPin`: whether they have set their till PIN (SPEC-tablet-kiosk, 7). */
+  | { status: 'signed-in'; operator: Operator; hasPin: boolean }
+  /**
+   * A device account (the till tablet, SPEC-tablet-kiosk): its cashier while the turn lasts (null
+   * when there is none or it has ended), the end of that turn and the PIN lock, as the server said
+   * at the last read of the identity.
+   */
+  | ({ status: 'device' } & DeviceSession);
+
+/** What a device session holds, as `app.get_session_identity()` answered. */
+export type DeviceSession = {
+  device: Device;
+  cashier: Operator | null;
+  turnExpiresAt: Date | null;
+  lockSecondsLeft: number;
+};
+
+/** A session the app can use: an operator, or a device with or without a cashier. */
+type ActiveState = Extract<AuthState, { status: 'signed-in' | 'device' }>;
 
 export type SignInOutcome = SignInResult | 'not-enabled' | ServerFault;
 
@@ -58,17 +78,52 @@ type AuthContextValue = {
   /** Leaving the recovery page: a verified link whose password was not saved signs out. */
   abandonRecovery: () => Promise<void>;
   /**
-   * For permission refusals from the server: re-checks the profile. Gone → signed out with
-   * 'not-enabled' (RequireAuth sends to /accedi); present → operator and role updated; network
-   * error → nothing changes. Resolves when the check is over; does nothing when signed out.
+   * For permission refusals from the server: re-checks the identity. Gone → signed out with
+   * 'not-enabled' (RequireAuth sends to /accedi); an operator → operator and role updated; a
+   * device → its cashier as the server has it now, so an ended turn leaves the device without a
+   * cashier instead of signing out; network error → nothing changes. Resolves when the check is
+   * over; does nothing when signed out.
    */
   reportNotEnabled: () => Promise<void>;
+  /**
+   * Reads the identity again from the server (a device's cashier, turn and lock after an unlock,
+   * a route change or the foreground), with the same outcomes as `reportNotEnabled`.
+   */
+  refreshIdentity: () => Promise<void>;
 };
+
+/** The state of a session with this identity, or null when the account is not enabled. */
+function stateOf(identity: SessionIdentity | null): ActiveState | null {
+  if (!identity) return null;
+  if (identity.kind === 'operator') {
+    return { status: 'signed-in', operator: identity.operator, hasPin: identity.hasPin };
+  }
+  const { device, cashier, turnExpiresAt, lockSecondsLeft } = identity;
+  return { status: 'device', device, cashier, turnExpiresAt, lockSecondsLeft };
+}
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function sameOperator(a: Operator, b: Operator): boolean {
+function sameOperator(a: Operator | null, b: Operator | null): boolean {
+  if (a === null || b === null) return a === b;
   return a.id === b.id && a.name === b.name && a.role === b.role;
+}
+
+/** Whether a fresh read changes nothing, so the screens keep the same state object. */
+function sameState(a: AuthState, b: ActiveState): boolean {
+  if (a.status === 'signed-in' && b.status === 'signed-in') {
+    return sameOperator(a.operator, b.operator) && a.hasPin === b.hasPin;
+  }
+  if (a.status === 'device' && b.status === 'device') {
+    return (
+      a.device.id === b.device.id &&
+      a.device.name === b.device.name &&
+      sameOperator(a.cashier, b.cashier) &&
+      a.turnExpiresAt?.getTime() === b.turnExpiresAt?.getTime() &&
+      a.lockSecondsLeft === b.lockSecondsLeft
+    );
+  }
+  return false;
 }
 
 /** Holds who is signed in on this device. Only this feature talks to Supabase Auth. */
@@ -99,10 +154,10 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
     checkedUser.current = null;
     const userId = await service.currentUserId();
     if (!userId) return { status: 'signed-out' };
-    const operator = await service.loadOperator(userId);
-    if (operator) {
+    const next = stateOf(await service.loadIdentity());
+    if (next) {
       checkedUser.current = userId;
-      return { status: 'signed-in', operator };
+      return next;
     }
     await endSession();
     return { status: 'signed-out', reason: 'not-enabled' };
@@ -147,28 +202,25 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   const checking = useRef(false);
 
   // An administrator can remove the account or change its role while the app is open: its token
-  // keeps working until it expires, but the profile is gone or different. Re-check it (one small
-  // query): gone → signed out as not enabled; present → operator and role updated; offline → the
-  // session is kept and the next check tries again.
+  // keeps working until it expires, but the profile is gone or different. On a device the cashier's
+  // turn ends on the server (Cambia, a new unlock elsewhere, 12 hours). Re-check it (one small
+  // query): gone → signed out as not enabled; present → operator and role, or device and cashier,
+  // updated; offline → the session is kept and the next check tries again.
   const recheckProfile = useCallback(async () => {
     const userId = checkedUser.current;
     if (userId === null || signingOut.current) return;
     const check = ++lastCheck.current;
-    let operator: Operator | null;
+    let next: ActiveState | null;
     try {
-      operator = await service.loadOperator(userId);
+      next = stateOf(await service.loadIdentity());
     } catch {
       return;
     }
     // A newer check started, or signed out or switched user, while this one was running.
     if (check !== lastCheck.current || checkedUser.current !== userId) return;
-    if (operator) {
-      const fresh = operator;
-      setState((current) =>
-        current.status === 'signed-in' && sameOperator(current.operator, fresh)
-          ? current
-          : { status: 'signed-in', operator: fresh },
-      );
+    if (next) {
+      const fresh = next;
+      setState((current) => (sameState(current, fresh) ? current : fresh));
       return;
     }
     checkedUser.current = null;
@@ -200,31 +252,34 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   }, [recheckProfile]);
 
   // A server refused an action for lack of permission (42501, not_operator): the profile may be
-  // gone or its role changed. Always checks again, even while a foreground check is running.
+  // gone or its role changed, or the device's turn ended. Always checks again, even while a
+  // foreground check is running. On a device this never signs out by itself: an ended turn leaves
+  // the device without a cashier (SPEC-tablet-kiosk, point 5).
   const reportNotEnabled = useCallback(() => recheckProfile(), [recheckProfile]);
+  const refreshIdentity = useCallback(() => recheckProfile(), [recheckProfile]);
 
   const signIn = useCallback(
     async (email: string, password: string): Promise<SignInOutcome> => {
       const result = await service.signIn(email, password);
       if (result !== 'ok') return result;
       let userId: string | null;
-      let operator: Operator | null;
+      let next: ActiveState | null;
       try {
         userId = await service.currentUserId();
-        operator = userId ? await service.loadOperator(userId) : null;
+        next = userId ? stateOf(await service.loadIdentity()) : null;
       } catch (error) {
         // The session is saved but its profile was never checked: do not keep it.
         await endSession();
         setState({ status: 'signed-out' });
         return error instanceof ServerFaultError ? error.kind : 'network';
       }
-      if (!userId || !operator) {
+      if (!userId || !next) {
         await endSession();
         setState({ status: 'signed-out' });
         return 'not-enabled';
       }
       checkedUser.current = userId;
-      setState({ status: 'signed-in', operator });
+      setState(next);
       return 'ok';
     },
     [service, endSession],
@@ -281,22 +336,22 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       await service.signOutOtherDevices();
 
       let userId: string | null;
-      let operator: Operator | null;
+      let next: ActiveState | null;
       try {
         userId = await service.currentUserId();
-        operator = userId ? await service.loadOperator(userId) : null;
+        next = userId ? stateOf(await service.loadIdentity()) : null;
       } catch (error) {
         // The password is saved and the session kept: "Riprova" loads the profile, as on restore.
         setState(errorState(error));
         return 'ok';
       }
-      if (!userId || !operator) {
+      if (!userId || !next) {
         await endSession();
         setState({ status: 'signed-out', reason: 'not-enabled' });
         return 'not-enabled';
       }
       checkedUser.current = userId;
-      setState({ status: 'signed-in', operator });
+      setState(next);
       return 'ok';
     },
     [service, endSession],
@@ -323,6 +378,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       completeRecovery,
       abandonRecovery,
       reportNotEnabled,
+      refreshIdentity,
     }),
     [
       state,
@@ -334,6 +390,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       completeRecovery,
       abandonRecovery,
       reportNotEnabled,
+      refreshIdentity,
     ],
   );
   return <AuthContext value={value}>{children}</AuthContext>;
@@ -345,9 +402,27 @@ export function useAuth(): AuthContextValue {
   return value;
 }
 
-/** The signed-in operator. Only for screens behind <RequireAuth>. */
+/**
+ * The operator using the app: the signed-in operator, or on a device the cashier whose turn is
+ * running (SPEC-tablet-kiosk, point 11: the existing screens do not change). Only for screens
+ * behind <RequireCashier>, which shows them only with one.
+ */
 export function useCurrentOperator(): Operator {
   const { state } = useAuth();
-  if (state.status !== 'signed-in') throw new Error('useCurrentOperator needs a signed-in user');
-  return state.operator;
+  if (state.status === 'signed-in') return state.operator;
+  if (state.status === 'device' && state.cashier) return state.cashier;
+  throw new Error('useCurrentOperator needs a signed-in operator or a cashier');
+}
+
+/**
+ * The device session (device, cashier, turn and lock), or null when this is not a device. The same
+ * object until the server's answer changes, so it can go in effect dependencies.
+ */
+export function useDevice(): DeviceSession | null {
+  const { state } = useAuth();
+  return useMemo(() => {
+    if (state.status !== 'device') return null;
+    const { device, cashier, turnExpiresAt, lockSecondsLeft } = state;
+    return { device, cashier, turnExpiresAt, lockSecondsLeft };
+  }, [state]);
 }

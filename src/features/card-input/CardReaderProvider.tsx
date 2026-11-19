@@ -7,7 +7,7 @@ const CardReaderContext = createContext<CardReader | null>(null);
 /**
  * Supplies the single card-reading service (SPEC-card-input, point 2): `main.tsx` passes the one with
  * the real adapters, `renderApp` one with fakes. It starts nothing by itself: reading begins only when
- * `CardReaderSession`, inside `RequireAuth`, calls `activate()`.
+ * `CardReaderSession`, inside `RequireCashier`, calls `activate()`.
  */
 export function CardReaderProvider({
   reader,

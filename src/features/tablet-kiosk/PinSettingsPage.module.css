@@ -1,0 +1,43 @@
+/* "PIN della cassa" on the phone: the PIN panel of /cassa (raised surface, white keys), full width. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+  background: var(--color-surface-raised);
+}
+
+.step {
+  margin: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+}
+
+.message {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  font-weight: 600;
+}
+
+.message[role='alert'] {
+  color: var(--color-danger-text);
+}
+
+.message svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}

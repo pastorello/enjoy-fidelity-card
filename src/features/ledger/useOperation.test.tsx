@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
+import { renderHookThenFire } from '../../test/fireAfterCommit';
 import { LedgerError } from './types';
 import { useOperation } from './useOperation';
 
@@ -190,5 +191,18 @@ describe('useOperation', () => {
     await act(async () => result.current.submit());
     expect(first).not.toHaveBeenCalled();
     expect(result.current).toMatchObject({ status: 'done', result: 'second' });
+  });
+
+  it('a submit right after a render runs the run of that render (the amount on screen)', async () => {
+    const typed = vi.fn<(id: string) => Promise<string>>(() => Promise.resolve('12,50'));
+    const shown = vi.fn<(id: string) => Promise<string>>(() => Promise.resolve('125,00'));
+    const hosted = renderHookThenFire(({ run }) => useOperation(run), { run: typed });
+
+    // The keypad shows the new amount; "Conferma" is tapped before `useEffect` has run.
+    hosted.rerenderAndFire({ run: shown }, (operation) => void operation.submit());
+    await act(async () => {});
+
+    expect(typed).not.toHaveBeenCalled();
+    expect(shown).toHaveBeenCalledTimes(1);
   });
 });

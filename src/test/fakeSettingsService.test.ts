@@ -36,6 +36,12 @@ describe('createFakeSettingsService', () => {
     expect(service.update).toHaveBeenCalledTimes(1);
   });
 
+  it('an update with a USB format changes it too', async () => {
+    const { service, current } = createFakeSettingsService();
+    await service.update({ centsPerPoint: 100, confirmThresholdCents: 15000, usbUidFormat: 'dec' });
+    expect(current()).toMatchObject({ centsPerPoint: 100, usbUidFormat: 'dec' });
+  });
+
   it('plays programmed load failures in order, then the last outcome repeats', async () => {
     const { service } = createFakeSettingsService({ loadResults: ['network', 'ok'] });
     const first: unknown = await service.load().catch((error: unknown) => error);

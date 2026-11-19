@@ -1,8 +1,8 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
-import { createFakeAuthService } from '../../test/fakeAuthService';
+import { createFakeAuthService, fakeDevice } from '../../test/fakeAuthService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
 async function fillAndSubmit(email: string, password: string) {
@@ -64,7 +64,7 @@ describe('sign-in page', () => {
 
   it('reports a network failure and stops waiting when the profile cannot be loaded', async () => {
     const fake = createFakeAuthService();
-    fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+    fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
     renderApp('/accedi', fake);
     await fillAndSubmit('giulia@example.com', 'password-di-prova');
     expect(await screen.findByRole('alert')).toHaveTextContent(
@@ -79,7 +79,7 @@ describe('sign-in page', () => {
     ['unavailable', 'Servizio momentaneamente non disponibile: riprova tra poco.'],
   ] as const)('tells a %s server apart from a missing connection', async (kind, message) => {
     const fake = createFakeAuthService();
-    fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+    fake.service.loadIdentity.mockRejectedValueOnce(new ServerFaultError(kind));
     renderApp('/accedi', fake);
     await fillAndSubmit('giulia@example.com', 'password-di-prova');
     expect(await screen.findByRole('alert')).toHaveTextContent(message);
@@ -109,6 +109,79 @@ describe('sign-in page', () => {
 
   it('leaves the page when already signed in', async () => {
     const { router } = renderApp('/accedi', signedInFake());
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+  });
+});
+
+const TABLET_NOTE =
+  'Sul tablet della cassa si accede una volta con l’account del bar; poi ognuno si alterna con il proprio PIN.';
+
+/** A matchMedia that answers every query with `matches`: true is the 1280×800 tablet. */
+function stubLayout(matches: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+describe('sign-in page on the cash-desk tablet (SPEC-tablet-kiosk, point 2)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the phone page at 390 px: no tablet note, the accounts note as before', async () => {
+    stubLayout(false);
+    renderApp('/accedi');
+    await screen.findByRole('heading', { level: 1, name: 'Accedi' });
+    expect(screen.queryByText(TABLET_NOTE)).not.toBeInTheDocument();
+    expect(screen.getByText(/Gli account li crea un amministratore/)).toBeInTheDocument();
+    expect(screen.getByRole('main')).not.toHaveAttribute('data-tablet', 'true');
+  });
+
+  it('shows the tablet note below "Password dimenticata?" in the tablet layout', async () => {
+    stubLayout(true);
+    renderApp('/accedi');
+    await screen.findByRole('heading', { level: 1, name: 'Accedi' });
+    const note = screen.getByText(TABLET_NOTE);
+    const link = screen.getByRole('link', { name: 'Password dimenticata?' });
+    expect(link).toHaveAttribute('href', '/password-dimenticata');
+    expect(link.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Wireframe "Tablet: accesso": the tablet note takes the place of the phone one.
+    expect(screen.queryByText(/Gli account li crea un amministratore/)).not.toBeInTheDocument();
+    expect(screen.getByRole('main')).toHaveAttribute('data-tablet', 'true');
+  });
+
+  it('sends a device account to "Chi è alla cassa?" after signing in', async () => {
+    stubLayout(true);
+    const fake = createFakeAuthService({ device: fakeDevice });
+    const { router } = renderApp('/accedi', fake);
+    await fillAndSubmit('cassa@example.com', 'password-di-prova');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
+    expect(await screen.findByRole('group', { name: 'Operatori' })).toBeInTheDocument();
+  });
+
+  it('sends a device to /cassa even when another page was asked for', async () => {
+    const fake = createFakeAuthService({ device: fakeDevice });
+    const { router } = renderApp('/impostazioni', fake);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    await fillAndSubmit('cassa@example.com', 'password-di-prova');
+    await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
+  });
+
+  it('leaves the page for /cassa when a device session is already saved', async () => {
+    const { router } = renderApp(
+      '/accedi',
+      createFakeAuthService({ userId: 'u', device: fakeDevice }),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
+  });
+
+  it('still sends an operator to the home on the tablet', async () => {
+    stubLayout(true);
+    const { router } = renderApp('/accedi');
+    await fillAndSubmit('giulia@example.com', 'password-di-prova');
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
   });
 });
@@ -151,7 +224,7 @@ describe('protected pages', () => {
     'word a %s server when the saved profile cannot be loaded for that',
     async (kind, message) => {
       const fake = signedInFake();
-      fake.service.loadOperator.mockRejectedValueOnce(new ServerFaultError(kind));
+      fake.service.loadIdentity.mockRejectedValueOnce(new ServerFaultError(kind));
       renderApp('/', fake);
       expect(await screen.findByText(message)).toBeInTheDocument();
       expect(screen.queryByText('Controlla la connessione e riprova.')).not.toBeInTheDocument();
@@ -160,7 +233,7 @@ describe('protected pages', () => {
 
   it('keep the fault message when "Riprova" fails again with a fault', async () => {
     const fake = signedInFake();
-    fake.service.loadOperator
+    fake.service.loadIdentity
       .mockRejectedValueOnce(new Error('offline'))
       .mockRejectedValueOnce(new ServerFaultError('misconfigured'));
     renderApp('/', fake);
@@ -168,12 +241,12 @@ describe('protected pages', () => {
     expect(
       await screen.findByText('Servizio non configurato: chiedi a un amministratore.'),
     ).toBeInTheDocument();
-    expect(fake.service.loadOperator).toHaveBeenCalledTimes(2);
+    expect(fake.service.loadIdentity).toHaveBeenCalledTimes(2);
   });
 
   it('offer "Riprova" when the profile cannot be loaded', async () => {
     const fake = signedInFake();
-    fake.service.loadOperator.mockRejectedValueOnce(new Error('offline'));
+    fake.service.loadIdentity.mockRejectedValueOnce(new Error('offline'));
     renderApp('/', fake);
     await userEvent.click(await screen.findByRole('button', { name: 'Riprova' }));
     expect(
