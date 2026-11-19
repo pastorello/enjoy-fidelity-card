@@ -6,16 +6,23 @@ export const seedAccounts = {
   operator: { email: 'operatore@example.com', name: 'Operatore Prova' },
   /** Reserved to e2e/password.spec.ts, which changes its password: no other test signs in with it. */
   recovery: { email: 'recupero@example.com', name: 'Recupero Prova' },
+  /**
+   * Reserved to e2e/tablet-pin.spec.ts, which sets its till PIN from the phone (it starts without
+   * one): no other test signs in with it or unlocks the till with it.
+   */
+  pin: { email: 'pin@example.com', name: 'Pin Prova' },
 } as const;
 
 /**
  * Fake device accounts of the till tablet (supabase/seed.sql, tablet-kiosk). `till` is the tablet
  * of the E2E flows; `lockedTill` is reserved to the 5-wrong-PIN test, so its lock never stops the
- * others.
+ * others; `pinTill` is reserved to e2e/tablet-pin.spec.ts, so its cashier never replaces the one of
+ * the tests on `till` running at the same time.
  */
 export const seedDevices = {
   till: { email: 'cassa@example.com', name: 'Tablet cassa' },
   lockedTill: { email: 'cassa-blocco@example.com', name: 'Tablet blocco' },
+  pinTill: { email: 'cassa-pin@example.com', name: 'Tablet cambio PIN' },
 } as const;
 
 /** Fake till PINs of the seed operators (supabase/seed.sql). */

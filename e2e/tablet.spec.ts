@@ -4,6 +4,16 @@ import { SEED_PASSWORD, SEED_PINS, seedAccounts, seedDevices, signInDevice } fro
 import { runSql } from './db';
 import { expect, test } from './fixtures';
 import { asWebNfc, freshUid, uniqueName } from './nfc';
+import {
+  REPEAT_WINDOW_MS,
+  cashierOf,
+  operatorButton,
+  operatorId,
+  passOnUsbReader,
+  readOnUsbReader,
+  resetDevice,
+  tapPin,
+} from './tablet';
 
 /**
  * The till tablet end to end (docs/specs/SPEC-tablet-kiosk.md, Testing Strategy; criteria 1, 2,
@@ -15,39 +25,6 @@ import { asWebNfc, freshUid, uniqueName } from './nfc';
 
 /** Same origin as playwright.config.ts (LOCAL_SUPABASE_URL). */
 const LOCAL_SUPABASE_URL = 'http://localhost:54321';
-/** The reader ignores the same uid for this long after a read (card-input, REPEAT_WINDOW_MS). */
-const REPEAT_WINDOW_MS = 2500;
-
-/** A card on the USB reader: the uid as a fast burst of keys closed by Enter. */
-async function passOnUsbReader(page: Page, uid: string) {
-  await page.keyboard.type(uid, { delay: 0 });
-  await page.keyboard.press('Enter');
-}
-
-/**
- * A card on the USB reader from a screen that reads cards, until the app goes to `next`. The reader
- * turns on once the settings (the USB format) are loaded, which no text shows yet: a burst sent
- * before is not a read, and is passed again. A second burst of a card already read is harmless:
- * the reader ignores the same uid within REPEAT_WINDOW_MS.
- */
-async function readOnUsbReader(page: Page, uid: string, next: string) {
-  await expect(async () => {
-    if (new URL(page.url()).pathname === '/') await passOnUsbReader(page, uid);
-    await expect(page).toHaveURL(next, { timeout: 1000 });
-  }).toPass({ timeout: 8000 });
-}
-
-/** Taps a PIN on the keypad of /cassa, one key after the other. */
-async function tapPin(page: Page, pin: string) {
-  const keypad = page.getByRole('group', { name: 'Tastierino PIN' });
-  await pin
-    .split('')
-    .reduce(
-      (typed, digit) =>
-        typed.then(() => keypad.getByRole('button', { name: digit, exact: true }).click()),
-      Promise.resolve(),
-    );
-}
 
 /** Types an amount on the app's keypad, digit by digit, as on a POS. */
 async function typeAmount(page: Page, digits: string) {
@@ -66,10 +43,6 @@ async function expectKeypadOff(page: Page) {
   const keys = page.getByRole('group', { name: 'Tastierino PIN' }).getByRole('button');
   await expect(keys).toHaveCount(11);
   await Promise.all((await keys.all()).map((key) => expect(key).toBeDisabled()));
-}
-
-function operatorButton(page: Page, name: string) {
-  return page.getByRole('group', { name: 'Operatori' }).getByRole('button', { name });
 }
 
 /** The publishable key and an access token of a seed account, from the local Auth. */
@@ -95,19 +68,6 @@ async function signedInApi(
       : null;
   if (typeof token !== 'string') throw new Error('Auth gave no access token.');
   return { key, token };
-}
-
-/** The id of a seed operator, by name. */
-function operatorId(name: string): string {
-  return runSql(`select id from app.operators where name = :'name';`, { name });
-}
-
-/** Who the server holds as the cashier of a device (empty: none). */
-function cashierOf(device: string): string {
-  return runSql(
-    `select coalesce(cashier_operator_id::text, '') from app.devices where name = :'name';`,
-    { name: device },
-  );
 }
 
 test.describe('the till tablet, with its own device account', () => {
@@ -225,12 +185,7 @@ test('5 wrong PINs lock the till, even after a reload; the 6th, right, is refuse
   request,
 }) => {
   // A tablet of its own, without a lock left by an earlier run.
-  runSql(
-    `update app.devices set failed_pin_attempts = 0, locked_until = null,
-       cashier_operator_id = null, cashier_since = null
-     where name = :'name';`,
-    { name: seedDevices.lockedTill.name },
-  );
+  resetDevice(seedDevices.lockedTill.name);
   await signInDevice(page, seedDevices.lockedTill.email);
   await operatorButton(page, seedAccounts.operator.name).click();
   const panel = page.getByRole('complementary', { name: 'PIN' });

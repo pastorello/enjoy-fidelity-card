@@ -6,7 +6,9 @@
 -- which changes its password: no other test signs in with it.
 -- tablet-kiosk: pin@example.com is reserved to the E2E that sets a PIN from the phone (it starts
 -- without one); cassa@example.com is the till tablet (device account) and cassa-blocco@example.com
--- a second tablet reserved to the E2E of the 5-wrong-PIN lock, so the lock never stops other tests.
+-- a second tablet reserved to the E2E of the 5-wrong-PIN lock, so the lock never stops other tests;
+-- cassa-pin@example.com a third tablet reserved to the E2E of the PIN set from the phone, so its
+-- cashier never replaces the one of the tests on cassa@example.com running at the same time.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
@@ -22,7 +24,8 @@ from (values
   ('33333333-3333-4333-8333-333333333333'::uuid, 'recupero@example.com'),
   ('44444444-4444-4444-8444-444444444444'::uuid, 'pin@example.com'),
   ('55555555-5555-4555-8555-555555555555'::uuid, 'cassa@example.com'),
-  ('66666666-6666-4666-8666-666666666666'::uuid, 'cassa-blocco@example.com')
+  ('66666666-6666-4666-8666-666666666666'::uuid, 'cassa-blocco@example.com'),
+  ('77777777-7777-4777-8777-777777777777'::uuid, 'cassa-pin@example.com')
 ) as fake (id, email);
 
 insert into auth.identities (
@@ -34,7 +37,8 @@ select
   now(), now(), now()
 from auth.users
 where email in ('admin@example.com', 'operatore@example.com', 'recupero@example.com',
-                'pin@example.com', 'cassa@example.com', 'cassa-blocco@example.com');
+                'pin@example.com', 'cassa@example.com', 'cassa-blocco@example.com',
+                'cassa-pin@example.com');
 
 select private.add_operator('admin@example.com', 'Admin Prova', 'admin');
 select private.add_operator('operatore@example.com', 'Operatore Prova', 'operator');
@@ -44,6 +48,7 @@ select private.add_operator('pin@example.com', 'Pin Prova', 'operator');
 -- Device accounts (tablet-kiosk): no cashier, unlocked.
 select private.add_device('cassa@example.com', 'Tablet cassa');
 select private.add_device('cassa-blocco@example.com', 'Tablet blocco');
+select private.add_device('cassa-pin@example.com', 'Tablet cambio PIN');
 
 -- Fake till PINs (tablet-kiosk), stored as set_my_pin stores them (bcrypt, cost 8):
 -- Admin Prova 2468, Operatore Prova 1357, Recupero Prova 8024. Pin Prova has none.
