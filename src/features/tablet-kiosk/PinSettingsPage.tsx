@@ -40,10 +40,14 @@ export function PinSettingsPage() {
   const [first, setFirst] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  // Set once the step has changed: from then on the live region says the current step.
+  const [announced, setAnnounced] = useState(false);
+  const step = first === null ? 'Scegli il PIN' : 'Ripeti il PIN';
 
   if (state.status === 'device') return <Navigate to="/" replace />;
 
   function startAgain(reason: Failure) {
+    setAnnounced(true);
     setFirst(null);
     setPin('');
     setFailure(reason);
@@ -78,6 +82,7 @@ export function PinSettingsPage() {
 
   function complete(entered: string) {
     if (first === null) {
+      setAnnounced(true);
       setFirst(entered);
       setPin('');
       return;
@@ -92,10 +97,22 @@ export function PinSettingsPage() {
   return (
     <AppShell title={PAGE_TITLE} backTo="/impostazioni">
       <section aria-labelledby="pin-step" className={styles.panel}>
-        <h2 id="pin-step" className={styles.step}>
-          {first === null ? 'Scegli il PIN' : 'Ripeti il PIN'}
-        </h2>
-        <PinPad value={pin} onChange={change} onComplete={complete} disabled={saving} />
+        <PinPad
+          heading={
+            <h2 id="pin-step" className={styles.step}>
+              {step}
+            </h2>
+          }
+          value={pin}
+          onChange={change}
+          onComplete={complete}
+          disabled={saving}
+        />
+        {/* The heading changes silently and the focus stays on the key: the step is said here. On
+            the page from the start, empty until the first change, so TalkBack reads each one. */}
+        <p className="visually-hidden" aria-live="polite" data-testid="pin-step-announcer">
+          {announced ? step : ''}
+        </p>
         {failure && (
           <p role="alert" className={styles.message}>
             <Icon name={failure === 'network' ? 'wifi-off' : 'circle-alert'} size={20} />

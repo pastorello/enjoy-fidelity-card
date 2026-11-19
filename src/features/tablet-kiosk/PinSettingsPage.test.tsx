@@ -69,6 +69,21 @@ describe('PIN della cassa (/impostazioni/pin)', () => {
     expect(screen.getByRole('img', { name: '0 cifre su 4 inserite' })).toBeInTheDocument();
   });
 
+  it('announces each step to screen readers: «Ripeti il PIN», then «Scegli il PIN» again', async () => {
+    openPinPage();
+    await findStep('Scegli il PIN');
+    const announcer = screen.getByTestId('pin-step-announcer');
+    expect(announcer).toHaveAttribute('aria-live', 'polite');
+    // Empty at first: the heading says the first step, and an announcement on load would repeat it.
+    expect(announcer).toHaveTextContent(/^$/);
+    await type('2468');
+    await findStep('Ripeti il PIN');
+    expect(announcer).toHaveTextContent('Ripeti il PIN');
+    await type('2469');
+    await findStep('Scegli il PIN');
+    expect(announcer).toHaveTextContent('Scegli il PIN');
+  });
+
   it('a different repetition says so and starts again, saving nothing', async () => {
     const { kiosk, marco } = openPinPage();
     await findStep('Scegli il PIN');

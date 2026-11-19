@@ -267,13 +267,15 @@ function CashierChooser({ turnEnded, lockSeconds }: { turnEnded: boolean; lockSe
         </div>
         {ready && (
           <aside aria-label="PIN" className={styles.pinPanel}>
-            <h2
-              className={styles.pinTitle}
-              data-body-font={chosen !== null && NOT_IN_DISPLAY.test(chosen.name)}
-            >
-              {chosen ? `PIN di ${chosen.name}` : CHOOSE_TITLE}
-            </h2>
             <PinPad
+              heading={
+                <h2
+                  className={styles.pinTitle}
+                  data-body-font={chosen !== null && NOT_IN_DISPLAY.test(chosen.name)}
+                >
+                  {chosen ? `PIN di ${chosen.name}` : CHOOSE_TITLE}
+                </h2>
+              }
               value={pin}
               onChange={setPin}
               onComplete={(entered) => {

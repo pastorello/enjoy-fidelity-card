@@ -26,6 +26,10 @@
   font-weight: 600;
 }
 
+.message[role='alert'] {
+  color: var(--color-danger-text);
+}
+
 .message svg {
   flex-shrink: 0;
   margin-top: 2px;

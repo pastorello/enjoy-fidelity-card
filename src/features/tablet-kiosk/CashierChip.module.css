@@ -1,7 +1,8 @@
 /* "Alla cassa: <nome> · Cambia" (wireframes "Tablet: …"): a 48 px outlined chip on the green
-   header, the cashier's initial in a white circle. */
+   header, the cashier's initial in a white circle. It shrinks with the header (phone width, split
+   screen, a long name): the name is cut with an ellipsis, the link keeps its full accessible name. */
 .chip {
-  flex-shrink: 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -10,12 +11,25 @@
   border: 2px solid var(--color-on-green);
   color: var(--color-on-green);
   text-decoration: none;
-  white-space: nowrap;
   font-family: var(--type-label-family);
   font-size: var(--type-label-size);
   line-height: var(--type-label-line-height);
   font-weight: var(--type-label-weight);
   letter-spacing: var(--type-label-letter-spacing);
+}
+
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A plain space after the name, not the chip's gap. */
+.change {
+  flex-shrink: 0;
+  margin-inline-start: calc(var(--space-1) - var(--space-2));
+  white-space: nowrap;
 }
 
 .initial {

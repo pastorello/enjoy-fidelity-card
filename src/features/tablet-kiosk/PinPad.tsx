@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { Icon } from '../../shared/ui/Icon';
 import styles from './PinPad.module.css';
 
@@ -13,6 +13,8 @@ type PinPadProps = {
   onComplete: (pin: string) => void;
   /** No operator chosen, verification running or lockout: taps are ignored. */
   disabled?: boolean;
+  /** The title above the dots ("PIN di Giulia"), grouped with them as in the wireframe. */
+  heading?: ReactNode;
 };
 
 const DOT_SIZE = 20;
@@ -37,7 +39,7 @@ function dotsLabel(count: number): string {
  * the parent re-renders both see the same stale `value`, and without the ref the second would
  * complete the PIN twice.
  */
-export function PinPad({ value, onChange, onComplete, disabled = false }: PinPadProps) {
+export function PinPad({ value, onChange, onComplete, disabled = false, heading }: PinPadProps) {
   const entered = useRef(value);
   useLayoutEffect(() => {
     entered.current = value;
@@ -61,27 +63,30 @@ export function PinPad({ value, onChange, onComplete, disabled = false }: PinPad
   const count = Math.min(value.length, PIN_LENGTH);
   return (
     <div className={styles.pinPad}>
-      {/* An SVG, so `role="img"` sits on an element that is one (wireframe: 20 px dots, 16 px apart). */}
-      <svg
-        role="img"
-        aria-label={dotsLabel(count)}
-        className={styles.dots}
-        width={DOTS_WIDTH}
-        height={DOT_SIZE}
-        viewBox={`0 0 ${DOTS_WIDTH} ${DOT_SIZE}`}
-      >
-        {Array.from({ length: PIN_LENGTH }, (_, index) => (
-          <circle
-            key={index}
-            className={styles.dot}
-            data-filled={index < count}
-            cx={index * (DOT_SIZE + DOT_GAP) + DOT_SIZE / 2}
-            cy={DOT_SIZE / 2}
-            r={(DOT_SIZE - DOT_STROKE) / 2}
-            strokeWidth={DOT_STROKE}
-          />
-        ))}
-      </svg>
+      <div className={styles.display}>
+        {heading}
+        {/* An SVG, so `role="img"` sits on an element that is one (wireframe: 20 px dots, 16 px apart). */}
+        <svg
+          role="img"
+          aria-label={dotsLabel(count)}
+          className={styles.dots}
+          width={DOTS_WIDTH}
+          height={DOT_SIZE}
+          viewBox={`0 0 ${DOTS_WIDTH} ${DOT_SIZE}`}
+        >
+          {Array.from({ length: PIN_LENGTH }, (_, index) => (
+            <circle
+              key={index}
+              className={styles.dot}
+              data-filled={index < count}
+              cx={index * (DOT_SIZE + DOT_GAP) + DOT_SIZE / 2}
+              cy={DOT_SIZE / 2}
+              r={(DOT_SIZE - DOT_STROKE) / 2}
+              strokeWidth={DOT_STROKE}
+            />
+          ))}
+        </svg>
+      </div>
       <fieldset aria-label="Tastierino PIN" disabled={disabled} className={styles.keypad}>
         {DIGITS.map((digit) => (
           <button
