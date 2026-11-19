@@ -12,6 +12,8 @@ import { CardReadPanel } from '../card-input/CardReadPanel';
 import { homeCardNotice } from '../cards/homeCardNotice';
 import { useHomeCardRead } from '../cards/useHomeCardRead';
 import { useCurrentOperator } from '../identity/AuthProvider';
+import { UsbReaderStatus } from '../tablet-kiosk/UsbReaderStatus';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import styles from './HomePage.module.css';
 import { customerBackState } from './customerBack';
 import { loadErrorText } from './loadErrorText';
@@ -111,12 +113,23 @@ const CARD_PANEL_TITLE = 'Avvicina la card';
 const CARD_PANEL_TEXT =
   'Lettura attiva: appoggia la card sul retro del telefono. Una card nuova apre la registrazione del cliente.';
 
+/** Texts of the reader column on the till tablet (wireframe "Tablet: cerca cliente"). */
+const TABLET_PANEL_TITLE = 'Passa la card sul lettore';
+const TABLET_PANEL_TEXT =
+  'L’app riceve il codice dal lettore da sola, senza bisogno di toccare un campo. Una card nuova apre la registrazione del cliente.';
+
 /** The panel's text while `cards` looks the card up (SPEC-cards, point 1). */
 const CARD_PANEL_READING = 'Lettura della card…';
 
-/** Home "Cerca cliente": card panel, search by name or phone, SERVITI OGGI, "Nuovo cliente". */
+/**
+ * Home "Cerca cliente": card panel, search by name or phone, SERVITI OGGI, "Nuovo cliente". On the
+ * till tablet (SPEC-tablet-kiosk, point 10) the same page in two columns: the USB reader on the left,
+ * the search with "Nuovo cliente" beside it and SERVITI OGGI in two columns on the right.
+ */
 export function HomePage() {
   const operator = useCurrentOperator();
+  // 1280×800: the reader column on the left, the search and SERVITI OGGI beside it.
+  const tablet = useTabletLayout();
   const served = useServedToday();
   const [searchParams, setSearchParams] = useSearchParams();
   // The text lives in the URL too (`?q=`, replaced), so "Indietro" from a customer finds it again.
@@ -174,39 +187,63 @@ export function HomePage() {
     );
   }
 
-  return (
-    <AppShell
-      account={{ name: operator.name, to: '/impostazioni' }}
-      actions={
-        prefill === null ? (
-          <ButtonLink to="/clienti/nuovo" variant="secondary" icon="plus" block>
-            Nuovo cliente
-          </ButtonLink>
-        ) : (
-          <ButtonLink
-            to={`/clienti/nuovo?${new URLSearchParams({ nome: prefill }).toString()}`}
-            icon="plus"
-            block
-          >
-            {newCustomerLabel(prefill)}
-          </ButtonLink>
-        )
-      }
-    >
-      <NavigationNotice />
+  const newCustomerAction =
+    prefill === null ? (
+      <ButtonLink
+        to="/clienti/nuovo"
+        variant="secondary"
+        icon="plus"
+        block={!tablet}
+        className={tablet ? styles.tabletAction : undefined}
+      >
+        Nuovo cliente
+      </ButtonLink>
+    ) : (
+      <ButtonLink
+        to={`/clienti/nuovo?${new URLSearchParams({ nome: prefill }).toString()}`}
+        icon="plus"
+        block={!tablet}
+        className={tablet ? styles.tabletAction : undefined}
+      >
+        {newCustomerLabel(prefill)}
+      </ButtonLink>
+    );
+
+  // On the tablet the reader column stays in full whatever is searched (wireframe "Tablet: cerca
+  // cliente"); on the phone the panel shrinks to one line while a search is shown.
+  const cardPanel = tablet ? (
+    <div className={styles.readerColumn}>
       <CardReadPanel
-        title={CARD_PANEL_TITLE}
-        description={cardRead.status === 'reading' ? CARD_PANEL_READING : CARD_PANEL_TEXT}
-        variant={searching && cardRead.status === 'idle' ? 'compact' : 'full'}
+        mode="usb"
+        title={TABLET_PANEL_TITLE}
+        description={cardRead.status === 'reading' ? CARD_PANEL_READING : TABLET_PANEL_TEXT}
         notice={cardNotice}
       />
-      <SearchField
-        ref={searchInput}
-        label={searching ? 'Cerca per nome o telefono' : 'Oppure cerca per nome o telefono'}
-        placeholder="Es. Rossi o 4521"
-        value={text}
-        onChange={changeText}
-      />
+      <UsbReaderStatus />
+    </div>
+  ) : (
+    <CardReadPanel
+      title={CARD_PANEL_TITLE}
+      description={cardRead.status === 'reading' ? CARD_PANEL_READING : CARD_PANEL_TEXT}
+      variant={searching && cardRead.status === 'idle' ? 'compact' : 'full'}
+      notice={cardNotice}
+    />
+  );
+
+  const searchField = (
+    <SearchField
+      ref={searchInput}
+      label={
+        searching && !tablet ? 'Cerca per nome o telefono' : 'Oppure cerca per nome o telefono'
+      }
+      placeholder="Es. Rossi o 4521"
+      value={text}
+      onChange={changeText}
+    />
+  );
+
+  const results = (
+    <>
       {/* On the page from the start: TalkBack does not read a live region that arrives with its text. */}
       <p className="visually-hidden" aria-live="polite" data-testid="search-announcer">
         {searchAnnouncement(search)}
@@ -258,6 +295,33 @@ export function HomePage() {
       {!searching && (
         <ServedTodaySection served={served} headingRef={servedHeading} onRetry={retryServed} />
       )}
+    </>
+  );
+
+  if (tablet) {
+    return (
+      <AppShell account={{ name: operator.name, to: '/impostazioni' }}>
+        <div className={styles.tabletLayout} data-tablet="true">
+          {cardPanel}
+          <div className={styles.tabletContent}>
+            <NavigationNotice />
+            <div className={styles.searchRow}>
+              <div className={styles.searchCell}>{searchField}</div>
+              {newCustomerAction}
+            </div>
+            {results}
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell account={{ name: operator.name, to: '/impostazioni' }} actions={newCustomerAction}>
+      <NavigationNotice />
+      {cardPanel}
+      {searchField}
+      {results}
     </AppShell>
   );
 }
