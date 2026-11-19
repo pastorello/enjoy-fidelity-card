@@ -82,20 +82,52 @@ test.describe('the till tablet, with its own device account', () => {
     await page.goto('/');
     await expect(page).toHaveURL(/\/cassa$/);
 
+    // Any card lookup sent from /cassa would mean the reader is on there.
+    const lookups: string[] = [];
+    page.on('request', (request) => {
+      if (request.url().endsWith('/rest/v1/rpc/lookup_card')) lookups.push(request.url());
+    });
+    // Keys that reach the document, counted on <html>: the USB wedge listens there (after
+    // `window`, where /cassa stops them).
+    await page.evaluate(() => {
+      const root = document.documentElement;
+      document.addEventListener(
+        'keydown',
+        () => {
+          root.dataset['keysOnDocument'] = String(Number(root.dataset['keysOnDocument'] ?? 0) + 1);
+        },
+        { capture: true },
+      );
+    });
+
     const operator = operatorButton(page, seedAccounts.operator.name);
     await operator.click();
     await expect(operator).toHaveAttribute('aria-pressed', 'true');
     const dots = page.getByRole('complementary', { name: 'PIN' }).getByRole('img');
     await expect(dots).toHaveAccessibleName('0 cifre su 4 inserite');
 
-    // The chosen operator's button has the focus: the reader's Enter must not press it either.
-    await operator.focus();
+    // A key of the PIN pad has the focus: the reader's Enter must not press it.
+    const one = page
+      .getByRole('group', { name: 'Tastierino PIN' })
+      .getByRole('button', { name: '1', exact: true });
+    await one.focus();
+    await passOnUsbReader(page, freshUid());
+    // Another operator's button has the focus: the reader's Enter must not choose them.
+    const other = operatorButton(page, seedAccounts.admin.name);
+    await expect(other).toHaveAttribute('aria-pressed', 'false');
+    await other.focus();
     await passOnUsbReader(page, freshUid());
     await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(freshUid()));
     await page.waitForTimeout(500);
+
     await expect(page).toHaveURL(/\/cassa$/);
     await expect(dots).toHaveAccessibleName('0 cifre su 4 inserite');
     await expect(operator).toHaveAttribute('aria-pressed', 'true');
+    await expect(other).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      await page.evaluate(() => document.documentElement.dataset['keysOnDocument'] ?? '0'),
+    ).toBe('0');
+    expect(lookups).toEqual([]);
     expect(cashierOf(seedDevices.till.name)).toBe('');
   });
 
@@ -133,6 +165,32 @@ test.describe('the till tablet, with its own device account', () => {
     expect(
       runSql(`select created_by from app.customers where id = :'id';`, { id: customerId }),
     ).toBe(cashier);
+
+    // Associa card: another new card on the USB reader is associated by the cashier; the USB
+    // reader cannot write, so the link stays not written (SPEC-tablet-kiosk, point 8).
+    const second = freshUid();
+    await page.goto(`/clienti/${customerId}/card`);
+    await expect(page.getByText('Passa la card nuova sul lettore')).toBeVisible();
+    await expect(async () => {
+      if (new URL(page.url()).pathname.endsWith('/card')) await passOnUsbReader(page, second);
+      await expect(page).toHaveURL(`/clienti/${customerId}`, { timeout: 1000 });
+    }).toPass({ timeout: 8000 });
+    await expect(page.getByRole('status')).toContainText('Link non scritto');
+    expect(
+      runSql(
+        `select active || '|' || associated_by || '|' || coalesce(link_written_at::text, 'none')
+         from app.cards where uid = :'uid';`,
+        { uid: second },
+      ),
+    ).toBe(`true|${cashier}|none`);
+    // Back to the first card, for the reads below.
+    await page.goto(`/clienti/${customerId}/card`);
+    await expect(page.getByText('Passa la card nuova sul lettore')).toBeVisible();
+    await page.waitForTimeout(REPEAT_WINDOW_MS);
+    await expect(async () => {
+      if (new URL(page.url()).pathname.endsWith('/card')) await passOnUsbReader(page, uid);
+      await expect(page).toHaveURL(`/clienti/${customerId}`, { timeout: 1000 });
+    }).toPass({ timeout: 8000 });
 
     // The same card, read again from the home with the fake reader: Registra spesa.
     await page.goto('/');
