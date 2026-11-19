@@ -17,12 +17,14 @@ export const seedAccounts = {
  * Fake device accounts of the till tablet (supabase/seed.sql, tablet-kiosk). `till` is the tablet
  * of the E2E flows; `lockedTill` is reserved to the 5-wrong-PIN test, so its lock never stops the
  * others; `pinTill` is reserved to e2e/tablet-pin.spec.ts, so its cashier never replaces the one of
- * the tests on `till` running at the same time.
+ * the tests on `till` running at the same time; `layoutTill` likewise for the layout E2E.
  */
 export const seedDevices = {
   till: { email: 'cassa@example.com', name: 'Tablet cassa' },
   lockedTill: { email: 'cassa-blocco@example.com', name: 'Tablet blocco' },
   pinTill: { email: 'cassa-pin@example.com', name: 'Tablet cambio PIN' },
+  /** Reserved to e2e/tablet-layout.spec.ts, which keeps an admin at its till. */
+  layoutTill: { email: 'cassa-layout@example.com', name: 'Tablet layout' },
 } as const;
 
 /** Fake till PINs of the seed operators (supabase/seed.sql). */
