@@ -338,9 +338,9 @@ dal telefono chiude il turno e il tablet torna a `/cassa` alla rotta successiva.
 in un progetto seriale `tablet-settings` dopo `phone-settings`: cassiere admin cambia il formato in
 "Decimale", una lettura decimale da `page.keyboard` trova la card, poi rimette "Esadecimale".
 **Accettazione:**
-- [ ] Criterio 4 provato in E2E
-- [ ] Formato ripristinato a fine test anche in caso di errore (`afterAll`)
-- [ ] Nessun test del progetto `phone` modificato
+- [x] Criterio 4 provato in E2E
+- [x] Formato ripristinato a fine test anche in caso di errore (`afterAll`)
+- [x] Nessun test del progetto `phone` modificato
 **Verifica:** `npm run e2e`
 **Dipendenze:** 16, 17, 19 · **File:** e2e/tablet-pin.spec.ts, e2e/tablet-settings.spec.ts,
 playwright.config.ts · **Dimensione:** M
