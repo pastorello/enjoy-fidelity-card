@@ -442,6 +442,60 @@ describe('a new PIN from the phone (criterion 4)', () => {
     });
     expect(write.error?.code).toBe('42501');
   });
+
+  it('does not deadlock with an unlock of the same cashier on the same tablet', async () => {
+    expect(await unlock(PIN)).toMatchObject({ status: 'ok' });
+    expect(deviceState()).toBe(`0|none|${operatorId}`);
+
+    // The unlock locks the device row first; the window before it reads the PIN row is
+    // widened until set_my_pin is queued on a lock, so the two meet in the worst order.
+    const claims = JSON.stringify({ sub: deviceUserId, role: 'authenticated' });
+    const marker = `deadlock-${randomUUID()}`;
+    const unlockInFlight = runSqlInBackground(
+      `begin;
+       select set_config('request.jwt.claims', :'claims', true);
+       select 1 from app.devices where user_id = :'device'::uuid for update;
+       do $$ /* ${marker} */
+       begin
+         for i in 1..250 loop
+           perform pg_stat_clear_snapshot();
+           if exists (
+             select 1 from pg_stat_activity
+             where pid <> pg_backend_pid() and wait_event_type = 'Lock'
+               and query like '%set_my_pin%'
+           ) then
+             return;
+           end if;
+           perform pg_sleep(0.02);
+         end loop;
+         raise exception 'set_my_pin never queued behind the unlock';
+       end $$;
+       select app.unlock_cashier(:'operator'::uuid, :'pin') ->> 'status';
+       commit;`,
+      { claims, device: deviceUserId, operator: operatorId, pin: PIN },
+    );
+    // set_my_pin is sent only once the device row is locked and the unlock is waiting for it.
+    await vi.waitFor(
+      () => {
+        const waiting = runSql(
+          `select count(*) from pg_stat_activity
+           where pid <> pg_backend_pid() and query like '%pg_stat_clear_snapshot%'
+             and query like :'pattern';`,
+          { pattern: `%${marker}%` },
+        );
+        if (waiting !== '1') throw new Error('The unlock does not hold the device row yet');
+      },
+      { timeout: 2000, interval: 20 },
+    );
+
+    const { error } = await operatorClient.schema('app').rpc('set_my_pin', { p_pin: PIN });
+    const held = await unlockInFlight;
+
+    expect(error).toBeNull();
+    expect(held.split('\n')).toContain('ok');
+    // The new PIN commits after that unlock, so it closes the turn the unlock opened.
+    expect(deviceState()).toBe('0|none|none');
+  });
 });
 
 /** Every key and every string value of an answer, however deep. */
