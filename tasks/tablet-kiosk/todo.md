@@ -356,10 +356,17 @@ lettore" larga 440 con `CardReadPanel mode="usb"` e i testi del wireframe, accan
 SERVITI OGGI. Indicatore "Lettore USB pronto"; se `usb.lastInvalidAt` è più recente di `usb.lastReadAt`
 "Codice non riconosciuto: controlla il formato del lettore in Impostazioni".
 **Accettazione:**
-- [ ] Componente con `matchMedia` tablet: testi del wireframe, indicatore nei due stati; lettura nota →
+- [x] Componente con `matchMedia` tablet: testi del wireframe, indicatore nei due stati; lettura nota →
       Registra spesa, sconosciuta → Nuovo cliente con card (criterio 5)
-- [ ] `HomePage.test.tsx` del telefono invariato
-- [ ] Detector Impeccable pulito; confronto con "Tablet: cerca cliente"
+- [x] `HomePage.test.tsx` del telefono invariato
+- [x] Detector Impeccable pulito; confronto con "Tablet: cerca cliente"
+**Nota:** i test del tablet sono in `HomePage.tablet.test.tsx` (quello del telefono non è toccato) e in
+`UsbReaderStatus.test.tsx`. L'indicatore è un `<output aria-label="Stato del lettore USB">` che resta vuoto
+finché il lettore USB è spento (impostazioni non caricate): "pronto" non va detto se l'app non ascolta. Sul
+tablet la colonna resta intera durante la ricerca (niente riga compatta), quindi il campo tiene "Oppure cerca
+per nome o telefono"; i risultati restano in una colonna, SERVITI OGGI in due; "Nuovo cliente «nome»" occupa
+al massimo metà riga e va a capo. Colonna sticky alta quanto lo schermo sotto l'intestazione; misurata 440 px
+a 1280×800 (screenshot confrontato con il wireframe).
 **Verifica:** `npm test -- HomePage`
 **Dipendenze:** 16 · **File:** src/features/customers/HomePage.tsx (+ .module.css, .test.tsx),
 src/features/tablet-kiosk/UsbReaderStatus.tsx · **Dimensione:** M
