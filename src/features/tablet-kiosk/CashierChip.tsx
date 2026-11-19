@@ -41,9 +41,12 @@ export function CashierChip({ name }: { name: string }) {
       <span aria-hidden="true" className={styles.initial}>
         {initialOf(name)}
       </span>
-      {/* A long name, or a narrow header, cuts the name with an ellipsis, never "Cambia". */}
+      {/* A long name cuts the name with an ellipsis, never "Cambia". In a narrow window only the
+          initial and "Cambia" show; the link keeps its full name. */}
       <span className={styles.name}>Alla cassa: {name}</span>{' '}
-      <span className={styles.change}>· Cambia</span>
+      <span className={styles.change}>
+        <span className={styles.separator}>·</span> Cambia
+      </span>
     </Link>
   );
 }

@@ -30,6 +30,12 @@ describe('"Alla cassa: <nome> · Cambia" chip', () => {
     expect(name).toMatch(/white-space:\s*nowrap/);
     expect(declarationsOf(CHIP, '.change')).toMatch(/flex-shrink:\s*0/);
   });
+
+  it('shows only the initial and "Cambia" under the tablet width, the name hidden for the eyes only', () => {
+    const css = readFileSync(CHIP, 'utf8');
+    const narrow = /@media \(max-width: 1023px\) \{([\s\S]*?)\n\}/.exec(css)?.[1] ?? '';
+    expect(narrow).toMatch(/\.name,\s*\.separator\s*\{[^}]*clip-path:\s*inset\(50%\)/);
+  });
 });
 
 describe('PIN della cassa', () => {
