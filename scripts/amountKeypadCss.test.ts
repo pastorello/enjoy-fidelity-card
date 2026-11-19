@@ -8,7 +8,7 @@ const css = readFileSync('src/features/ledger/AmountKeypad.module.css', 'utf8');
 
 function declarationsOf(selector: string): string {
   const escaped = selector.replace(/[.[\]'=]/g, '\\$&');
-  return new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+  return new RegExp(`(?:^|\\}|\\*/)\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
 }
 
 function heightOf(selector: string): number {
@@ -19,6 +19,15 @@ describe('AmountKeypad stylesheet', () => {
   it('makes amount keys 64 px tall and free reward keys 56 px tall', () => {
     expect(heightOf(".keypad[data-variant='amount'] .key")).toBe(64);
     expect(heightOf(".keypad[data-variant='points'] .key")).toBe(56);
+  });
+
+  it('makes the keys of the till tablet 120 px (amount) and 104 px (points) tall, 12 px apart', () => {
+    // Wireframes "Tablet: registra spesa" and "Tablet: premio libero" (SPEC-tablet-kiosk, point 10).
+    expect(heightOf(".keypad[data-size='tablet'][data-variant='amount'] .key")).toBe(120);
+    expect(heightOf(".keypad[data-size='tablet'][data-variant='points'] .key")).toBe(104);
+    expect(declarationsOf(".keypad[data-size='tablet']")).toMatch(
+      /gap:\s*calc\(var\(--space-2\) \+ var\(--space-1\)\)/,
+    );
   });
 
   it('never lets a key get narrower than the touch target', () => {

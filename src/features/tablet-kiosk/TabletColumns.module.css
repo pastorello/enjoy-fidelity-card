@@ -1,0 +1,43 @@
+/* Two columns at 1280×800 (SPEC-tablet-kiosk, point 10), edge to edge: the shell's main pads its
+   content by space-3. 24 px between blocks and 32 px around, as in the tablet wireframes. */
+.layout {
+  flex: 1;
+  display: flex;
+  margin: calc(-1 * var(--space-3));
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-3) + var(--space-2));
+  padding: var(--space-4);
+}
+
+.aside {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-3) + var(--space-2));
+  padding: var(--space-4);
+  background: var(--color-surface-raised);
+}
+
+.aside[data-width='400'] {
+  width: 400px;
+}
+
+.aside[data-width='440'] {
+  width: 440px;
+}
+
+.aside[data-width='480'] {
+  width: 480px;
+}
+
+.aside[data-centered='true'] {
+  justify-content: center;
+}

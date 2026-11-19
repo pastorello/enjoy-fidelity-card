@@ -5,6 +5,8 @@ import { formatCents, formatInteger } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { StatusView } from '../../shared/ui/StatusView';
+import { TabletColumns } from '../tablet-kiosk/TabletColumns';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { CustomerRowLink } from '../cards/CustomerRowLink';
 import { loadErrorText } from '../customers/loadErrorText';
 import type { CustomerSummary } from '../customers/types';
@@ -262,18 +264,25 @@ function PurchaseActions({ customerId, purchase }: { customerId: string; purchas
   );
 }
 
-/** The customer row, IMPORTO, the preview with the ratio in force (`useSettings()`), the keypad. */
+/**
+ * The customer row, IMPORTO, the preview with the ratio in force (`useSettings()`), the keypad.
+ * On the till tablet (SPEC-tablet-kiosk, point 10; wireframe "Tablet: registra spesa") the keypad
+ * goes to a 480 px column on the right, larger, and the actions follow the preview on the left,
+ * away from the bottom edge.
+ */
 function PurchaseBody({
   customer,
   purchase,
   onSettingsRetry,
+  tablet,
 }: {
   customer: CustomerSummary;
   purchase: Purchase;
   onSettingsRetry: () => void;
+  tablet: boolean;
 }) {
   const { settings, amountCents, setAmountCents, failure, invalid, points, unusual } = purchase;
-  return (
+  const summary = (
     <>
       <CustomerRowLink customer={customer} />
       <section aria-label="Importo" className={styles.amount}>
@@ -297,11 +306,31 @@ function PurchaseBody({
           {INVALID_TEXT}
         </p>
       )}
-      {failure ? (
-        <LedgerFailure title={FAILURE_TITLE} text={FAILURE_TEXT[failure]} />
-      ) : (
-        <AmountKeypad value={amountCents} onChange={setAmountCents} />
-      )}
+    </>
+  );
+  const keypad = failure ? (
+    <LedgerFailure title={FAILURE_TITLE} text={FAILURE_TEXT[failure]} />
+  ) : (
+    <AmountKeypad
+      value={amountCents}
+      onChange={setAmountCents}
+      size={tablet ? 'tablet' : undefined}
+    />
+  );
+  if (tablet) {
+    return (
+      <TabletColumns column="keypad" width={480} label="Tastierino" centered aside={keypad}>
+        {summary}
+        <div className={styles.tabletActions}>
+          <PurchaseActions customerId={customer.id} purchase={purchase} />
+        </div>
+      </TabletColumns>
+    );
+  }
+  return (
+    <>
+      {summary}
+      {keypad}
     </>
   );
 }
@@ -317,6 +346,7 @@ export function PurchasePage() {
   const load = useCustomer(id);
   const purchase = usePurchase(id);
   const heading = useRef<HTMLHeadingElement>(null);
+  const tablet = useTabletLayout();
 
   // "Riprova" gives way to the loading state: the focus goes to the title, not to <body>.
   function retryCustomer() {
@@ -365,9 +395,15 @@ export function PurchasePage() {
       />
     );
   } else if (load.status === 'done') {
-    actions = <PurchaseActions customerId={load.customer.id} purchase={purchase} />;
+    // On the till tablet the actions are in the left column (PurchaseBody), not in the footer.
+    actions = tablet ? null : <PurchaseActions customerId={load.customer.id} purchase={purchase} />;
     body = (
-      <PurchaseBody customer={load.customer} purchase={purchase} onSettingsRetry={retrySettings} />
+      <PurchaseBody
+        customer={load.customer}
+        purchase={purchase}
+        onSettingsRetry={retrySettings}
+        tablet={tablet}
+      />
     );
   } else if (load.status === 'loading') {
     body = <StatusView kind="loading" />;

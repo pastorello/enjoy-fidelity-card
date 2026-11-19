@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { formatInteger, formatPoints } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { StatusView } from '../../shared/ui/StatusView';
+import { TabletColumns } from '../tablet-kiosk/TabletColumns';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { CustomerRowLink } from '../cards/CustomerRowLink';
 import { loadErrorText } from '../customers/loadErrorText';
 import type { CustomerSummary } from '../customers/types';
@@ -12,7 +14,12 @@ import { useCustomer, type CustomerLoad } from '../customers/useCustomer';
 import { useAuth } from '../identity/AuthProvider';
 import type { Reward } from '../rewards/types';
 import { formatMovementDate, formatSignedPoints } from './formatMovement';
-import { FreeRewardActions, FreeRewardForm, useFreeReward } from './FreeRewardForm';
+import {
+  FreeRewardActions,
+  FreeRewardForm,
+  FreeRewardKeypad,
+  useFreeReward,
+} from './FreeRewardForm';
 import { LedgerDoneView } from './LedgerDoneView';
 import { LedgerFailure } from './LedgerFailure';
 import { useLedgerService } from './LedgerServiceProvider';
@@ -242,8 +249,11 @@ function Catalog({
   );
 }
 
-/** The footer: the refusal, "Saldo dopo il riscatto N punti" and "Riscatta N punti". */
-function RedeemActions({ redeem }: { redeem: Redeem }) {
+/**
+ * The footer: the refusal, "Saldo dopo il riscatto N punti" and "Riscatta N punti". Without
+ * `withAfter` on the till tablet, whose Riepilogo already says the balance after.
+ */
+function RedeemActions({ redeem, withAfter = true }: { redeem: Redeem; withAfter?: boolean }) {
   const { chosen, balance, operation, refusal, failure } = redeem;
   const busy = operation.status === 'busy';
   if (failure) {
@@ -270,7 +280,7 @@ function RedeemActions({ redeem }: { redeem: Redeem }) {
           <span>{REFUSAL_TEXT[refusal]}</span>
         </p>
       )}
-      {after !== null && (
+      {withAfter && after !== null && (
         <p className={styles.after}>
           <span>Saldo dopo il riscatto</span>
           <span className={styles.afterValue}>
@@ -284,6 +294,46 @@ function RedeemActions({ redeem }: { redeem: Redeem }) {
           : 'Riscatta'}
       </Button>
     </div>
+  );
+}
+
+/** A line of Riepilogo: the label on the left, the value on the right. */
+function SummaryLine({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className={styles.summaryLine}>
+      <dt>{label}</dt>
+      <dd className={styles.summaryValue}>{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * Riepilogo of the till tablet (SPEC-tablet-kiosk, point 10; wireframe "Tablet: riscatta premio"):
+ * the reward chosen, the balance now and after, then the refusal and "Riscatta N punti", in the
+ * 400 px column on the right.
+ */
+function RedeemSummary({ redeem, titleId }: { redeem: Redeem; titleId: string }) {
+  const { chosen, balance } = redeem;
+  return (
+    <>
+      <h2 id={titleId} className={styles.summaryTitle}>
+        Riepilogo
+      </h2>
+      <dl className={styles.summary}>
+        {chosen && <SummaryLine label="Premio">{chosen.name}</SummaryLine>}
+        <SummaryLine label="Saldo attuale">
+          {formatInteger(balance)} {pointsWord(balance)}
+        </SummaryLine>
+        {chosen && (
+          <SummaryLine label="Dopo il riscatto">
+            {formatInteger(balance - chosen.points)} {pointsWord(balance - chosen.points)}
+          </SummaryLine>
+        )}
+      </dl>
+      <div className={styles.tabletActions}>
+        <RedeemActions redeem={redeem} withAfter={false} />
+      </div>
+    </>
   );
 }
 
@@ -344,6 +394,8 @@ function CatalogRedeem({ id }: { id: string }) {
   const rewards = useActiveRewards();
   const redeem = useRedeem(id, load, rewards);
   const heading = useRef<HTMLHeadingElement>(null);
+  const tablet = useTabletLayout();
+  const summaryId = useId();
 
   // "Riprova" gives way to the loading state: the focus goes to the title, not to <body>.
   function retryCustomer() {
@@ -376,8 +428,8 @@ function CatalogRedeem({ id }: { id: string }) {
     );
   } else if (load.status === 'done') {
     const withCatalog = rewards.status === 'done' && rewards.rewards.length > 0;
-    actions = withCatalog || redeem.failure ? <RedeemActions redeem={redeem} /> : null;
-    body = (
+    actions = !tablet && (withCatalog || redeem.failure) ? <RedeemActions redeem={redeem} /> : null;
+    const content = (
       <>
         <CustomerRowLink customer={load.customer} />
         {redeem.failure && (
@@ -393,6 +445,18 @@ function CatalogRedeem({ id }: { id: string }) {
           <Icon name="chevron-right" size={20} />
         </Link>
       </>
+    );
+    body = tablet ? (
+      <TabletColumns
+        column="summary"
+        width={400}
+        labelledBy={summaryId}
+        aside={<RedeemSummary redeem={redeem} titleId={summaryId} />}
+      >
+        {content}
+      </TabletColumns>
+    ) : (
+      content
     );
   }
 
@@ -412,6 +476,7 @@ function FreeRedeem({ id }: { id: string }) {
   const load = useCustomer(id);
   const free = useFreeReward(id, load);
   const heading = useRef<HTMLHeadingElement>(null);
+  const tablet = useTabletLayout();
 
   function retryCustomer() {
     load.retry();
@@ -437,14 +502,37 @@ function FreeRedeem({ id }: { id: string }) {
       />
     );
   } else if (load.status === 'done') {
-    actions = <FreeRewardActions free={free} />;
-    body = (
+    const content = (
       <>
         <CustomerRowLink customer={load.customer} />
         {free.failure && <LedgerFailure title={FAILURE_TITLE} text={FAILURE_TEXT[free.failure]} />}
-        <FreeRewardForm customer={load.customer} free={free} />
+        <FreeRewardForm customer={load.customer} free={free} withKeypad={!tablet} />
       </>
     );
+    if (tablet) {
+      // Wireframe "Tablet: premio libero": the keypad and "Riscatta" in the 480 px column.
+      body = (
+        <TabletColumns
+          column="keypad"
+          width={480}
+          label="Tastierino"
+          centered
+          aside={
+            <>
+              <FreeRewardKeypad free={free} tablet />
+              <div className={styles.tabletActions}>
+                <FreeRewardActions free={free} />
+              </div>
+            </>
+          }
+        >
+          {content}
+        </TabletColumns>
+      );
+    } else {
+      actions = <FreeRewardActions free={free} />;
+      body = content;
+    }
   }
 
   return (

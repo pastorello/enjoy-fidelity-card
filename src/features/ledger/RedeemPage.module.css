@@ -146,3 +146,56 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* Till tablet (wireframe "Tablet: riscatta premio"): CATALOGO in two columns on the left. */
+[data-tablet-column='main'] .catalog {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--space-2) + var(--space-1));
+}
+
+[data-tablet-column='main'] .legend {
+  grid-column: 1 / -1;
+}
+
+/* Riepilogo in the 400 px column on the right: label and value on a line, 12 px above and below. */
+.summaryTitle {
+  margin: 0;
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+}
+
+.summary {
+  margin: 0;
+}
+
+.summaryLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: calc(var(--space-2) + var(--space-1)) 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+}
+
+.summaryLine + .summaryLine {
+  border-top: 1px solid var(--color-divider);
+}
+
+.summaryValue {
+  margin: 0;
+  font-weight: var(--type-label-lg-weight);
+  text-align: end;
+  overflow-wrap: anywhere;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* The main action 72 px tall, as in the tablet wireframes. */
+.tabletActions button,
+.tabletActions a {
+  min-height: 72px;
+}

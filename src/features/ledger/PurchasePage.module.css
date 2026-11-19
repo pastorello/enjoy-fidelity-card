@@ -103,3 +103,13 @@
   font-size: var(--type-body-sm-size);
   line-height: var(--type-body-sm-line-height);
 }
+
+/* Till tablet (wireframe "Tablet: registra spesa"): the actions 72 px tall, 16 px apart, right
+   after the preview in the left column, away from the bottom edge (Android's bars, note nt1). */
+.tabletActions .actions {
+  gap: var(--space-3);
+}
+
+.tabletActions .actions > * {
+  min-height: 72px;
+}

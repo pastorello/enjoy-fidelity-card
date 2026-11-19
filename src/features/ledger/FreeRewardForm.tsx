@@ -128,12 +128,15 @@ export type FreeReward = ReturnType<typeof useFreeReward>;
 export function FreeRewardForm({
   customer,
   free,
+  withKeypad = true,
 }: {
   customer: CustomerSummary;
   free: FreeReward;
+  /** False on the till tablet, whose keypad is in its own column (`FreeRewardKeypad`). */
+  withKeypad?: boolean;
 }) {
   const alertId = useId();
-  const { insufficient, locked, failure } = free;
+  const { insufficient, locked } = free;
   return (
     <>
       <TextField
@@ -172,10 +175,21 @@ export function FreeRewardForm({
           <span>{INVALID_TEXT}</span>
         </p>
       )}
-      {!failure && (
-        <AmountKeypad variant="points" value={free.points} onChange={free.changePoints} />
-      )}
+      {withKeypad && <FreeRewardKeypad free={free} />}
     </>
+  );
+}
+
+/** The points keypad, gone while the outcome is uncertain; larger on the till tablet. */
+export function FreeRewardKeypad({ free, tablet = false }: { free: FreeReward; tablet?: boolean }) {
+  if (free.failure) return null;
+  return (
+    <AmountKeypad
+      variant="points"
+      value={free.points}
+      onChange={free.changePoints}
+      size={tablet ? 'tablet' : undefined}
+    />
   );
 }
 

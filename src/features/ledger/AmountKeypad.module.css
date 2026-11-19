@@ -45,3 +45,22 @@
   outline: 3px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
+
+/* The till tablet at 1280×800 (wireframes "Tablet: registra spesa" and "Tablet: premio libero"):
+   the keypad fills its 480 px column, keys 120 px (amount) and 104 px (points) tall, 12 px apart. */
+.keypad[data-size='tablet'] {
+  gap: calc(var(--space-2) + var(--space-1));
+}
+
+/* White keys on the cream column, as in the wireframes. */
+.keypad[data-size='tablet'] .key {
+  background: var(--color-white);
+}
+
+.keypad[data-size='tablet'][data-variant='amount'] .key {
+  height: 120px;
+}
+
+.keypad[data-size='tablet'][data-variant='points'] .key {
+  height: 104px;
+}
