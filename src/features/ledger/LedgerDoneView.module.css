@@ -157,3 +157,14 @@
   color: var(--color-danger-text);
   overflow-wrap: anywhere;
 }
+
+/* Till tablet at 1280×800 (wireframes "Tablet: spesa registrata" and "Tablet: premio riscattato"):
+   content and footer in one 480 px column in the middle, the footer without its rule. */
+.screen[data-tablet='true'] .main,
+.screen[data-tablet='true'] .footer {
+  padding-inline: calc((100% - 480px) / 2);
+}
+
+.screen[data-tablet='true'] .footer {
+  border-top: 0;
+}

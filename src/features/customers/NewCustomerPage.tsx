@@ -9,6 +9,9 @@ import { NewCustomerCardBelowForm, NewCustomerCardLink } from '../cards/NewCusto
 import { useNewCustomerCard } from '../cards/useNewCustomerCard';
 import { CustomerForm, nameFromQuery } from './CustomerForm';
 import { SaveFailure } from './SaveFailure';
+import { TabletColumns } from '../tablet-kiosk/TabletColumns';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
+import styles from './NewCustomerPage.module.css';
 import { useSaveCustomer } from './useSaveCustomer';
 
 const FORM_ID = 'new-customer';
@@ -31,36 +34,74 @@ export function NewCustomerPage() {
     enabled: !busy && card.lookup.status !== 'reading' && card.saved === null,
   });
   const fromLink = card.source === 'link';
+  const tablet = useTabletLayout();
 
   if (card.saved !== null) return <NewCustomerCardLink saved={card.saved} />;
 
-  return (
-    <AppShell
-      title="Nuovo cliente"
-      backTo="/"
-      actions={
-        <Button type="submit" form={FORM_ID} block busy={busy}>
-          {failure?.uncertain ? 'Riprova' : 'Salva cliente'}
-        </Button>
-      }
+  const saveButton = (
+    <Button
+      type="submit"
+      form={FORM_ID}
+      block={!tablet}
+      busy={busy}
+      className={tablet ? styles.tabletSave : undefined}
     >
-      {fromLink &&
-        (card.taken ? (
-          <CardTakenNotice owner={card.taken.owner}>
-            <Button variant="secondary" block onClick={card.continueWithoutCard}>
-              Continua senza card
-            </Button>
-          </CardTakenNotice>
-        ) : (
-          card.uid !== null && <NewCustomerCardPanel uid={card.uid} />
-        ))}
-      <CustomerForm
-        id={FORM_ID}
-        withPrivacy
-        initialValues={{ name: initialName }}
-        onSubmit={save}
-        refusal={refusal}
-      />
+      {failure?.uncertain ? 'Riprova' : 'Salva cliente'}
+    </Button>
+  );
+  // From `?card`: the card read, or the notice that it is someone else's (SPEC-cards, point 2).
+  const linkCard =
+    fromLink &&
+    (card.taken ? (
+      <CardTakenNotice owner={card.taken.owner}>
+        <Button variant="secondary" block onClick={card.continueWithoutCard}>
+          Continua senza card
+        </Button>
+      </CardTakenNotice>
+    ) : (
+      card.uid !== null && <NewCustomerCardPanel uid={card.uid} />
+    ));
+  const form = (
+    <CustomerForm
+      id={FORM_ID}
+      withPrivacy
+      initialValues={{ name: initialName }}
+      onSubmit={save}
+      refusal={refusal}
+    />
+  );
+
+  if (tablet) {
+    // Wireframe "Tablet: nuovo cliente" (SPEC-tablet-kiosk, point 10): the form and "Salva
+    // cliente" on the left, away from the bottom edge; the card in the 440 px column.
+    return (
+      <AppShell title="Nuovo cliente" backTo="/">
+        <TabletColumns
+          column="card"
+          width={440}
+          centered
+          aside={
+            <>
+              {linkCard}
+              <NewCustomerCardBelowForm card={card} />
+            </>
+          }
+        >
+          <div className={styles.tabletForm}>
+            {form}
+            {failure && <SaveFailure text={failure.text} />}
+            {saveButton}
+            {fromLink && !card.taken && <RegisteredCustomerHint />}
+          </div>
+        </TabletColumns>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell title="Nuovo cliente" backTo="/" actions={saveButton}>
+      {linkCard}
+      {form}
       <NewCustomerCardBelowForm card={card} />
       {failure && <SaveFailure text={failure.text} />}
       {fromLink && !card.taken && <RegisteredCustomerHint />}

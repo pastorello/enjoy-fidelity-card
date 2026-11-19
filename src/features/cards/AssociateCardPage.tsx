@@ -18,6 +18,7 @@ import { formatCardLabel, shortName } from './formatCard';
 import { NetworkError, type CardSummary } from './types';
 import { useActiveCard } from './useActiveCard';
 import { associatedNotice, useAssociateCard } from './useAssociateCard';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { useUsbCardInput } from '../tablet-kiosk/useUsbCardInput';
 
 const TITLE = 'Associa card';
@@ -98,6 +99,7 @@ function AssociateCard({
   const [focusReading, setFocusReading] = useState(false);
   const association = useAssociateCard(customer.id, activeCard, { writing: rewrite });
   const usb = useUsbCardInput();
+  const tablet = useTabletLayout();
   const name = shortName(customer.name);
   const editPath = `/clienti/${customer.id}/modifica`;
 
@@ -166,17 +168,13 @@ function AssociateCard({
         }
       : null;
 
-  return (
-    <AppShell
-      title={TITLE}
-      backTo={editPath}
-      actions={
-        <ButtonLink to={editPath} variant="secondary" block>
-          Annulla
-        </ButtonLink>
-      }
-    >
-      <CustomerRowLink customer={customer} />
+  const cancelLink = (
+    <ButtonLink to={editPath} variant="secondary" block>
+      Annulla
+    </ButtonLink>
+  );
+  const reading = (
+    <>
       <CardReadPanel
         mode={usb ? 'usb' : 'web-nfc'}
         title={usb ? USB_PANEL_TITLE : PANEL_TITLE}
@@ -204,6 +202,27 @@ function AssociateCard({
           </p>
         )
       )}
+    </>
+  );
+
+  if (tablet) {
+    // Wireframe "Tablet: associa card" (SPEC-tablet-kiosk, point 10): one 560 px column in the
+    // middle, "Annulla" in it rather than in a footer at the bottom edge.
+    return (
+      <AppShell title={TITLE} backTo={editPath}>
+        <CustomerRowLink customer={customer} />
+        <div className={styles.tabletColumn} data-tablet-column="associate">
+          {reading}
+          {cancelLink}
+        </div>
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell title={TITLE} backTo={editPath} actions={cancelLink}>
+      <CustomerRowLink customer={customer} />
+      {reading}
     </AppShell>
   );
 }

@@ -5,6 +5,7 @@ import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { vibrate } from '../card-input/vibrate';
 import { firstName } from '../cards/customerName';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import styles from './LedgerDoneView.module.css';
 import { LedgerError, type LedgerResult } from './types';
 import type { Operation } from './useOperation';
@@ -79,6 +80,7 @@ export function LedgerDoneView({
   cancel,
 }: LedgerDoneViewProps) {
   const navigate = useNavigate();
+  const tablet = useTabletLayout();
   const heading = useRef<HTMLHeadingElement>(null);
   const vibrated = useRef(false);
   const [secondsLeft, setSecondsLeft] = useState(RETURN_AFTER_SECONDS);
@@ -133,7 +135,9 @@ export function LedgerDoneView({
   const canCancel = cancel !== undefined && !cancelled && !refused && secondsLeft > 0;
 
   return (
-    <div className={styles.screen}>
+    // On the till tablet (wireframes "Tablet: spesa registrata" and "Tablet: premio riscattato")
+    // the same screen in one 480 px column in the middle.
+    <div className={styles.screen} data-testid="done-screen" data-tablet={tablet || undefined}>
       <main className={styles.main}>
         <span className={styles.check}>
           <Icon name={cancelled ? 'undo-2' : 'check'} size={48} />

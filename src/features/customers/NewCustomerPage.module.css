@@ -1,0 +1,13 @@
+/* Nuovo cliente on the till tablet (wireframe "Tablet: nuovo cliente"): the form at most 640 px
+   wide, "Salva cliente" 320 px wide right under it, away from the bottom edge. */
+.tabletForm {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.tabletSave {
+  align-self: flex-start;
+  width: 320px;
+}
