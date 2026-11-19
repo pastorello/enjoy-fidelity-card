@@ -152,11 +152,43 @@ describe('HomePage at 1280×800 (wireframe "Tablet: cerca cliente")', () => {
     expect(router.state.location.search).toBe(`?card=${UNKNOWN_UID}`);
   });
 
-  it('keeps the phone home at 390 px: Web NFC texts, no reader indicator, footer action', async () => {
+  it('keeps the USB reader panel on the till tablet in a narrow window (portrait, split screen)', async () => {
     stubLayout(false);
-    await renderTablet(PHONE_TITLE);
+    const { router } = await renderTablet();
+    // The single-column home, with the reader the tablet has: no NFC texts.
+    expect(document.querySelector('[data-tablet="true"]')).toBeNull();
+    expect(screen.getByRole('contentinfo')).toContainElement(
+      screen.getByRole('link', { name: 'Nuovo cliente' }),
+    );
+    const panel = screen.getByRole('region', { name: 'Lettura card' });
+    expect(within(panel).getByText(TABLET_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText(/Attiva l’NFC/)).not.toBeInTheDocument();
+    expect(await screen.findByText(READY)).toBeInTheDocument();
+
+    // A search does not shrink it to the phone's "avvicina la card" line.
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: /cerca per nome o telefono/i }),
+      'rossi',
+    );
+    expect(
+      await screen.findByRole('list', { name: 'Risultati della ricerca' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Lettura attiva: puoi anche avvicinare la card')).toBeNull();
+    expect(
+      within(screen.getByRole('region', { name: 'Lettura card' })).getByText(TABLET_TITLE),
+    ).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByRole('searchbox', { name: /cerca per nome o telefono/i }));
+    usbBurst(UNKNOWN_UID);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/clienti/nuovo'));
+  });
+
+  it('keeps the phone home at 390 px for an operator: Web NFC texts, no reader indicator', async () => {
+    stubLayout(false);
+    renderApp('/', signedInFake(), createFakeSettingsService());
+    const panel = await screen.findByRole('region', { name: 'Lettura card' });
+    expect(await within(panel).findByText(PHONE_TITLE)).toBeInTheDocument();
     expect(screen.queryByText(TABLET_TITLE)).not.toBeInTheDocument();
-    expect(screen.queryByText(READY)).not.toBeInTheDocument();
     expect(screen.queryByRole('status', { name: 'Stato del lettore USB' })).not.toBeInTheDocument();
     expect(screen.getByRole('contentinfo')).toContainElement(
       screen.getByRole('link', { name: 'Nuovo cliente' }),

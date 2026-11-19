@@ -13,6 +13,7 @@ import { homeCardNotice } from '../cards/homeCardNotice';
 import { useHomeCardRead } from '../cards/useHomeCardRead';
 import { useCurrentOperator } from '../identity/AuthProvider';
 import { UsbReaderStatus } from '../tablet-kiosk/UsbReaderStatus';
+import { useUsbCardInput } from '../tablet-kiosk/useUsbCardInput';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import styles from './HomePage.module.css';
 import { customerBackState } from './customerBack';
@@ -130,6 +131,8 @@ export function HomePage() {
   const operator = useCurrentOperator();
   // 1280×800: the reader column on the left, the search and SERVITI OGGI beside it.
   const tablet = useTabletLayout();
+  // The till tablet reads cards with its USB reader only, whatever the window's size.
+  const usb = useUsbCardInput();
   const served = useServedToday();
   const [searchParams, setSearchParams] = useSearchParams();
   // The text lives in the URL too (`?q=`, replaced), so "Indietro" from a customer finds it again.
@@ -209,10 +212,11 @@ export function HomePage() {
       </ButtonLink>
     );
 
-  // On the tablet the reader column stays in full whatever is searched (wireframe "Tablet: cerca
-  // cliente"); on the phone the panel shrinks to one line while a search is shown.
-  const cardPanel = tablet ? (
-    <div className={styles.readerColumn}>
+  // The USB reader stays in full whatever is searched (wireframe "Tablet: cerca cliente"): in a
+  // column at 1280×800, at the top in a narrow window. On the phone the panel shrinks to one line
+  // while a search is shown.
+  const usbPanel = (
+    <>
       <CardReadPanel
         mode="usb"
         title={TABLET_PANEL_TITLE}
@@ -220,7 +224,12 @@ export function HomePage() {
         notice={cardNotice}
       />
       <UsbReaderStatus />
-    </div>
+    </>
+  );
+  const cardPanel = tablet ? (
+    <div className={styles.readerColumn}>{usbPanel}</div>
+  ) : usb ? (
+    usbPanel
   ) : (
     <CardReadPanel
       title={CARD_PANEL_TITLE}
