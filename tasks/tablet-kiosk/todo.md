@@ -450,9 +450,9 @@ test`) e `scripts/kioskCriteria.test.ts` che controlla che i criteri 1–8 abbia
 nel file indicato. Quality bar completa più `npm run build && npm run check:bundle`. PR da `feat/tablet-kiosk`
 su base `main`, da unire dopo #22; `brain/STATUS.md` e `brain/HANDOFF.md` aggiornati.
 **Accettazione:**
-- [ ] Ogni criterio ha almeno una prova verificata dallo script
-- [ ] CI verde sulla PR (pgTAP, componenti, integrazione, E2E telefono + tablet: criterio 8)
-- [ ] Nessuna pubblicazione su progetti remoti (la fa l'orchestratore)
+- [x] Ogni criterio ha almeno una prova verificata dallo script (criterio 7 parziale: task 23-25 aperti)
+- [x] CI verde sulla PR (pgTAP, componenti, integrazione, E2E telefono + tablet: criterio 8) — PR #23, run 44497918857
+- [x] Nessuna pubblicazione su progetti remoti (la fa l'orchestratore)
 **Verifica:** `npm test -- kioskCriteria`; CI su GitHub
 **Dipendenze:** 26 · **File:** tasks/tablet-kiosk/plan.md, tasks/tablet-kiosk/todo.md,
 scripts/kioskCriteria.test.ts, brain/STATUS.md, brain/HANDOFF.md · **Dimensione:** M
