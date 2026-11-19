@@ -79,12 +79,7 @@ del modulo `identity`.
    virgola decimale, date Europe/Rome, difesa dalle formule), sezione ESPORTA DATI in fondo a
    `/impostazioni` con "Clienti CSV" e "Movimenti CSV". Migrazione `*_export.sql` da applicare allo staging
    con `db push`; prova manuale sul telefono con l'utente (criterio 10, RUNBOOK, "Prova manuale
-   dell'esportazione"). **`tablet-kiosk` in corso** su `feat/tablet-kiosk` (2026-11-19, PR verso `main`
-   in bozza; #22 già in `main`): task 1-22, 26 e 27 fatti; **aperti i task 23-25** (layout 1280×800 di
-   Registra spesa, Premio libero, Riscatta premio, Nuovo cliente, Associa card, Catalogo premi, conferme
-   ed E2E dei layout). Criteri 1-6 e 8 verificati test per test (`scripts/kioskCriteria.test.ts`,
-   `tasks/tablet-kiosk/plan.md`), criterio 7 parziale fino ai task 23-25. Migrazione `*_tablet_kiosk.sql`
-   da applicare allo staging con `db push`; prova sul tablet vero col lettore USB con l'utente.
+   dell'esportazione"). **`tablet-kiosk` completo** su `feat/tablet-kiosk` (2026-11-19, PR #23 verso `main`): task 1-27 fatti, criteri 1-8 verificati test per test (`scripts/kioskCriteria.test.ts`, `tasks/tablet-kiosk/plan.md`), layout 1280×800 di tutte le schermate Tablet-* misurati in E2E (`e2e/tablet-layout.spec.ts`). Migrazioni `*_tablet_kiosk.sql` e `*_tablet_kiosk_pin_lock_order.sql` da applicare allo staging con `db push`; prova sul tablet vero col lettore USB con l'utente.
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -104,7 +99,7 @@ del modulo `identity`.
 ## Modifiche non pubblicate
 
 - In `main` (2026-11-19): PR #13-#22 (da `identity` a `export`). Fuori da `main`: `feat/tablet-kiosk`
-  (PR in bozza, task 23-25 aperti). Le migrazioni restano da applicare allo staging con `db push`.
+  (PR #23 pronta). Le migrazioni restano da applicare allo staging con `db push`.
 
 ## Ultima sessione
 

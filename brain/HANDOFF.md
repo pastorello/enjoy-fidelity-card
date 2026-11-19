@@ -10,13 +10,14 @@
 - `tablet-kiosk`, task 27: tabella "Verifica dei criteri di successo" in `tasks/tablet-kiosk/plan.md` e
   `scripts/kioskCriteria.test.ts` (ogni criterio 1-8 cita prove che esistono davvero). Quality bar
   completa, build e `check:bundle` verdi in locale. PR da `feat/tablet-kiosk` verso `main` aperta in bozza.
+- `tablet-kiosk`, task 23-25: layout 1280×800 di Registra spesa, Premio libero, Riscatta premio, Nuovo
+  cliente, Associa card, Catalogo premi e conferme (cornice comune `TabletColumns`), misurati in
+  `e2e/tablet-layout.spec.ts`. Criterio 7 completo; PR #23 pronta per la revisione.
 
 ## Prima cosa per la prossima finestra
 
-- **Task 23-25 di `tablet-kiosk` ancora aperti** (layout 1280×800 di Registra spesa, Premio libero,
-  Riscatta premio, Nuovo cliente, Associa card, Catalogo premi, conferme; E2E dei layout). Finché mancano,
-  il criterio 7 è solo parziale e la PR resta in bozza. Fatti questi, aggiornare la riga 7 della tabella in
-  `plan.md` con le prove E2E e togliere la bozza dalla PR.
+- PR #23 (`tablet-kiosk`) da unire; poi `db push` delle due migrazioni `*_tablet_kiosk*.sql` sullo staging
+  e, dopo il merge, in produzione.
 
 ## In attesa di altri
 

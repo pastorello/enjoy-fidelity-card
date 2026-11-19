@@ -394,8 +394,8 @@ src/features/ledger/CustomerLedgerSection.module.css, src/features/ledger/Moveme
 **Descrizione:** Registra spesa e Premio libero: importo/punti a sinistra, tastierino a destra (480; la spesa
 con "00"); Riscatta premio: catalogo + riepilogo (400). Solo CSS e composizione.
 **Accettazione:**
-- [ ] Componente con `matchMedia` tablet: tastierino nella colonna destra; riepilogo del riscatto a destra
-- [ ] `scripts/amountKeypadCss.test.ts` e test del telefono invariati; detector Impeccable pulito
+- [x] Componente con `matchMedia` tablet: tastierino nella colonna destra; riepilogo del riscatto a destra
+- [x] `scripts/amountKeypadCss.test.ts` e test del telefono invariati; detector Impeccable pulito
 **Verifica:** `npm test -- PurchasePage RedeemPage FreeRewardForm amountKeypadCss`
 **Dipendenze:** 21 · **File:** src/features/ledger/PurchasePage.module.css, FreeRewardForm.module.css,
 RedeemPage.module.css, AmountKeypad.module.css, PurchasePage.test.tsx · **Dimensione:** M
@@ -407,9 +407,9 @@ RedeemPage.module.css, AmountKeypad.module.css, PurchasePage.test.tsx · **Dimen
 Premio registrato senza intestazione, colonna larga. Il link ai punti resta "non scritto" (il lettore USB non
 scrive).
 **Accettazione:**
-- [ ] Componente con `matchMedia` tablet: testi USB del wireframe; card sconosciuta letta in Nuovo cliente
+- [x] Componente con `matchMedia` tablet: testi USB del wireframe; card sconosciuta letta in Nuovo cliente
       associata (criterio 5)
-- [ ] Test del telefono invariati; detector Impeccable pulito
+- [x] Test del telefono invariati; detector Impeccable pulito
 **Verifica:** `npm test -- NewCustomerCardPanel AssociateCardPage RewardsCatalogPage LedgerDoneView`
 **Dipendenze:** 21 · **File:** src/features/cards/NewCustomerCardPanel.tsx (+ .module.css),
 src/features/cards/AssociateCardPage.tsx, src/features/rewards/RewardsCatalogPage.module.css,
@@ -422,14 +422,14 @@ Spesa/Premio registrato, Impostazioni, `/cassa`, accesso) larghezze delle colonn
 pochi px), `scrollWidth <= clientWidth`, ogni elemento interattivo ≥ 48 px; screenshot confrontati a mano con i
 wireframe.
 **Accettazione:**
-- [ ] Criterio 7 provato in E2E; progetto `phone` invariato e verde
-- [ ] Detector Impeccable pulito su `src/features`
+- [x] Criterio 7 provato in E2E; progetto `phone` invariato e verde
+- [x] Detector Impeccable pulito su `src/features`
 **Verifica:** `npm run e2e`; `npx impeccable detect src/features`
 **Dipendenze:** 22, 23, 24 · **File:** e2e/tablet-layout.spec.ts, e2e/auth.ts · **Dimensione:** M
 
 ## Checkpoint E
-- [ ] Ogni schermata Tablet-* confrontata a 1280×800; azioni principali lontane dal bordo inferiore
-- [ ] E2E `phone` e `phone-settings` invariati e verdi
+- [x] Ogni schermata Tablet-* confrontata a 1280×800; azioni principali lontane dal bordo inferiore
+- [x] E2E `phone` e `phone-settings` invariati e verdi
 
 ## Task 26: Documentazione
 **Descrizione:** `docs/setup-tablet.md` (installazione PWA, accesso con l'account del bar, prova del lettore e
@@ -450,7 +450,7 @@ test`) e `scripts/kioskCriteria.test.ts` che controlla che i criteri 1–8 abbia
 nel file indicato. Quality bar completa più `npm run build && npm run check:bundle`. PR da `feat/tablet-kiosk`
 su base `main`, da unire dopo #22; `brain/STATUS.md` e `brain/HANDOFF.md` aggiornati.
 **Accettazione:**
-- [x] Ogni criterio ha almeno una prova verificata dallo script (criterio 7 parziale: task 23-25 aperti)
+- [x] Ogni criterio ha almeno una prova verificata dallo script (criterio 7 completo con i task 23-25)
 - [x] CI verde sulla PR (pgTAP, componenti, integrazione, E2E telefono + tablet: criterio 8) — PR #23, run 44497918857
 - [x] Nessuna pubblicazione su progetti remoti (la fa l'orchestratore)
 **Verifica:** `npm test -- kioskCriteria`; CI su GitHub
@@ -458,6 +458,6 @@ su base `main`, da unire dopo #22; `brain/STATUS.md` e `brain/HANDOFF.md` aggior
 scripts/kioskCriteria.test.ts, brain/STATUS.md, brain/HANDOFF.md · **Dimensione:** M
 
 ## Checkpoint F
-- [ ] Gli 8 criteri di successo di SPEC-tablet-kiosk verificati
-- [ ] PR su `main` pronta per `code-review-and-quality`, da unire dopo #22
+- [x] Gli 8 criteri di successo di SPEC-tablet-kiosk verificati
+- [x] PR su `main` pronta per `code-review-and-quality`, da unire dopo #22
 - [ ] Prova sul tablet vero con il lettore USB, con l'utente, dopo la pubblicazione su staging
