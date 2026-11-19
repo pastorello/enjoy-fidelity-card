@@ -438,8 +438,8 @@ del formato dell'uid, "Mostra tastiera virtuale" di Android, densità reale dell
 trappole trovate); CLAUDE.md (progetto Playwright `tablet`, rotte `/cassa` e `/impostazioni/pin`);
 `brain/MAP.md`.
 **Accettazione:**
-- [ ] Ogni passo indica la schermata di Supabase o la riga SQL; nessun segreto né dato reale
-- [ ] Differenze dal contratto (`/impostazioni/pin`) e da identity (PIN in `private`) richiamate dove servono
+- [x] Ogni passo indica la schermata di Supabase o la riga SQL; nessun segreto né dato reale
+- [x] Differenze dal contratto (`/impostazioni/pin`) e da identity (PIN in `private`) richiamate dove servono
 **Verifica:** rilettura; `npm run format:check`
 **Dipendenze:** 25 · **File:** docs/setup-tablet.md, docs/setup-accounts.md,
 brain/topics/operations/RUNBOOK.md, CLAUDE.md, brain/MAP.md · **Dimensione:** M

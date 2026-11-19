@@ -170,7 +170,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint E: Impeccable pulito su ogni schermata tablet; confronto con i wireframe Tablet-*; E2E `phone` invariati
 
 ### Fase 6: Chiusura
-- [ ] Task 26: `docs/setup-tablet.md`, `docs/setup-accounts.md` (`add_device`), RUNBOOK, CLAUDE.md, memoria
+- [x] Task 26: `docs/setup-tablet.md`, `docs/setup-accounts.md` (`add_device`), RUNBOOK, CLAUDE.md, memoria
 - [ ] Task 27: Verifica dei criteri di successo (`scripts/kioskCriteria.test.ts`) e PR
 
 ### Checkpoint F: i criteri 1–8 verificati; quality bar completa verde; PR su `main` pronta per `code-review-and-quality`, da unire dopo #22
