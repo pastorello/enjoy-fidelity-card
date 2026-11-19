@@ -32,6 +32,14 @@ let deviceUserId: string;
 let operatorId: string;
 let operatorClient: SupabaseClient;
 let deviceClient: SupabaseClient;
+/** Seed accounts (supabase/seed.sql): signing in does not change them. */
+const SEED_PASSWORD = 'password-di-prova';
+/**
+ * A customer with one purchase of this run: on a fresh database (CI) the seed has no movement,
+ * and criterion 1 needs every table and view of app to have rows. Anonymized at the end.
+ */
+let seedAdminClient: SupabaseClient;
+let ownCustomerId: string | undefined;
 // How long a transaction held open in psql keeps the API call queued behind it.
 const HOLD_SECONDS = 1;
 
@@ -130,9 +138,36 @@ beforeAll(async () => {
   const { error } = await operatorClient.schema('app').rpc('set_my_pin', { p_pin: PIN });
   if (error) throw error;
   deviceClient = await signedIn(device.email, device.password);
+
+  // Customers and movements are never deleted: the seed operator records them, never the
+  // throwaway operator whose profile is removed at the end.
+  const seedOperator = await signedIn('operatore@example.com', SEED_PASSWORD);
+  seedAdminClient = await signedIn('admin@example.com', SEED_PASSWORD);
+  const created = await seedOperator.schema('app').rpc('create_customer', {
+    p_operation_id: randomUUID(),
+    p_name: `Cassa Movimento ${run}`,
+    p_phone: null,
+    p_privacy_consent: true,
+    p_notes: null,
+  });
+  if (created.error) throw created.error;
+  const summary: unknown = created.data;
+  if (typeof summary !== 'object' || summary === null || !('id' in summary)) {
+    throw new Error('create_customer answered no customer');
+  }
+  ownCustomerId = String(summary.id);
+  const purchase = await seedOperator.schema('app').rpc('record_purchase', {
+    p_operation_id: randomUUID(),
+    p_customer_id: ownCustomerId,
+    p_amount_cents: 1250,
+  });
+  if (purchase.error) throw purchase.error;
 });
 
 afterAll(async () => {
+  if (ownCustomerId) {
+    await seedAdminClient.schema('app').rpc('anonymize_customer', { p_customer_id: ownCustomerId });
+  }
   // Devices and profiles outlive their Auth users by design: remove them so other suites see the seed only.
   runSql(`delete from app.devices where name = :'name';`, { name: device.name });
   runSql(`delete from app.operators where name = :'name';`, { name: operator.name });
