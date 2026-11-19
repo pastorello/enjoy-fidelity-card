@@ -155,7 +155,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 4: PIN e Impostazioni
 - [x] Task 17: `/impostazioni/pin` e riga "PIN della cassa" nella sezione ACCOUNT (telefono)
 - [x] Task 18: Impostazioni sul tablet: cassiere nel riquadro, "Esci" chiude il turno, "Disconnetti il tablet", niente password né PIN
-- [ ] Task 19: Sezione "LETTORE CARD" (formato del lettore USB) solo con cassiere amministratore
+- [x] Task 19: Sezione "LETTORE CARD" (formato del lettore USB) solo con cassiere amministratore
 - [ ] Task 20: E2E: PIN impostato dal telefono e usato sul tablet, turno precedente chiuso; formato del lettore cambiato e ripristinato
 
 ### Checkpoint D: revisione `security-and-hardening` del client (PIN mai in log/URL/storage, tasti fisici, guardia, disconnessione)

@@ -323,10 +323,10 @@ cassiere amministratore: scelta tra "Esadecimale", "Esadecimale, byte invertiti"
 invertiti" e "Salva"; salva con `update_settings` passando rapporto e soglia appena riletti dal server
 (servizio di `settings`, nessuna chiamata diretta); vale dalla lettura successiva.
 **Accettazione:**
-- [ ] Componente: assente sul telefono e con cassiere operatore; salva il formato senza toccare rapporto e
+- [x] Componente: assente sul telefono e con cassiere operatore; salva il formato senza toccare rapporto e
       soglia; `forbidden` → `reportNotEnabled()`
-- [ ] Ordine delle sezioni del tablet coerente con cross-review §1
-- [ ] Detector Impeccable pulito; glifi Display verificati
+- [x] Ordine delle sezioni del tablet coerente con cross-review §1
+- [x] Detector Impeccable pulito; glifi Display verificati
 **Verifica:** `npm test -- UsbFormatSection SettingsPage`
 **Dipendenze:** 18 · **File:** src/features/tablet-kiosk/UsbFormatSection.tsx (+ .module.css, .test.tsx),
 src/features/identity/SettingsPage.tsx · **Dimensione:** M
