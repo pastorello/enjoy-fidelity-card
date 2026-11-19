@@ -98,3 +98,17 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* Scheda cliente at 1280×800 (wireframe "Tablet: scheda cliente"): the actions 72 px tall with
+   16 px between them, the rows of ULTIMI MOVIMENTI 72 px tall. */
+[data-tablet-column='customer'] .actions {
+  gap: var(--space-3);
+}
+
+[data-tablet-column='customer'] .actions > * {
+  min-height: 72px;
+}
+
+[data-tablet-column='movements'] .list > li {
+  min-height: 72px;
+}

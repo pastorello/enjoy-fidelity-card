@@ -118,3 +118,19 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
+
+/* Movimenti at 1280×800 (wireframe "Tablet: movimenti del cliente"): one wide column, 32 px from
+   the edges (the shell's 16 px plus 16) and 16 px between blocks. */
+.tabletColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+/* The customer row (cards' CustomerRowLink) is edge to edge under the header on the phone; on the
+   tablet it sits inside the column, as in the wireframe. */
+.tabletColumn > a:first-child {
+  margin: 0;
+}

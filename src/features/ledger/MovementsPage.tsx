@@ -9,6 +9,7 @@ import { CustomerRowLink } from '../cards/CustomerRowLink';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useCustomer } from '../customers/useCustomer';
 import { useCurrentOperator } from '../identity/AuthProvider';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { CancelMovementDialog, type CancelOutcome } from './CancelMovementDialog';
 import { correctionText, formatSignedPoints, groupByDay, movementLabel } from './formatMovement';
 import styles from './MovementsPage.module.css';
@@ -156,6 +157,8 @@ export function MovementsPage() {
   const history = useMovementHistory(id);
   const heading = useRef<HTMLHeadingElement>(null);
   const { role } = useCurrentOperator();
+  // 1280×800: the same content in one wide column.
+  const tablet = useTabletLayout();
   const [target, setTarget] = useState<Movement | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   // Bumped when a cancellation settles: the button that opened the dialog may be gone.
@@ -273,7 +276,14 @@ export function MovementsPage() {
       headingRef={heading}
       actions={actions}
     >
-      {body}
+      {tablet ? (
+        // 1280×800 (wireframe "Tablet: movimenti del cliente"): one wide column, 32 px from the edges.
+        <div className={styles.tabletColumn} data-tablet="true" data-testid="movements-column">
+          {body}
+        </div>
+      ) : (
+        body
+      )}
     </AppShell>
   );
 }
