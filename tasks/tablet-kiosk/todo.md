@@ -309,10 +309,10 @@ della cassa"; solo con cassiere amministratore "Disconnetti il tablet" con `Conf
 riaccedere servono email e password dell'account del bar") → `signOut` → `/accedi`. Impostazioni complete o
 ridotte secondo il ruolo del cassiere (già da `useCurrentOperator`).
 **Accettazione:**
-- [ ] Componente: senza "Cambia password" e "PIN della cassa" sul dispositivo; "Esci" → `endTurn` →
+- [x] Componente: senza "Cambia password" e "PIN della cassa" sul dispositivo; "Esci" → `endTurn` →
       `/cassa`; "Disconnetti il tablet" solo con cassiere admin, con conferma
-- [ ] Test esistenti di `SettingsPage` (telefono) verdi senza modifiche alle aspettative
-- [ ] Detector Impeccable pulito
+- [x] Test esistenti di `SettingsPage` (telefono) verdi senza modifiche alle aspettative
+- [x] Detector Impeccable pulito
 **Verifica:** `npm test -- SettingsPage`
 **Dipendenze:** 14, 17 · **File:** src/features/identity/SettingsPage.tsx (+ .module.css, .test.tsx),
 src/features/tablet-kiosk/DisconnectTabletButton.tsx · **Dimensione:** M
