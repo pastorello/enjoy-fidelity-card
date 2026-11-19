@@ -376,8 +376,15 @@ src/features/tablet-kiosk/UsbReaderStatus.tsx · **Dimensione:** M
 colonna larga. Solo CSS e composizione; testi, stati e azioni dei moduli proprietari invariati; azioni lontane
 dal bordo inferiore.
 **Accettazione:**
-- [ ] Componente con `matchMedia` tablet: le due colonne presenti con i ruoli e le etichette di prima
-- [ ] Test del telefono invariati; detector Impeccable pulito; confronto con i wireframe
+- [x] Componente con `matchMedia` tablet: le due colonne presenti con i ruoli e le etichette di prima
+- [x] Test del telefono invariati; detector Impeccable pulito; confronto con i wireframe
+**Nota:** i test del tablet sono in `CustomerPage.tablet.test.tsx` e `MovementsPage.tablet.test.tsx` (quelli
+del telefono non sono toccati; `src/test/stubLayout.ts` è il matchMedia finto condiviso). `CustomerLedgerSection`
+esporta le sue due parti (`CustomerLedgerActions`, `CustomerLastMovements`) e sul telefono le rende come prima.
+Colonne marcate `data-tablet-column="customer"` (560 px misurati a 1280×800) e `"movements"`. ULTIMI
+MOVIMENTI resta a 4 righe anche sul tablet (il wireframe ne disegna 6; il numero è del modulo ledger). Su
+Movimenti la riga del cliente sta dentro la colonna (sul telefono è a filo sotto l'intestazione).
+Screenshot a 1280×800 confrontati con "Tablet: scheda cliente" e "Tablet: movimenti del cliente".
 **Verifica:** `npm test -- CustomerPage MovementsPage`
 **Dipendenze:** 21 · **File:** src/features/customers/CustomerPage.tsx (+ .module.css),
 src/features/ledger/CustomerLedgerSection.module.css, src/features/ledger/MovementsPage.module.css

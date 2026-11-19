@@ -162,7 +162,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 5: Layout 1280×800
 - [x] Task 21: Cerca: colonna "Passa la card sul lettore" (440), "Lettore USB pronto" / "Codice non riconosciuto…"
-- [ ] Task 22: Scheda cliente (560 + movimenti) e Movimenti (colonna larga)
+- [x] Task 22: Scheda cliente (560 + movimenti) e Movimenti (colonna larga)
 - [ ] Task 23: Registra spesa, Premio libero (tastierino a destra 480) e Riscatta premio (riepilogo 400)
 - [ ] Task 24: Nuovo cliente (pannello Card 440), Associa card, Catalogo premi (480), Spesa/Premio registrato
 - [ ] Task 25: E2E dei layout a 1280×800: colonne, nessuno scorrimento orizzontale, target ≥ 48 px
