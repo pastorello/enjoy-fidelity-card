@@ -114,6 +114,60 @@ Se l'email non arriva (sezione 6 non ancora fatta, casella sbagliata): come prim
 ricrealo con una password nuova e richiama `private.add_operator` con lo stesso nome, come per rimettere un
 operatore.
 
+### Tablet della cassa (account di dispositivo)
+
+Il tablet condiviso della cassa (fase 3, `docs/specs/SPEC-tablet-kiosk.md` punto 1) accede **una volta** con
+un account suo, l'**account del bar**, che non è di nessun operatore: chi sta alla cassa si alterna poi con
+il proprio PIN di 4 cifre. Serve che la migrazione `*_tablet_kiosk.sql` sia già sul progetto (`npx supabase
+db push`, sezione 2). Installazione del tablet, prova del lettore e PIN: `docs/setup-tablet.md`.
+
+Un account Auth è **o** di un operatore **o** di un dispositivo, mai tutti e due: `private.add_device`
+rifiuta un utente già collegato a un operatore e `private.add_operator` rifiuta un utente collegato a un
+dispositivo. Per questo il tablet non usa mai l'account del titolare.
+
+**Creare il dispositivo**
+
+1. **Authentication → Users → Add user → Create new user**: un'email solo per il tablet (del tipo
+   `cassa@…`, su una casella che il titolare legge: lì arriva "Password dimenticata?" dell'account del
+   bar), una password lunga e casuale salvata nel gestore di password, **Auto Confirm User** attivo.
+2. **SQL Editor**, con una nuova query:
+
+   ```sql
+   select private.add_device('<email>', '<nome del tablet>');   -- es. 'Tablet cassa'
+   ```
+
+   Il nome serve solo a riconoscere il dispositivo (unico, senza distinzione di maiuscole). La funzione
+   restituisce l'id del dispositivo; si ferma con un errore se l'email non esiste, se l'account è di un
+   operatore o se è già collegato a un altro dispositivo. Come `add_operator`, la esegue solo `postgres`
+   dallo SQL Editor: nessun ruolo dell'API la può chiamare.
+3. Sul tablet si accede su `/accedi` con questa email e questa password: l'app apre `/cassa` ("Chi è alla
+   cassa?"). Più tablet sono ammessi, ognuno con un account e un nome suoi.
+
+**Controllare i dispositivi** (SQL Editor; la tabella non è esposta dall'API e il PIN non c'è):
+
+```sql
+select name, user_id is not null as collegato, cashier_operator_id is not null as turno_aperto,
+       locked_until
+from app.devices order by name;
+```
+
+**Togliere un dispositivo** (tablet perso, rubato o sostituito): **Authentication → Users** → menu della
+riga dell'account del tablet → **Delete user**. La riga del dispositivo resta, scollegata (`collegato` =
+false): da subito nessuno può più agire come suo cassiere e il tablet non legge né scrive più nulla (la
+sicurezza sta nella RLS, trappola 19 del RUNBOOK); l'app torna su `/accedi` alla lettura successiva
+dell'identità (cambio di schermata o ritorno in primo piano). Se il tablet è stato perso, cambia anche il PIN di chi lo usava (ognuno dal
+proprio telefono, `docs/setup-tablet.md` §4).
+
+**Rimettere un dispositivo**: ricrea l'utente (passo 1) e richiama `private.add_device` con
+**lo stesso nome** di prima: il dispositivo viene ricollegato.
+
+**Cambiare la password dell'account del bar**: "Password dimenticata?" su `/accedi` del tablet (l'email
+arriva alla casella del passo 1), oppure cancella e ricrea l'utente come sopra. Dal tablet non c'è "Cambia
+password": in una sessione di dispositivo cambierebbe la password del bar, non quella del cassiere.
+
+Gli operatori del tablet sono quelli di questa sezione, con il loro ruolo: non serve registrarli di nuovo.
+Il PIN non si imposta qui né dallo SQL Editor (si salva solo come hash in `private.operator_pins`).
+
 ## 5. Vercel
 
 > **Da decidere prima**: il piano gratuito *Hobby* di Vercel è riservato all'uso personale e non commerciale.
