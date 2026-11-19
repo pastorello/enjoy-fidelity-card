@@ -133,6 +133,50 @@ describe('SettingsProvider', () => {
     expect(fake.service.load).toHaveBeenCalledOnce();
   });
 
+  it('saveUsbFormat reads ratio and threshold again from the server and sends them with the format', async () => {
+    const fake = createFakeSettingsService();
+    const settings = renderWith(fake);
+    await waitFor(() => expect(shown()).toHaveTextContent('ready:100/15000'));
+    // Another administrator changed the ratio after this page loaded.
+    fake.changeElsewhere({ centsPerPoint: 250 });
+
+    let result: UpdateSettingsResult | undefined;
+    await act(async () => {
+      result = await settings().saveUsbFormat('dec');
+    });
+
+    expect(fake.service.update).toHaveBeenCalledExactlyOnceWith({
+      centsPerPoint: 250,
+      confirmThresholdCents: 15000,
+      usbUidFormat: 'dec',
+    });
+    expect(result).toMatchObject({ status: 'ok', settings: { usbUidFormat: 'dec' } });
+    expect(fake.current()).toMatchObject({ centsPerPoint: 250, usbUidFormat: 'dec' });
+    expect(shown()).toHaveTextContent('ready:250/15000');
+  });
+
+  it.each([
+    ['network', 'network'],
+    ['unknown', 'unknown'],
+    ['not-found', 'forbidden'],
+  ] as const)(
+    'saveUsbFormat sends nothing when the fresh read fails (%s → %s)',
+    async (loadFailure, status) => {
+      const fake = createFakeSettingsService({ loadResults: ['ok', loadFailure] });
+      const settings = renderWith(fake);
+      await waitFor(() => expect(shown()).toHaveTextContent('ready:100/15000'));
+
+      let result: UpdateSettingsResult | undefined;
+      await act(async () => {
+        result = await settings().saveUsbFormat('dec');
+      });
+
+      expect(result).toEqual({ status });
+      expect(fake.service.update).not.toHaveBeenCalled();
+      expect(fake.current().usbUidFormat).toBe('hex');
+    },
+  );
+
   it('reloads when the page becomes visible again, not when it is hidden', async () => {
     const fake = createFakeSettingsService();
     renderWith(fake);

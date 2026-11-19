@@ -9,6 +9,7 @@ import { RewardsSettingsSection } from '../rewards/RewardsSettingsSection';
 import { OperatorFinalNote, PointsSettingsSection } from '../settings/PointsSettingsSection';
 import { DisconnectTabletButton } from '../tablet-kiosk/DisconnectTabletButton';
 import { useKioskService } from '../tablet-kiosk/KioskServiceProvider';
+import { UsbFormatSection } from '../tablet-kiosk/UsbFormatSection';
 import { useAuth, useCurrentOperator, useDevice } from './AuthProvider';
 import { roleLabel } from './types';
 import styles from './SettingsPage.module.css';
@@ -88,6 +89,7 @@ export function SettingsPage() {
         </section>
       )}
       <RewardsSettingsSection />
+      <UsbFormatSection />
       <ExportSection />
       <OperatorFinalNote />
     </AppShell>

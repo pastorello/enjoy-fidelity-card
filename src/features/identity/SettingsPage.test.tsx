@@ -190,11 +190,14 @@ describe('settings page on the till tablet', () => {
     const account = await screen.findByRole('region', { name: 'Account' });
     const points = screen.getByRole('region', { name: 'PUNTI E CONTROLLI' });
     const management = screen.getByRole('region', { name: 'GESTIONE' });
+    // LETTORE CARD sits between GESTIONE and ESPORTA DATI (cross-review §1, item 5).
+    const reader = screen.getByRole('region', { name: 'LETTORE CARD' });
     const exportSection = screen.getByRole('region', { name: 'ESPORTA DATI' });
     expect(Array.from(screen.getByRole('main').children)).toEqual([
       account,
       points,
       management,
+      reader,
       exportSection,
     ]);
   });

@@ -35,7 +35,7 @@ function sequence<T>(results: readonly T[], fallback: T): () => T {
 
 /**
  * In-memory SettingsService for component tests. A successful `update` changes what the next
- * `load` returns (the USB format stays as it is, like on the server); `changeElsewhere()`
+ * `load` returns (the USB format stays as it is unless given, like on the server); `changeElsewhere()`
  * simulates another admin saving from another phone. Both methods are `vi.fn`, so tests count
  * calls (double taps, "Riprova") with `toHaveBeenCalledTimes`.
  */
@@ -61,7 +61,9 @@ export function createFakeSettingsService({
       saves += 1;
       stored = {
         ...stored,
-        ...input,
+        centsPerPoint: input.centsPerPoint,
+        confirmThresholdCents: input.confirmThresholdCents,
+        usbUidFormat: input.usbUidFormat ?? stored.usbUidFormat,
         updatedAt: `2026-11-17T10:00:${String(saves).padStart(2, '0')}.000Z`,
       };
       return Promise.resolve({ status: 'ok', settings: stored });

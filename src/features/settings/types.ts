@@ -42,11 +42,13 @@ export type SettingsService = {
   /** Reads the configuration row. Rejects with a `SettingsLoadError`. */
   load(): Promise<Settings>;
   /**
-   * Saves both values at once (admins only, checked on the server). Never rejects. The USB
-   * reader format is never sent from here: the server keeps it unchanged.
+   * Saves ratio and threshold at once (admins only, checked on the server). Never rejects.
+   * `usbUidFormat` is sent only by LETTORE CARD on the till tablet (SPEC-tablet-kiosk, point 9);
+   * without it the server keeps the reader format unchanged.
    */
   update(input: {
     centsPerPoint: number;
     confirmThresholdCents: number;
+    usbUidFormat?: UsbUidFormat;
   }): Promise<UpdateSettingsResult>;
 };
