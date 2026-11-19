@@ -11,12 +11,6 @@ import { operatorButton, resetDevice, tapPin } from './tablet';
  * 70 px above the bottom edge (Android's bars, note nt1); and the columns of point 10 where the
  * screen has them. A tablet of its own (`layoutTill`), with the seed admin at the till, so the
  * admin screens are there too.
- *
- * Nuovo cliente (Card panel 440 px), Registra spesa and Premio libero (keypad 480 px), Riscatta
- * premio (summary 400 px) and Catalogo premi (480 px) still have the phone's one-column layout with
- * the actions in the footer: their tablet layouts are tasks 23 and 24 of tasks/tablet-kiosk, still
- * open. Until then this spec checks only what holds for them already (no horizontal scroll, 48 px
- * targets); their columns and the bottom clearance of their actions come with those tasks.
  */
 
 // One tablet, one cashier on the server: these tests take turns on it.
@@ -135,8 +129,8 @@ test('every screen of the tablet wireframes at 1280×800 (criterion 7)', async (
     await page.getByRole('link', { name: 'Nuovo cliente' }).click();
     await expect(page.getByRole('region', { name: 'Card' })).toBeVisible();
     const save = page.getByRole('button', { name: 'Salva cliente' });
-    // Task 24: the Card panel (440 px) and "Salva cliente" away from the bottom edge.
-    await expectTabletScreen(page, null);
+    await expectColumn(page.locator('[data-tablet-column="card"]'), 440, 'right');
+    await expectTabletScreen(page, save);
     await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
     await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
     await save.click();
@@ -155,28 +149,41 @@ test('every screen of the tablet wireframes at 1280×800 (criterion 7)', async (
     await expect(page.getByRole('group', { name: 'Tastierino numerico' })).toBeVisible();
     await typeAmount(page, '2500');
     const confirm = page.getByRole('button', { name: /^Conferma/ });
-    // Task 23: the keypad column (480 px) and "Conferma" away from the bottom edge.
-    await expectTabletScreen(page, null);
+    await expectColumn(page.getByRole('complementary', { name: 'Tastierino' }), 480, 'right');
+    await expectTabletScreen(page, confirm);
     await confirm.click();
     await expect(page.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeVisible();
-    await expectTabletScreen(page, null);
+    // One 480 px column in the middle, without header.
+    const way = page.getByRole('link', { name: 'Leggi un’altra card' });
+    const wayBox = await way.boundingBox();
+    if (!wayBox) throw new Error('No box on Spesa registrata');
+    expect(Math.abs(wayBox.width - 480)).toBeLessThanOrEqual(TOLERANCE);
+    expect(Math.abs(wayBox.x + wayBox.width / 2 - 640)).toBeLessThanOrEqual(TOLERANCE);
+    await expectTabletScreen(page, way);
   });
 
   await test.step('Riscatta premio and Premio libero', async () => {
     await page.goto(`${customerPath}/premi`);
     await expect(page.getByRole('heading', { level: 1, name: 'Riscatta premio' })).toBeVisible();
-    await expectTabletScreen(page, null);
+    const summary = page.getByRole('complementary', { name: 'Riepilogo' });
+    await expectColumn(summary, 400, 'right');
+    await expectTabletScreen(page, summary.getByRole('button', { name: /^Riscatta/ }));
     await page.getByRole('link', { name: /Premio libero/ }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Premio libero' })).toBeVisible();
-    // Task 23: the summary (400 px) of Riscatta premio and the keypad (480 px) of Premio libero.
-    await expectTabletScreen(page, null);
+    const keypad = page.getByRole('complementary', { name: 'Tastierino' });
+    await expectColumn(keypad, 480, 'right');
+    await expectTabletScreen(page, keypad.getByRole('button', { name: /^Riscatta/ }));
   });
 
   await test.step('Associa card', async () => {
     await page.goto(`${customerPath}/card`);
     await expect(page.getByText('Passa la card nuova sul lettore')).toBeVisible();
-    // Task 24: "Annulla" in the wide column, away from the bottom edge.
-    await expectTabletScreen(page, null);
+    const wide = page.locator('[data-tablet-column="associate"]');
+    const box = await wide.boundingBox();
+    if (!box) throw new Error('No Associa card column');
+    expect(Math.abs(box.width - 560)).toBeLessThanOrEqual(TOLERANCE);
+    expect(Math.abs(box.x + box.width / 2 - 640)).toBeLessThanOrEqual(TOLERANCE);
+    await expectTabletScreen(page, wide.getByRole('link', { name: 'Annulla' }));
   });
 
   await test.step('Movimenti', async () => {
@@ -188,8 +195,9 @@ test('every screen of the tablet wireframes at 1280×800 (criterion 7)', async (
   await test.step('Catalogo premi', async () => {
     await page.goto('/impostazioni/premi');
     await expect(page.getByRole('heading', { level: 1, name: /Catalogo premi/ })).toBeVisible();
-    // Task 24: the list and the 480 px "Nuovo premio" column.
-    await expectTabletScreen(page, null);
+    const newReward = page.locator('[data-tablet-column="new-reward"]');
+    await expectColumn(newReward, 480, 'right');
+    await expectTabletScreen(page, newReward.getByRole('button', { name: 'Aggiungi premio' }));
   });
 
   await test.step('Impostazioni', async () => {
