@@ -38,7 +38,7 @@ function openTill(kiosk = createFakeKioskService({ cashiers: [marco(), sara(), g
     undefined,
     kiosk,
   );
-  return { ...view, kiosk };
+  return { ...view, kiosk, fake };
 }
 
 function operators() {
@@ -248,6 +248,36 @@ describe('CashierPage, "Chi è alla cassa?"', () => {
       'Servizio momentaneamente non disponibile: riprova tra poco.',
     );
     expect(dots()).toHaveAccessibleName('0 cifre su 4 inserite');
+  });
+
+  it('a PIN removed meanwhile (no_pin): the name is off with "PIN da impostare dal telefono"', async () => {
+    const chosen = giulia();
+    const kiosk = createFakeKioskService({ cashiers: [marco(), chosen] });
+    const { router } = openTill(kiosk);
+    fireEvent.click(await findOperator('Giulia Prova'));
+    kiosk.removePin(chosen.id);
+
+    tap('1', '2', '3', '4');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('PIN da impostare dal telefono');
+    const button = await findOperator('Giulia Prova');
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent('PIN da impostare dal telefono');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(keypad()).toBeDisabled();
+    expect(dots()).toHaveAccessibleName('0 cifre su 4 inserite');
+    expect(router.state.location.pathname).toBe('/cassa');
+  });
+
+  it('refused (not a device any more): the identity is checked again, back to /accedi', async () => {
+    const { kiosk, router, fake } = openTill();
+    fireEvent.click(await findOperator('Giulia Prova'));
+    kiosk.failNext('unlock', 'forbidden');
+    fake.removeProfile();
+
+    tap('1', '2', '3', '4');
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
   });
 
   it('nobody with a PIN: says that everyone sets it from their phone', async () => {

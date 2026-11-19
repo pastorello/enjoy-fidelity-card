@@ -249,6 +249,12 @@ export function createFakeKioskService({
     setPin(operatorId: string, pin: string) {
       savePin(operatorId, pin);
     },
+    /** The operator has no PIN any more (their account was removed), as the server would see it. */
+    removePin(operatorId: string) {
+      const operator = operators.get(operatorId);
+      if (!operator) throw new Error(`fakeKioskService: no operator ${operatorId}`);
+      operator.pin = null;
+    },
     /** Ends the turn as the 12 hours would, without moving the clock. */
     expireTurn() {
       if (cashier) cashier = { ...cashier, since: now() - KIOSK_TURN_MS };
