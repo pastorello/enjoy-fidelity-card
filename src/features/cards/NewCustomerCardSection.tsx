@@ -16,6 +16,7 @@ import { cardReadErrorText } from './homeCardNotice';
 import { NewCustomerCardPanel } from './NewCustomerCardPanel';
 import styles from './NewCustomerCardSection.module.css';
 import { useActiveCard } from './useActiveCard';
+import { useUsbCardInput } from '../tablet-kiosk/useUsbCardInput';
 import type {
   NewCustomerCard,
   NewCustomerCardLookup,
@@ -26,6 +27,9 @@ const TITLE = 'Card (facoltativa)';
 const NEW_CUSTOMER_TITLE = 'Nuovo cliente';
 const TEXT =
   'Lettura attiva: avvicina una card nuova per associarla adesso, oppure fallo più tardi dalla scheda.';
+/** The same on the till tablet, read by the USB reader (wireframe "Tablet: nuovo cliente"). */
+const USB_TEXT =
+  'Passa una card nuova sul lettore per associarla adesso, oppure fallo più tardi dalla scheda.';
 
 /** Reading is on, or about to be: the section of the wireframe. Otherwise the reader's own states. */
 const READING: ReadonlySet<NfcStatus> = new Set(['checking', 'starting', 'active']);
@@ -44,14 +48,16 @@ type NewCustomerCardSectionProps = {
  */
 export function NewCustomerCardSection({ lookup, onRetry }: NewCustomerCardSectionProps) {
   const reader = useCardReaderState();
-  if (!READING.has(reader.nfc)) {
+  // The till tablet's USB reader has no state of its own: the Web NFC state does not apply.
+  const usb = useUsbCardInput();
+  if (!usb && !READING.has(reader.nfc)) {
     return (
       <section aria-label="Card">
         <CardReadPanel title={TITLE} description={TEXT} />
       </section>
     );
   }
-  const starting = reader.nfc !== 'active';
+  const starting = !usb && reader.nfc !== 'active';
   return (
     <section aria-label="Card" className={styles.section}>
       <Icon name="nfc" className={styles.icon} />
@@ -70,7 +76,9 @@ export function NewCustomerCardSection({ lookup, onRetry }: NewCustomerCardSecti
               ? 'Avvio della lettura…'
               : lookup.status === 'reading'
                 ? 'Lettura della card…'
-                : TEXT}
+                : usb
+                  ? USB_TEXT
+                  : TEXT}
           </p>
         )}
       </div>

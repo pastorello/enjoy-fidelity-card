@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLatest } from '../../lib/useLatest';
+import { useUsbCardInput } from '../tablet-kiosk/useUsbCardInput';
 import { useCardWriter } from '../card-input/useCardWriter';
 import type { CardWriteFailure, CardWriteStep } from '../card-input/webNfcWriter';
 import { useAuth } from '../identity/AuthProvider';
@@ -80,7 +81,12 @@ type Options = {
  */
 export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLinkWriting {
   const service = useCardsService();
-  const { canWrite, writeUrl } = useCardWriter();
+  const writer = useCardWriter();
+  // The till tablet reads with its USB reader, which cannot write: the link stays not written
+  // (SPEC-tablet-kiosk, point 8), even if the browser offers Web NFC.
+  const usb = useUsbCardInput();
+  const canWrite = writer.canWrite && !usb;
+  const { writeUrl } = writer;
   const { reportNotEnabled } = useAuth();
   const [state, setState] = useState<CardLinkWriteState>({ status: 'idle' });
   // The attempt in progress: aborting it drops every answer it is still waiting for.
