@@ -553,3 +553,7 @@ fermarsi e avvisare (domanda aperta 10 della spec).
     L'idempotenza vale per `operation_id`: due inviti con id diversi alla stessa email o allo stesso nome
     entro 2 minuti danno `in_progress`; una prenotazione `pending` più vecchia passa a `failed` al primo invito
     successivo con la stessa email o lo stesso nome.
+57. `npm run e2e` lanciato subito dopo `npx supabase db reset` può fallire nei primi test (accesso con
+    "Servizio momentaneamente non disponibile: riprova tra poco.", pagina dei punti con "Non riesco a caricare
+    i punti."): Auth e Data API stanno ancora ripartendo. Non è un difetto dell'app: attendere qualche
+    secondo (o rieseguire) prima degli E2E; dopo un reset rieseguire anche `./scripts/reload-auth-templates.sh`.
