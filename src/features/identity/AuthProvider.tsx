@@ -64,6 +64,9 @@ export type RecoveryOutcome =
   | 'save-network'
   | 'save-unknown';
 
+/** The two links that open `/imposta-password`: "Password dimenticata" and an invite. */
+export type LinkKind = 'recovery' | 'invite';
+
 type AuthContextValue = {
   state: AuthState;
   signIn: (email: string, password: string) => Promise<SignInOutcome>;
@@ -73,8 +76,16 @@ type AuthContextValue = {
   currentEmail: () => Promise<string | null>;
   /** Asks for the recovery email; every server answer is 'sent', only no answer is 'network'. */
   requestPasswordReset: (email: string, redirectTo: string) => Promise<ResetRequestResult>;
-  /** Verifies the link (once per link), saves the password and signs in as the link's user. */
-  completeRecovery: (tokenHash: string, password: string) => Promise<RecoveryOutcome>;
+  /**
+   * Verifies the link (once per link), saves the password and signs in as the link's user. A
+   * recovery also signs out the user's other devices; an invite does not (a person just invited
+   * has none).
+   */
+  completeRecovery: (
+    tokenHash: string,
+    password: string,
+    kind?: LinkKind,
+  ) => Promise<RecoveryOutcome>;
   /** Leaving the recovery page: a verified link whose password was not saved signs out. */
   abandonRecovery: () => Promise<void>;
   /**
@@ -300,14 +311,21 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
   );
 
   const completeRecovery = useCallback(
-    async (tokenHash: string, password: string): Promise<RecoveryOutcome> => {
+    async (
+      tokenHash: string,
+      password: string,
+      kind: LinkKind = 'recovery',
+    ): Promise<RecoveryOutcome> => {
       if (verifiedToken.current !== tokenHash) {
         verifiedToken.current = null;
         saveMayHaveLanded.current = false;
         verifying.current = true;
         let verified;
         try {
-          verified = await service.verifyRecovery(tokenHash);
+          verified =
+            kind === 'invite'
+              ? await service.verifyInvite(tokenHash)
+              : await service.verifyRecovery(tokenHash);
         } finally {
           verifying.current = false;
         }
@@ -333,7 +351,7 @@ export function AuthProvider({ service, children }: { service: AuthService; chil
       }
       verifiedToken.current = null;
       saveMayHaveLanded.current = false;
-      await service.signOutOtherDevices();
+      if (kind === 'recovery') await service.signOutOtherDevices();
 
       let userId: string | null;
       let next: ActiveState | null;

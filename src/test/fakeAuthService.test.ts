@@ -180,6 +180,19 @@ describe('createFakeAuthService: password recovery', () => {
     await expect(fake.service.loadIdentity()).resolves.toMatchObject({ operator: linkOperator });
   });
 
+  it('an invite verification shares the programmed results and switches to the link user', async () => {
+    const fake = createFakeAuthService({
+      verifyResults: ['network', 'ok'],
+      recoveryUser: { userId: 'user-2', operator: linkOperator, email: 'marco@example.com' },
+    });
+    expect(await fake.service.verifyInvite('hash')).toBe('network');
+    await expect(fake.service.currentUserId()).resolves.toBeNull();
+    expect(await fake.service.verifyInvite('hash')).toBe('ok');
+    await expect(fake.service.currentUserId()).resolves.toBe('user-2');
+    expect(fake.service.verifyInvite).toHaveBeenCalledTimes(2);
+    expect(fake.service.verifyRecovery).not.toHaveBeenCalled();
+  });
+
   it('a failed verification leaves the session as it was', async () => {
     const fake = createFakeAuthService({ userId: 'user-1', verifyResults: ['invalid-link'] });
     const seen: (string | null)[] = [];
