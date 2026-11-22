@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { messagesTo } from '../../e2e/mailpit';
+import { linkHref, messagesTo, waitForMessageTo } from '../../e2e/mailpit';
 import { localSupabase, memoryClient, runSql } from './localSupabase';
 
 // SPEC-operators.md point 5: the Edge Function operator-invites served locally
@@ -26,6 +26,7 @@ function account(label: string, name: string): Account {
   };
 }
 
+const admin = account('funzione-admin', 'Funzione Admin');
 const operator = account('funzione-operatore', 'Funzione Operatore');
 const device = account('funzione-tablet', 'Funzione Tablet');
 const tokens = new Map<Account, string>();
@@ -119,7 +120,11 @@ async function waitForFunction(deadline = Date.now() + 20_000): Promise<void> {
 
 beforeAll(async () => {
   await waitForFunction();
-  await Promise.all([operator, device].map(createUser));
+  await Promise.all([admin, operator, device].map(createUser));
+  admin.id = runSql(`select private.add_operator(:'email', :'name', 'admin');`, {
+    email: admin.email,
+    name: admin.name,
+  });
   operator.id = runSql(`select private.add_operator(:'email', :'name', 'operator');`, {
     email: operator.email,
     name: operator.name,
@@ -128,20 +133,29 @@ beforeAll(async () => {
     email: device.email,
     name: device.name,
   });
-  await Promise.all([operator, device].map(signIn));
+  await Promise.all([admin, operator, device].map(signIn));
 }, 40_000);
 
 afterAll(async () => {
+  // The invites of this run: their reservations, profiles and Auth users, then the callers.
+  const invitedUsers = runSql(
+    `select coalesce(string_agg(u.id::text, ','), '') from auth.users u
+     where lower(u.email) like 'invitato-%-' || :'run' || '@example.com';`,
+    { run },
+  )
+    .split(',')
+    .filter(Boolean);
   runSql(
-    `delete from app.devices where name = :'device';
-     delete from app.operators where id = nullif(:'operator', '')::uuid;`,
-    { device: device.name, operator: operator.id },
+    `delete from private.operator_invites where requested_by = nullif(:'admin', '')::uuid;
+     delete from app.operators where invited_by = nullif(:'admin', '')::uuid;
+     delete from app.devices where name = :'device';
+     delete from app.operators where id = any(array[nullif(:'operator', ''), nullif(:'admin', '')]::uuid[]);`,
+    { device: device.name, operator: operator.id, admin: admin.id },
   );
   await Promise.all(
-    [operator, device]
-      .map((of) => of.userId)
-      .filter(Boolean)
-      .map((id) => secret.auth.admin.deleteUser(id).catch(() => undefined)),
+    [...invitedUsers, ...[admin, operator, device].map((of) => of.userId).filter(Boolean)].map(
+      (id) => secret.auth.admin.deleteUser(id).catch(() => undefined),
+    ),
   );
 });
 
@@ -172,17 +186,17 @@ describe('operator-invites served locally: whoever is not an admin', () => {
   it('an operator: 403 forbidden for every action, no trace', async () => {
     const since = new Date();
     const invite = inviteBody('da-operatore');
-    const admin = inviteBody('admin-da-operatore', 'admin');
+    const adminInvite = inviteBody('admin-da-operatore', 'admin');
     const authorization = `Bearer ${tokenOf(operator)}`;
     const answers = await Promise.all([
       call(invite, authorization),
-      call(admin, authorization),
+      call(adminInvite, authorization),
       call({ action: 'resend', operator_id: operator.id }, authorization),
       call({ action: 'cancel', operator_id: operator.id }, authorization),
     ]);
     expect(answers).toEqual(answers.map(() => ({ status: 403, body: { error: 'forbidden' } })));
     await expectNoTrace(invite, since);
-    await expectNoTrace(admin, since);
+    await expectNoTrace(adminInvite, since);
     expect(
       runSql(`select count(*) from app.operators where id = :'id'::uuid and user_id is not null;`, {
         id: operator.id,
@@ -213,5 +227,151 @@ describe('operator-invites served locally: whoever is not an admin', () => {
     // projects do not); handler.test.ts proves the function never sends one.
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'forbidden_origin' });
+  });
+});
+
+/** Status, role, inviter and Auth metadata of the profiles with `name` (one row per profile). */
+function profilesNamed(name: string): string[] {
+  const rows = runSql(
+    `select coalesce(string_agg(
+       r.status || '|' || r.role || '|' || coalesce(o.invited_by::text, '') || '|' ||
+       (o.invited_at is not null)::text || '|' ||
+       coalesce(u.raw_user_meta_data ->> 'name', '') || '|' ||
+       coalesce(u.raw_user_meta_data ->> 'invited_by', '') || '|' ||
+       coalesce(u.raw_user_meta_data ->> 'role_label', ''), E'\\n'), '')
+     from app.operators o
+     cross join lateral private.operator_rows(o.id) r
+     left join auth.users u on u.id = o.user_id
+     where o.name = :'name';`,
+    { name },
+  );
+  return rows === '' ? [] : rows.split('\n');
+}
+
+/** Waits a little longer than an email takes to arrive, then returns every email to `email`. */
+async function settledMessagesTo(email: string, since: Date) {
+  await waitForMessageTo(email, since);
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  return messagesTo(email, since);
+}
+
+describe('operator-invites served locally: the real invite email (Mailpit)', () => {
+  it('an admin invites an admin: one email, one invited profile, metadata and link of the spec', async () => {
+    const since = new Date();
+    const body = { ...inviteBody('reale', 'admin'), name: `Zoë & <b>Co</b> ${run}` };
+    const answer = await call(body, `Bearer ${tokenOf(admin)}`);
+    expect(answer.status).toBe(200);
+    expect(answer.body).toMatchObject({
+      status: 'invited',
+      operator: { name: body.name, role: 'admin' },
+    });
+
+    expect(profilesNamed(body.name)).toEqual([
+      `invited|admin|${admin.id}|true|${body.name}|${admin.name}|amministratore`,
+    ]);
+
+    const messages = await settledMessagesTo(body.email, since);
+    expect(messages).toHaveLength(1);
+    const [message] = messages;
+    if (!message) throw new Error('no email');
+    expect(message.subject).toBe('Enjoy Card: il tuo invito');
+    // html/template escapes the name in the text: it can never become markup.
+    expect(message.html).toContain('Ciao Zoë &amp; &lt;b&gt;Co&lt;/b&gt;');
+    expect(message.html).not.toContain('<b>Co</b>');
+    const text = message.html.replace(/\s+/g, ' ');
+    expect(text).toContain(
+      `${admin.name} ti ha invitato come amministratore dell’Enjoy Card, la fidelity card dell’Enjoy Bar.`,
+    );
+    expect(text).toContain('il link vale un’ora e si usa una volta sola.');
+    expect(message.html).not.toMatch(/<img\b/i);
+
+    const link = new URL(linkHref(message.html, 'Scegli la password'));
+    expect(`${link.origin}${link.pathname}`).toBe(`${ORIGIN}/imposta-password`);
+    expect(link.searchParams.get('type')).toBe('invite');
+    const tokenHash = link.searchParams.get('token_hash');
+    expect(tokenHash).toMatch(/^[0-9a-f]{20,}$/);
+    const fragment = new URLSearchParams(link.hash.slice(1));
+    expect(Object.fromEntries(fragment)).toEqual({
+      nome: body.name,
+      da: admin.name,
+      ruolo: 'amministratore',
+    });
+
+    // The link is a real invite token for this person.
+    const invitee = memoryClient(local.url, local.publishableKey);
+    const { data, error } = await invitee.auth.verifyOtp({
+      type: 'invite',
+      token_hash: tokenHash ?? '',
+    });
+    expect(error).toBeNull();
+    expect(data.user?.email).toBe(body.email);
+  });
+
+  it('the same operation_id twice in a row: one email, one profile, the same operator', async () => {
+    const since = new Date();
+    const body = inviteBody('ripetuto');
+    const authorization = `Bearer ${tokenOf(admin)}`;
+    const first = await call(body, authorization);
+    const second = await call(body, authorization);
+    expect(first.status).toBe(200);
+    expect(second).toEqual(first);
+    expect(await settledMessagesTo(body.email, since)).toHaveLength(1);
+    expect(profilesNamed(body.name)).toHaveLength(1);
+  });
+
+  it('the same operation_id twice in parallel: one email, one profile', async () => {
+    const since = new Date();
+    const body = inviteBody('parallelo');
+    const authorization = `Bearer ${tokenOf(admin)}`;
+    const answers = await Promise.all([call(body, authorization), call(body, authorization)]);
+    const statuses = answers.map((answer) => answer.status).toSorted((a, b) => a - b);
+    // Both done, or one done and the other told the same invite is still running.
+    expect([
+      [200, 200],
+      [200, 409],
+    ]).toContainEqual(statuses);
+    for (const answer of answers.filter((a) => a.status === 409)) {
+      expect(answer.body).toEqual({ error: 'in_progress' });
+    }
+    expect(await settledMessagesTo(body.email, since)).toHaveLength(1);
+    expect(profilesNamed(body.name)).toHaveLength(1);
+    // Once the first has finished, the retry gets the same operator.
+    const retry = await call(body, authorization);
+    expect(retry.status).toBe(200);
+    expect(profilesNamed(body.name)).toHaveLength(1);
+    expect(await messagesTo(body.email, since)).toHaveLength(1);
+  });
+
+  it('the email of the tablet account: 409 email_is_device, no email', async () => {
+    const since = new Date();
+    const body = { ...inviteBody('tablet'), email: device.email };
+    const answer = await call(body, `Bearer ${tokenOf(admin)}`);
+    expect(answer).toEqual({ status: 409, body: { error: 'email_is_device' } });
+    expect(profilesNamed(body.name)).toEqual([]);
+    expect(await messagesTo(device.email, since)).toEqual([]);
+  });
+
+  it('a name already used: 409 name_taken, no email, no profile', async () => {
+    const since = new Date();
+    const body = { ...inviteBody('nome-usato'), name: operator.name };
+    const answer = await call(body, `Bearer ${tokenOf(admin)}`);
+    expect(answer).toEqual({ status: 409, body: { error: 'name_taken' } });
+    // The refused reservation stays written (begin answers in jsonb); no Auth user, no email.
+    expect(
+      runSql(`select count(*) from auth.users where lower(email) = lower(:'email');`, {
+        email: body.email,
+      }),
+    ).toBe('0');
+    expect(await messagesTo(body.email, since)).toEqual([]);
+    expect(profilesNamed(operator.name)).toHaveLength(1);
+  });
+
+  it('the email of an account: 409 email_taken, no email', async () => {
+    const since = new Date();
+    const body = { ...inviteBody('email-usata'), email: operator.email };
+    const answer = await call(body, `Bearer ${tokenOf(admin)}`);
+    expect(answer).toEqual({ status: 409, body: { error: 'email_taken', deactivated: false } });
+    expect(profilesNamed(body.name)).toEqual([]);
+    expect(await messagesTo(operator.email, since)).toEqual([]);
   });
 });
