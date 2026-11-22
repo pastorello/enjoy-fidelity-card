@@ -85,17 +85,15 @@ type Context = { origin: string; authorization: string; deps: HandlerDeps };
 
 type RpcError = { code?: string } | null;
 
-/** The begin RPC of resend and cancel, called with the caller's token: PostgREST checks the token, the RPC is_admin(). */
-function beginCall(input: OperatorInput): { fn: string; args: Record<string, string> } {
-  const fn = input.action === 'resend' ? 'operator_resend_begin' : 'operator_cancel_begin';
-  return { fn, args: { p_operator_id: input.operator_id } };
-}
-
 /** The code of a refused begin: the caller's rights never come from anything but the RPC. */
 function refusalCode(error: NonNullable<RpcError>): ErrorCode {
   if (error.code === '42501') return 'forbidden';
   if (error.code === 'EO005') return 'admin_from_device';
   if (error.code === '22023') return 'invalid_input';
+  if (error.code === 'EO002') return 'self';
+  // EO004 not invited any more; P0002 no such profile (not in the table of the spec: the person
+  // is not waiting for an invite either, and the dialog asks to reload the list).
+  if (error.code === 'EO004' || error.code === 'P0002') return 'not_invited';
   // PGRST301-303: token missing, invalid or expired (PostgREST).
   if (error.code !== undefined && /^PGRST30\d$/.test(error.code)) return 'unauthorized';
   return 'upstream';
@@ -137,19 +135,132 @@ async function perform(input: Input, context: Context): Promise<Response> {
 
 async function settle(input: Input, context: Context): Promise<Outcome> {
   if (input.action === 'invite') return invite(input, context);
-  // The resend and cancel steps after the begin RPC arrive with task 9 of
-  // tasks/operators/todo.md; until then an allowed request answers like a failure of the server.
-  const { fn, args } = beginCall(input);
+  if (input.action === 'resend') return resend(input, context);
+  return cancel(input, context);
+}
+
+function recordOf(data: unknown): Record<string, unknown> {
+  return typeof data === 'object' && data !== null && !Array.isArray(data) ? { ...data } : {};
+}
+
+function uuidOf(value: unknown): string | null {
+  return typeof value === 'string' && UUID.test(value) ? value : null;
+}
+
+/**
+ * The begin RPC of resend and cancel with the caller's token: PostgREST checks the token, the RPC
+ * is_admin(), the target and the caller (EO002, EO004). Its data, or the outcome of a refusal.
+ */
+async function operatorBegin(
+  input: OperatorInput,
+  { authorization, deps }: Context,
+): Promise<{ data: Record<string, unknown> } | { outcome: Outcome }> {
+  const fn = input.action === 'resend' ? 'operator_resend_begin' : 'operator_cancel_begin';
   try {
-    const { error } = await context.deps
-      .callerClient(context.authorization)
+    const { data, error } = await deps
+      .callerClient(authorization)
       .schema('app')
-      .rpc(fn, args);
-    if (error) return failure(refusalCode(error));
+      .rpc(fn, { p_operator_id: input.operator_id });
+    if (error) return { outcome: failure(refusalCode(error)) };
+    return { data: recordOf(data) };
   } catch {
     // A client that throws is a server failure; nothing of it reaches the answer.
+    return { outcome: failure('upstream') };
+  }
+}
+
+/**
+ * The resend (SPEC-operators point 5, "Reinvio"): begin, metadata naming who sends it again, the
+ * invite (or a recovery link once the email is confirmed), then finish with the requested_by of
+ * begin. No idempotency: every resend sends an email and the last one wins.
+ */
+async function resend(input: OperatorInput, context: Context): Promise<Outcome> {
+  const begin = await operatorBegin(input, context);
+  if ('outcome' in begin) return begin.outcome;
+  const target = begin.data;
+  const userId = uuidOf(target.user_id);
+  const requestedBy = uuidOf(target.requested_by);
+  const { email, name, role_label: roleLabel, invited_by_name: invitedBy } = target;
+  if (userId === null || requestedBy === null) return failure('upstream');
+  if (typeof email !== 'string' || email === '' || typeof name !== 'string') {
+    return failure('upstream');
+  }
+  if (roleLabel !== ROLE_LABEL.admin && roleLabel !== ROLE_LABEL.operator) {
+    return failure('upstream');
+  }
+
+  const redirectTo = `${context.origin}/imposta-password`;
+  const metadata = {
+    name,
+    invited_by: typeof invitedBy === 'string' ? invitedBy : '',
+    role_label: roleLabel,
+  };
+  const { deps } = context;
+  const admin = deps.adminClient.auth;
+  try {
+    const updated = await admin.admin.updateUserById(userId, { user_metadata: metadata });
+    if (updated.error) return resendAuthFailure(updated.error);
+    const { error } =
+      target.email_confirmed === true
+        ? await admin.resetPasswordForEmail(email, { redirectTo })
+        : await admin.admin.inviteUserByEmail(email, { redirectTo, data: metadata });
+    if (error) return resendAuthFailure(error);
+  } catch {
+    return failure('upstream');
+  }
+
+  try {
+    const { data, error } = await deps.adminClient.schema('app').rpc('operator_resend_finish', {
+      p_operator_id: input.operator_id,
+      p_requested_by: requestedBy,
+    });
+    if (error) return failure(error.code === 'P0002' ? 'not_invited' : 'upstream');
+    const answer = recordOf(data);
+    if (answer.status === 'done')
+      return { status: 200, body: { status: 'resent' }, logged: 'resent' };
+    if (answer.status === 'forbidden') return failure('forbidden');
+  } catch {
+    // Falls through: the email left, but the database did not say done.
   }
   return failure('upstream');
+}
+
+/** 422 email_exists on a resend: the link was opened meanwhile, the list is out of date. */
+function resendAuthFailure(error: {
+  status?: number | undefined;
+  code?: string | undefined;
+}): Outcome {
+  const outcome = authFailure(error);
+  return outcome.logged === 'email_taken' ? failure('not_invited') : outcome;
+}
+
+/**
+ * The cancel (SPEC-operators point 5, "Annullamento"): begin, then operator_cancel_check rereads
+ * the database with the secret key, and only its `true` deletes the Auth user (the profile
+ * becomes removed through `on delete set null`; no row of app.operators is deleted).
+ */
+async function cancel(input: OperatorInput, context: Context): Promise<Outcome> {
+  const begin = await operatorBegin(input, context);
+  if ('outcome' in begin) return begin.outcome;
+  const userId = uuidOf(begin.data.user_id);
+  const requestedBy = uuidOf(begin.data.requested_by);
+  if (userId === null || requestedBy === null) return failure('upstream');
+
+  const { deps } = context;
+  try {
+    const { data, error } = await deps.adminClient.schema('app').rpc('operator_cancel_check', {
+      p_operator_id: input.operator_id,
+      p_user_id: userId,
+      p_requested_by: requestedBy,
+    });
+    if (error) return failure('upstream');
+    if (data !== true) return failure('not_invited');
+    const deleted = await deps.adminClient.auth.admin.deleteUser(userId);
+    if (deleted.error) return failure('upstream');
+  } catch {
+    return failure('upstream');
+  }
+  return { status: 200, body: { status: 'cancelled' }, logged: 'cancelled' };
 }
 
 /** What operator_invite_begin answered, read without trusting its shape. */

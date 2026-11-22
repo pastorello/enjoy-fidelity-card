@@ -416,6 +416,10 @@ type Step =
   | 'admin.operator_invite_finish'
   | 'admin.operator_invite_fail'
   | 'admin.operator_invite_orphan'
+  | 'caller.operator_resend_begin'
+  | 'admin.operator_resend_finish'
+  | 'caller.operator_cancel_begin'
+  | 'admin.operator_cancel_check'
   | 'admin.updateUserById'
   | 'admin.inviteUserByEmail'
   | 'admin.resetPasswordForEmail'
@@ -433,12 +437,28 @@ const ok = (data: unknown): Answer => ({ data, error: null });
 const proceed = { status: 'proceed', invited_by_name: 'Anna' };
 const finished = { status: 'done', operator: OPERATOR };
 
-/** Default answers: a new user, invited and linked. */
+const ADMIN_ID = '9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d';
+/** operator_resend_begin of an invited person who never opened the link. */
+const resendTarget = {
+  user_id: OLD_USER,
+  email: 'giulia@example.test',
+  name: 'Giulia',
+  role_label: 'operatore',
+  invited_by_name: 'Marco',
+  email_confirmed: false,
+  requested_by: ADMIN_ID,
+};
+
+/** Default answers: a new user, invited and linked; a resend and a cancel that go through. */
 const DEFAULTS: Record<Step, Answer> = {
   'caller.operator_invite_begin': ok(proceed),
   'admin.operator_invite_finish': ok(finished),
   'admin.operator_invite_fail': ok(true),
   'admin.operator_invite_orphan': ok(true),
+  'caller.operator_resend_begin': ok(resendTarget),
+  'admin.operator_resend_finish': ok({ status: 'done' }),
+  'caller.operator_cancel_begin': ok({ user_id: OLD_USER, requested_by: ADMIN_ID }),
+  'admin.operator_cancel_check': ok(true),
   'admin.updateUserById': ok({ user: { id: OLD_USER } }),
   'admin.inviteUserByEmail': ok({ user: { id: NEW_USER } }),
   'admin.resetPasswordForEmail': ok({}),
@@ -892,6 +912,260 @@ describe('invite', () => {
       expect(logs).toHaveLength(1);
       for (const entry of logs) {
         expect(Object.keys(entry ?? {}).toSorted()).toEqual(['action', 'operation_id', 'outcome']);
+      }
+    });
+  });
+});
+
+// Resend and cancel (SPEC-operators point 5, "Reinvio" and "Annullamento").
+const resendBody = { action: 'resend', operator_id: OPERATOR.id };
+const cancelBody = { action: 'cancel', operator_id: OPERATOR.id };
+const resentMetadata = { name: 'Giulia', invited_by: 'Marco', role_label: 'operatore' };
+const rpcError = (code: string): Answer => ({
+  data: null,
+  error: { code, message: SECRET_MESSAGE },
+});
+
+describe('resend', () => {
+  it('begin, metadata, invite, then finish with the requested_by of begin: 200 resent', async () => {
+    const { deps, steps, argsOf, logs } = inviteDeps();
+    const response = await handle(post(resendBody), deps);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'resent' });
+    expect(steps()).toEqual([
+      'caller.operator_resend_begin',
+      'admin.updateUserById',
+      'admin.inviteUserByEmail',
+      'admin.operator_resend_finish',
+    ]);
+    expect(argsOf('caller.operator_resend_begin')).toEqual([{ p_operator_id: OPERATOR.id }]);
+    expect(argsOf('admin.updateUserById')).toEqual([OLD_USER, { user_metadata: resentMetadata }]);
+    expect(argsOf('admin.inviteUserByEmail')).toEqual([
+      'giulia@example.test',
+      { redirectTo: `${APP}/imposta-password`, data: resentMetadata },
+    ]);
+    expect(argsOf('admin.operator_resend_finish')).toEqual([
+      { p_operator_id: OPERATOR.id, p_requested_by: ADMIN_ID },
+    ]);
+    expect(logs).toEqual([{ action: 'resend', outcome: 'resent' }]);
+  });
+
+  it('an admin keeps role_label amministratore in the metadata', async () => {
+    const { deps, argsOf } = inviteDeps({
+      'caller.operator_resend_begin': ok({ ...resendTarget, role_label: 'amministratore' }),
+    });
+    expect((await handle(post(resendBody), deps)).status).toBe(200);
+    expect(argsOf('admin.updateUserById')?.[1]).toEqual({
+      user_metadata: { ...resentMetadata, role_label: 'amministratore' },
+    });
+  });
+
+  it('email confirmed (link opened, password never saved): a recovery link, no invite', async () => {
+    const { deps, steps, argsOf } = inviteDeps({
+      'caller.operator_resend_begin': ok({ ...resendTarget, email_confirmed: true }),
+    });
+    const response = await handle(post(resendBody, { origin: 'http://localhost:4173' }), deps);
+    expect(response.status).toBe(200);
+    expect(steps()).toEqual([
+      'caller.operator_resend_begin',
+      'admin.updateUserById',
+      'admin.resetPasswordForEmail',
+      'admin.operator_resend_finish',
+    ]);
+    expect(argsOf('admin.resetPasswordForEmail')).toEqual([
+      'giulia@example.test',
+      { redirectTo: 'http://localhost:4173/imposta-password' },
+    ]);
+  });
+
+  it.each([
+    ['EO002', 403, 'self'],
+    ['EO004', 409, 'not_invited'],
+    ['P0002', 409, 'not_invited'],
+    ['42501', 403, 'forbidden'],
+    ['EO005', 403, 'admin_from_device'],
+    ['PGRST301', 401, 'unauthorized'],
+    ['XX000', 502, 'upstream'],
+  ])('begin refused with %s: %i %s and no other step', async (code, status, error) => {
+    const { deps, steps, logs } = inviteDeps({ 'caller.operator_resend_begin': rpcError(code) });
+    const response = await handle(post(resendBody), deps);
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error });
+    expect(steps()).toEqual(['caller.operator_resend_begin']);
+    expect(logs).toEqual([{ action: 'resend', outcome: error }]);
+  });
+
+  it.each([
+    ['null', null],
+    ['no user_id', { ...resendTarget, user_id: undefined }],
+    ['a user_id that is not a uuid', { ...resendTarget, user_id: 'x' }],
+    ['no email', { ...resendTarget, email: null }],
+    ['no requested_by', { ...resendTarget, requested_by: null }],
+  ])('begin with an answer it does not know (%s): 502 and no Auth call', async (_label, data) => {
+    const { deps, steps } = inviteDeps({ 'caller.operator_resend_begin': ok(data) });
+    const response = await handle(post(resendBody), deps);
+    expect(response.status).toBe(502);
+    expect(steps()).toEqual(['caller.operator_resend_begin']);
+  });
+
+  it('the metadata update fails: no email, 502', async () => {
+    const { deps, steps } = inviteDeps({ 'admin.updateUserById': authError(500) });
+    const response = await handle(post(resendBody), deps);
+    expect(response.status).toBe(502);
+    expect(steps()).toEqual(['caller.operator_resend_begin', 'admin.updateUserById']);
+  });
+
+  it.each([
+    ['inviteUserByEmail', false],
+    ['resetPasswordForEmail', true],
+  ] as const)('429 of Auth on %s: 429 rate_limited and no finish', async (method, confirmed) => {
+    const { deps, steps } = inviteDeps({
+      'caller.operator_resend_begin': ok({ ...resendTarget, email_confirmed: confirmed }),
+      [`admin.${method}`]: authError(429, 'over_email_send_rate_limit'),
+    });
+    const response = await handle(post(resendBody), deps);
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: 'rate_limited' });
+    expect(steps()).not.toContain('admin.operator_resend_finish');
+  });
+
+  it('422 email_exists (the link was opened meanwhile): 409 not_invited, no finish', async () => {
+    const { deps, steps } = inviteDeps({
+      'admin.inviteUserByEmail': authError(422, 'email_exists'),
+    });
+    const response = await handle(post(resendBody), deps);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'not_invited' });
+    expect(steps()).not.toContain('admin.operator_resend_finish');
+  });
+
+  it('Auth throws: 502 upstream, no finish', async () => {
+    const { deps, steps } = inviteDeps({ 'admin.inviteUserByEmail': 'throw' });
+    const response = await handle(post(resendBody), deps);
+    expect(response.status).toBe(502);
+    expect(steps()).not.toContain('admin.operator_resend_finish');
+  });
+
+  it.each([
+    ['forbidden (the requester lost the role)', ok({ status: 'forbidden' }), 403, 'forbidden'],
+    ['P0002 (the profile is gone)', rpcError('P0002'), 409, 'not_invited'],
+    ['an unknown answer', ok({ status: 'what' }), 502, 'upstream'],
+    ['an error', rpcError('XX000'), 502, 'upstream'],
+    ['a throw', 'throw', 502, 'upstream'],
+  ] as const)('finish answers %s: %i %s', async (_label, answer, status, error) => {
+    const { deps } = inviteDeps({ 'admin.operator_resend_finish': answer });
+    const response = await handle(post(resendBody), deps);
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error });
+  });
+});
+
+describe('cancel', () => {
+  it('begin, check, then deleteUser on the user of begin: 200 cancelled', async () => {
+    const { deps, steps, argsOf, logs } = inviteDeps();
+    const response = await handle(post(cancelBody), deps);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'cancelled' });
+    expect(steps()).toEqual([
+      'caller.operator_cancel_begin',
+      'admin.operator_cancel_check',
+      'admin.deleteUser',
+    ]);
+    expect(argsOf('caller.operator_cancel_begin')).toEqual([{ p_operator_id: OPERATOR.id }]);
+    expect(argsOf('admin.operator_cancel_check')).toEqual([
+      { p_operator_id: OPERATOR.id, p_user_id: OLD_USER, p_requested_by: ADMIN_ID },
+    ]);
+    expect(argsOf('admin.deleteUser')).toEqual([OLD_USER]);
+    expect(logs).toEqual([{ action: 'cancel', outcome: 'cancelled' }]);
+  });
+
+  it.each([
+    ['false', ok(false)],
+    ['null', ok(null)],
+    ['the string "true"', ok('true')],
+  ])('check answers %s: 409 not_invited and never deleteUser', async (_label, answer) => {
+    const { deps, steps } = inviteDeps({ 'admin.operator_cancel_check': answer });
+    const response = await handle(post(cancelBody), deps);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'not_invited' });
+    expect(steps()).toEqual(['caller.operator_cancel_begin', 'admin.operator_cancel_check']);
+  });
+
+  it.each([
+    ['an error', rpcError('XX000')],
+    ['a throw', 'throw'],
+  ] as const)('check fails with %s: 502 upstream and never deleteUser', async (_label, answer) => {
+    const { deps, steps } = inviteDeps({ 'admin.operator_cancel_check': answer });
+    const response = await handle(post(cancelBody), deps);
+    expect(response.status).toBe(502);
+    expect(steps()).not.toContain('admin.deleteUser');
+  });
+
+  it.each([
+    ['EO002', 403, 'self'],
+    ['EO004', 409, 'not_invited'],
+    ['P0002', 409, 'not_invited'],
+    ['42501', 403, 'forbidden'],
+    ['XX000', 502, 'upstream'],
+  ])('begin refused with %s: %i %s and no other step', async (code, status, error) => {
+    const { deps, steps } = inviteDeps({ 'caller.operator_cancel_begin': rpcError(code) });
+    const response = await handle(post(cancelBody), deps);
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error });
+    expect(steps()).toEqual(['caller.operator_cancel_begin']);
+  });
+
+  it.each([
+    ['null', null],
+    ['no user_id', { requested_by: ADMIN_ID }],
+    ['no requested_by', { user_id: OLD_USER, requested_by: null }],
+  ])('begin with an answer it does not know (%s): 502, no check', async (_label, data) => {
+    const { deps, steps } = inviteDeps({ 'caller.operator_cancel_begin': ok(data) });
+    const response = await handle(post(cancelBody), deps);
+    expect(response.status).toBe(502);
+    expect(steps()).toEqual(['caller.operator_cancel_begin']);
+  });
+
+  it.each([
+    ['an error', authError(500)],
+    ['a throw', 'throw'],
+  ] as const)('deleteUser fails with %s: 502 upstream', async (_label, answer) => {
+    const { deps } = inviteDeps({ 'admin.deleteUser': answer });
+    const response = await handle(post(cancelBody), deps);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: 'upstream' });
+  });
+});
+
+describe('resend and cancel logs', () => {
+  it('never put an email, the token or an Auth message in a response or a log', async () => {
+    const scenarios: [object, Partial<Record<Step, Answer>>][] = [
+      [resendBody, {}],
+      [
+        resendBody,
+        { 'caller.operator_resend_begin': ok({ ...resendTarget, email_confirmed: true }) },
+      ],
+      [resendBody, { 'caller.operator_resend_begin': rpcError('EO004') }],
+      [resendBody, { 'admin.inviteUserByEmail': authError(429, 'over_email_send_rate_limit') }],
+      [resendBody, { 'admin.inviteUserByEmail': 'throw' }],
+      [resendBody, { 'admin.operator_resend_finish': rpcError('XX000') }],
+      [cancelBody, {}],
+      [cancelBody, { 'admin.operator_cancel_check': ok(false) }],
+      [cancelBody, { 'admin.deleteUser': authError(500) }],
+    ];
+    const runs = scenarios.map(([body, answers]) => ({ body, ...inviteDeps(answers) }));
+    const responses = await Promise.all(runs.map((run) => handle(post(run.body), run.deps)));
+    const bodies = await Promise.all(responses.map((response) => response.text()));
+    runs.forEach(({ logs }, index) => {
+      const texts = [bodies[index] ?? '', JSON.stringify(logs)];
+      for (const text of texts) {
+        expect(text).not.toContain('example.test');
+        expect(text).not.toContain('header.payload.signature');
+        expect(text).not.toContain(SECRET_MESSAGE);
+      }
+      expect(logs).toHaveLength(1);
+      for (const entry of logs) {
+        expect(Object.keys(entry ?? {}).toSorted()).toEqual(['action', 'outcome']);
       }
     });
   });
