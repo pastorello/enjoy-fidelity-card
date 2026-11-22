@@ -38,6 +38,12 @@
   cursor: not-allowed;
 }
 
+/* The whole form is disabled (the invite form while the list loads): every option is grey. */
+fieldset:disabled .option {
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
 .radio {
   flex-shrink: 0;
   width: var(--icon);
