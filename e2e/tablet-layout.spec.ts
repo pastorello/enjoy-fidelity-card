@@ -194,8 +194,10 @@ test('the cashier chip fits a narrow window of the till tablet (390 px wide)', a
   await page.getByRole('searchbox').fill('Bianchi');
   await page.getByRole('link', { name: /Giulia Bianchi/ }).click();
   await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}$/);
-  await expectHeaderFits(page.getByRole('link', { name: /Modifica/ }));
+  // Measured once the new page is drawn: the URL changes first, and until React commits the
+  // navigation the chip found is the one of the home page, which is then removed.
   await expect(page.getByRole('heading', { level: 1, name: 'Giulia Bianchi' })).toBeVisible();
+  await expectHeaderFits(page.getByRole('link', { name: /Modifica/ }));
 
   resetDevice(till.name);
 });
