@@ -22,3 +22,8 @@
 .messages:not(:empty) {
   padding-block: var(--space-2);
 }
+
+/* A name with a glyph Enjoy Display lacks, inside a dialog title (displayGlyphs.test.ts). */
+.typedName {
+  font-family: var(--type-body-family);
+}

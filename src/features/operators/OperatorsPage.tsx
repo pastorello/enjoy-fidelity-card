@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppShell } from '../../app/AppShell';
 import { ServerFaultError } from '../../lib/serverFault';
 import { AdminsOnly } from '../../shared/ui/AdminsOnly';
+import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { StatusView } from '../../shared/ui/StatusView';
+import { NOT_IN_DISPLAY } from '../cards/customerName';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useAuth, useCurrentOperator } from '../identity/AuthProvider';
-import { OperatorRow } from './OperatorRow';
+import { OperatorRow, type RowAction } from './OperatorRow';
 import styles from './OperatorsPage.module.css';
 import { useOperatorsService } from './OperatorsServiceProvider';
-import type { Operator } from './types';
+import type { ActiveResult, Operator } from './types';
 
 const TITLE = 'Operatori';
 const BACK_TO = '/impostazioni';
@@ -78,7 +80,128 @@ function useOperatorsList() {
     load();
   }, [load]);
 
-  return { state, reload };
+  /** An action was refused with `forbidden`: the same as a refused list. */
+  const forbid = useCallback(() => {
+    latest.current += 1;
+    setState({ status: 'forbidden' });
+    void reportNotEnabled();
+  }, [reportNotEnabled]);
+
+  return { state, reload, forbid };
+}
+
+const GENERIC_ERROR = 'Operazione non riuscita. Riprova tra poco.';
+
+type ChangeFailure = Exclude<ActiveResult['status'], 'ok' | 'forbidden'>;
+
+/**
+ * SPEC-operators point 6: errors stay in the dialog. `upstream` and anything else (no answer, a
+ * profile gone or without an account meanwhile, a server fault) get the generic text.
+ */
+const CHANGE_ERROR: Record<ChangeFailure, string> = {
+  'last-admin':
+    'Serve almeno un amministratore attivo: prima rendi amministratore un’altra persona.',
+  self: 'Non puoi cambiare il tuo account da qui.',
+  'admin-from-device': GENERIC_ERROR,
+  'no-account': GENERIC_ERROR,
+  'not-found': GENERIC_ERROR,
+  network: GENERIC_ERROR,
+  unknown: GENERIC_ERROR,
+};
+
+/** Refusals that mean the list on screen is stale: it is asked again behind the dialog. */
+const STALE: ReadonlySet<ChangeFailure> = new Set(['no-account', 'not-found']);
+
+/** The texts of the two confirmations (SPEC-operators point 2). */
+const CONFIRM = {
+  deactivate: {
+    title: 'Disattivare',
+    description:
+      'Non potrà più accedere all’app. I suoi movimenti restano nello storico; puoi riattivarlo quando vuoi.',
+    confirmLabel: 'Disattiva',
+    tone: 'danger',
+    done: (name: string) => `${name} è disattivato.`,
+  },
+  reactivate: {
+    title: 'Riattivare',
+    description: 'Potrà di nuovo accedere con la sua password.',
+    confirmLabel: 'Riattiva',
+    tone: 'primary',
+    done: (name: string) => `${name} è di nuovo attivo.`,
+  },
+} as const;
+
+type Pending = { operator: Operator; action: RowAction };
+
+/**
+ * "Disattiva" / "Riattiva" with their `ConfirmDialog`: one request at a time (a double tap sends
+ * one), errors in the dialog, which stays open to try again (the change is idempotent). Done: the
+ * dialog closes, the outcome goes to the live region and the list is asked again from the server.
+ */
+function useActiveChange({
+  onDone,
+  onStale,
+  onForbidden,
+}: {
+  onDone: (operator: Operator, message: string) => void;
+  onStale: () => void;
+  onForbidden: () => void;
+}) {
+  const service = useOperatorsService();
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Set synchronously, so a second tap in the same frame is ignored before `busy` renders.
+  const sending = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send({ operator, action }: Pending) {
+    let result: ActiveResult;
+    try {
+      result = await service.setActive(operator.id, action === 'reactivate');
+    } catch {
+      // A server fault (`ServerFaultError`): "altro" in the table of point 6.
+      result = { status: 'unknown' };
+    }
+    sending.current = false;
+    setBusy(false);
+    if (result.status === 'ok') {
+      setPending(null);
+      onDone(operator, CONFIRM[action].done(operator.name));
+    } else if (result.status === 'forbidden') {
+      setPending(null);
+      onForbidden();
+    } else {
+      setError(CHANGE_ERROR[result.status]);
+      if (STALE.has(result.status)) onStale();
+    }
+  }
+
+  return {
+    pending,
+    busy,
+    error,
+    open: (operator: Operator, action: RowAction) => {
+      setError(null);
+      setPending({ operator, action });
+    },
+    confirm: () => {
+      if (sending.current || pending === null) return;
+      sending.current = true;
+      setBusy(true);
+      setError(null);
+      void send(pending);
+    },
+    cancel: () => {
+      if (sending.current) return;
+      setPending(null);
+      setError(null);
+    },
+  };
+}
+
+/** A name with a glyph Enjoy Display lacks is set in the body font inside the title. */
+function TitleName({ name }: { name: string }) {
+  return <span className={NOT_IN_DISPLAY.test(name) ? styles.typedName : undefined}>{name}</span>;
 }
 
 /**
@@ -86,11 +209,23 @@ function useOperatorsList() {
  * list, or its loading and error states.
  */
 function Operators() {
-  const { state, reload } = useOperatorsList();
+  const { state, reload, forbid } = useOperatorsList();
   // Every state renders the same AppShell, so its h1 stays mounted through loading and errors.
   const heading = useRef<HTMLHeadingElement>(null);
   // The outcome of the last action ("{nome} è disattivato."): the row actions set it.
-  const [message] = useState('');
+  const [message, setMessage] = useState('');
+  // The row of the last action done: it keeps the focus through the reload.
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const change = useActiveChange({
+    onDone(operator, text) {
+      setMessage(text);
+      setFocusedId(operator.id);
+      reload();
+    },
+    onStale: reload,
+    onForbidden: forbid,
+  });
+  const confirmTexts = change.pending === null ? null : CONFIRM[change.pending.action];
 
   // "Riprova" is replaced by the loading state: the focus goes to the title, not to <body>.
   function retry() {
@@ -119,7 +254,15 @@ function Operators() {
     content = (
       <ul className={styles.list} aria-label="Operatori del bar">
         {state.operators.map((operator) => (
-          <OperatorRow key={operator.id} operator={operator} />
+          <OperatorRow
+            key={operator.id}
+            operator={operator}
+            focused={operator.id === focusedId}
+            onAction={(target, action) => {
+              setFocusedId(null);
+              change.open(target, action);
+            }}
+          />
         ))}
       </ul>
     );
@@ -134,6 +277,23 @@ function Operators() {
         </div>
         {content}
       </div>
+      <ConfirmDialog
+        open={change.pending !== null}
+        tone={confirmTexts?.tone ?? 'primary'}
+        title={
+          change.pending && (
+            <>
+              {confirmTexts?.title} <TitleName name={change.pending.operator.name} />?
+            </>
+          )
+        }
+        description={confirmTexts?.description}
+        confirmLabel={confirmTexts?.confirmLabel ?? ''}
+        busy={change.busy}
+        error={change.error}
+        onConfirm={change.confirm}
+        onCancel={change.cancel}
+      />
     </AppShell>
   );
 }

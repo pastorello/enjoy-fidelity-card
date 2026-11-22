@@ -56,3 +56,12 @@
   line-height: var(--type-body-sm-line-height);
   color: var(--color-ink-muted);
 }
+
+/* "Disattiva" / "Riattiva": compact beside the name, still a 48 px target (the wireframe draws 44). */
+.action {
+  flex-shrink: 0;
+  min-height: var(--touch-target);
+  padding: 0 12px;
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line-height);
+}

@@ -234,3 +234,213 @@ describe('OperatorsPage: loading and errors', () => {
     expect(operators.service.list).not.toHaveBeenCalled();
   });
 });
+
+const DEACTIVATE_TEXT =
+  'Non potrà più accedere all’app. I suoi movimenti restano nello storico; puoi riattivarlo quando vuoi.';
+const GENERIC_TEXT = 'Operazione non riuscita. Riprova tra poco.';
+
+function teamWithIds() {
+  const operators = wireframeTeam();
+  const idOf = (name: string) => {
+    const found = operators.find((operator) => operator.name === name);
+    if (!found) throw new Error(`no ${name}`);
+    return found.id;
+  };
+  return { operators, idOf };
+}
+
+function messages(): HTMLElement {
+  const region = document.querySelector<HTMLElement>('[data-operators-messages]');
+  if (!region) throw new Error('no messages region');
+  return region;
+}
+
+async function openDeactivate(name: string) {
+  const list = await findList();
+  await userEvent.click(within(rowOf(list, name)).getByRole('button', { name: 'Disattiva' }));
+  return screen.getByRole('dialog');
+}
+
+describe('OperatorsPage: Disattiva e Riattiva', () => {
+  it('puts "Disattiva" on active and invited rows, "Riattiva" on deactivated ones, nothing on removed', async () => {
+    renderPage();
+    const list = await findList();
+    const buttons = (name: string) =>
+      within(rowOf(list, name))
+        .queryAllByRole('button')
+        .map((button) => button.textContent);
+    expect(buttons('andrea')).toEqual(['Disattiva']);
+    expect(buttons('Marco')).toEqual(['Disattiva']);
+    expect(buttons('Sara')).toEqual(['Riattiva']);
+    expect(buttons('Zeno')).toEqual([]);
+    expect(buttons('Giulia')).toEqual([]);
+    const deactivate = within(rowOf(list, 'andrea')).getByRole('button', { name: 'Disattiva' });
+    expect(deactivate).toHaveAttribute('data-variant', 'danger-secondary');
+    // The button names the person it acts on.
+    expect(deactivate).toHaveAccessibleDescription('andrea Prova');
+    expect(within(rowOf(list, 'Sara')).getByRole('button')).toHaveAttribute(
+      'data-variant',
+      'secondary',
+    );
+  });
+
+  it('deactivates after the confirmation: outcome in the live region, list asked again', async () => {
+    const { operators, idOf } = teamWithIds();
+    const fake = createFakeOperatorsService({ operators });
+    renderPage(fake);
+    const dialog = await openDeactivate('andrea');
+    expect(
+      within(dialog).getByRole('heading', { name: 'Disattivare andrea Prova?' }),
+    ).toBeVisible();
+    expect(dialog).toHaveAccessibleDescription(DEACTIVATE_TEXT);
+    // A dangerous action starts on the safe choice.
+    expect(within(dialog).getByRole('button', { name: 'Lascia com’è' })).toHaveFocus();
+    expect(fake.service.list).toHaveBeenCalledTimes(1);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disattiva' }));
+
+    await waitFor(() => expect(messages()).toHaveTextContent('andrea Prova è disattivato.'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(fake.service.setActive).toHaveBeenCalledExactlyOnceWith(idOf('andrea Prova'), false);
+    const list = await findList();
+    await waitFor(() =>
+      expect(rowOf(list, 'andrea')).toHaveTextContent(
+        'Amministratore · disattivato, movimenti nello storico',
+      ),
+    );
+    expect(fake.service.list).toHaveBeenCalledTimes(2);
+    const reactivate = within(rowOf(list, 'andrea')).getByRole('button', { name: 'Riattiva' });
+    expect(reactivate).toHaveFocus();
+  });
+
+  it('deactivates an invited person too', async () => {
+    const { operators, idOf } = teamWithIds();
+    const fake = createFakeOperatorsService({ operators });
+    renderPage(fake);
+    const dialog = await openDeactivate('Marco');
+    expect(within(dialog).getByRole('heading', { name: 'Disattivare Marco Prova?' })).toBeVisible();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disattiva' }));
+    await waitFor(() => expect(messages()).toHaveTextContent('Marco Prova è disattivato.'));
+    expect(fake.service.setActive).toHaveBeenCalledExactlyOnceWith(idOf('Marco Prova'), false);
+  });
+
+  it('reactivates after the confirmation', async () => {
+    const { operators, idOf } = teamWithIds();
+    const fake = createFakeOperatorsService({ operators });
+    renderPage(fake);
+    const list = await findList();
+    await userEvent.click(within(rowOf(list, 'Sara')).getByRole('button', { name: 'Riattiva' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Riattivare Sara Prova?' })).toBeVisible();
+    expect(dialog).toHaveAccessibleDescription('Potrà di nuovo accedere con la sua password.');
+    const confirm = within(dialog).getByRole('button', { name: 'Riattiva' });
+    expect(confirm).toHaveAttribute('data-variant', 'primary');
+    expect(confirm).toHaveFocus();
+
+    await userEvent.click(confirm);
+
+    await waitFor(() => expect(messages()).toHaveTextContent('Sara Prova è di nuovo attivo.'));
+    expect(fake.service.setActive).toHaveBeenCalledExactlyOnceWith(idOf('Sara Prova'), true);
+    await waitFor(() => expect(rowOf(list, 'Sara')).toHaveTextContent('Operatore · attivo'));
+    expect(within(rowOf(list, 'Sara')).getByRole('button', { name: 'Disattiva' })).toHaveFocus();
+  });
+
+  it('"Lascia com’è" closes the dialog without asking anything', async () => {
+    const fake = createFakeOperatorsService({ operators: wireframeTeam() });
+    renderPage(fake);
+    const dialog = await openDeactivate('andrea');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(fake.service.setActive).not.toHaveBeenCalled();
+    expect(messages()).toBeEmptyDOMElement();
+  });
+
+  it('a double tap on the confirmation sends one request', async () => {
+    const fake = createFakeOperatorsService({ operators: wireframeTeam() });
+    const held = fake.holdNext('setActive');
+    renderPage(fake);
+    const dialog = await openDeactivate('andrea');
+    const confirm = within(dialog).getByRole('button', { name: 'Disattiva' });
+    await userEvent.dblClick(confirm);
+    expect(confirm).toHaveAttribute('aria-busy', 'true');
+    // While it runs, the dialog does not close.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    held.release();
+    await waitFor(() => expect(messages()).toHaveTextContent('andrea Prova è disattivato.'));
+    expect(fake.service.setActive).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'last-admin',
+      'Serve almeno un amministratore attivo: prima rendi amministratore un’altra persona.',
+    ],
+    ['self', 'Non puoi cambiare il tuo account da qui.'],
+    ['unknown', GENERIC_TEXT],
+    ['network', GENERIC_TEXT],
+    ['admin-from-device', GENERIC_TEXT],
+  ] as const)('%s: the text stays in the dialog, nothing is reloaded', async (failure, text) => {
+    const fake = createFakeOperatorsService({ operators: wireframeTeam() });
+    fake.failNext('setActive', failure);
+    renderPage(fake);
+    const dialog = await openDeactivate('andrea');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disattiva' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(text);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(messages()).toBeEmptyDOMElement();
+    expect(fake.service.list).toHaveBeenCalledTimes(1);
+    // Confirming again asks again (the change is idempotent).
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disattiva' }));
+    await waitFor(() => expect(messages()).toHaveTextContent('andrea Prova è disattivato.'));
+    expect(fake.service.setActive).toHaveBeenCalledTimes(2);
+  });
+
+  it('a server fault: the generic text in the dialog', async () => {
+    const fake = createFakeOperatorsService({ operators: wireframeTeam() });
+    fake.failNext('setActive', new ServerFaultError('unavailable'));
+    renderPage(fake);
+    const dialog = await openDeactivate('andrea');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disattiva' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(GENERIC_TEXT);
+  });
+
+  it('closing after an error clears it for the next time', async () => {
+    const fake = createFakeOperatorsService({ operators: wireframeTeam() });
+    fake.failNext('setActive', 'unknown');
+    renderPage(fake);
+    let dialog = await openDeactivate('andrea');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disattiva' }));
+    await within(dialog).findByRole('alert');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    dialog = await openDeactivate('andrea');
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('a person whose account was removed meanwhile: the generic text and the list asked again', async () => {
+    const { operators, idOf } = teamWithIds();
+    const fake = createFakeOperatorsService({ operators });
+    renderPage(fake);
+    const dialog = await openDeactivate('andrea');
+    fake.removeAccount(idOf('andrea Prova'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disattiva' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(GENERIC_TEXT);
+    await waitFor(() => expect(fake.service.list).toHaveBeenCalledTimes(2));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    const list = await findList();
+    await waitFor(() => expect(within(rowOf(list, 'andrea')).queryByRole('button')).toBeNull());
+  });
+
+  it('forbidden: reports it to AuthProvider and shows the "solo amministratori" view', async () => {
+    const fake = createFakeOperatorsService({ operators: wireframeTeam() });
+    fake.failNext('setActive', 'forbidden');
+    const { auth } = renderPage(fake);
+    const dialog = await openDeactivate('andrea');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disattiva' }));
+    expect(
+      await screen.findByRole('heading', { level: 2, name: 'Solo per gli amministratori' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(auth.service.loadIdentity.mock.calls.length).toBeGreaterThan(1));
+  });
+});
