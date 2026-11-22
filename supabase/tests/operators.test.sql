@@ -6,7 +6,7 @@
 -- Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(77);
+select plan(80);
 
 -- Fake Auth users. Accepted invite = email confirmed and a password; the others are invited.
 insert into auth.users (id, email, email_confirmed_at, encrypted_password) values
@@ -384,6 +384,22 @@ select is(
   pg_temp.op('alfa'),
   'from a device, deactivated_by is the cashier'
 );
+-- Reactivating a deactivated admin from a device would give back a permanent admin account
+-- (SPEC-operators point 7): EO005, like naming one. A deactivated operator comes back from there.
+update app.operators set role = 'admin' where id = pg_temp.op('Aaa Spento');
+select pg_temp.as_user('00000000-0000-4000-d500-000000000011');
+set local role authenticated;
+select throws_ok(format($$select * from app.set_operator_active(%L, true)$$, pg_temp.op('Aaa Spento')),
+  'EO005', null, 'an admin cashier cannot reactivate a deactivated admin from a device');
+select is(
+  (select r.status from app.set_operator_active(pg_temp.op('Epsilon'), true) r),
+  'invited',
+  'an admin cashier can reactivate a deactivated operator'
+);
+reset role;
+select is((select deactivated_at is not null from app.operators where id = pg_temp.op('Aaa Spento')), true,
+  'EO005 left the admin deactivated');
+update app.operators set role = 'operator' where id = pg_temp.op('Aaa Spento');
 select is((select role from app.operators where id = pg_temp.op('Gamma')), 'operator',
   'EO005 wrote nothing');
 

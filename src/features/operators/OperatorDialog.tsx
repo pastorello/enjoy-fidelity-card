@@ -10,6 +10,7 @@ import styles from './OperatorDialog.module.css';
 import { STATUS_LABEL } from './OperatorRow';
 import {
   ADMIN_FROM_PHONE,
+  ADMIN_REACTIVATE_FROM_PHONE,
   GENERIC_ERROR,
   LAST_ADMIN_ERROR,
   RATE_LIMITED_ERROR,
@@ -287,6 +288,18 @@ export function OperatorDialog({
             </Button>
           </div>
         )}
+      </>
+    );
+  } else if (
+    operator.status === 'deactivated' &&
+    operator.role === 'admin' &&
+    (tablet || onDevice)
+  ) {
+    // Point 7: from the till a deactivated admin is not reactivated; the row has no "Riattiva".
+    content = (
+      <>
+        <p className={styles.note}>{ADMIN_REACTIVATE_FROM_PHONE}</p>
+        {alert}
       </>
     );
   } else {

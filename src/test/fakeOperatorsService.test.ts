@@ -153,6 +153,17 @@ describe('setActive', () => {
     });
   });
 
+  it('never reactivates a deactivated admin from a device; a deactivated operator yes', async () => {
+    const fake = setUp();
+    await fake.service.setActive(BRUNO.id, false);
+    await fake.service.setActive(CARLA.id, false);
+    fake.setCaller({ actingId: ANNA.id, onDevice: true });
+    expect(await fake.service.setActive(BRUNO.id, true)).toEqual({ status: 'admin-from-device' });
+    expect(await fake.service.setActive(CARLA.id, true)).toMatchObject({
+      operator: { status: 'active' },
+    });
+  });
+
   it('a reactivated person who never accepted is invited again', async () => {
     const fake = setUp();
     await fake.service.setActive(DARIO.id, false);

@@ -14,6 +14,12 @@ import { stubLayout } from '../../test/stubLayout';
 const PATH = '/impostazioni/operatori';
 const INVITE_FROM_PHONE = 'Un amministratore si invita dal telefono.';
 const NAME_FROM_PHONE = 'Un amministratore si nomina dal telefono.';
+const REACTIVATE_FROM_PHONE = 'Un amministratore si riattiva dal telefono.';
+
+/** A deactivated admin: from a device only the phone brings them back (SPEC-operators point 7). */
+function paolo(): FakeOperator {
+  return fakeOperator({ name: 'Paolo Prova', role: 'admin', deactivated: true, hasPin: true });
+}
 const PHONE_NOTE = 'Riceverà un’email per scegliere la password.';
 const TABLET_NOTE =
   'Riceverà un’email per scegliere la password; il PIN per il tablet lo imposta dal proprio telefono.';
@@ -37,9 +43,9 @@ function team(): FakeOperator[] {
  * The tablet with Giulia, an admin, as the cashier: the fake knows it is a device. `layout` false:
  * the same device with a screen narrower than the tablet layout.
  */
-function renderTablet(path = PATH, layout = true) {
+function renderTablet(path = PATH, layout = true, extra: FakeOperator[] = []) {
   stubLayout(layout);
-  const operators = team();
+  const operators = [...team(), ...extra];
   const giulia = operators[0];
   const fake = createFakeOperatorsService({
     operators,
@@ -66,9 +72,9 @@ function renderTablet(path = PATH, layout = true) {
   return { fake };
 }
 
-function renderPhone() {
+function renderPhone(extra: FakeOperator[] = []) {
   stubLayout(false);
-  const fake = createFakeOperatorsService({ operators: team() });
+  const fake = createFakeOperatorsService({ operators: [...team(), ...extra] });
   renderApp(
     PATH,
     signedInFake(),
@@ -209,6 +215,42 @@ describe('OperatorsPage: tablet layout', () => {
     ).toHaveAccessibleDescription(PHONE_NOTE);
   });
 
+  it('a deactivated admin has no "Riattiva", with "si riattiva dal telefono"; a deactivated operator has it', async () => {
+    renderTablet(PATH, true, [paolo()]);
+    const list = await findList();
+    const row = rowOf(list, 'Paolo Prova');
+    expect(within(row).queryByRole('button', { name: 'Riattiva' })).toBeNull();
+    expect(row).toHaveTextContent(REACTIVATE_FROM_PHONE);
+    const sara = rowOf(list, 'Sara Prova');
+    expect(within(sara).getByRole('button', { name: 'Riattiva' })).toBeVisible();
+    expect(sara).not.toHaveTextContent(REACTIVATE_FROM_PHONE);
+  });
+
+  it('a device without the tablet layout does not offer "Riattiva" for an admin either', async () => {
+    renderTablet(PATH, false, [paolo()]);
+    const row = rowOf(await findList(), 'Paolo Prova');
+    expect(within(row).queryByRole('button', { name: 'Riattiva' })).toBeNull();
+    expect(row).toHaveTextContent(REACTIVATE_FROM_PHONE);
+  });
+
+  it('the person dialog of a deactivated admin says it is reactivated from the phone', async () => {
+    renderTablet(PATH, true, [paolo()]);
+    const dialog = await openPerson('Paolo Prova');
+    expect(dialog).toHaveTextContent(REACTIVATE_FROM_PHONE);
+  });
+
+  it('a reactivation refused with admin_from_device is told in the dialog', async () => {
+    const { fake } = renderTablet();
+    const list = await findList();
+    await userEvent.click(
+      within(rowOf(list, 'Sara Prova')).getByRole('button', { name: 'Riattiva' }),
+    );
+    const confirm = await screen.findByRole('dialog');
+    fake.failNext('setActive', 'admin-from-device');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Riattiva' }));
+    expect(await within(confirm).findByRole('alert')).toHaveTextContent(REACTIVATE_FROM_PHONE);
+  });
+
   it('settings row: "Account, ruoli, inviti e PIN"', async () => {
     renderTablet('/impostazioni');
     const row = await screen.findByRole('link', { name: /Operatori/ });
@@ -218,6 +260,13 @@ describe('OperatorsPage: tablet layout', () => {
 });
 
 describe('OperatorsPage: phone layout unchanged', () => {
+  it('a deactivated admin can be reactivated from the phone', async () => {
+    renderPhone([paolo()]);
+    const row = rowOf(await findList(), 'Paolo Prova');
+    expect(within(row).getByRole('button', { name: 'Riattiva' })).toBeVisible();
+    expect(row).not.toHaveTextContent(REACTIVATE_FROM_PHONE);
+  });
+
   it('keeps the form in the footer region, "Amministratore" enabled, the phone note', async () => {
     renderPhone();
     const list = await findList();

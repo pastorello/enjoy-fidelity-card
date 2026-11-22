@@ -148,10 +148,11 @@ prima, e il profilo viene ricollegato con il suo storico (come `private.add_oper
 ### Dal tablet della cassa
 
 Con un amministratore alla cassa, **Impostazioni → GESTIONE → Operatori** mostra la stessa schermata (con
-lo stato del PIN di ognuno) e la colonna **Invita operatore** a destra. Dal tablet però **non si invita né
-si promuove un amministratore**: "Amministratore" è disabilitato con la nota "Un amministratore si invita
-dal telefono." (lo rifiuta anche il server). Il resto (inviti di operatori, retrocessioni, Disattiva,
-Riattiva, Reinvia invito, Annulla invito) si fa anche da lì. Il PIN ognuno lo imposta dal proprio telefono
+lo stato del PIN di ognuno) e la colonna **Invita operatore** a destra. Dal tablet però **non si invita, non si
+promuove e non si riattiva un amministratore**: "Amministratore" è disabilitato con la nota "Un
+amministratore si invita dal telefono." e un amministratore disattivato non ha **Riattiva** ("Un
+amministratore si riattiva dal telefono."); lo rifiuta anche il server. Il resto (inviti di operatori,
+retrocessioni, Disattiva, Riattiva di un operatore, Reinvia invito, Annulla invito) si fa anche da lì. Il PIN ognuno lo imposta dal proprio telefono
 (`docs/setup-tablet.md` §4).
 
 ### Password dimenticata

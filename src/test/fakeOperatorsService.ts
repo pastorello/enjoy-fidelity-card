@@ -394,8 +394,12 @@ export function createFakeOperatorsService({
 
   function setActive(operatorId: string, active: boolean): OperatorChangeResult {
     const operator = target(operatorId);
-    if (active) operator.deactivated = false;
-    else if (!operator.deactivated) {
+    if (active) {
+      if (operator.deactivated && operator.role === 'admin' && caller.onDevice) {
+        throw new Refusal('admin-from-device');
+      }
+      operator.deactivated = false;
+    } else if (!operator.deactivated) {
       assertOtherAdmin(operator);
       operator.deactivated = true;
     }

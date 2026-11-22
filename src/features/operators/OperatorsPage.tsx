@@ -12,7 +12,12 @@ import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { InviteForm } from './InviteForm';
 import { OperatorDialog } from './OperatorDialog';
 import { OperatorRow, type RowAction, type RowFocus } from './OperatorRow';
-import { GENERIC_ERROR, LAST_ADMIN_ERROR, SELF_ERROR } from './operatorTexts';
+import {
+  ADMIN_REACTIVATE_FROM_PHONE,
+  GENERIC_ERROR,
+  LAST_ADMIN_ERROR,
+  SELF_ERROR,
+} from './operatorTexts';
 import styles from './OperatorsPage.module.css';
 import { useOperatorsService } from './OperatorsServiceProvider';
 import type { ActiveResult, Operator } from './types';
@@ -104,7 +109,8 @@ type ChangeFailure = Exclude<ActiveResult['status'], 'ok' | 'forbidden'>;
 const CHANGE_ERROR: Record<ChangeFailure, string> = {
   'last-admin': LAST_ADMIN_ERROR,
   self: SELF_ERROR,
-  'admin-from-device': GENERIC_ERROR,
+  // EO005: a deactivated admin reactivated from a device (no "Riattiva" is offered there).
+  'admin-from-device': ADMIN_REACTIVATE_FROM_PHONE,
   'no-account': GENERIC_ERROR,
   'not-found': GENERIC_ERROR,
   network: GENERIC_ERROR,

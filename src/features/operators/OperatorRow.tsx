@@ -2,7 +2,9 @@ import { useEffect, useId, useRef } from 'react';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { NOT_IN_DISPLAY } from '../cards/customerName';
+import { useDevice } from '../identity/AuthProvider';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
+import { ADMIN_REACTIVATE_FROM_PHONE } from './operatorTexts';
 import styles from './OperatorRow.module.css';
 import type { Operator, OperatorStatus } from './types';
 
@@ -36,12 +38,21 @@ function initialOf(name: string): string {
 /**
  * The row's action (SPEC-operators point 2): "Disattiva" for active and invited people,
  * "Riattiva" for deactivated ones; none for removed people (no account) and for the own row.
+ * From the till (`fromTill`: the tablet layout or a device account) a deactivated admin has none
+ * either: an admin is reactivated from the phone (point 7, EO005).
  */
 export type RowAction = 'deactivate' | 'reactivate';
 
-export function rowActionOf(operator: Operator): RowAction | null {
+/** A deactivated admin seen from the till: no "Riattiva", the note instead. */
+export function reactivatesFromPhone(operator: Operator, fromTill: boolean): boolean {
+  return fromTill && operator.status === 'deactivated' && operator.role === 'admin';
+}
+
+export function rowActionOf(operator: Operator, fromTill = false): RowAction | null {
   if (operator.isMe) return null;
-  if (operator.status === 'deactivated') return 'reactivate';
+  if (operator.status === 'deactivated') {
+    return reactivatesFromPhone(operator, fromTill) ? null : 'reactivate';
+  }
   if (operator.status === 'removed') return null;
   return 'deactivate';
 }
@@ -76,11 +87,13 @@ type OperatorRowProps = {
  */
 export function OperatorRow({ operator, onAction, onOpen, focus }: OperatorRowProps) {
   const tablet = useTabletLayout();
+  const device = useDevice();
+  const fromTill = tablet || device !== null;
   const nameId = useId();
   const actionRef = useRef<HTMLButtonElement>(null);
   const personRef = useRef<HTMLButtonElement>(null);
   const itemRef = useRef<HTMLLIElement>(null);
-  const action = rowActionOf(operator);
+  const action = rowActionOf(operator, fromTill);
   const opens = opensDialog(operator);
   const initial = initialOf(operator.name);
   const away = isAway(operator) ? 'true' : undefined;
@@ -99,6 +112,9 @@ export function OperatorRow({ operator, onAction, onOpen, focus }: OperatorRowPr
         {operator.isMe ? `${operator.name} (tu)` : operator.name}
       </span>{' '}
       <span className={styles.status}>{statusText(operator, tablet)}</span>
+      {reactivatesFromPhone(operator, fromTill) && (
+        <span className={styles.status}>{ADMIN_REACTIVATE_FROM_PHONE}</span>
+      )}
     </span>
   );
 

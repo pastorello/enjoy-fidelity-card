@@ -86,7 +86,10 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
        movimenti restano nello storico; puoi riattivarlo quando vuoi.", conferma "Disattiva".
      - `deactivated`: pulsante "Riattiva" (stile secondario; **non nel wireframe**, Open Questions 2) →
        `ConfirmDialog` `tone="primary"`: "Riattivare {nome}?" / "Potrà di nuovo accedere con la sua
-       password." / "Riattiva".
+       password." / "Riattiva". Dal tablet (layout tablet o account di dispositivo) un amministratore
+       disattivato non ha "Riattiva": sotto lo stato la nota "Un amministratore si riattiva dal telefono."
+       (anche nel dialogo della persona; punto 7, `EO005`, con lo stesso testo nel dialogo se il server
+       rifiuta).
      - `removed`: nessuna azione (non esiste più un account da riattivare); per rimetterlo si invita di nuovo
        con lo **stesso nome** (punto 3, ricollegamento come `add_operator`).
      - **Gestione della persona** (deviazione: il wireframe non mostra come si cambia ruolo né come si
@@ -350,7 +353,10 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
         `acting_operator_id()` → `EO002`; bersaglio `removed` (senza account) → `EO003`;
         `set_operator_role(…, 'admin')` da un dispositivo (`private.current_device_id() is not null`, anche con
         cassiere amministratore) → `EO005`, come l'invito di un amministratore (punto 5): `EO002` blocca solo
-        il cassiere stesso, non un operatore che gli sta accanto e promuove il proprio profilo;
+        il cassiere stesso, non un operatore che gli sta accanto e promuove il proprio profilo; per lo stesso
+        motivo `set_operator_active(…, true)` su un amministratore disattivato da un dispositivo → `EO005`
+        (riattivarlo ridarebbe un account amministratore permanente con la sua password); un operatore
+        disattivato si riattiva anche dal tablet;
      3. regola dell'ultimo amministratore: se l'operazione toglie a un amministratore attivo il ruolo o
         l'accesso, deve restare almeno un **altro** amministratore attivo con l'invito accettato secondo la
         regola del punto 2 (`email_confirmed_at` non nullo **e** password impostata), altrimenti `EO001`. Con "nessuna azione su sé stessi" scatta solo
@@ -690,11 +696,11 @@ Ognuna ha un default già adottato; serve il titolare solo dove indicato.
     aggiornato.
 11. **Amministratori dal tablet** (il wireframe "Tablet: operatori" mostra la schermata completa, con il ruolo
     "Amministratore" nel modulo). Default: **no** — da un dispositivo, anche con cassiere amministratore, non si
-    invita un amministratore né si promuove qualcuno ad amministratore (`EO005`, radio disabilitato con la
-    nota). Motivo: turno di 12 ore senza chiusura per inattività e PIN di 4 cifre indovinabile in pochi giorni
+    invita un amministratore, né si promuove qualcuno ad amministratore, né si riattiva un amministratore
+    disattivato (`EO005`, radio disabilitato o "Riattiva" assente, con la nota). Motivo: turno di 12 ore senza chiusura per inattività e PIN di 4 cifre indovinabile in pochi giorni
     (SPEC-tablet-kiosk, Open Questions 1 e 2); senza questa regola chi trova il tablet sbloccato da un titolare
     otterrebbe un accesso amministratore permanente e da remoto (dati dei clienti, export, annullamenti).
-    Restano sul tablet elenco, inviti di operatori, retrocessioni, disattivazioni, riattivazioni, reinvii e
-    annullamenti. Rischio residuo da conoscere: un invito come **operatore** con la propria email dà comunque
+    Restano sul tablet elenco, inviti di operatori, retrocessioni, disattivazioni, riattivazioni di operatori,
+    reinvii e annullamenti. Rischio residuo da conoscere: un invito come **operatore** con la propria email dà comunque
     accesso da remoto da operatore. Alternative: chiedere di nuovo il PIN dentro la RPC (stesso contatore di
     blocco di `unlock_cashier`), oppure nessun invito dal tablet. **Da chiedere al titolare.**
