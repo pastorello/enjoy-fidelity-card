@@ -64,45 +64,95 @@ dice "Servizio non configurato: chiedi a un amministratore." perché non riesce 
 
 ## 4. Operatori e amministratori
 
-Nella V1 gli account si creano a mano dal pannello di Supabase: niente inviti dall'app. Le email di
-Supabase Auth partono da `info@enjoygaeta.it` (configurato dal titolare su entrambi i progetti), ma la
-procedura qui sotto non ne manda nessuna. Usa sempre email e nomi veri solo nella dashboard, mai in questo
-repository.
+Dal 2026-11-22 (`docs/specs/SPEC-operators.md`) gli account si creano **dall'app**: un amministratore invita
+la persona dalla schermata Operatori e lei sceglie da sola la password dal link dell'email. La dashboard di
+Supabase e lo SQL Editor servono solo per il **primo amministratore** (che nessuno può invitare) e come
+**riserva** se l'invito dall'app non è disponibile. Le email di Supabase Auth partono da `info@enjoygaeta.it`
+(configurato dal titolare su entrambi i progetti). Email e nomi veri si scrivono solo nell'app o nella
+dashboard, mai in questo repository.
 
-### Registrare un operatore (anche il primo amministratore)
+**Prima volta su un progetto online.** Prima che la schermata funzioni servono la migrazione
+`*_operators.sql`, la Edge Function `operator-invites` e il template **Invite user** (oggetto "Enjoy Card: il
+tuo invito", corpo di `supabase/templates/invite.html`): li prepara chi pubblica, seguendo le "Note di
+deploy" di `docs/specs/SPEC-operators.md`, prima sullo staging e poi sulla produzione. Finché non ci sono,
+l'invito risponde con un errore e si usa la riserva qui sotto.
+
+### Il primo amministratore (e la riserva)
 
 1. **Authentication → Users → Add user → Create new user**: email e password della persona, con
    **Auto Confirm User** attivo (così l'account è subito utilizzabile e non parte nessuna email).
    Comunica la password di persona, non per messaggio; oppure usa una password lunga e casuale che non
    comunichi a nessuno e, dopo il passo 2, scegli **Send password recovery** dalla riga dell'utente: la
    persona riceve la mail e sceglie da sola la password su `/imposta-password`.
-   Non usare "Send magic link" né "Invite user": con le iscrizioni chiuse rispondono "Signups not allowed
-   for this instance", ed è giusto così (nessuno deve potersi creare un account da solo).
+   Non usare "Send magic link" né "Invite user" della dashboard: non collegano il profilo dell'app e, con le
+   iscrizioni chiuse, la dashboard può rispondere "Signups not allowed for this instance" (l'invito dall'app
+   passa dalla Edge Function; che funzioni anche online con le iscrizioni chiuse si conferma nella prova
+   sullo staging delle "Note di deploy", passo 6).
 2. **SQL Editor**, con una nuova query:
 
    ```sql
    select private.add_operator('<email>', '<nome>', 'admin');     -- titolare
-   select private.add_operator('<email>', '<nome>', 'operator');  -- cameriere
+   select private.add_operator('<email>', '<nome>', 'operator');  -- cameriere (solo come riserva)
    ```
 
    Il nome è quello che compare nell'app e nello storico dei movimenti: deve essere unico (per gli
    omonimi aggiungi un dettaglio, es. "Marco B."). La funzione restituisce l'id del profilo; se l'email non
-   esiste o è già collegata a un altro profilo, si ferma con un errore che lo spiega.
+   esiste o è già collegata a un altro profilo, si ferma con un errore che lo spiega. Ricollegando un
+   profilo disattivato lo riattiva.
 3. La persona accede dal telefono su `/accedi` con email e password.
 
-Per **cambiare ruolo** si richiama `private.add_operator` con la stessa email, lo stesso nome e il ruolo
-nuovo.
+Da qui in poi gli altri account li crea questo amministratore dall'app.
 
-### Togliere un operatore
+### Invitare un operatore o un amministratore (dall'app)
 
-**Authentication → Users** → menu della riga → **Delete user**. Il profilo resta, scollegato, perché il
-suo nome serve nello storico; da quel momento l'app su quel telefono torna su `/accedi` con "Account non
-abilitato" e il suo accesso non legge più nulla. Il profilo non si cancella mai.
+1. Sul telefono, da amministratore: **Impostazioni → GESTIONE → Operatori** (`/impostazioni/operatori`).
+2. In fondo, nella sezione **Invita operatore**: **Nome** (unico, come sopra), **Email**, **Ruolo**
+   ("Operatore", già scelto, oppure "Amministratore"), poi **Invia invito**. Sopra l'elenco compare "Invito
+   inviato a {nome}." e la riga della persona dice "… · invito inviato".
+3. La persona riceve l'email "Enjoy Card: il tuo invito" (se non arriva, guardi nello spam), tocca il
+   pulsante e su `/imposta-password` vede "Ciao, {nome}", sceglie la password (almeno 8 caratteri) e tocca
+   **Salva e accedi**: entra nell'app con il ruolo scelto e nell'elenco la riga diventa "attivo".
+4. Il link vale **un'ora** ed è usabile una volta. Scaduto o perso: tocca il nome della persona
+   nell'elenco → **Reinvia invito** (il link precedente smette di funzionare).
+5. Email sbagliata: tocca il nome → **Annulla invito** → conferma; poi invita di nuovo con lo stesso nome e
+   l'email giusta.
 
-### Rimettere un operatore
+Errori che la schermata spiega da sé: nome già usato, email che ha già un account (o di una persona
+disattivata: va riattivata), email dell'account del tablet, troppe email in poco tempo ("Riprova tra qualche
+minuto"). Un doppio tocco o un nuovo tocco dopo un errore di rete non mandano due inviti.
 
-Ricrea l'utente (passo 1 sopra) e richiama `private.add_operator` con **lo stesso nome** di prima: il
-profilo viene ricollegato con il suo storico.
+### Cambiare ruolo
+
+**Impostazioni → GESTIONE → Operatori** → tocca il nome della persona → nel dialogo scegli il **Ruolo** →
+**Salva ruolo** → conferma con **Rendi amministratore** o **Rendi operatore**. Vale subito sul server; la
+persona vede le impostazioni del nuovo ruolo alla schermata successiva. Il ruolo di una persona disattivata
+si cambia dopo averla riattivata.
+
+### Togliere e rimettere un operatore
+
+- **Togliere**: nella riga della persona **Disattiva** → conferma **Disattiva**. Da subito il suo accesso
+  non legge né scrive nulla, il suo telefono torna su `/accedi` con "Account non abilitato" al cambio di
+  schermata o al ritorno in primo piano, e il suo turno sul tablet finisce. I movimenti restano nello
+  storico con il suo nome; il profilo non si cancella mai.
+- **Rimettere**: nella riga **Riattiva** → conferma **Riattiva**. La persona accede con la sua password di
+  prima.
+
+Regole controllate dal server: nessuno cambia o disattiva il proprio account dalla schermata (la propria
+riga, "(tu)", non ha azioni) e resta sempre **almeno un amministratore attivo** ("Serve almeno un
+amministratore attivo: prima rendi amministratore un'altra persona.").
+
+Un utente cancellato dalla dashboard (**Authentication → Users → Delete user**, procedura della V1) resta
+nell'elenco come disattivato, senza azioni: per rimetterlo lo si invita di nuovo con **lo stesso nome** di
+prima, e il profilo viene ricollegato con il suo storico (come `private.add_operator`).
+
+### Dal tablet della cassa
+
+Con un amministratore alla cassa, **Impostazioni → GESTIONE → Operatori** mostra la stessa schermata (con
+lo stato del PIN di ognuno) e la colonna **Invita operatore** a destra. Dal tablet però **non si invita né
+si promuove un amministratore**: "Amministratore" è disabilitato con la nota "Un amministratore si invita
+dal telefono." (lo rifiuta anche il server). Il resto (inviti di operatori, retrocessioni, Disattiva,
+Riattiva, Reinvia invito, Annulla invito) si fa anche da lì. Il PIN ognuno lo imposta dal proprio telefono
+(`docs/setup-tablet.md` §4).
 
 ### Password dimenticata
 
@@ -110,9 +160,9 @@ La persona se la reimposta da sola dall'app: su `/accedi` tocca **"Password dime
 via email e sceglie una password nuova (chi è collegato usa **Impostazioni → ACCOUNT → Cambia password**,
 stesso link). Serve che la sezione 6 sia stata eseguita sul progetto in uso.
 
-Se l'email non arriva (sezione 6 non ancora fatta, casella sbagliata): come prima, cancella l'utente,
-ricrealo con una password nuova e richiama `private.add_operator` con lo stesso nome, come per rimettere un
-operatore.
+Se l'email non arriva (sezione 6 non ancora fatta, casella sbagliata): come riserva, cancella l'utente,
+ricrealo con una password nuova e richiama `private.add_operator` con lo stesso nome (sezione "Il primo
+amministratore (e la riserva)").
 
 ### Tablet della cassa (account di dispositivo)
 

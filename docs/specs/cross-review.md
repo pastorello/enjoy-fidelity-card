@@ -40,6 +40,9 @@ aggiungono soltanto parti delimitate (colonna "Contributi").
 
 Tutti i 15 wireframe della pagina tablet (Tablet-* e "Tablet: cambio operatore") appartengono a
 `tablet-kiosk`, che cambia solo impaginazione e intestazione delle schermate dei moduli proprietari.
+Eccezione dal 2026-11-22: "Tablet: operatori" lo realizza `operators`, costruito dopo `tablet-kiosk`
+(`/impostazioni/operatori` con la colonna "Invita operatore" da 480 px, [SPEC-operators.md](SPEC-operators.md));
+dal tablet non si invita né si promuove un amministratore (`EO005`).
 
 **Ordine unico delle sezioni di `/impostazioni`** (prima non era scritto in un solo posto, e la sezione
 ACCOUNT non aveva una posizione per l'amministratore):
