@@ -148,7 +148,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 4: Schermata Operatori (telefono)
 - [x] Task 16: Elenco: stati, ordine, "(tu)" senza azioni, caricamento/errore, regione dei messaggi, `AdminsOnly`
-- [ ] Task 17: "Disattiva" e "Riattiva" con conferma; `EO001` e altri errori; elenco ricaricato
+- [x] Task 17: "Disattiva" e "Riattiva" con conferma; `EO001` e altri errori; elenco ricaricato
 - [ ] Task 18: Dialogo persona: ruolo con seconda conferma, "Reinvia invito", "Annulla invito"
 - [ ] Task 19: "Invita operatore": validazioni, `operation_id` stabile, errori del punto 6, esito
 

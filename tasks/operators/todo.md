@@ -276,7 +276,7 @@ OperatorRow.tsx (+ .module.css) · **Dimensione:** M
 della spec; esiti "{nome} è disattivato." / "{nome} è di nuovo attivo."; `EO001`, `EO002`, `upstream` nel
 dialogo; elenco ricaricato dal server dopo ogni azione riuscita.
 **Accettazione:**
-- [ ] Componente: conferma, esito nella regione live, elenco ricaricato; `last_admin` col testo del punto 6;
+- [x] Componente: conferma, esito nella regione live, elenco ricaricato; `last_admin` col testo del punto 6;
       `removed` senza azioni
 **Verifica:** `npm test -- operators`
 **Dipendenze:** 16 · **File:** src/features/operators/OperatorRow.tsx, OperatorsPage.tsx, OperatorsPage.test.tsx
