@@ -153,7 +153,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 19: "Invita operatore": validazioni, `operation_id` stabile, errori del punto 6, esito
 
 ### Fase 5: Invito accettato e sessioni
-- [ ] Task 20: `/imposta-password` versione invito: frammento, testi, `error`/`error_code`, `verifyInvite`, link scaduto
+- [x] Task 20: `/imposta-password` versione invito: frammento, testi, `error`/`error_code`, `verifyInvite`, link scaduto
 - [ ] Task 21: Inoltro di `type=invite` in `RootLayout`, nota di `/accedi`, identità ricontrollata a ogni cambio di rotta per gli operatori
 - [ ] Task 22: E2E telefono: invito → Mailpit → password → home; cambio ruolo e ritorno; disattivazione con seconda sessione e riattivazione
 

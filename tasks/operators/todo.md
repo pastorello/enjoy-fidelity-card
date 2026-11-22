@@ -316,9 +316,9 @@ le versioni); "Salva e accedi" → `verifyInvite` (`verifyOtp({ type: 'invite' }
 ricarica dell'identità → `/`; link scaduto → "Chiedi a chi ti ha invitato…" con "Vai all'accesso". Niente
 campo Email (deviazione dichiarata).
 **Accettazione:**
-- [ ] Componente: "Ciao, {nome}" e testo con `da`/`ruolo`; valori non validi → testi generici; "Terrore" non fa
+- [x] Componente: "Ciao, {nome}" e testo con `da`/`ruolo`; valori non validi → testi generici; "Terrore" non fa
       scadere il link, `error_code` sì; link scaduto → "Vai all'accesso"; test del recupero invariati
-- [ ] Servizio Supabase e finto: `verifyInvite` con `type: 'invite'`
+- [x] Servizio Supabase e finto: `verifyInvite` con `type: 'invite'`
 **Verifica:** `npm test -- ResetPasswordPage supabaseAuthService`
 **Dipendenze:** 13 · **File:** src/features/identity/ResetPasswordPage.tsx (+ .test.tsx),
 supabaseAuthService.ts (+ test), types.ts, src/test/fakeAuthService.ts · **Dimensione:** M
