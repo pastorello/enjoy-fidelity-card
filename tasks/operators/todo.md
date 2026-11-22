@@ -340,11 +340,11 @@ src/features/identity/RequireAuth.tsx (+ test) · **Dimensione:** M
 **Descrizione:** `e2e/operators.spec.ts` (progetto `phone`, 390×844) con `admin-operatori@example.com`, invitati
 `invito-<casuale>@example.com` e `e2e/mailpit.ts`.
 **Accettazione:**
-- [ ] Invito → una email in Mailpit → link → "Ciao, …" → password → home col ruolo scelto; nell'elenco
+- [x] Invito → una email in Mailpit → link → "Ciao, …" → password → home col ruolo scelto; nell'elenco
       "invito inviato" poi "attivo" (criteri 1, 2)
-- [ ] Cambio ruolo di `ruolo@example.com` con la sua sessione aperta che vede le impostazioni del nuovo ruolo
+- [x] Cambio ruolo di `ruolo@example.com` con la sua sessione aperta che vede le impostazioni del nuovo ruolo
       alla rotta successiva, poi ritorno al ruolo iniziale (criterio 6)
-- [ ] Disattivazione di `disattiva@example.com` con una seconda sessione che al cambio di rotta torna su
+- [x] Disattivazione di `disattiva@example.com` con una seconda sessione che al cambio di rotta torna su
       `/accedi` col messaggio, poi riattivazione e nuovo accesso con la stessa password (criterio 7)
 **Verifica:** `npm run e2e -- operators`
 **Dipendenze:** 10, 19, 21 · **File:** e2e/operators.spec.ts, e2e/mailpit.ts · **Dimensione:** M

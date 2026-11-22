@@ -155,7 +155,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 5: Invito accettato e sessioni
 - [x] Task 20: `/imposta-password` versione invito: frammento, testi, `error`/`error_code`, `verifyInvite`, link scaduto
 - [x] Task 21: Inoltro di `type=invite` in `RootLayout`, nota di `/accedi`, identità ricontrollata a ogni cambio di rotta per gli operatori
-- [ ] Task 22: E2E telefono: invito → Mailpit → password → home; cambio ruolo e ritorno; disattivazione con seconda sessione e riattivazione
+- [x] Task 22: E2E telefono: invito → Mailpit → password → home; cambio ruolo e ritorno; disattivazione con seconda sessione e riattivazione
 
 ### Checkpoint D: criteri 1–9 e 11 verdi in E2E; detector Impeccable pulito; confronto con i wireframe; revisione `security-and-hardening` del client
 
