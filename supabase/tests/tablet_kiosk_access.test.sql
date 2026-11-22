@@ -4,7 +4,7 @@
 -- one, every check and every author column follows the cashier. Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(71);
+select plan(75);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -160,6 +160,12 @@ insert into rpc_calls values
    $$select app.operator_invite_begin(gen_random_uuid(), 'Nuovo Cassa', 'nuovo.cassa@example.com',
      'operator')$$,
    '42501', 'Only an admin can invite'),
+  ('operator_resend_begin', 'write',
+   $$select app.operator_resend_begin('00000000-0000-4000-0000-0000000000ff')$$,
+   '42501', 'Only an admin can change the invites'),
+  ('operator_cancel_begin', 'write',
+   $$select app.operator_cancel_begin('00000000-0000-4000-0000-0000000000ff')$$,
+   '42501', 'Only an admin can change the invites'),
   -- The steps of operator-invites that need the secret key: never executable by a session.
   ('operator_invite_finish', 'service',
    $$select app.operator_invite_finish(gen_random_uuid(), gen_random_uuid())$$,
@@ -170,6 +176,12 @@ insert into rpc_calls values
   ('operator_invite_orphan', 'service',
    $$select app.operator_invite_orphan(gen_random_uuid(), gen_random_uuid())$$,
    '42501', 'permission denied for function operator_invite_orphan'),
+  ('operator_resend_finish', 'service',
+   $$select app.operator_resend_finish(gen_random_uuid(), gen_random_uuid())$$,
+   '42501', 'permission denied for function operator_resend_finish'),
+  ('operator_cancel_check', 'service',
+   $$select app.operator_cancel_check(gen_random_uuid(), gen_random_uuid(), gen_random_uuid())$$,
+   '42501', 'permission denied for function operator_cancel_check'),
   ('update_settings', 'write',
    $$select app.update_settings(100, 15000, null)$$, '42501', 'Only an admin can change the settings');
 grant select on rpc_calls to authenticated;

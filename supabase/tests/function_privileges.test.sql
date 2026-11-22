@@ -45,7 +45,9 @@ select is(
     select f from unnest(array[
       'app.operator_invite_finish(uuid, uuid)',
       'app.operator_invite_fail(uuid)',
-      'app.operator_invite_orphan(uuid, uuid)']) f
+      'app.operator_invite_orphan(uuid, uuid)',
+      'app.operator_resend_finish(uuid, uuid)',
+      'app.operator_cancel_check(uuid, uuid, uuid)']) f
     where has_function_privilege('authenticated', f, 'execute')),
   array[]::text[],
   'authenticated cannot execute the service_role steps of operator-invites'
@@ -55,7 +57,9 @@ select is(
     select f from unnest(array[
       'app.operator_invite_finish(uuid, uuid)',
       'app.operator_invite_fail(uuid)',
-      'app.operator_invite_orphan(uuid, uuid)']) f
+      'app.operator_invite_orphan(uuid, uuid)',
+      'app.operator_resend_finish(uuid, uuid)',
+      'app.operator_cancel_check(uuid, uuid, uuid)']) f
     where not has_function_privilege('service_role', f, 'execute')),
   array[]::text[],
   'service_role can execute the steps of operator-invites that need the secret key'

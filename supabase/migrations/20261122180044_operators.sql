@@ -786,3 +786,159 @@ revoke execute on function app.operator_invite_finish(uuid, uuid), app.operator_
   app.operator_invite_orphan(uuid, uuid) from public, anon, authenticated;
 grant execute on function app.operator_invite_finish(uuid, uuid), app.operator_invite_fail(uuid),
   app.operator_invite_orphan(uuid, uuid) to service_role;
+
+-- Resend and cancel an invite (SPEC-operators.md point 5) ----------------------------------------
+-- Both start with the caller's token (is_admin checked here, never in the Edge Function) and end
+-- with a step that only the secret key runs, which reads the database again: between the two
+-- steps the requester may have been demoted or deactivated, and the invited person may have
+-- accepted. "Invited" = linked, not deactivated, and the invite not accepted (email unconfirmed
+-- or no password), the rule of private.operator_rows.
+
+-- The target of a resend or a cancel, with the checks shared by both begins. Order: 42501,
+-- P0002, EO002, EO004 (active, deactivated or removed).
+create function private.invited_target(p_operator_id uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_requested_by uuid;
+  v_target app.operators;
+  v_user auth.users;
+begin
+  if not private.is_admin() then
+    raise exception 'Only an admin can change the invites' using errcode = '42501';
+  end if;
+  v_requested_by := private.acting_operator_id();
+  select * into v_target from app.operators o where o.id = p_operator_id;
+  if v_target.id is null then
+    raise exception 'Operator % not found', p_operator_id using errcode = 'P0002';
+  end if;
+  if v_target.id = v_requested_by then
+    raise exception 'Nobody can change their own account from here' using errcode = 'EO002';
+  end if;
+  select * into v_user from auth.users u where u.id = v_target.user_id;
+  if v_user.id is null or v_target.deactivated_at is not null
+     or (v_user.email_confirmed_at is not null and coalesce(v_user.encrypted_password, '') <> '') then
+    raise exception 'Operator % is not waiting for an invite', p_operator_id using errcode = 'EO004';
+  end if;
+  return jsonb_build_object(
+    'user_id', v_user.id,
+    'email', v_user.email,
+    'name', v_target.name,
+    'role_label', case v_target.role when 'admin' then 'amministratore' else 'operatore' end,
+    'invited_by_name', (select o.name from app.operators o where o.id = v_requested_by),
+    'email_confirmed', v_user.email_confirmed_at is not null,
+    'requested_by', v_requested_by);
+end;
+$$;
+
+revoke execute on function private.invited_target(uuid) from public, anon, authenticated;
+
+-- operator_resend_begin: what the function needs to send the invite again. email_confirmed
+-- true (the link was opened, the password never saved) -> a recovery link, since Auth refuses
+-- to invite a confirmed user. No idempotency: every resend sends an email, the last one wins.
+create function app.operator_resend_begin(p_operator_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select private.invited_target(p_operator_id);
+$$;
+
+-- operator_cancel_begin: the Auth user to delete and who asks.
+create function app.operator_cancel_begin(p_operator_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object('user_id', t->'user_id', 'requested_by', t->'requested_by')
+  from private.invited_target(p_operator_id) t;
+$$;
+
+revoke execute on function app.operator_resend_begin(uuid), app.operator_cancel_begin(uuid)
+  from public, anon;
+grant execute on function app.operator_resend_begin(uuid), app.operator_cancel_begin(uuid)
+  to authenticated;
+
+-- operator_resend_finish (secret key only): after the email left, the requester becomes the
+-- inviter. Locks the target and the requester by id (the order of lock_operator_target, so a
+-- concurrent role or access change queues instead of deadlocking), then checks the requester is
+-- still an active admin, as operator_invite_finish. Answers done | forbidden (nothing written);
+-- P0002 for an unknown profile.
+create function app.operator_resend_finish(p_operator_id uuid, p_requested_by uuid)
+returns jsonb
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+begin
+  perform 1 from app.operators o
+  where o.id in (p_operator_id, p_requested_by)
+  order by o.id
+  for update;
+  if not exists (select 1 from app.operators o where o.id = p_operator_id) then
+    raise exception 'Operator % not found', p_operator_id using errcode = 'P0002';
+  end if;
+  if p_requested_by is null or p_requested_by = p_operator_id or not exists (
+    select 1 from app.operators o
+    where o.id = p_requested_by and o.role = 'admin'
+      and o.deactivated_at is null and o.user_id is not null
+  ) then
+    return jsonb_build_object('status', 'forbidden');
+  end if;
+  update app.operators o set invited_by = p_requested_by, invited_at = now()
+  where o.id = p_operator_id;
+  return jsonb_build_object('status', 'done');
+end;
+$$;
+
+-- operator_cancel_check (secret key only): may the function delete this Auth user to cancel the
+-- invite? In one transaction: the Auth user (for update, lock order auth.users -> operators as
+-- operator_invite_finish), then the target and the requester by id. True only when the profile
+-- is still linked to that user, not deactivated, the invite still not accepted, and the
+-- requester (not the target) still an active admin. Deleting the user turns the profile into
+-- removed (on delete set null); no profile is ever deleted.
+create function app.operator_cancel_check(
+  p_operator_id uuid, p_user_id uuid, p_requested_by uuid
+)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_user auth.users;
+begin
+  select * into v_user from auth.users u where u.id = p_user_id for update;
+  if v_user.id is null then
+    return false;
+  end if;
+  perform 1 from app.operators o
+  where o.id in (p_operator_id, p_requested_by)
+  order by o.id
+  for update;
+  return p_requested_by is distinct from p_operator_id
+    and not (v_user.email_confirmed_at is not null and coalesce(v_user.encrypted_password, '') <> '')
+    and exists (
+      select 1 from app.operators o
+      where o.id = p_operator_id and o.user_id = p_user_id and o.deactivated_at is null)
+    and exists (
+      select 1 from app.operators o
+      where o.id = p_requested_by and o.role = 'admin'
+        and o.deactivated_at is null and o.user_id is not null);
+end;
+$$;
+
+revoke execute on function app.operator_resend_finish(uuid, uuid),
+  app.operator_cancel_check(uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function app.operator_resend_finish(uuid, uuid),
+  app.operator_cancel_check(uuid, uuid, uuid) to service_role;

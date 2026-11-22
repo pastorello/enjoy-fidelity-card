@@ -6,7 +6,7 @@
 -- Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(89);
+select plan(134);
 
 -- Fake Auth users. Accepted invite = email confirmed and a password.
 insert into auth.users (id, email, email_confirmed_at, encrypted_password) values
@@ -480,6 +480,236 @@ set local role service_role;
 select is(app.operator_invite_orphan(pg_temp.opid(15), '00000000-0000-4000-d700-000000000025'), false,
   'orphan: another operation holds the email -> false');
 reset role;
+
+-- Resend and cancel (SPEC-operators.md point 5) ----------------------------------------------
+-- Fixtures: Gino invited (never opened the link), Ivo invited with the email confirmed and no
+-- password (token verified, password not saved), Lia invited (to cancel), Mara invited (to
+-- deactivate), Nino removed, Fabio an admin.
+insert into auth.users (id, email, email_confirmed_at, encrypted_password) values
+  ('00000000-0000-4000-d700-000000000041', 'inv.gino@example.com', null, null),
+  ('00000000-0000-4000-d700-000000000042', 'inv.ivo@example.com', now(), ''),
+  ('00000000-0000-4000-d700-000000000043', 'inv.lia@example.com', null, null),
+  ('00000000-0000-4000-d700-000000000044', 'inv.fabio@example.com', now(),
+   extensions.crypt('password-di-prova', extensions.gen_salt('bf', 4))),
+  ('00000000-0000-4000-d700-000000000045', 'inv.mara@example.com', null, null),
+  ('00000000-0000-4000-d700-000000000046', 'inv.nino@example.com', null, null);
+select private.add_operator('inv.gino@example.com', 'Gino Inviti', 'operator');
+select private.add_operator('inv.ivo@example.com', 'Ivo Inviti', 'admin');
+select private.add_operator('inv.lia@example.com', 'Lia Inviti', 'operator');
+select private.add_operator('inv.fabio@example.com', 'Fabio Inviti', 'admin');
+select private.add_operator('inv.mara@example.com', 'Mara Inviti', 'operator');
+select private.add_operator('inv.nino@example.com', 'Nino Inviti', 'operator');
+-- Nino removed while invited: the account was deleted from the panel.
+delete from auth.users where id = '00000000-0000-4000-d700-000000000046';
+update app.operators set invited_by = pg_temp.op('Anna'), invited_at = now() - interval '1 day'
+where id in (pg_temp.op('Gino'), pg_temp.op('Ivo'), pg_temp.op('Lia'), pg_temp.op('Mara'));
+
+select has_function('app', 'operator_resend_begin', array['uuid'],
+  'app.operator_resend_begin(uuid) exists');
+select has_function('app', 'operator_resend_finish', array['uuid', 'uuid'],
+  'app.operator_resend_finish(uuid, uuid) exists');
+select has_function('app', 'operator_cancel_begin', array['uuid'],
+  'app.operator_cancel_begin(uuid) exists');
+select has_function('app', 'operator_cancel_check', array['uuid', 'uuid', 'uuid'],
+  'app.operator_cancel_check(uuid, uuid, uuid) exists');
+select is(
+  (select bool_and(p.prosecdef and p.proconfig @> array['search_path=""']) from pg_proc p
+   where p.oid in ('app.operator_resend_begin(uuid)'::regprocedure,
+                   'app.operator_resend_finish(uuid, uuid)'::regprocedure,
+                   'app.operator_cancel_begin(uuid)'::regprocedure,
+                   'app.operator_cancel_check(uuid, uuid, uuid)'::regprocedure)),
+  true,
+  'the resend and cancel functions are security definer with an empty search_path'
+);
+select is(
+  array(
+    select f from unnest(array['app.operator_resend_begin(uuid)', 'app.operator_cancel_begin(uuid)']) f
+    where not has_function_privilege('authenticated', f, 'execute')
+       or has_function_privilege('anon', f, 'execute')),
+  array[]::text[],
+  'resend_begin and cancel_begin: authenticated yes (is_admin inside), anon no'
+);
+select is(
+  array(
+    select f from unnest(array[
+      'app.operator_resend_finish(uuid, uuid)', 'app.operator_cancel_check(uuid, uuid, uuid)']) f
+    where has_function_privilege('authenticated', f, 'execute')
+       or has_function_privilege('anon', f, 'execute')
+       or not has_function_privilege('service_role', f, 'execute')),
+  array[]::text[],
+  'resend_finish and cancel_check: service_role only'
+);
+select pg_temp.as_user('00000000-0000-4000-d700-000000000001');
+set local role authenticated;
+select throws_ok(
+  format('select app.operator_resend_finish(%L, %L)', pg_temp.op('Gino'), pg_temp.op('Anna')),
+  '42501', null, 'authenticated cannot call operator_resend_finish');
+select throws_ok(
+  format('select app.operator_cancel_check(%L, %L, %L)', pg_temp.op('Lia'),
+         '00000000-0000-4000-d700-000000000043', pg_temp.op('Anna')),
+  '42501', null, 'authenticated cannot call operator_cancel_check');
+
+-- resend_begin, as Anna (admin account).
+select is(
+  app.operator_resend_begin(pg_temp.op('Gino')),
+  jsonb_build_object(
+    'user_id', '00000000-0000-4000-d700-000000000041', 'email', 'inv.gino@example.com',
+    'name', 'Gino Inviti', 'role_label', 'operatore', 'invited_by_name', 'Anna Inviti',
+    'email_confirmed', false, 'requested_by', pg_temp.op('Anna')),
+  'resend_begin: an invited person who never opened the link');
+select is(
+  app.operator_resend_begin(pg_temp.op('Ivo')),
+  jsonb_build_object(
+    'user_id', '00000000-0000-4000-d700-000000000042', 'email', 'inv.ivo@example.com',
+    'name', 'Ivo Inviti', 'role_label', 'amministratore', 'invited_by_name', 'Anna Inviti',
+    'email_confirmed', true, 'requested_by', pg_temp.op('Anna')),
+  'resend_begin: email confirmed and an empty password is still invited (email_confirmed true)');
+select throws_ok(format('select app.operator_resend_begin(%L)', pg_temp.op('Carla')),
+  'EO004', null, 'resend_begin: an active person -> EO004');
+select throws_ok(format('select app.operator_resend_begin(%L)', pg_temp.op('Dario')),
+  'EO004', null, 'resend_begin: a deactivated person -> EO004');
+select throws_ok(format('select app.operator_resend_begin(%L)', pg_temp.op('Nino')),
+  'EO004', null, 'resend_begin: a removed person -> EO004');
+select throws_ok(format('select app.operator_resend_begin(%L)', pg_temp.op('Anna')),
+  'EO002', null, 'resend_begin: oneself -> EO002');
+select throws_ok($$select app.operator_resend_begin('00000000-0000-4000-d799-000000000001')$$,
+  'P0002', null, 'resend_begin: an unknown profile -> P0002');
+reset role;
+
+-- A deactivated invited person is not invited any more.
+update app.operators set deactivated_at = now(), deactivated_by = pg_temp.op('Anna')
+where id = pg_temp.op('Mara');
+select pg_temp.as_user('00000000-0000-4000-d700-000000000001');
+set local role authenticated;
+select throws_ok(format('select app.operator_resend_begin(%L)', pg_temp.op('Mara')),
+  'EO004', null, 'resend_begin: a deactivated invited person -> EO004');
+select throws_ok(format('select app.operator_cancel_begin(%L)', pg_temp.op('Mara')),
+  'EO004', null, 'cancel_begin: a deactivated invited person -> EO004');
+reset role;
+
+-- Not an admin: an operator account, a device with an operator cashier.
+select pg_temp.as_user('00000000-0000-4000-d700-000000000003');
+set local role authenticated;
+select throws_ok(format('select app.operator_resend_begin(%L)', pg_temp.op('Gino')),
+  '42501', null, 'resend_begin: an operator -> 42501');
+select throws_ok(format('select app.operator_cancel_begin(%L)', pg_temp.op('Lia')),
+  '42501', null, 'cancel_begin: an operator -> 42501');
+reset role;
+select pg_temp.as_user('00000000-0000-4000-d700-000000000012');
+set local role authenticated;
+select throws_ok(format('select app.operator_resend_begin(%L)', pg_temp.op('Gino')),
+  '42501', null, 'resend_begin: a device with an operator cashier -> 42501');
+reset role;
+
+-- A device with an admin cashier: the cashier is the requester.
+select pg_temp.as_user('00000000-0000-4000-d700-000000000011');
+set local role authenticated;
+select is(app.operator_resend_begin(pg_temp.op('Gino'))->>'requested_by', pg_temp.op('Anna')::text,
+  'resend_begin from a device: requested_by is the admin cashier');
+select is(app.operator_cancel_begin(pg_temp.op('Lia'))->>'requested_by', pg_temp.op('Anna')::text,
+  'cancel_begin from a device: requested_by is the admin cashier');
+reset role;
+
+-- resend_finish: the requester becomes the inviter.
+set local role service_role;
+select is(app.operator_resend_finish(pg_temp.op('Gino'), pg_temp.op('Fabio')),
+  '{"status": "done"}'::jsonb, 'resend_finish by an active admin -> done');
+reset role;
+select is(
+  (select invited_by = pg_temp.op('Fabio') and invited_at = now() from app.operators
+   where id = pg_temp.op('Gino')),
+  true, 'resend_finish sets invited_by to the requester and invited_at to now');
+update app.operators set role = 'operator' where id = pg_temp.op('Fabio');
+set local role service_role;
+select is(app.operator_resend_finish(pg_temp.op('Ivo'), pg_temp.op('Fabio')),
+  '{"status": "forbidden"}'::jsonb, 'resend_finish after the requester was demoted -> forbidden');
+reset role;
+select is(
+  (select invited_by = pg_temp.op('Anna') from app.operators where id = pg_temp.op('Ivo')),
+  true, 'a forbidden resend_finish writes nothing');
+update app.operators set role = 'admin', deactivated_at = now(), deactivated_by = pg_temp.op('Anna')
+where id = pg_temp.op('Fabio');
+set local role service_role;
+select is(app.operator_resend_finish(pg_temp.op('Ivo'), pg_temp.op('Fabio')),
+  '{"status": "forbidden"}'::jsonb, 'resend_finish after the requester was deactivated -> forbidden');
+select throws_ok(
+  format('select app.operator_resend_finish(%L, %L)', '00000000-0000-4000-d799-000000000001',
+         pg_temp.op('Anna')),
+  'P0002', null, 'resend_finish: an unknown profile -> P0002');
+reset role;
+update app.operators set deactivated_at = null, deactivated_by = null where id = pg_temp.op('Fabio');
+
+-- cancel_begin, as Anna.
+select pg_temp.as_user('00000000-0000-4000-d700-000000000001');
+set local role authenticated;
+select is(
+  app.operator_cancel_begin(pg_temp.op('Lia')),
+  jsonb_build_object('user_id', '00000000-0000-4000-d700-000000000043',
+                     'requested_by', pg_temp.op('Anna')),
+  'cancel_begin: an invited person -> {user_id, requested_by}');
+select is(app.operator_cancel_begin(pg_temp.op('Ivo'))->>'user_id',
+  '00000000-0000-4000-d700-000000000042',
+  'cancel_begin: email confirmed without a password is still invited');
+select throws_ok(format('select app.operator_cancel_begin(%L)', pg_temp.op('Carla')),
+  'EO004', null, 'cancel_begin: an active person -> EO004');
+select throws_ok(format('select app.operator_cancel_begin(%L)', pg_temp.op('Dario')),
+  'EO004', null, 'cancel_begin: a deactivated person -> EO004');
+select throws_ok(format('select app.operator_cancel_begin(%L)', pg_temp.op('Nino')),
+  'EO004', null, 'cancel_begin: a removed person -> EO004');
+select throws_ok(format('select app.operator_cancel_begin(%L)', pg_temp.op('Anna')),
+  'EO002', null, 'cancel_begin: oneself -> EO002');
+select throws_ok($$select app.operator_cancel_begin('00000000-0000-4000-d799-000000000001')$$,
+  'P0002', null, 'cancel_begin: an unknown profile -> P0002');
+reset role;
+
+-- cancel_check, with the secret key.
+set local role service_role;
+select is(
+  app.operator_cancel_check(pg_temp.op('Lia'), '00000000-0000-4000-d700-000000000043', pg_temp.op('Anna')),
+  true, 'cancel_check: still invited, still linked, requester still admin -> true');
+select is(
+  app.operator_cancel_check(pg_temp.op('Lia'), '00000000-0000-4000-d700-000000000041', pg_temp.op('Anna')),
+  false, 'cancel_check: the profile is not linked to that user -> false');
+select is(
+  app.operator_cancel_check(pg_temp.op('Lia'), '00000000-0000-4000-d700-000000000043', pg_temp.op('Lia')),
+  false, 'cancel_check: the target as requester -> false');
+select is(
+  app.operator_cancel_check('00000000-0000-4000-d799-000000000001',
+    '00000000-0000-4000-d700-000000000043', pg_temp.op('Anna')),
+  false, 'cancel_check: an unknown profile -> false');
+reset role;
+update app.operators set role = 'operator' where id = pg_temp.op('Fabio');
+set local role service_role;
+select is(
+  app.operator_cancel_check(pg_temp.op('Lia'), '00000000-0000-4000-d700-000000000043', pg_temp.op('Fabio')),
+  false, 'cancel_check: the requester is no longer an admin -> false');
+reset role;
+update app.operators set role = 'admin', deactivated_at = now(), deactivated_by = pg_temp.op('Anna')
+where id = pg_temp.op('Fabio');
+set local role service_role;
+select is(
+  app.operator_cancel_check(pg_temp.op('Lia'), '00000000-0000-4000-d700-000000000043', pg_temp.op('Fabio')),
+  false, 'cancel_check: the requester was deactivated -> false');
+reset role;
+-- Meanwhile Lia accepted the invite (email confirmed and a password).
+update auth.users
+set email_confirmed_at = now(),
+    encrypted_password = extensions.crypt('password-di-prova', extensions.gen_salt('bf', 4))
+where id = '00000000-0000-4000-d700-000000000043';
+set local role service_role;
+select is(
+  app.operator_cancel_check(pg_temp.op('Lia'), '00000000-0000-4000-d700-000000000043', pg_temp.op('Anna')),
+  false, 'cancel_check: the person accepted the invite meanwhile -> false');
+reset role;
+-- Meanwhile Mara was deactivated (still unconfirmed).
+set local role service_role;
+select is(
+  app.operator_cancel_check(pg_temp.op('Mara'), '00000000-0000-4000-d700-000000000045', pg_temp.op('Anna')),
+  false, 'cancel_check: the person was deactivated meanwhile -> false');
+reset role;
+select is((select count(*)::int from app.operators where name like '% Inviti' and id in
+  (pg_temp.op('Gino'), pg_temp.op('Ivo'), pg_temp.op('Lia'), pg_temp.op('Mara'))), 4,
+  'resend and cancel never delete a profile');
 
 select * from finish();
 rollback;
