@@ -6,7 +6,7 @@
 -- Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(78);
+select plan(79);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -406,6 +406,9 @@ select is(pg_temp.off_history(), current_setting('test.history'),
 update app.operators
 set deactivated_at = now(), deactivated_by = current_setting('test.admin_id')::uuid
 where id = current_setting('test.off_id')::uuid;
+insert into private.operator_pins (operator_id, pin_hash)
+values (current_setting('test.off_id')::uuid, extensions.crypt('4321', extensions.gen_salt('bf', 4)))
+on conflict (operator_id) do nothing;
 delete from auth.users where id = '00000000-0000-4000-d000-000000000002';
 insert into auth.users (id, email) values
   ('00000000-0000-4000-d000-000000000005', 'op.access.back@example.com');
@@ -422,6 +425,9 @@ select is(
 );
 select is(pg_temp.off_history(), current_setting('test.history'),
   'relinking changes neither the count nor the sum of the movements');
+select is(
+  (select count(*)::int from private.operator_pins where operator_id = current_setting('test.off_id')::uuid),
+  0, 'relinking a removed profile to a new account drops the PIN of the old one');
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000005","role":"authenticated"}', true);
 set local role authenticated;
 select ok(private.is_admin(), 'the new account of the relinked profile works');

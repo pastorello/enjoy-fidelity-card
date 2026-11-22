@@ -249,7 +249,8 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
         `add_operator`), controlla che `auth.users.email` di `user_id` sia l'email prenotata, ricontrolla che
         chi ha chiesto l'invito sia ancora un amministratore attivo, che l'email non sia di un dispositivo o
         di un altro profilo e che il nome sia libero, poi crea il profilo (o ricollega quello `removed` con lo
-        stesso nome, togliendo `deactivated_at`), imposta `invited_by`, `invited_at` e segna l'operazione
+        stesso nome, togliendo `deactivated_at` e cancellando il PIN del vecchio account: la nuova persona
+        imposta il suo; `add_operator` fa lo stesso quando ricollega un profilo `removed`), imposta `invited_by`, `invited_at` e segna l'operazione
         `done`. **Idempotente**: se l'operazione è già `done` con lo stesso `user_id` risponde `done` con lo
         stesso profilo. Risposte `done` | `name_taken` | `email_taken` | `email_is_device` | `forbidden`.
      5. **Compensazione**: se 3 fallisce, `app.operator_invite_fail(operation_id)` (solo `service_role`) segna

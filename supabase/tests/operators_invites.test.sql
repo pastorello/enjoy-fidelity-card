@@ -6,7 +6,7 @@
 -- Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(134);
+select plan(136);
 
 -- Reservations left on the local stack by the integration tests and the E2E (real invites): this
 -- file counts the rows it makes, so it starts from none. Rolled back with everything else.
@@ -365,6 +365,9 @@ reset role;
 
 -- finish with another user: refused, whether done or pending.
 select pg_temp.new_user(22, 'inv.elena@example.com');
+-- The removed Elena kept the till PIN of her old account: the relink below must drop it.
+insert into private.operator_pins (operator_id, pin_hash)
+values (pg_temp.op('Elena'), extensions.crypt('4321', extensions.gen_salt('bf', 4)));
 set local role service_role;
 select throws_ok(
   $$select app.operator_invite_finish(pg_temp.opid(2), '00000000-0000-4000-d700-000000000022')$$,
@@ -390,6 +393,15 @@ select is(
    from app.operators o where o.name = 'Elena Inviti'),
   format('t|%s|t|t', '00000000-0000-4000-d700-000000000022'),
   'the removed profile is relinked to the new user, not duplicated');
+select is((select has_pin from private.operator_rows(pg_temp.op('Elena'))), false,
+  'the relinked profile does not inherit the PIN of the old account');
+-- The id is read before: a device without a cashier reads no row of app.operators.
+select set_config('test.elena', pg_temp.op('Elena')::text, true);
+select pg_temp.as_user('00000000-0000-4000-d700-000000000013');
+set local role authenticated;
+select is(app.unlock_cashier(current_setting('test.elena')::uuid, '4321')->>'status', 'no_pin',
+  'the old PIN does not open a till turn for the new account');
+reset role;
 
 -- finish: the name taken meanwhile, the email linked meanwhile, the requester no longer admin.
 select pg_temp.new_user(23, 'inv.sette@example.com');
