@@ -146,7 +146,8 @@ chi è alla cassa. Le card si leggono con un lettore NFC USB in emulazione tasti
     amministratore compare "Disconnetti il tablet" (proposta, non nel wireframe: Open Questions 4;
     `ConfirmDialog` pericoloso: "Per riaccedere servono email e password dell'account del bar"), che fa
     `signOut` e porta ad `/accedi`.
-13. **Operatori** (wireframe "Tablet: operatori"): rinviato come sul telefono (decisione identity V1 e
+13. **Operatori** (wireframe "Tablet: operatori"; aggiornamento 2026-11-22: ora in
+    [SPEC-operators.md](SPEC-operators.md), anche sul tablet con cassiere amministratore): rinviato come sul telefono (decisione identity V1 e
     DECISIONS 2026-11-17). La riga "Operatori" in GESTIONE non c'è; operatori e dispositivi si gestiscono
     in Supabase; lo stato "PIN impostato / da impostare" si vede in "Chi è alla cassa?".
 14. **Tastiera virtuale di Android**: con il lettore USB collegato Android nasconde la tastiera a

@@ -266,6 +266,9 @@ con `-x …,mailpit,…`: va tolto `mailpit` dall'elenco. `[auth.rate_limit] ema
 
 ## Out of Scope
 
+(Aggiornamento 2026-11-22: inviti, schermata Operatori, versione "invito" di `/imposta-password` e nota di
+Accesso sono ora in [SPEC-operators.md](SPEC-operators.md).)
+
 Inviti via email e schermata Operatori (decisione del 2026-11-17), quindi anche la versione "invito" del
 wireframe Imposta password ("Ciao, Marco", "Andrea ti ha invitato…", Email in sola lettura) e la frase sugli
 inviti della nota di Accesso; cambio email dell'account; email di notifica "password cambiata"; criteri di

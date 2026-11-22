@@ -33,10 +33,10 @@ aggiungono soltanto parti delimitate (colonna "Contributi").
 | Impostazioni (amministratore) | `/impostazioni` | `identity` (pagina e riquadro account) | `settings`, `identity-password`, `rewards`, `export` (sezioni, ordine sotto) |
 | Impostazioni (operatore) | `/impostazioni` | `identity` | `settings` (PUNTI, nota finale), `identity-password` (ACCOUNT) |
 | Catalogo premi | `/impostazioni/premi` | `rewards` | — |
-| Operatori | — | **nessuno: rinviato** (decisione 2026-11-17, gestione in Supabase) | anche la riga "Operatori" di GESTIONE |
+| Operatori | `/impostazioni/operatori` | `operators` (dal 2026-11-22, [SPEC-operators.md](SPEC-operators.md); prima rinviato) | anche la riga "Operatori" di GESTIONE e il layout "Tablet: operatori" |
 | Accesso | `/accedi` | `identity` (V1) | `identity-password` (link "Password dimenticata?") |
 | Password dimenticata | `/password-dimenticata` | `identity-password` | — |
-| Invito: scegli la password | `/imposta-password` | `identity-password` (solo la versione "recupero"; la versione "invito" è rinviata) | — |
+| Invito: scegli la password | `/imposta-password` | `identity-password` (versione "recupero") | `operators` (versione "invito", [SPEC-operators.md](SPEC-operators.md)) |
 
 Tutti i 15 wireframe della pagina tablet (Tablet-* e "Tablet: cambio operatore") appartengono a
 `tablet-kiosk`, che cambia solo impaginazione e intestazione delle schermate dei moduli proprietari.
