@@ -14,6 +14,8 @@ import { ExportServiceProvider } from './features/export/ExportServiceProvider';
 import { supabaseExportService } from './features/export/supabaseExportService';
 import { LedgerServiceProvider } from './features/ledger/LedgerServiceProvider';
 import { supabaseLedgerService } from './features/ledger/supabaseLedgerService';
+import { OperatorsServiceProvider } from './features/operators/OperatorsServiceProvider';
+import { supabaseOperatorsService } from './features/operators/supabaseOperatorsService';
 import { RewardsServiceProvider } from './features/rewards/RewardsServiceProvider';
 import { supabaseRewardsService } from './features/rewards/supabaseRewardsService';
 import { AuthProvider } from './features/identity/AuthProvider';
@@ -59,9 +61,11 @@ createRoot(container).render(
               <LedgerServiceProvider service={supabaseLedgerService}>
                 <ExportServiceProvider service={supabaseExportService}>
                   <KioskServiceProvider service={supabaseKioskService}>
-                    <CardReaderProvider reader={cardReader}>
-                      <RouterProvider router={router} />
-                    </CardReaderProvider>
+                    <OperatorsServiceProvider service={supabaseOperatorsService}>
+                      <CardReaderProvider reader={cardReader}>
+                        <RouterProvider router={router} />
+                      </CardReaderProvider>
+                    </OperatorsServiceProvider>
                   </KioskServiceProvider>
                 </ExportServiceProvider>
               </LedgerServiceProvider>
