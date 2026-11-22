@@ -83,10 +83,52 @@ export async function handle(request: Request, deps: HandlerDeps): Promise<Respo
 
 type Context = { origin: string; authorization: string; deps: HandlerDeps };
 
-// The invite, resend and cancel steps arrive with tasks 8 and 9 of tasks/operators/todo.md; until then
-// a well-formed request reaches no client and answers like any other failure of the server.
-function perform(_input: Input, { origin }: Context): Promise<Response> {
-  return Promise.resolve(json(502, { error: 'upstream' }, origin));
+type RpcError = { code?: string } | null;
+
+/** The begin RPC of each action, called with the caller's token: PostgREST checks the token, the RPC is_admin(). */
+function beginCall(input: Input): { fn: string; args: Record<string, string> } {
+  if (input.action === 'invite') {
+    return {
+      fn: 'operator_invite_begin',
+      args: {
+        p_operation_id: input.operation_id,
+        p_name: input.name,
+        p_email: input.email,
+        p_role: input.role,
+      },
+    };
+  }
+  const fn = input.action === 'resend' ? 'operator_resend_begin' : 'operator_cancel_begin';
+  return { fn, args: { p_operator_id: input.operator_id } };
+}
+
+/** The answer to a refused begin: the caller's rights never come from anything but the RPC. */
+function refusal(error: NonNullable<RpcError>, origin: string): Response {
+  if (error.code === '42501') return json(403, { error: 'forbidden' }, origin);
+  // PGRST301-303: token missing, invalid or expired (PostgREST).
+  if (error.code !== undefined && /^PGRST30\d$/.test(error.code)) {
+    return json(401, { error: 'unauthorized' }, origin);
+  }
+  return json(502, { error: 'upstream' }, origin);
+}
+
+// The invite, resend and cancel steps after the begin RPC arrive with tasks 8 and 9 of
+// tasks/operators/todo.md; until then an allowed request answers like any other failure of the
+// server, and an invite reservation it made is released so a new tap starts at once.
+async function perform(input: Input, { origin, authorization, deps }: Context): Promise<Response> {
+  const { fn, args } = beginCall(input);
+  try {
+    const { error } = await deps.callerClient(authorization).schema('app').rpc(fn, args);
+    if (error) return refusal(error, origin);
+    if (input.action === 'invite') {
+      await deps.adminClient
+        .schema('app')
+        .rpc('operator_invite_fail', { p_operation_id: input.operation_id });
+    }
+  } catch {
+    // A client that throws is a server failure; nothing of it reaches the answer.
+  }
+  return json(502, { error: 'upstream' }, origin);
 }
 
 /** The request origin when it is allowed, else null. Exact match, or the preview pattern. */

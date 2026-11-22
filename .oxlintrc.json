@@ -66,5 +66,5 @@
       }
     }
   ],
-  "ignorePatterns": ["dist", "coverage", "node_modules", ".claude"]
+  "ignorePatterns": ["dist", "coverage", "node_modules", ".claude", "supabase/functions/*/index.ts"]
 }

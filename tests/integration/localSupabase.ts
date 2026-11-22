@@ -4,8 +4,16 @@ import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-/** Keys of the LOCAL stack, read from `supabase status`. The secret key never leaves test code. */
-export type LocalSupabase = { url: string; publishableKey: string; secretKey: string };
+/**
+ * Keys of the LOCAL stack, read from `supabase status`. The secret key never leaves test code.
+ * `anonKey` is the legacy anon JWT: the token an unauthenticated caller can send to a function.
+ */
+export type LocalSupabase = {
+  url: string;
+  publishableKey: string;
+  secretKey: string;
+  anonKey: string;
+};
 
 export function localSupabase(): LocalSupabase {
   let output: string;
@@ -27,7 +35,12 @@ export function localSupabase(): LocalSupabase {
   if (hostname !== '127.0.0.1' && hostname !== 'localhost') {
     throw new Error(`Integration tests only run against the local stack, not ${url}.`);
   }
-  return { url, publishableKey: value('PUBLISHABLE_KEY'), secretKey: value('SECRET_KEY') };
+  return {
+    url,
+    publishableKey: value('PUBLISHABLE_KEY'),
+    secretKey: value('SECRET_KEY'),
+    anonKey: value('ANON_KEY'),
+  };
 }
 
 /** A client that keeps its session in memory only and never refreshes it on its own. */
