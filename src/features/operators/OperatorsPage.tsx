@@ -7,6 +7,8 @@ import { StatusView } from '../../shared/ui/StatusView';
 import { NOT_IN_DISPLAY } from '../cards/customerName';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useAuth, useCurrentOperator } from '../identity/AuthProvider';
+import { TabletColumns } from '../tablet-kiosk/TabletColumns';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { InviteForm } from './InviteForm';
 import { OperatorDialog } from './OperatorDialog';
 import { OperatorRow, type RowAction, type RowFocus } from './OperatorRow';
@@ -207,8 +209,11 @@ function TitleName({ name }: { name: string }) {
 /**
  * The administrators' screen (wireframe "Operatori"): the polite region of the outcomes, then the
  * list, or its loading and error states; "Invita operatore" in the footer, on the raised surface.
+ * On the tablet layout (wireframe "Tablet: operatori") the list stays on the left and "Invita
+ * operatore" goes to the 480 px column on the right, from the top.
  */
 function Operators() {
+  const tablet = useTabletLayout();
   const { state, reload, forbid } = useOperatorsList();
   // Every state renders the same AppShell, so its h1 stays mounted through loading and errors.
   const heading = useRef<HTMLHeadingElement>(null);
@@ -281,31 +286,30 @@ function Operators() {
     );
   }
 
-  return (
-    <AppShell
-      title={TITLE}
-      backTo={BACK_TO}
-      headingRef={heading}
-      actions={
-        <InviteForm
-          disabled={state.status === 'loading'}
-          onInvited={(operator) => {
-            setMessage(`Invito inviato a ${operator.name}.`);
-            setFocused(null);
-            reload();
-          }}
-          onForbidden={forbid}
-        />
-      }
-      actionsTone="raised"
-    >
-      {/* One block: the empty region adds no gap of the shell above the list. */}
-      <div className={styles.content}>
-        <div aria-live="polite" className={styles.messages} data-operators-messages>
-          {message}
-        </div>
-        {content}
+  const form = (
+    <InviteForm
+      disabled={state.status === 'loading'}
+      onInvited={(operator) => {
+        setMessage(`Invito inviato a ${operator.name}.`);
+        setFocused(null);
+        reload();
+      }}
+      onForbidden={forbid}
+    />
+  );
+
+  // One block: the empty region adds no gap of the shell above the list.
+  const main = (
+    <div className={styles.content}>
+      <div aria-live="polite" className={styles.messages} data-operators-messages>
+        {message}
       </div>
+      {content}
+    </div>
+  );
+
+  const dialogs = (
+    <>
       <ConfirmDialog
         open={change.pending !== null}
         tone={confirmTexts?.tone ?? 'primary'}
@@ -341,6 +345,30 @@ function Operators() {
           onClose={() => setPerson(null)}
         />
       )}
+    </>
+  );
+
+  if (tablet) {
+    return (
+      <AppShell title={TITLE} backTo={BACK_TO} headingRef={heading}>
+        <TabletColumns column="invite-operator" width={480} label="Invita operatore" aside={form}>
+          {main}
+        </TabletColumns>
+        {dialogs}
+      </AppShell>
+    );
+  }
+
+  return (
+    <AppShell
+      title={TITLE}
+      backTo={BACK_TO}
+      headingRef={heading}
+      actions={form}
+      actionsTone="raised"
+    >
+      {main}
+      {dialogs}
     </AppShell>
   );
 }

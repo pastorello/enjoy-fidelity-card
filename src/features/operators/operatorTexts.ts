@@ -13,6 +13,9 @@ export const SELF_ERROR = 'Non puoi cambiare il tuo account da qui.';
 /** EO005 and the note under Ruolo on the tablet. */
 export const ADMIN_FROM_PHONE = 'Un amministratore si nomina dal telefono.';
 
+/** The note under Ruolo of "Invita operatore" on the tablet (SPEC-operators point 3). */
+export const ADMIN_INVITE_FROM_PHONE = 'Un amministratore si invita dal telefono.';
+
 /** EO004 / 409 `not_invited`. */
 export function notInvitedError(name: string): string {
   return `${name} ha già accettato l’invito o non è attivo: ricarica l’elenco.`;

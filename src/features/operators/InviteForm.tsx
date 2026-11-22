@@ -3,10 +3,13 @@ import { useLatest } from '../../lib/useLatest';
 import { Button } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { TextField } from '../../shared/ui/TextField';
+import { useDevice } from '../identity/AuthProvider';
 import type { Role } from '../identity/types';
+import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import styles from './InviteForm.module.css';
 import {
   ADMIN_FROM_PHONE,
+  ADMIN_INVITE_FROM_PHONE,
   EMAIL_DEACTIVATED_ERROR,
   EMAIL_IS_DEVICE_ERROR,
   EMAIL_TAKEN_ERROR,
@@ -20,6 +23,11 @@ import { useOperatorsService } from './OperatorsServiceProvider';
 import { RoleFieldset } from './RoleFieldset';
 import type { InviteResult, OperatorBrief } from './types';
 import { validateInvite, type InviteFormValues } from './validateInvite';
+
+/** The note under "Invia invito" (SPEC-operators point 3); the tablet names the till PIN too. */
+const NOTE = 'Riceverà un’email per scegliere la password.';
+const TABLET_NOTE =
+  'Riceverà un’email per scegliere la password; il PIN per il tablet lo imposta dal proprio telefono.';
 
 const EMPTY: InviteFormValues = { name: '', email: '', role: 'operator' };
 
@@ -69,9 +77,17 @@ export type InviteFormProps = {
  * no answer sends one email at most. The button is busy until the answer (a double tap sends
  * once). The refusals of point 6 go under the field they concern, or under the button; `forbidden`
  * goes to the page. Sent: the form empties (the role back to "Operatore").
+ *
+ * On the tablet layout the page puts it in the `<aside aria-label="Invita operatore">` column, so
+ * it is a plain block there (no second landmark of the same name), and "Amministratore" cannot be
+ * chosen (Open Questions 11): the same rule as the person dialog, also for a device without the
+ * tablet layout. The server refuses an admin from a device anyway (`admin_from_device`).
  */
 export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps) {
   const service = useOperatorsService();
+  const tablet = useTabletLayout();
+  const onDevice = useDevice() !== null;
+  const adminDisabled = tablet || onDevice;
   const [values, setValues] = useState<InviteFormValues>(EMPTY);
   // Read by the submit handler: the values the screen shows, even right after a commit.
   const latestValues = useLatest(values);
@@ -164,8 +180,9 @@ export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps
     }
   }
 
+  const Box = tablet ? 'div' : 'section';
   return (
-    <section aria-labelledby={headingId} className={styles.box}>
+    <Box aria-labelledby={tablet ? undefined : headingId} className={styles.box}>
       <h2 id={headingId} className={styles.title}>
         Invita operatore
       </h2>
@@ -198,6 +215,8 @@ export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps
             name={roleName}
             value={values.role}
             onChange={changeRole}
+            adminDisabled={adminDisabled}
+            note={adminDisabled ? ADMIN_INVITE_FROM_PHONE : undefined}
             error={errors.role}
           />
           <Button type="submit" block busy={busy} aria-describedby={noteId}>
@@ -210,10 +229,10 @@ export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps
             </p>
           )}
           <p id={noteId} className={styles.note}>
-            Riceverà un’email per scegliere la password.
+            {tablet ? TABLET_NOTE : NOTE}
           </p>
         </fieldset>
       </form>
-    </section>
+    </Box>
   );
 }
