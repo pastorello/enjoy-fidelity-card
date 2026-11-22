@@ -264,9 +264,9 @@ cerchio, tratteggiata per i disattivati), nome, "ruolo · stato" dei testi della
 tocco, ordine del server; `StatusView` di caricamento ed errore con "Riprova"; regione `aria-live="polite"`
 dei messaggi; operatore → `AdminsOnly`; `forbidden` → `reportNotEnabled()`.
 **Accettazione:**
-- [ ] Componente: quattro stati con i testi giusti; "(tu)" senza pulsanti; errore e "Riprova"; operatore →
+- [x] Componente: quattro stati con i testi giusti; "(tu)" senza pulsanti; errore e "Riprova"; operatore →
       vista "solo amministratori"
-- [ ] Impeccable pulito; screenshot 390×844 confrontato con il wireframe; glifi Display verificati
+- [x] Impeccable pulito; screenshot 390×844 confrontato con il wireframe; glifi Display verificati
 **Verifica:** `npm test -- operators`
 **Dipendenze:** 15 · **File:** src/features/operators/OperatorsPage.tsx (+ .module.css, .test.tsx),
 OperatorRow.tsx (+ .module.css) · **Dimensione:** M

@@ -147,7 +147,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint C: quality bar completa verde; test di rewards e `ConfirmDialog` invariati; revisione con l'utente prima della schermata
 
 ### Fase 4: Schermata Operatori (telefono)
-- [ ] Task 16: Elenco: stati, ordine, "(tu)" senza azioni, caricamento/errore, regione dei messaggi, `AdminsOnly`
+- [x] Task 16: Elenco: stati, ordine, "(tu)" senza azioni, caricamento/errore, regione dei messaggi, `AdminsOnly`
 - [ ] Task 17: "Disattiva" e "Riattiva" con conferma; `EO001` e altri errori; elenco ricaricato
 - [ ] Task 18: Dialogo persona: ruolo con seconda conferma, "Reinvia invito", "Annulla invito"
 - [ ] Task 19: "Invita operatore": validazioni, `operation_id` stabile, errori del punto 6, esito
