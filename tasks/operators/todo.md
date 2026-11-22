@@ -235,8 +235,8 @@ src/features/operators/OperatorsServiceProvider.tsx (+ .test.tsx), src/main.tsx,
 **Descrizione:** `src/shared/ui/Dialog.tsx` estratto da `ConfirmDialog` (`showModal`, focus restituito, Esc,
 titolo, `children`, "Chiudi"); `ConfirmDialog` ricostruito sopra; esempio in `/dev/ui`.
 **Accettazione:**
-- [ ] Test di `Dialog`: focus restituito, Esc chiude, titolo accessibile
-- [ ] `ConfirmDialog.test.tsx` invariato e verde; stesso aspetto (nessun token nuovo); Impeccable pulito
+- [x] Test di `Dialog`: focus restituito, Esc chiude, titolo accessibile
+- [x] `ConfirmDialog.test.tsx` invariato e verde; stesso aspetto (nessun token nuovo); Impeccable pulito
 **Verifica:** `npm test -- Dialog`
 **Dipendenze:** nessuna · **File:** src/shared/ui/Dialog.tsx (+ .module.css, .test.tsx),
 src/shared/ui/ConfirmDialog.tsx, src/app/dev/UiGallery.tsx · **Dimensione:** M

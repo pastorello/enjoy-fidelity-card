@@ -141,7 +141,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 3: Servizio e componenti condivisi
 - [x] Task 12: `OperatorsService`, `supabaseOperatorsService`, guardia del confine
 - [x] Task 13: `fakeOperatorsService`, `OperatorsServiceProvider`, `main.tsx` e `renderApp`
-- [ ] Task 14: `Dialog` (guscio) estratto da `ConfirmDialog`, test invariati, `/dev/ui`
+- [x] Task 14: `Dialog` (guscio) estratto da `ConfirmDialog`, test invariati, `/dev/ui`
 - [ ] Task 15: `AdminsOnly` condiviso, `OperatorsSettingsRow` prima di "Catalogo premi", rotta `/impostazioni/operatori`
 
 ### Checkpoint C: quality bar completa verde; test di rewards e `ConfirmDialog` invariati; revisione con l'utente prima della schermata
