@@ -162,8 +162,8 @@ tabella del punto 5; log solo `operation_id`, azione ed esito.
 `deleteUser` solo con `true`, altrimenti 409 `not_invited`; 200 `cancelled`); `EO002` → 403 `self`, `EO004` →
 409 `not_invited`.
 **Accettazione:**
-- [ ] Unità: `_resend_finish` riceve il `requested_by` di `_resend_begin`; link di recupero se `email_confirmed`
-- [ ] Unità: `deleteUser` solo con `_cancel_check` vero; codici HTTP della tabella
+- [x] Unità: `_resend_finish` riceve il `requested_by` di `_resend_begin`; link di recupero se `email_confirmed`
+- [x] Unità: `deleteUser` solo con `_cancel_check` vero; codici HTTP della tabella
 **Verifica:** `npm test -- operator-invites`
 **Dipendenze:** 8 · **File:** supabase/functions/operator-invites/handler.ts, handler.test.ts · **Dimensione:** S
 

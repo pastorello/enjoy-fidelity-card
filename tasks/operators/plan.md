@@ -132,7 +132,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 6: `handler.ts`: origine, CORS, `OPTIONS`, metodo, corpo, 401; strumenti (test.include, `tsconfig.functions.json`, typecheck)
 - [x] Task 7: `index.ts`, `deno.json`, `config.toml`, `functions/.env.example`; servita in locale (anon → nessun effetto, operatore → 403)
 - [x] Task 8: Invito nel handler: begin → metadati → invito/recupero → finish → compensazione; mappa degli esiti HTTP; log
-- [ ] Task 9: Reinvio e annullamento nel handler
+- [x] Task 9: Reinvio e annullamento nel handler
 - [ ] Task 10: Template `invite.html`, `reload-auth-templates.sh`, integrazione reale con Mailpit (una email, idempotenza), passo CI
 - [ ] Task 11: Integrazione reale di reinvio, token verificato senza password, annullamento e ricollegamento
 
