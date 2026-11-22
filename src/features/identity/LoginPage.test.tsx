@@ -23,6 +23,17 @@ describe('sign-in page', () => {
     expect(screen.getByText(/Gli account li crea un amministratore/)).toBeInTheDocument();
   });
 
+  it('shows the note of the wireframe, which points invited people to their email', async () => {
+    renderApp('/accedi');
+    await screen.findByRole('heading', { level: 1, name: 'Accedi' });
+    expect(
+      screen.getByText(
+        'Gli account li crea un amministratore. Se hai ricevuto un invito, apri il link nell’email per scegliere la password.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/rivolgiti a chi gestisce l’app/)).not.toBeInTheDocument();
+  });
+
   it('links "Password dimenticata?" below the button to the recovery page', async () => {
     const { router } = renderApp('/accedi');
     const link = await screen.findByRole('link', { name: 'Password dimenticata?' });
