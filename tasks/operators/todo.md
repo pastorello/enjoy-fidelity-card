@@ -133,9 +133,9 @@ tsconfig.functions.json, vite.config.ts, package.json · **Dimensione:** M
 `/cors`); `[functions.operator-invites] verify_jwt = true` in `config.toml`; `supabase/functions/.env.example`
 (solo `APP_ORIGINS`), `.env` ignorato (verificato con `git check-ignore`). Primo test di integrazione.
 **Accettazione:**
-- [ ] Integrazione (`operators.test.ts`) con `functions serve`: chiave `anon` → 401/403 senza effetti; operatore
+- [x] Integrazione (`operators.test.ts`) con `functions serve`: chiave `anon` → 401/403 senza effetti; operatore
       → 403 `forbidden`; dispositivo senza cassiere → 403
-- [ ] `index.ts` fuori da tsc e lint; nessuna chiave nel repo
+- [x] `index.ts` fuori da tsc e lint; nessuna chiave nel repo
 **Verifica:** `npx supabase functions serve` in background, poi `npm run test:integration -- operators`
 **Dipendenze:** 6 · **File:** supabase/functions/operator-invites/index.ts, deno.json, supabase/config.toml,
 supabase/functions/.env.example, tests/integration/operators.test.ts · **Dimensione:** M

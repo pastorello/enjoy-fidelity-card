@@ -130,7 +130,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 2: Edge Function `operator-invites`
 - [x] Task 6: `handler.ts`: origine, CORS, `OPTIONS`, metodo, corpo, 401; strumenti (test.include, `tsconfig.functions.json`, typecheck)
-- [ ] Task 7: `index.ts`, `deno.json`, `config.toml`, `functions/.env.example`; servita in locale (anon → nessun effetto, operatore → 403)
+- [x] Task 7: `index.ts`, `deno.json`, `config.toml`, `functions/.env.example`; servita in locale (anon → nessun effetto, operatore → 403)
 - [ ] Task 8: Invito nel handler: begin → metadati → invito/recupero → finish → compensazione; mappa degli esiti HTTP; log
 - [ ] Task 9: Reinvio e annullamento nel handler
 - [ ] Task 10: Template `invite.html`, `reload-auth-templates.sh`, integrazione reale con Mailpit (una email, idempotenza), passo CI
