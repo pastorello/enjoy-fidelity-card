@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { findFakeAdapterTraces } from './check-bundle.ts';
+import { findFakeAdapterTraces, findPrivilegedKeyTraces } from './check-bundle.ts';
 
 // SPEC-card-input, success criterion 8: the published build never carries the E2E fake card reader.
 
@@ -63,5 +63,30 @@ describe('findFakeAdapterTraces', () => {
   it('fails when dist/ does not exist (the build has not run)', () => {
     rmSync(dist, { recursive: true, force: true });
     expect(() => findFakeAdapterTraces(dist)).toThrow(/npm run build/);
+  });
+});
+
+// SPEC-operators, criterion 5: the key of the Edge Function never reaches a published build. The key
+// below is made up and assembled at run time, so this file holds nothing shaped like a real key.
+describe('findPrivilegedKeyTraces', () => {
+  const fakeKey = `${['sb', 'secret', ''].join('_')}${'q'.repeat(31)}`;
+
+  it('reports nothing for a clean build, even one that names the publishable key', () => {
+    write('assets/env-1a2b3c.js', 'const key = "sb_publishable_made_up_for_the_test";');
+    expect(findPrivilegedKeyTraces(dist)).toEqual([]);
+  });
+
+  it('finds a secret key inside a JS chunk or the HTML', () => {
+    write('assets/main-def456.js', `const k = "${fakeKey}";`);
+    write('index.html', `<meta name="k" content="${fakeKey}">`);
+    expect(findPrivilegedKeyTraces(dist)).toEqual([
+      { file: 'assets/main-def456.js', kind: 'secret API key' },
+      { file: 'index.html', kind: 'secret API key' },
+    ]);
+  });
+
+  it('fails when dist/ does not exist (the build has not run)', () => {
+    rmSync(dist, { recursive: true, force: true });
+    expect(() => findPrivilegedKeyTraces(dist)).toThrow(/npm run build/);
   });
 });
