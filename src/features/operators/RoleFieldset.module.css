@@ -52,3 +52,19 @@
   line-height: var(--type-body-sm-line-height);
   color: var(--color-ink-muted);
 }
+
+/* Why the server refused the role, like the error under a TextField. */
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-danger-text);
+}
+
+.error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}

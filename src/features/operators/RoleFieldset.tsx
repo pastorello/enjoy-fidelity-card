@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { Icon } from '../../shared/ui/Icon';
 import type { Role } from '../identity/types';
 import styles from './RoleFieldset.module.css';
 
@@ -16,6 +17,8 @@ type RoleFieldsetProps = {
   adminDisabled?: boolean;
   /** Shown under the radios and describing the group, e.g. "Un amministratore si nomina dal telefono." */
   note?: string | undefined;
+  /** Why the server refused the role (`admin_from_device`), under the radios; describes the group. */
+  error?: string | null | undefined;
 };
 
 /**
@@ -28,10 +31,13 @@ export function RoleFieldset({
   onChange,
   adminDisabled = false,
   note,
+  error,
 }: RoleFieldsetProps) {
   const noteId = useId();
+  const errorId = useId();
+  const describedBy = [error && errorId, note && noteId].filter(Boolean).join(' ') || undefined;
   return (
-    <fieldset className={styles.fieldset} aria-describedby={note ? noteId : undefined}>
+    <fieldset className={styles.fieldset} aria-describedby={describedBy}>
       <legend className={styles.legend}>Ruolo</legend>
       <div className={styles.options}>
         {OPTIONS.map((option) => {
@@ -56,6 +62,12 @@ export function RoleFieldset({
           );
         })}
       </div>
+      {error && (
+        <p id={errorId} role="alert" className={styles.error}>
+          <Icon name="circle-alert" size={18} />
+          {error}
+        </p>
+      )}
       {note && (
         <p id={noteId} className={styles.note}>
           {note}

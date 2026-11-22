@@ -1,0 +1,49 @@
+/* "Invita operatore" (wireframe "Operatori"): the screen's footer, on the raised surface. */
+.box {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  margin: 0 0 calc(var(--space-2) + var(--space-1));
+  font-family: var(--type-section-title-family);
+  font-size: var(--type-section-title-size);
+  line-height: var(--type-section-title-line-height);
+  font-weight: var(--type-section-title-weight);
+  letter-spacing: var(--type-section-title-letter-spacing);
+  color: var(--color-ink);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Why the invite did not go, under the button (SPEC-operators point 6). */
+.failure {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-danger-text);
+}
+
+.failure svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* "Riceverà un’email per scegliere la password.", muted as in the wireframe. */
+.note {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}

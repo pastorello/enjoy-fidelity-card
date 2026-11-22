@@ -7,6 +7,7 @@ import { StatusView } from '../../shared/ui/StatusView';
 import { NOT_IN_DISPLAY } from '../cards/customerName';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useAuth, useCurrentOperator } from '../identity/AuthProvider';
+import { InviteForm } from './InviteForm';
 import { OperatorDialog } from './OperatorDialog';
 import { OperatorRow, type RowAction, type RowFocus } from './OperatorRow';
 import { GENERIC_ERROR, LAST_ADMIN_ERROR, SELF_ERROR } from './operatorTexts';
@@ -205,7 +206,7 @@ function TitleName({ name }: { name: string }) {
 
 /**
  * The administrators' screen (wireframe "Operatori"): the polite region of the outcomes, then the
- * list, or its loading and error states.
+ * list, or its loading and error states; "Invita operatore" in the footer, on the raised surface.
  */
 function Operators() {
   const { state, reload, forbid } = useOperatorsList();
@@ -281,7 +282,23 @@ function Operators() {
   }
 
   return (
-    <AppShell title={TITLE} backTo={BACK_TO} headingRef={heading}>
+    <AppShell
+      title={TITLE}
+      backTo={BACK_TO}
+      headingRef={heading}
+      actions={
+        <InviteForm
+          disabled={state.status === 'loading'}
+          onInvited={(operator) => {
+            setMessage(`Invito inviato a ${operator.name}.`);
+            setFocused(null);
+            reload();
+          }}
+          onForbidden={forbid}
+        />
+      }
+      actionsTone="raised"
+    >
       {/* One block: the empty region adds no gap of the shell above the list. */}
       <div className={styles.content}>
         <div aria-live="polite" className={styles.messages} data-operators-messages>
