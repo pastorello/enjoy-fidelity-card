@@ -17,6 +17,8 @@ type DialogProps = {
   closeLabel?: string;
   /** Where focus starts; "Chiudi" when not given. Read once, when the dialog opens. */
   initialFocusRef?: RefObject<HTMLElement | null> | undefined;
+  /** Receives the close action, for a dialog with steps that moves the focus to it later. */
+  closeRef?: RefObject<HTMLButtonElement | null> | undefined;
   /** "Chiudi" or Esc. */
   onClose: () => void;
 };
@@ -35,6 +37,7 @@ function OpenDialog({
   children,
   closeLabel = 'Chiudi',
   initialFocusRef,
+  closeRef: outerCloseRef,
   onClose,
 }: Omit<DialogProps, 'open'>) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -75,7 +78,15 @@ function OpenDialog({
         </p>
       )}
       {children}
-      <Button ref={closeRef} variant="secondary" block onClick={onClose}>
+      <Button
+        ref={(node) => {
+          closeRef.current = node;
+          if (outerCloseRef) outerCloseRef.current = node;
+        }}
+        variant="secondary"
+        block
+        onClick={onClose}
+      >
         {closeLabel}
       </Button>
     </dialog>

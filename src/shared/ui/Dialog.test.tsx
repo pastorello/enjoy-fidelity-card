@@ -98,4 +98,22 @@ describe('Dialog', () => {
     expect(screen.getByRole('button', { name: 'Lascia com’è' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Chiudi' })).not.toBeInTheDocument();
   });
+
+  it('hands its close action to closeRef, so a step of the dialog can move the focus there', () => {
+    const closeRef = { current: null as HTMLButtonElement | null };
+    render(
+      <Dialog
+        open
+        title="Annullare?"
+        closeLabel="Lascia com’è"
+        closeRef={closeRef}
+        onClose={() => {}}
+      >
+        {null}
+      </Dialog>,
+    );
+    expect(closeRef.current).toBe(screen.getByRole('button', { name: 'Lascia com’è' }));
+    // It still starts on the close action by default.
+    expect(closeRef.current).toHaveFocus();
+  });
 });

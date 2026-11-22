@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react';
 import { Button } from '../../shared/ui/Button';
+import { Icon } from '../../shared/ui/Icon';
 import { NOT_IN_DISPLAY } from '../cards/customerName';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import styles from './OperatorRow.module.css';
@@ -8,7 +9,7 @@ import type { Operator, OperatorStatus } from './types';
 const ROLE_LABEL = { admin: 'Amministratore', operator: 'Operatore' } as const;
 
 /** SPEC-operators point 2, table of the states: `removed` reads as `deactivated`. */
-const STATUS_LABEL: Record<OperatorStatus, string> = {
+export const STATUS_LABEL: Record<OperatorStatus, string> = {
   active: 'attivo',
   invited: 'invito inviato',
   deactivated: 'disattivato, movimenti nello storico',
@@ -45,40 +46,69 @@ export function rowActionOf(operator: Operator): RowAction | null {
   return 'deactivate';
 }
 
+/** Who opens the person dialog: active, invited and deactivated people, never the own row. */
+export function opensDialog(operator: Operator): boolean {
+  return !operator.isMe && operator.status !== 'removed';
+}
+
+/** Which control of the row takes the focus: its action button, or the person button. */
+export type RowFocus = 'action' | 'person';
+
 type OperatorRowProps = {
   operator: Operator;
   /** "Disattiva" or "Riattiva" was tapped: the page asks for the confirmation. */
   onAction: (operator: Operator, action: RowAction) => void;
+  /** The name was tapped: the page opens the dialog "{nome}". */
+  onOpen: (operator: Operator) => void;
   /**
-   * The row of the last action done: its button (or the row, when it has none any more) takes the
-   * focus, again each time the reloaded list changes its state.
+   * The row of the last action done: that control (or the row, when it has none any more) takes
+   * the focus, again each time the reloaded list changes its state.
    */
-  focused?: boolean;
+  focus?: RowFocus | undefined;
 };
 
 /**
  * One person of the Operators screen (wireframe "Operatori"): the initial in the circle (dashed and
  * grey for deactivated and removed people), the name with "(tu)" for the person acting, and
- * "ruolo · stato" under it, then "Disattiva" or "Riattiva". The own row has no action and is not
- * tappable.
+ * "ruolo · stato" under it (a button with a chevron that opens the dialog "{nome}"), then
+ * "Disattiva" or "Riattiva". The own row has no action and is not tappable; a removed row has no
+ * button.
  */
-export function OperatorRow({ operator, onAction, focused = false }: OperatorRowProps) {
+export function OperatorRow({ operator, onAction, onOpen, focus }: OperatorRowProps) {
   const tablet = useTabletLayout();
   const nameId = useId();
   const actionRef = useRef<HTMLButtonElement>(null);
+  const personRef = useRef<HTMLButtonElement>(null);
   const itemRef = useRef<HTMLLIElement>(null);
   const action = rowActionOf(operator);
+  const opens = opensDialog(operator);
   const initial = initialOf(operator.name);
   const away = isAway(operator) ? 'true' : undefined;
   useEffect(() => {
-    if (!focused) return;
+    if (focus === undefined) return;
     // After the dialog returned the focus to the opener, and again once the reloaded row changes
-    // its action (it may have moved in the list): its button, or the row when it has none.
-    (action === null ? itemRef.current : actionRef.current)?.focus();
-  }, [focused, action]);
+    // (it may have moved in the list): the control asked for, or the row when it has none.
+    const shown = focus === 'action' ? action !== null : opens;
+    const control = focus === 'action' ? actionRef.current : personRef.current;
+    (shown ? control : itemRef.current)?.focus();
+  }, [focus, action, opens]);
+
+  const text = (
+    <span className={styles.text}>
+      <span id={nameId} className={styles.name} data-operator-name>
+        {operator.isMe ? `${operator.name} (tu)` : operator.name}
+      </span>{' '}
+      <span className={styles.status}>{statusText(operator, tablet)}</span>
+    </span>
+  );
 
   return (
-    <li ref={itemRef} tabIndex={focused ? -1 : undefined} className={styles.item} data-away={away}>
+    <li
+      ref={itemRef}
+      tabIndex={focus === undefined ? undefined : -1}
+      className={styles.item}
+      data-away={away}
+    >
       <span
         className={styles.initial}
         aria-hidden="true"
@@ -88,12 +118,20 @@ export function OperatorRow({ operator, onAction, focused = false }: OperatorRow
       >
         {initial}
       </span>
-      <span className={styles.text}>
-        <span id={nameId} className={styles.name} data-operator-name>
-          {operator.isMe ? `${operator.name} (tu)` : operator.name}
-        </span>
-        <span className={styles.status}>{statusText(operator, tablet)}</span>
-      </span>
+      {opens ? (
+        // Like ListRow: the name and the state are the target, with the chevron.
+        <button
+          ref={personRef}
+          type="button"
+          className={styles.person}
+          onClick={() => onOpen(operator)}
+        >
+          {text}
+          <Icon name="chevron-right" size={20} className={styles.chevron} />
+        </button>
+      ) : (
+        text
+      )}
       {action !== null && (
         <Button
           ref={actionRef}

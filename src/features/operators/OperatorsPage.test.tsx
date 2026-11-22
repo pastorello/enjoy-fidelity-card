@@ -265,9 +265,11 @@ describe('OperatorsPage: Disattiva e Riattiva', () => {
   it('puts "Disattiva" on active and invited rows, "Riattiva" on deactivated ones, nothing on removed', async () => {
     renderPage();
     const list = await findList();
+    // The row actions; the person button (name and state, which opens the dialog) is apart.
     const buttons = (name: string) =>
       within(rowOf(list, name))
         .queryAllByRole('button')
+        .filter((button) => button.querySelector('[data-operator-name]') === null)
         .map((button) => button.textContent);
     expect(buttons('andrea')).toEqual(['Disattiva']);
     expect(buttons('Marco')).toEqual(['Disattiva']);
@@ -278,7 +280,7 @@ describe('OperatorsPage: Disattiva e Riattiva', () => {
     expect(deactivate).toHaveAttribute('data-variant', 'danger-secondary');
     // The button names the person it acts on.
     expect(deactivate).toHaveAccessibleDescription('andrea Prova');
-    expect(within(rowOf(list, 'Sara')).getByRole('button')).toHaveAttribute(
+    expect(within(rowOf(list, 'Sara')).getByRole('button', { name: 'Riattiva' })).toHaveAttribute(
       'data-variant',
       'secondary',
     );

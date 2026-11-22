@@ -1,0 +1,50 @@
+/* The person dialog (SPEC-operators point 2): content of the Dialog shell, tokens of ConfirmDialog. */
+
+/* A name with a glyph Enjoy Display lacks, inside the title (displayGlyphs.test.ts). */
+.titleName[data-body-font='true'] {
+  font-family: var(--type-body-family);
+}
+
+/* The second confirmation: the question in the body font (any name reads), then its consequence. */
+.question {
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.consequence {
+  margin-bottom: var(--space-2);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+/* "Reinvia invito" and "Annulla invito", apart from the role. */
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+
+.note {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* Why the action failed, as in ConfirmDialog: the icon in the danger colour, the text in ink. */
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}
+
+.errorIcon {
+  flex-shrink: 0;
+  color: var(--color-danger-text);
+}

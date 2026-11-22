@@ -7,7 +7,9 @@ import { StatusView } from '../../shared/ui/StatusView';
 import { NOT_IN_DISPLAY } from '../cards/customerName';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useAuth, useCurrentOperator } from '../identity/AuthProvider';
-import { OperatorRow, type RowAction } from './OperatorRow';
+import { OperatorDialog } from './OperatorDialog';
+import { OperatorRow, type RowAction, type RowFocus } from './OperatorRow';
+import { GENERIC_ERROR, LAST_ADMIN_ERROR, SELF_ERROR } from './operatorTexts';
 import styles from './OperatorsPage.module.css';
 import { useOperatorsService } from './OperatorsServiceProvider';
 import type { ActiveResult, Operator } from './types';
@@ -26,7 +28,7 @@ type ListState =
 
 /** "Operatori non caricati": the words of sign-in for the network and the server (SPEC point 2). */
 function listErrorText(error: ListFailure): string {
-  return error === 'unknown' ? 'Operazione non riuscita. Riprova tra poco.' : loadErrorText(error);
+  return error === 'unknown' ? GENERIC_ERROR : loadErrorText(error);
 }
 
 /**
@@ -90,8 +92,6 @@ function useOperatorsList() {
   return { state, reload, forbid };
 }
 
-const GENERIC_ERROR = 'Operazione non riuscita. Riprova tra poco.';
-
 type ChangeFailure = Exclude<ActiveResult['status'], 'ok' | 'forbidden'>;
 
 /**
@@ -99,9 +99,8 @@ type ChangeFailure = Exclude<ActiveResult['status'], 'ok' | 'forbidden'>;
  * profile gone or without an account meanwhile, a server fault) get the generic text.
  */
 const CHANGE_ERROR: Record<ChangeFailure, string> = {
-  'last-admin':
-    'Serve almeno un amministratore attivo: prima rendi amministratore un’altra persona.',
-  self: 'Non puoi cambiare il tuo account da qui.',
+  'last-admin': LAST_ADMIN_ERROR,
+  self: SELF_ERROR,
   'admin-from-device': GENERIC_ERROR,
   'no-account': GENERIC_ERROR,
   'not-found': GENERIC_ERROR,
@@ -214,18 +213,27 @@ function Operators() {
   const heading = useRef<HTMLHeadingElement>(null);
   // The outcome of the last action ("{nome} è disattivato."): the row actions set it.
   const [message, setMessage] = useState('');
-  // The row of the last action done: it keeps the focus through the reload.
-  const [focusedId, setFocusedId] = useState<string | null>(null);
+  // The row of the last action done, and which of its controls: it keeps the focus through the
+  // reload.
+  const [focused, setFocused] = useState<{ id: string; target: RowFocus } | null>(null);
+  // The person whose dialog is open (a snapshot, followed by the reloaded list).
+  const [person, setPerson] = useState<Operator | null>(null);
   const change = useActiveChange({
     onDone(operator, text) {
       setMessage(text);
-      setFocusedId(operator.id);
+      setFocused({ id: operator.id, target: 'action' });
       reload();
     },
     onStale: reload,
     onForbidden: forbid,
   });
   const confirmTexts = change.pending === null ? null : CONFIRM[change.pending.action];
+  const shownPerson =
+    person === null
+      ? null
+      : ((state.status === 'done'
+          ? state.operators.find((operator) => operator.id === person.id)
+          : undefined) ?? person);
 
   // "Riprova" is replaced by the loading state: the focus goes to the title, not to <body>.
   function retry() {
@@ -257,10 +265,14 @@ function Operators() {
           <OperatorRow
             key={operator.id}
             operator={operator}
-            focused={operator.id === focusedId}
+            focus={focused?.id === operator.id ? focused.target : undefined}
             onAction={(target, action) => {
-              setFocusedId(null);
+              setFocused(null);
               change.open(target, action);
+            }}
+            onOpen={(target) => {
+              setFocused(null);
+              setPerson(target);
             }}
           />
         ))}
@@ -294,6 +306,24 @@ function Operators() {
         onConfirm={change.confirm}
         onCancel={change.cancel}
       />
+      {shownPerson && (
+        <OperatorDialog
+          key={shownPerson.id}
+          operator={shownPerson}
+          onDone={(operator, text) => {
+            setPerson(null);
+            setMessage(text);
+            setFocused({ id: operator.id, target: 'person' });
+            reload();
+          }}
+          onStale={reload}
+          onForbidden={() => {
+            setPerson(null);
+            forbid();
+          }}
+          onClose={() => setPerson(null)}
+        />
+      )}
     </AppShell>
   );
 }
