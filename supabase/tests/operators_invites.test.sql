@@ -8,6 +8,10 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select plan(134);
 
+-- Reservations left on the local stack by the integration tests and the E2E (real invites): this
+-- file counts the rows it makes, so it starts from none. Rolled back with everything else.
+delete from private.operator_invites;
+
 -- Fake Auth users. Accepted invite = email confirmed and a password.
 insert into auth.users (id, email, email_confirmed_at, encrypted_password) values
   ('00000000-0000-4000-d700-000000000001', 'inv.anna@example.com', now(),
