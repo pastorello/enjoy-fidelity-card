@@ -98,10 +98,10 @@ supabase/tests/function_privileges.test.sql · **Dimensione:** S
 mentre B retrocede A; disattivazione durante `unlock_cashier` dello stesso operatore; due
 `operator_invite_begin` alla stessa email con `operation_id` diversi in parallelo. Utenti creati e tolti dal test.
 **Accettazione:**
-- [ ] Corsa tra admin: una riesce, l'altra `42501`; resta almeno un admin attivo
-- [ ] Disattivazione contro sblocco: nessun deadlock; dopo la corsa il dispositivo non legge nulla e
+- [x] Corsa tra admin: una riesce, l'altra `42501`; resta almeno un admin attivo
+- [x] Disattivazione contro sblocco: nessun deadlock; dopo la corsa il dispositivo non legge nulla e
       `get_session_identity()` dà cassiere nullo (non si verifica `cashier_operator_id`)
-- [ ] Inviti paralleli: uno `proceed`, l'altro `in_progress`
+- [x] Inviti paralleli: uno `proceed`, l'altro `in_progress`
 **Verifica:** `npm run test:integration -- operators-concurrency`
 **Dipendenze:** 4 · **File:** tests/integration/operators-concurrency.test.ts, tests/integration/localSupabase.ts
 · **Dimensione:** S

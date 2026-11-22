@@ -124,7 +124,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 2: `list_operators`, `set_operator_role`, `set_operator_active` (ultimo admin, sé stessi, `removed`, `EO005`, turni chiusi); pgTAP
 - [x] Task 3: `private.operator_invites`, `operator_invite_begin`/`_finish`/`_fail`/`_orphan`; privilegi solo `service_role`; pgTAP
 - [x] Task 4: `operator_resend_begin`/`_finish`, `operator_cancel_begin`/`_check`; pgTAP
-- [ ] Task 5: Integrazione con due connessioni: corsa tra due admin, disattivazione durante `unlock_cashier`, due inviti in parallelo
+- [x] Task 5: Integrazione con due connessioni: corsa tra due admin, disattivazione durante `unlock_cashier`, due inviti in parallelo
 
 ### Checkpoint A: `db:test` e `test:integration` verdi; pgTAP esistenti invariati; revisione `security-and-hardening` del database
 
