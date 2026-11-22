@@ -23,12 +23,12 @@ azzera `deactivated_at`/`_by`). Seed: `disattiva@example.com` "Disattiva Prova",
 Prova" (operatori, con PIN finto), `admin-operatori@example.com` "Admin Operatori" (admin, con PIN finto),
 tablet `cassa-operatori@example.com` "Tablet operatori".
 **Accettazione:**
-- [ ] pgTAP (`operators_access.test.sql`): un profilo con `deactivated_at` impostato (scritto dal test come
+- [x] pgTAP (`operators_access.test.sql`): un profilo con `deactivated_at` impostato (scritto dal test come
       `postgres`) legge 0 righe da ogni tabella/vista `app`, ogni RPC di scrittura lo rifiuta col codice già
       in uso, `get_session_identity()` è null; come cassiere: assente da `list_cashiers`, `unlock_cashier` →
       `no_pin`, il dispositivo non legge nulla; azzerato `deactivated_at` tutto torna
-- [ ] pgTAP: `add_operator` su un profilo disattivato lo riattiva; conteggio e somma dei movimenti invariati
-- [ ] Tutti i pgTAP esistenti verdi senza modifiche; suite E2E e integrazione verdi col seed nuovo
+- [x] pgTAP: `add_operator` su un profilo disattivato lo riattiva; conteggio e somma dei movimenti invariati
+- [x] Tutti i pgTAP esistenti verdi senza modifiche; suite E2E e integrazione verdi col seed nuovo
 **Verifica:** `npm run db:reset && npm run db:test && npm run e2e`
 **Dipendenze:** nessuna · **File:** supabase/migrations/*_operators.sql, supabase/tests/operators_access.test.sql,
 supabase/seed.sql · **Dimensione:** M
