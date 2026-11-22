@@ -84,11 +84,11 @@ p_operator_id, p_requested_by)` (solo `service_role`: richiedente ancora admin, 
 uuid, uuid)` (solo `service_role`: blocca `auth.users`, persona ancora `invited`, profilo ancora collegato,
 richiedente ancora admin).
 **Accettazione:**
-- [ ] pgTAP: `resend_begin` accetta un `invited` con email confermata e password vuota (`email_confirmed: true`),
+- [x] pgTAP: `resend_begin` accetta un `invited` con email confermata e password vuota (`email_confirmed: true`),
       rifiuta `active`/`deactivated`/`removed` con `EO004` e sé stessi con `EO002`
-- [ ] pgTAP: `cancel_begin` solo per `invited`; `_cancel_check` falso se nel frattempo la persona ha accettato
+- [x] pgTAP: `cancel_begin` solo per `invited`; `_cancel_check` falso se nel frattempo la persona ha accettato
       o il richiedente non è più admin; `_resend_finish` rifiutato se il richiedente è stato retrocesso
-- [ ] pgTAP: `_resend_finish` e `_cancel_check` non eseguibili da `authenticated`
+- [x] pgTAP: `_resend_finish` e `_cancel_check` non eseguibili da `authenticated`
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 3 · **File:** supabase/migrations/*_operators.sql, supabase/tests/operators_invites.test.sql,
 supabase/tests/function_privileges.test.sql · **Dimensione:** S
