@@ -391,8 +391,8 @@ rimedio), `docs/specs/contract.md` (rotta, colonne, funzione, codici `EO001`–`
 comandi), `docs/specs/cross-review.md` §1 voce 4, `brain/MAP.md`. Le note di deploy restano nella spec per
 l'orchestratore.
 **Accettazione:**
-- [ ] Ogni passo indica il comando o la schermata esatta; nessun segreto né dato reale
-- [ ] `CLAUDE.md` e `contract.md` coerenti con il codice
+- [x] Ogni passo indica il comando o la schermata esatta; nessun segreto né dato reale
+- [x] `CLAUDE.md` e `contract.md` coerenti con il codice
 **Verifica:** rilettura; `npm run format:check`
 **Dipendenze:** 24 · **File:** docs/setup-accounts.md, brain/topics/operations/RUNBOOK.md,
 docs/specs/contract.md, CLAUDE.md, docs/specs/cross-review.md · **Dimensione:** M

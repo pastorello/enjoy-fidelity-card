@@ -166,7 +166,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint E: Impeccable pulito sul layout tablet; confronto con "Tablet: operatori"; E2E `phone` invariati
 
 ### Fase 7: Chiusura
-- [ ] Task 25: `docs/setup-accounts.md` §4, RUNBOOK (procedura, trappola dei template di Kong), `contract.md`, `CLAUDE.md`, `cross-review.md`, `brain/MAP.md`
+- [x] Task 25: `docs/setup-accounts.md` §4, RUNBOOK (procedura, trappola dei template di Kong), `contract.md`, `CLAUDE.md`, `cross-review.md`, `brain/MAP.md`
 - [ ] Task 26: Verifica dei criteri di successo (`scripts/operatorsCriteria.test.ts`) e PR su `main`
 
 ### Checkpoint F: criteri 1–12 verificati (12: la parte di deploy è dell'orchestratore); quality bar completa verde; PR pronta per `code-review-and-quality`
