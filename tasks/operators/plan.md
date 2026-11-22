@@ -121,7 +121,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 1: Database (rischio più alto)
 - [x] Task 1: Colonne di `app.operators`, helper ridefiniti (disattivato = nessun accesso), `add_operator` che riattiva, seed riservato; pgTAP
-- [ ] Task 2: `list_operators`, `set_operator_role`, `set_operator_active` (ultimo admin, sé stessi, `removed`, `EO005`, turni chiusi); pgTAP
+- [x] Task 2: `list_operators`, `set_operator_role`, `set_operator_active` (ultimo admin, sé stessi, `removed`, `EO005`, turni chiusi); pgTAP
 - [ ] Task 3: `private.operator_invites`, `operator_invite_begin`/`_finish`/`_fail`/`_orphan`; privilegi solo `service_role`; pgTAP
 - [ ] Task 4: `operator_resend_begin`/`_finish`, `operator_cancel_begin`/`_check`; pgTAP
 - [ ] Task 5: Integrazione con due connessioni: corsa tra due admin, disattivazione durante `unlock_cashier`, due inviti in parallelo

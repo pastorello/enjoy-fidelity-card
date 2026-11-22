@@ -43,13 +43,13 @@ bersaglio e admin attivi, poi `42501`, `P0002`, `EO002`, `EO003`, `EO005` (admin
 `deactivated_by` e chiude i turni di cassa della persona su tutti i tablet. Privilegi come
 `20261117230000_function_privileges.sql`.
 **Accettazione:**
-- [ ] pgTAP (`operators.test.sql`): `list_operators` → `42501` per operatore, dispositivo senza cassiere e con
+- [x] pgTAP (`operators.test.sql`): `list_operators` → `42501` per operatore, dispositivo senza cassiere e con
       cassiere operatore; ok per cassiere admin con `is_me` sul cassiere; i quattro stati, `invited` anche con
       email confermata e password vuota
-- [ ] pgTAP: `EO002` su sé stessi, `EO003` su `removed`, `EO001` sull'ultimo admin (un admin `invited` non
+- [x] pgTAP: `EO002` su sé stessi, `EO003` su `removed`, `EO001` sull'ultimo admin (un admin `invited` non
       conta), `EO005` per `set_operator_role(…, 'admin')` dal cassiere admin, idempotenza, profilo restituito
       con la forma di `list_operators`; turno di cassa chiuso alla disattivazione; movimenti invariati
-- [ ] `function_privileges.test.sql` verde con le funzioni nuove
+- [x] `function_privileges.test.sql` verde con le funzioni nuove
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1 · **File:** supabase/migrations/*_operators.sql, supabase/tests/operators.test.sql,
 supabase/tests/function_privileges.test.sql · **Dimensione:** M
