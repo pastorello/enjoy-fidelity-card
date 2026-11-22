@@ -288,9 +288,9 @@ attivo solo se cambia e seconda conferma (promozione/retrocessione); "Reinvia in
 invito" con seconda conferma solo per `invited`; per `deactivated` solo email e stato; errori nel dialogo;
 esiti nella regione live.
 **Accettazione:**
-- [ ] Componente: promozione e retrocessione con i testi della spec; reinvio e annullamento solo per `invited`;
+- [x] Componente: promozione e retrocessione con i testi della spec; reinvio e annullamento solo per `invited`;
       `not_invited`, `last_admin`, `upstream` nel dialogo; elenco ricaricato
-- [ ] Focus restituito alla riga alla chiusura; Impeccable pulito
+- [x] Focus restituito alla riga alla chiusura; Impeccable pulito
 **Verifica:** `npm test -- operators`
 **Dipendenze:** 14, 17 · **File:** src/features/operators/OperatorDialog.tsx (+ .module.css, .test.tsx),
 OperatorRow.tsx · **Dimensione:** M
