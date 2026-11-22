@@ -302,9 +302,9 @@ Ruolo ("Operatore" di default), "Invia invito" `busy`, nota; validazioni locali 
 `useLatest`); errori del punto 6 nella posizione indicata; riuscito → modulo svuotato, messaggio, elenco
 ricaricato.
 **Accettazione:**
-- [ ] Componente: ogni validazione; doppio tocco non parte; dopo `network` stesso `operation_id`, campi cambiati
+- [x] Componente: ogni validazione; doppio tocco non parte; dopo `network` stesso `operation_id`, campi cambiati
       → id nuovo; ogni errore della tabella del punto 6 (`rate_limited` compreso) senza eccezioni
-- [ ] Impeccable pulito; target ≥ 48 px
+- [x] Impeccable pulito; target ≥ 48 px
 **Verifica:** `npm test -- operators`
 **Dipendenze:** 16 · **File:** src/features/operators/InviteForm.tsx (+ .module.css, .test.tsx),
 validateInvite.ts (+ .test.ts) · **Dimensione:** M

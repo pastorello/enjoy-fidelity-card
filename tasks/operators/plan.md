@@ -150,7 +150,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 16: Elenco: stati, ordine, "(tu)" senza azioni, caricamento/errore, regione dei messaggi, `AdminsOnly`
 - [x] Task 17: "Disattiva" e "Riattiva" con conferma; `EO001` e altri errori; elenco ricaricato
 - [x] Task 18: Dialogo persona: ruolo con seconda conferma, "Reinvia invito", "Annulla invito"
-- [ ] Task 19: "Invita operatore": validazioni, `operation_id` stabile, errori del punto 6, esito
+- [x] Task 19: "Invita operatore": validazioni, `operation_id` stabile, errori del punto 6, esito
 
 ### Fase 5: Invito accettato e sessioni
 - [ ] Task 20: `/imposta-password` versione invito: frammento, testi, `error`/`error_code`, `verifyInvite`, link scaduto
