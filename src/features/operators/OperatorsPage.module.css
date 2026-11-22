@@ -1,0 +1,24 @@
+/* The Operators screen (wireframe "Operatori"); its rows are OperatorRow. */
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The region of the outcomes and the list (or its states), with no gap between them. */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The outcome of the last action, above the list; takes no room while empty. */
+.messages {
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  font-weight: 600;
+}
+
+.messages:not(:empty) {
+  padding-block: var(--space-2);
+}

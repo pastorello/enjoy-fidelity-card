@@ -1,0 +1,58 @@
+/* One person of the Operators screen (wireframe "Operatori"), with the tokens of ListRow. */
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-ink);
+}
+
+/* Deactivated and removed people are grey. */
+.item[data-away='true'] {
+  color: var(--color-ink-muted);
+}
+
+/* The initial in the circle, in Enjoy Display; decorative (the name follows). */
+.initial {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  border: 2px solid currentColor;
+  border-radius: var(--radius-full);
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.initial[data-away='true'] {
+  border: 1px dashed currentColor;
+}
+
+/* An initial Enjoy Display lacks is set in the body font (displayGlyphs.test.ts). */
+.initial[data-body-font='true'] {
+  font-family: var(--type-body-family);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.name {
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  overflow-wrap: anywhere;
+}
+
+.status {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
