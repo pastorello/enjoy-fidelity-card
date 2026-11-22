@@ -329,8 +329,8 @@ nota di `/accedi` del wireframe; l'identità si ricontrolla a ogni cambio di rot
 operatore (senza bloccare la schermata): risposta nulla → `/accedi` con "Account non abilitato…", ruolo
 cambiato → sessione aggiornata.
 **Accettazione:**
-- [ ] Componente: inoltro con frammento conservato; nota di `/accedi`
-- [ ] Componente: operatore disattivato → `/accedi` col messaggio al cambio di rotta; ruolo cambiato →
+- [x] Componente: inoltro con frammento conservato; nota di `/accedi`
+- [x] Componente: operatore disattivato → `/accedi` col messaggio al cambio di rotta; ruolo cambiato →
       Impostazioni ridotte o complete alla rotta successiva; test di `RequireAuth`/`RequireCashier` invariati
 **Verifica:** `npm test -- identity RootLayout`
 **Dipendenze:** 20 · **File:** src/app/RootLayout.tsx (+ test), src/features/identity/LoginPage.tsx (+ test),
