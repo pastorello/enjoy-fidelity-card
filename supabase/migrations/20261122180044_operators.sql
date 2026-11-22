@@ -258,3 +258,199 @@ $$;
 
 revoke execute on function app.get_session_identity(), app.list_cashiers() from public, anon;
 grant execute on function app.get_session_identity(), app.list_cashiers() to authenticated;
+
+-- Operators screen: list, role, deactivation (SPEC-operators.md points 2 and 7) ----------------
+-- One row per profile of a person (devices live in app.devices and never appear), with a
+-- status computed here. "Invite accepted" = email confirmed AND a password: verifyOtp of the
+-- invite confirms the email before the password is saved, and whoever stops between the two
+-- steps stays invited. The same rule counts the admins for EO001. Never a PIN hash or a token.
+create function private.operator_rows(p_operator_id uuid)
+returns table (
+  id uuid, name text, role text, status text, email text, has_pin boolean, is_me boolean
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select o.id, o.name, o.role,
+         case
+           when o.user_id is null then 'removed'
+           when o.deactivated_at is not null then 'deactivated'
+           when u.email_confirmed_at is not null and coalesce(u.encrypted_password, '') <> '' then 'active'
+           else 'invited'
+         end,
+         case when o.user_id is null then null else u.email end,
+         exists (select 1 from private.operator_pins p where p.operator_id = o.id),
+         (o.id = private.acting_operator_id()) is true
+  from app.operators o
+  left join auth.users u on u.id = o.user_id
+  where p_operator_id is null or o.id = p_operator_id
+  order by (o.user_id is null or o.deactivated_at is not null), lower(o.name), o.id;
+$$;
+
+revoke execute on function private.operator_rows(uuid) from public, anon, authenticated;
+
+-- list_operators: admins only (an admin account, or a device with an admin cashier).
+create function app.list_operators()
+returns table (
+  id uuid, name text, role text, status text, email text, has_pin boolean, is_me boolean
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.is_admin() then
+    raise exception 'Only an admin can list the operators' using errcode = '42501';
+  end if;
+  return query select * from private.operator_rows(null);
+end;
+$$;
+
+-- The checks shared by set_operator_role and set_operator_active, after the lock. Locks the
+-- target and every active admin, always by id, so two admins acting at the same time queue up
+-- instead of deadlocking; the checks run in a later statement, which in read committed sees
+-- what the other transaction has just committed (A demoting B while B demotes A: the second
+-- one is no admin any more and gets 42501). Order: 42501, P0002, EO002, EO003; the values are
+-- checked by the callers. Returns the target as it is now.
+create function private.lock_operator_target(p_operator_id uuid)
+returns app.operators
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_target app.operators;
+begin
+  -- Before the lock too: a caller who is no admin never waits on, nor holds, admin rows.
+  if not private.is_admin() then
+    raise exception 'Only an admin can change the operators' using errcode = '42501';
+  end if;
+
+  perform 1 from app.operators o
+  where o.id = p_operator_id or (o.role = 'admin' and o.deactivated_at is null and o.user_id is not null)
+  order by o.id
+  for update;
+
+  if not private.is_admin() then
+    raise exception 'Only an admin can change the operators' using errcode = '42501';
+  end if;
+  select * into v_target from app.operators o where o.id = p_operator_id;
+  if v_target.id is null then
+    raise exception 'Operator % not found', p_operator_id using errcode = 'P0002';
+  end if;
+  if v_target.id = private.acting_operator_id() then
+    raise exception 'Nobody can change their own account from here' using errcode = 'EO002';
+  end if;
+  if v_target.user_id is null then
+    raise exception 'Operator % has no account', p_operator_id using errcode = 'EO003';
+  end if;
+  return v_target;
+end;
+$$;
+
+revoke execute on function private.lock_operator_target(uuid) from public, anon, authenticated;
+
+-- EO001: taking the role or the access away from an admin who is not deactivated needs at
+-- least one OTHER admin, not deactivated, with an account and an accepted invite. With "no
+-- action on oneself" it fires only in races, and stays as a defence.
+create function private.assert_other_admin(p_target app.operators)
+returns void
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if p_target.role <> 'admin' or p_target.deactivated_at is not null then
+    return;
+  end if;
+  if not exists (
+    select 1 from app.operators o
+    join auth.users u on u.id = o.user_id
+    where o.id <> p_target.id and o.role = 'admin' and o.deactivated_at is null
+      and u.email_confirmed_at is not null and coalesce(u.encrypted_password, '') <> ''
+  ) then
+    raise exception 'At least one other active admin is needed' using errcode = 'EO001';
+  end if;
+end;
+$$;
+
+revoke execute on function private.assert_other_admin(app.operators) from public, anon, authenticated;
+
+-- set_operator_role: the role of another person. Never 'admin' from a device (EO005, like the
+-- invite of an admin): an admin is named from the phone. Same role -> nothing written.
+create function app.set_operator_role(p_operator_id uuid, p_role text)
+returns table (
+  id uuid, name text, role text, status text, email text, has_pin boolean, is_me boolean
+)
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_target app.operators;
+begin
+  v_target := private.lock_operator_target(p_operator_id);
+  if p_role is null or p_role not in ('admin', 'operator') then
+    raise exception 'The role must be admin or operator' using errcode = '22023';
+  end if;
+  if p_role = 'admin' and private.current_device_id() is not null then
+    raise exception 'An admin is named from the phone, not from a device' using errcode = 'EO005';
+  end if;
+
+  if v_target.role <> p_role then
+    if p_role = 'operator' then
+      perform private.assert_other_admin(v_target);
+    end if;
+    update app.operators o set role = p_role where o.id = v_target.id;
+  end if;
+  return query select * from private.operator_rows(v_target.id);
+end;
+$$;
+
+-- set_operator_active: deactivate or reactivate another person. Deactivating records who did
+-- it and, in the same transaction, closes that person's till turns on every tablet (lock
+-- order: operators, then devices; unlock_cashier locks the device and reads the operator
+-- without locking it, so there is no cycle). The PIN stays, for the reactivation. The
+-- guarantee is valid_cashier_id, which ignores a deactivated cashier on every request.
+-- Same state -> nothing written.
+create function app.set_operator_active(p_operator_id uuid, p_active boolean)
+returns table (
+  id uuid, name text, role text, status text, email text, has_pin boolean, is_me boolean
+)
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_target app.operators;
+begin
+  v_target := private.lock_operator_target(p_operator_id);
+  if p_active is null then
+    raise exception 'active must be true or false' using errcode = '22023';
+  end if;
+
+  if p_active and v_target.deactivated_at is not null then
+    update app.operators o set deactivated_at = null, deactivated_by = null where o.id = v_target.id;
+  elsif not p_active and v_target.deactivated_at is null then
+    perform private.assert_other_admin(v_target);
+    update app.operators o
+    set deactivated_at = now(), deactivated_by = private.acting_operator_id()
+    where o.id = v_target.id;
+    update app.devices d set cashier_operator_id = null, cashier_since = null
+    where d.cashier_operator_id = v_target.id;
+  end if;
+  return query select * from private.operator_rows(v_target.id);
+end;
+$$;
+
+revoke execute on function app.list_operators(), app.set_operator_role(uuid, text),
+  app.set_operator_active(uuid, boolean) from public, anon;
+grant execute on function app.list_operators(), app.set_operator_role(uuid, text),
+  app.set_operator_active(uuid, boolean) to authenticated;
