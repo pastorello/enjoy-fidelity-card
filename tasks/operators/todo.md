@@ -173,11 +173,12 @@ spec, colori di `recovery.html`, nessuna immagine esterna); `[auth.email.templat
 `scripts/reload-auth-templates.sh` aspetta anche "reloaded template type: invite". Integrazione con Mailpit.
 Passo CI: copia di `.env.example`, `functions serve` in background con attesa della risposta.
 **Accettazione:**
-- [ ] Integrazione: invito reale → una email, un profilo `invited`, metadati corretti, link con
+- [x] Integrazione: invito reale → una email, un profilo `invited`, metadati corretti, link con
       `token_hash`, `type=invite` e frammento `nome`/`da`/`ruolo`
-- [ ] Integrazione: stesso `operation_id` due volte, anche in parallelo → una sola email e un solo profilo;
+- [x] Integrazione: stesso `operation_id` due volte, anche in parallelo → una sola email e un solo profilo;
       email di un dispositivo → `email_is_device`; nome usato / email di un account → nessuna email
-- [ ] CI verde con la funzione servita
+- [ ] CI verde con la funzione servita (passo già in `ci.yml` dal Task 7; la stessa sequenza è verde in
+      locale: da confermare sulla PR)
 **Verifica:** `./scripts/reload-auth-templates.sh && npm run test:integration -- operators`; CI sulla PR
 **Dipendenze:** 7, 8 · **File:** supabase/templates/invite.html, supabase/config.toml,
 scripts/reload-auth-templates.sh, tests/integration/operators.test.ts, .github/workflows/ci.yml

@@ -133,7 +133,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 7: `index.ts`, `deno.json`, `config.toml`, `functions/.env.example`; servita in locale (anon → nessun effetto, operatore → 403)
 - [x] Task 8: Invito nel handler: begin → metadati → invito/recupero → finish → compensazione; mappa degli esiti HTTP; log
 - [x] Task 9: Reinvio e annullamento nel handler
-- [ ] Task 10: Template `invite.html`, `reload-auth-templates.sh`, integrazione reale con Mailpit (una email, idempotenza), passo CI
+- [x] Task 10: Template `invite.html`, `reload-auth-templates.sh`, integrazione reale con Mailpit (una email, idempotenza), passo CI (CI da confermare sulla PR)
 - [ ] Task 11: Integrazione reale di reinvio, token verificato senza password, annullamento e ricollegamento
 
 ### Checkpoint B: unità e integrazione della funzione verdi in locale e in CI; revisione `security-and-hardening` (chiave segreta, origine, compensazione, log)
