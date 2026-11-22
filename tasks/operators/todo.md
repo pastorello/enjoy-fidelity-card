@@ -148,11 +148,11 @@ supabase/functions/.env.example, tests/integration/operators.test.ts · **Dimens
 compensazione (`_fail`; `deleteUser` solo se utente nuovo **e** `_orphan` vero). Mappa degli esiti HTTP della
 tabella del punto 5; log solo `operation_id`, azione ed esito.
 **Accettazione:**
-- [ ] Unità: ordine begin → metadati → invito → finish; `done` → nessun invito; 429 → `rate_limited` e `_fail`;
+- [x] Unità: ordine begin → metadati → invito → finish; `done` → nessun invito; 429 → `rate_limited` e `_fail`;
       422 `email_exists` → `email_taken`; finish `name_taken` → `deleteUser` solo con utente nuovo e `_orphan`
       vero; `existing_confirmed` → `resetPasswordForEmail` con lo stesso `redirectTo`; `EO005` → 403
       `admin_from_device`; `redirectTo` mai dal corpo
-- [ ] Unità: nessuna email, token o messaggio di Auth nei log né nelle risposte
+- [x] Unità: nessuna email, token o messaggio di Auth nei log né nelle risposte
 **Verifica:** `npm test -- operator-invites`
 **Dipendenze:** 6 · **File:** supabase/functions/operator-invites/handler.ts, handler.test.ts · **Dimensione:** M
 
