@@ -4,8 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { holdOpenAs, localSupabase, memoryClient, runSql, waitForBlocked } from './localSupabase';
 
 // SPEC-operators.md, "Testing Strategy", row "Concorrenza": the races of the Operatori screen
-// on two connections. Criterion 8: two admins demoting each other never leave the bar without
-// an admin. Criterion 7: a deactivation racing unlock_cashier of the same person never
+// on two connections. Criterion 8: two admins demoting or deactivating each other never leave
+// the bar without an admin. Criterion 7: a deactivation racing unlock_cashier of the same person never
 // deadlocks and never leaves a working till turn. Point 5: two invites to the same email never
 // reach Auth together. Every account is made here and removed at the end, so the seed accounts
 // reserved to the E2E are never touched.
@@ -76,8 +76,9 @@ async function rpc(of: Account, fn: string, args: Record<string, unknown>): Prom
 
 const demote = (by: Account, target: Account) =>
   rpc(by, 'set_operator_role', { p_operator_id: target.id, p_role: 'operator' });
-const deactivate = (target: Account) =>
-  rpc(adminC, 'set_operator_active', { p_operator_id: target.id, p_active: false });
+const deactivateBy = (by: Account, target: Account) =>
+  rpc(by, 'set_operator_active', { p_operator_id: target.id, p_active: false });
+const deactivate = (target: Account) => deactivateBy(adminC, target);
 const unlock = () => rpc(device, 'unlock_cashier', { p_operator_id: cashier.id, p_pin: PIN });
 
 function statusOf(outcome: Outcome): string {
@@ -95,13 +96,16 @@ async function rounds(round: (index: number) => Promise<void>, index = 0): Promi
   await rounds(round, index + 1);
 }
 
-/** Admins with an account, not deactivated, who accepted their invite (the rule of EO001). */
-function activeAdmins(): number {
+/**
+ * How many of A and B are still active admins. Only the two racing: adminC and the seed admins
+ * would keep any count of the whole bar at one or more whatever the race did.
+ */
+function activeAdminsOfAB(): number {
   return Number(
     runSql(
-      `select count(*) from app.operators o join auth.users u on u.id = o.user_id
-       where o.role = 'admin' and o.deactivated_at is null
-         and u.email_confirmed_at is not null and coalesce(u.encrypted_password, '') <> '';`,
+      `select count(*) from app.operators
+       where id in (:'a'::uuid, :'b'::uuid) and role = 'admin' and deactivated_at is null;`,
+      { a: adminA.id, b: adminB.id },
     ),
   );
 }
@@ -110,11 +114,22 @@ function roleOf(of: Account): string {
   return runSql(`select role from app.operators where id = :'id'::uuid;`, { id: of.id });
 }
 
+/** 'admin' / 'operator', with ' off' when deactivated. */
+function stateOf(of: Account): string {
+  return runSql(
+    `select role || case when deactivated_at is null then '' else ' off' end
+     from app.operators where id = :'id'::uuid;`,
+    { id: of.id },
+  );
+}
+
+/** A and B active admins again. */
 function restoreAdmins(): void {
-  runSql(`update app.operators set role = 'admin' where id in (:'a'::uuid, :'b'::uuid);`, {
-    a: adminA.id,
-    b: adminB.id,
-  });
+  runSql(
+    `update app.operators set role = 'admin', deactivated_at = null, deactivated_by = null
+     where id in (:'a'::uuid, :'b'::uuid);`,
+    { a: adminA.id, b: adminB.id },
+  );
 }
 
 /** The cashier active again and the tablet without a turn nor a lock. */
@@ -156,12 +171,21 @@ async function expectTabletGivesNothing(): Promise<void> {
   expect(reads.filter((line) => !/: (0|refused)$/.test(line))).toEqual([]);
 }
 
-/** What a round left: the answers, the roles of A and B, whether an admin is left. */
+/** What a round left: the answers, the roles of A and B, whether one of them is still an admin. */
 function demotionRace(outcomes: Outcome[]) {
   return {
     codes: outcomes.map((outcome) => outcome.code).toSorted(),
     roles: [roleOf(adminA), roleOf(adminB)].toSorted(),
-    adminLeft: activeAdmins() >= 1,
+    adminLeft: activeAdminsOfAB() >= 1,
+  };
+}
+
+/** The same for races that deactivate: the state (role, deactivated) of A and B. */
+function accessRace(outcomes: Outcome[]) {
+  return {
+    codes: outcomes.map((outcome) => outcome.code).toSorted(),
+    states: [stateOf(adminA), stateOf(adminB)].toSorted(),
+    adminLeft: activeAdminsOfAB() >= 1,
   };
 }
 
@@ -228,8 +252,7 @@ afterAll(async () => {
 });
 
 describe('A demotes B while B demotes A (criterion 8)', () => {
-  /** Exactly one demotion went through, the other was refused with 42501; one admin is left. */
-  /** One demotion went through, the other was refused with 42501; an admin is left. */
+  /** One demotion went through, the other was refused with 42501; A or B is still an admin. */
   const ONE_DEMOTION = { codes: ['42501', 'ok'], roles: ['admin', 'operator'], adminLeft: true };
 
   it(`at once, ${ROUNDS} rounds: one wins, the other is no admin any more`, async () => {
@@ -253,6 +276,61 @@ describe('A demotes B while B demotes A (criterion 8)', () => {
     await waitForBlocked(2);
     await released;
     expect(demotionRace(await calls)).toEqual(ONE_DEMOTION);
+  });
+
+  afterAll(restoreAdmins);
+});
+
+describe('A deactivates B while B deactivates A (criterion 8)', () => {
+  /** One deactivation went through, the other was refused with 42501; A or B is still an admin. */
+  const ONE_DEACTIVATION = {
+    codes: ['42501', 'ok'],
+    states: ['admin', 'admin off'],
+    adminLeft: true,
+  };
+
+  it(`at once, ${ROUNDS} rounds: one wins, the other has no access any more`, async () => {
+    const races: ReturnType<typeof accessRace>[] = [];
+    await rounds(async () => {
+      restoreAdmins();
+      races.push(
+        accessRace(await Promise.all([deactivateBy(adminA, adminB), deactivateBy(adminB, adminA)])),
+      );
+    });
+    expect(races).toEqual(Array.from({ length: ROUNDS }, () => ONE_DEACTIVATION));
+  });
+
+  it('both queued behind a lock on A: the second one sees the first and gets 42501', async () => {
+    restoreAdmins();
+    const { released } = await holdOpenAs(
+      adminC.userId,
+      `select 1 from app.operators where id = :'id'::uuid for update`,
+      { id: adminA.id },
+      HOLD_SECONDS,
+    );
+    const calls = Promise.all([deactivateBy(adminA, adminB), deactivateBy(adminB, adminA)]);
+    await waitForBlocked(2);
+    await released;
+    expect(accessRace(await calls)).toEqual(ONE_DEACTIVATION);
+  });
+
+  it(`A demotes B while B deactivates A, ${ROUNDS} rounds: one wins, A or B stays an admin`, async () => {
+    const races: ReturnType<typeof accessRace>[] = [];
+    await rounds(async () => {
+      restoreAdmins();
+      races.push(
+        accessRace(await Promise.all([demote(adminA, adminB), deactivateBy(adminB, adminA)])),
+      );
+    });
+    // A won: B is an operator, A an admin. B won: A is deactivated, B an admin.
+    for (const race of races) {
+      expect(race.codes).toEqual(['42501', 'ok']);
+      expect([
+        ['admin', 'operator'],
+        ['admin', 'admin off'],
+      ]).toContainEqual(race.states);
+      expect(race.adminLeft).toBe(true);
+    }
   });
 
   afterAll(restoreAdmins);
