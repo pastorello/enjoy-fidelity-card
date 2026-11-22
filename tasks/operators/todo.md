@@ -373,9 +373,9 @@ OperatorsPage.tablet.test.tsx, InviteForm.tsx, OperatorDialog.tsx · **Dimension
 **Descrizione:** `e2e/tablet-operators.spec.ts` (progetto `tablet`, 1280×800) col dispositivo riservato
 `cassa-operatori@example.com` e il cassiere `admin-operatori@example.com`.
 **Accettazione:**
-- [ ] Elenco e colonna da 480 px, "(tu)" sul cassiere, stati con PIN, nessuno scorrimento orizzontale, target
+- [x] Elenco e colonna da 480 px, "(tu)" sul cassiere, stati con PIN, nessuno scorrimento orizzontale, target
       ≥ 48 px, radio "Amministratore" disabilitato (criterio 10)
-- [ ] Un cassiere disattivato dal telefono torna su `/cassa` con "Turno scaduto…" e non compare più in "Chi è
+- [x] Un cassiere disattivato dal telefono torna su `/cassa` con "Turno scaduto…" e non compare più in "Chi è
       alla cassa?"; poi riattivato (criterio 7)
 **Verifica:** `npm run e2e -- tablet-operators`
 **Dipendenze:** 22, 23 · **File:** e2e/tablet-operators.spec.ts, e2e/tablet.ts · **Dimensione:** S

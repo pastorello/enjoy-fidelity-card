@@ -161,7 +161,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 6: Tablet 1280×800
 - [x] Task 23: Layout tablet: colonna "Invita operatore" 480 px, stati con PIN, radio "Amministratore" disabilitato con le note, sottotitolo della riga
-- [ ] Task 24: E2E tablet (`cassa-operatori@example.com`): colonne, nessuno scorrimento, target ≥ 48 px, "(tu)" sul cassiere, cassiere disattivato → `/cassa`
+- [x] Task 24: E2E tablet (`cassa-operatori@example.com`): colonne, nessuno scorrimento, target ≥ 48 px, "(tu)" sul cassiere, cassiere disattivato → `/cassa`
 
 ### Checkpoint E: Impeccable pulito sul layout tablet; confronto con "Tablet: operatori"; E2E `phone` invariati
 
