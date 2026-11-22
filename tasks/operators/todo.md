@@ -247,8 +247,8 @@ src/shared/ui/ConfirmDialog.tsx, src/app/dev/UiGallery.tsx · **Dimensione:** M
 `RewardsSettingsSection` come primo `<li>` (commento "riga Operatori rinviata" aggiornato); rotta
 `/impostazioni/operatori` con `OperatorsPage` minima (`AppShell` "Operatori", Indietro → `/impostazioni`).
 **Accettazione:**
-- [ ] Test di rewards invariati; test di `AdminsOnly` condiviso
-- [ ] Componente: la riga è prima di "Catalogo premi", solo per gli admin; tocco → `/impostazioni/operatori`
+- [x] Test di rewards invariati; test di `AdminsOnly` condiviso
+- [x] Componente: la riga è prima di "Catalogo premi", solo per gli admin; tocco → `/impostazioni/operatori`
 **Verifica:** `npm test`
 **Dipendenze:** 13 · **File:** src/shared/ui/AdminsOnly.tsx (+ test), src/features/rewards/RewardsCatalogPage.tsx,
 src/features/operators/OperatorsSettingsRow.tsx, src/features/rewards/RewardsSettingsSection.tsx (+ test),
