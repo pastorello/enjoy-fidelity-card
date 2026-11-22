@@ -1,8 +1,9 @@
 -- No function in app or private may be executable by anon or PUBLIC, today or
 -- when created later: callers must be signed in, and every grant is explicit.
+-- The steps of the Edge Function that run with the secret key are service_role only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(4);
+select plan(6);
 
 create function app.privilege_probe() returns int language sql as $$ select 1 $$;
 create function private.privilege_probe() returns int language sql as $$ select 1 $$;
@@ -38,6 +39,26 @@ select ok(
 select ok(
   not has_function_privilege('authenticated', 'private.privilege_probe()', 'execute'),
   'a new function in private needs an explicit grant'
+);
+select is(
+  array(
+    select f from unnest(array[
+      'app.operator_invite_finish(uuid, uuid)',
+      'app.operator_invite_fail(uuid)',
+      'app.operator_invite_orphan(uuid, uuid)']) f
+    where has_function_privilege('authenticated', f, 'execute')),
+  array[]::text[],
+  'authenticated cannot execute the service_role steps of operator-invites'
+);
+select is(
+  array(
+    select f from unnest(array[
+      'app.operator_invite_finish(uuid, uuid)',
+      'app.operator_invite_fail(uuid)',
+      'app.operator_invite_orphan(uuid, uuid)']) f
+    where not has_function_privilege('service_role', f, 'execute')),
+  array[]::text[],
+  'service_role can execute the steps of operator-invites that need the secret key'
 );
 
 select * from finish();

@@ -4,7 +4,7 @@
 -- one, every check and every author column follows the cashier. Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(67);
+select plan(71);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -92,7 +92,8 @@ select set_config('test.hidden', pg_temp.expected_hidden()::text, true);
 
 -- Every function of app, classified. A new one fails the last test until it is
 -- placed here: read and write RPCs must refuse a device without a cashier; the
--- kiosk RPCs (tasks 4 and 5) answer devices by design and have their own tests.
+-- kiosk RPCs (tasks 4 and 5) answer devices by design and have their own tests; the
+-- service steps of operator-invites run only with the secret key (operators_invites.test.sql).
 create temp table rpc_calls (name text primary key, kind text, call text, errcode text, message text);
 insert into rpc_calls values
   ('search_customers', 'read', $$select * from app.search_customers('Cliente')$$, 'P0001', 'not_operator'),
@@ -155,6 +156,20 @@ insert into rpc_calls values
   ('set_operator_active', 'write',
    $$select * from app.set_operator_active('00000000-0000-4000-0000-0000000000ff', false)$$,
    '42501', 'Only an admin can change the operators'),
+  ('operator_invite_begin', 'write',
+   $$select app.operator_invite_begin(gen_random_uuid(), 'Nuovo Cassa', 'nuovo.cassa@example.com',
+     'operator')$$,
+   '42501', 'Only an admin can invite'),
+  -- The steps of operator-invites that need the secret key: never executable by a session.
+  ('operator_invite_finish', 'service',
+   $$select app.operator_invite_finish(gen_random_uuid(), gen_random_uuid())$$,
+   '42501', 'permission denied for function operator_invite_finish'),
+  ('operator_invite_fail', 'service',
+   $$select app.operator_invite_fail(gen_random_uuid())$$,
+   '42501', 'permission denied for function operator_invite_fail'),
+  ('operator_invite_orphan', 'service',
+   $$select app.operator_invite_orphan(gen_random_uuid(), gen_random_uuid())$$,
+   '42501', 'permission denied for function operator_invite_orphan'),
   ('update_settings', 'write',
    $$select app.update_settings(100, 15000, null)$$, '42501', 'Only an admin can change the settings');
 grant select on rpc_calls to authenticated;
