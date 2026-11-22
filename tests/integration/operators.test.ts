@@ -375,3 +375,158 @@ describe('operator-invites served locally: the real invite email (Mailpit)', () 
     expect(await messagesTo(operator.email, since)).toEqual([]);
   });
 });
+
+/** The token_hash and type of the "Scegli la password" link of an email. */
+function linkToken(html: string): { tokenHash: string; type: string | null } {
+  const link = new URL(linkHref(html, 'Scegli la password'));
+  expect(`${link.origin}${link.pathname}`).toBe(`${ORIGIN}/imposta-password`);
+  const tokenHash = link.searchParams.get('token_hash');
+  if (!tokenHash) throw new Error('no token_hash in the link');
+  return { tokenHash, type: link.searchParams.get('type') };
+}
+
+/** Invites `body` as the admin and returns the new operator id and the token of its email. */
+async function invited(
+  body: ReturnType<typeof inviteBody>,
+): Promise<{ id: string; tokenHash: string }> {
+  const since = new Date();
+  const answer = await call(body, `Bearer ${tokenOf(admin)}`);
+  expect(answer.status).toBe(200);
+  const { body: answered } = answer;
+  const profile =
+    typeof answered === 'object' && answered !== null && 'operator' in answered
+      ? answered.operator
+      : null;
+  const id = typeof profile === 'object' && profile !== null && 'id' in profile ? profile.id : null;
+  if (typeof id !== 'string') throw new Error('no operator id in the answer');
+  const messages = await settledMessagesTo(body.email, since);
+  expect(messages).toHaveLength(1);
+  const [message] = messages;
+  if (!message) throw new Error('no email');
+  const { tokenHash, type } = linkToken(message.html);
+  expect(type).toBe('invite');
+  return { id, tokenHash };
+}
+
+/** Status of the profile `id` by the rule of SPEC-operators point 2. */
+function statusOf(id: string): string {
+  return runSql(`select status from private.operator_rows(:'id'::uuid);`, { id });
+}
+
+describe('operator-invites served locally: resend and cancel for real (Mailpit)', () => {
+  it('a resend: a new invite email, the old token answers otp_expired, the new one works', async () => {
+    const body = inviteBody('reinvio');
+    const first = await invited(body);
+
+    const since = new Date();
+    const answer = await call(
+      { action: 'resend', operator_id: first.id },
+      `Bearer ${tokenOf(admin)}`,
+    );
+    expect(answer).toEqual({ status: 200, body: { status: 'resent' } });
+    const messages = await settledMessagesTo(body.email, since);
+    expect(messages).toHaveLength(1);
+    const [message] = messages;
+    if (!message) throw new Error('no email');
+    expect(message.subject).toBe('Enjoy Card: il tuo invito');
+    const second = linkToken(message.html);
+    expect(second.type).toBe('invite');
+    expect(second.tokenHash).not.toBe(first.tokenHash);
+
+    const old = await memoryClient(local.url, local.publishableKey).auth.verifyOtp({
+      type: 'invite',
+      token_hash: first.tokenHash,
+    });
+    expect(old.error?.code).toBe('otp_expired');
+
+    expect(statusOf(first.id)).toBe('invited');
+    const invitee = memoryClient(local.url, local.publishableKey);
+    const fresh = await invitee.auth.verifyOtp({ type: 'invite', token_hash: second.tokenHash });
+    expect(fresh.error).toBeNull();
+    expect(fresh.data.user?.email).toBe(body.email);
+  });
+
+  // Task 11 asks for "verified without saving the password → still invited, the resend sends a
+  // working link". Not possible with the status rule of point 2 ("email confirmed and a
+  // password"): GoTrue (signupVerify) gives every invited user without a password a random
+  // temporary one when the invite token is verified, in the same transaction that confirms the
+  // email, so that row reads exactly like an accepted invite. This test pins what really happens
+  // until a decision changes the rule; the criterion stays open in tasks/operators/todo.md.
+  it('a token verified without saving the password: Auth sets a temporary password, the rule reads active, no resend', async () => {
+    const body = inviteBody('senza-password');
+    const first = await invited(body);
+    expect(statusOf(first.id)).toBe('invited');
+
+    // The person opens the link and leaves before saving a password.
+    const opened = await memoryClient(local.url, local.publishableKey).auth.verifyOtp({
+      type: 'invite',
+      token_hash: first.tokenHash,
+    });
+    expect(opened.error).toBeNull();
+    expect(
+      runSql(
+        `select (email_confirmed_at is not null)::text || ',' ||
+                (coalesce(encrypted_password, '') <> '')::text
+         from auth.users where lower(email) = lower(:'email');`,
+        { email: body.email },
+      ),
+    ).toBe('true,true');
+    expect(statusOf(first.id)).toBe('active');
+
+    const since = new Date();
+    const answer = await call(
+      { action: 'resend', operator_id: first.id },
+      `Bearer ${tokenOf(admin)}`,
+    );
+    expect(answer).toEqual({ status: 409, body: { error: 'not_invited' } });
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect(await messagesTo(body.email, since)).toEqual([]);
+  });
+
+  it('a cancel: the link already sent stops working, the profile is removed, a new invite relinks it', async () => {
+    const body = inviteBody('annullato');
+    const first = await invited(body);
+    const movementsBefore = runSql(`select count(*) from app.movements;`);
+
+    const answer = await call(
+      { action: 'cancel', operator_id: first.id },
+      `Bearer ${tokenOf(admin)}`,
+    );
+    expect(answer).toEqual({ status: 200, body: { status: 'cancelled' } });
+    expect(statusOf(first.id)).toBe('removed');
+    expect(
+      runSql(`select count(*) from auth.users where lower(email) = lower(:'email');`, {
+        email: body.email,
+      }),
+    ).toBe('0');
+
+    const stale = await memoryClient(local.url, local.publishableKey).auth.verifyOtp({
+      type: 'invite',
+      token_hash: first.tokenHash,
+    });
+    expect(stale.error).not.toBeNull();
+    expect(stale.data.user).toBeNull();
+
+    // A second cancel finds nobody to cancel.
+    const again = await call(
+      { action: 'cancel', operator_id: first.id },
+      `Bearer ${tokenOf(admin)}`,
+    );
+    expect(again).toEqual({ status: 409, body: { error: 'not_invited' } });
+
+    // The right email with the same name relinks the removed profile: same id, invited again.
+    const right = { ...inviteBody('annullato-giusta'), name: body.name };
+    const relinked = await invited(right);
+    expect(relinked.id).toBe(first.id);
+    expect(statusOf(first.id)).toBe('invited');
+    expect(profilesNamed(body.name)).toHaveLength(1);
+    expect(
+      runSql(
+        `select lower(u.email) from app.operators o join auth.users u on u.id = o.user_id
+         where o.id = :'id'::uuid;`,
+        { id: first.id },
+      ),
+    ).toBe(right.email.toLowerCase());
+    expect(runSql(`select count(*) from app.movements;`)).toBe(movementsBefore);
+  });
+});
