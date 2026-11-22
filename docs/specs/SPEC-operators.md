@@ -64,17 +64,24 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
 
      | Stato | Quando | Testo sotto il nome |
      |---|---|---|
-     | `active` | account collegato, non disattivato, invito accettato (email confermata **e** password impostata) | "Amministratore · attivo" |
-     | `invited` | account collegato, non disattivato, invito non completato: `email_confirmed_at` nullo **oppure** `encrypted_password` nullo o vuoto | "Operatore · invito inviato" |
+     | `active` | account collegato, non disattivato, invito accettato (email confermata **e** password impostata **e** `invite_accepted_at`: la password l'ha scelta la persona) | "Amministratore · attivo" |
+     | `invited` | account collegato, non disattivato, invito non completato: `email_confirmed_at` nullo **oppure** `encrypted_password` nullo o vuoto **oppure** `invite_accepted_at` nullo | "Operatore · invito inviato" |
      | `deactivated` | `deactivated_at` impostato | "Operatore · disattivato, movimenti nello storico" |
      | `removed` | utente di Auth cancellato dal pannello (`user_id` nullo, regola V1) | come `deactivated` |
 
      Perché anche la password: `verifyOtp({ type: 'invite' })` (punto 4, passo a) imposta già
      `email_confirmed_at`, prima che `updateUser({ password })` (passo b) salvi la password. Chi chiude la
      pagina tra i due passi (salvataggio fallito, `abandonRecovery` all'uscita) ha l'email confermata e nessuna
-     password: resta `invited` e gli si può rimandare l'invito. La stessa regola vale ovunque serva "invito
-     accettato": `list_operators`, `operator_resend_begin`, `operator_invite_begin` e il conteggio degli
-     amministratori della regola `EO001` (punto 7).
+     password scelta da lei: resta `invited` e gli si può rimandare l'invito. In realtà GoTrue, alla verifica
+     del token d'invito di un utente senza password, gli dà una **password temporanea casuale** (prima di
+     confermare l'email, nella stessa transazione): email confermata e password non bastano, quindi conta
+     `app.operators.invite_accepted_at` (Open Questions 12), impostato da un trigger su `auth.users` quando la
+     password cambia su un utente con l'email **già** confermata (`updateUser` dopo il link d'invito o di
+     recupero). Vale anche per l'utente creato dalla dashboard con una password (punto 5, passo 2: la funzione
+     la sostituisce con una casuale prima che il profilo esista): resta `invited` finché non sceglie la sua.
+     La stessa regola vale ovunque serva "invito accettato": `list_operators`, `operator_resend_begin`,
+     `operator_cancel_begin`, `operator_cancel_check` e il conteggio degli amministratori della regola `EO001`
+     (punto 7).
 
      Nel layout tablet si aggiunge " · PIN impostato" / " · PIN da impostare" per `active` e `invited`
      (wireframe "Tablet: operatori").
@@ -359,7 +366,8 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
         disattivato si riattiva anche dal tablet;
      3. regola dell'ultimo amministratore: se l'operazione toglie a un amministratore attivo il ruolo o
         l'accesso, deve restare almeno un **altro** amministratore attivo con l'invito accettato secondo la
-        regola del punto 2 (`email_confirmed_at` non nullo **e** password impostata), altrimenti `EO001`. Con "nessuna azione su sé stessi" scatta solo
+        regola del punto 2 (`email_confirmed_at` non nullo **e** password impostata **e** `invite_accepted_at`),
+        altrimenti `EO001`. Con "nessuna azione su sé stessi" scatta solo
         nelle corse (A retrocede B mentre B retrocede A: la seconda transazione aspetta il blocco, poi non è
         più amministratore e riceve `42501`), ma resta come difesa;
      4. scrittura; stesso valore di prima → nessuna modifica, risposta uguale (idempotente). Restituiscono il
@@ -510,7 +518,10 @@ create unique index on private.operator_invites (lower(name)) where status = 'pe
 
 ### Note di deploy (per l'orchestratore; prima staging, poi produzione)
 
-1. Migrazione: `npx supabase db push` sullo staging (progetto collegato), poi sulla produzione.
+1. Migrazione: `npx supabase db push` sullo staging (progetto collegato), poi sulla produzione. Una
+   migrazione (`*_operators_invite_accepted.sql`) crea il trigger `operators_mark_invite_accepted` su
+   `auth.users` (Open Questions 12): dopo il push, controllare che esista (`select tgname from pg_trigger
+   where tgrelid = 'auth.users'::regclass`) e che un invito accettato sullo staging risulti "attivo".
 2. Template: Authentication → Emails → Templates → **Invite user**: oggetto e corpo di
    `supabase/templates/invite.html` (controllare che il pulsante contenga `?token_hash={{ .TokenHash }}&type=invite`
    e non `{{ .ConfirmationURL }}`). Mai `supabase config push`.
@@ -704,3 +715,14 @@ Ognuna ha un default già adottato; serve il titolare solo dove indicato.
     reinvii e annullamenti. Rischio residuo da conoscere: un invito come **operatore** con la propria email dà comunque
     accesso da remoto da operatore. Alternative: chiedere di nuovo il PIN dentro la RPC (stesso contatore di
     blocco di `unlock_cashier`), oppure nessun invito dal tablet. **Da chiedere al titolare.**
+12. **Quando un invito è accettato** (emerso dai test sullo stack reale: GoTrue dà una password temporanea
+    casuale a chi verifica il token d'invito, quindi "email confermata e password" del punto 2 leggeva
+    `active` chi aveva solo aperto il link, e chi aveva un utente creato dalla dashboard con una password).
+    Default: colonna `app.operators.invite_accepted_at`, impostata da un trigger su `auth.users` al primo
+    cambio di password con l'email già confermata (la password scelta dalla persona); `operator_invite_finish`
+    collega con `null`, `add_operator` (account fatti a mano, V1) la imposta se l'utente ha già email
+    confermata e password; i profili esistenti la ricevono dalla migrazione. Effetti: chi ha solo aperto il
+    link resta "invito inviato", "Reinvia invito" gli manda il link di recupero e "Annulla invito" resta
+    possibile; non conta per `EO001`. Una password impostata da un amministratore dalla dashboard su un
+    invitato conta come accettazione. Alternativa: una RPC chiamata dall'app dopo `updatePassword` (dipende
+    dal client; se fallisce dopo il salvataggio la persona resta `invited`).

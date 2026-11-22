@@ -6,7 +6,7 @@
 -- Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(136);
+select plan(148);
 
 -- Reservations left on the local stack by the integration tests and the E2E (real invites): this
 -- file counts the rows it makes, so it starts from none. Rolled back with everything else.
@@ -707,10 +707,20 @@ select is(
   app.operator_cancel_check(pg_temp.op('Lia'), '00000000-0000-4000-d700-000000000043', pg_temp.op('Fabio')),
   false, 'cancel_check: the requester was deactivated -> false');
 reset role;
--- Meanwhile Lia accepted the invite (email confirmed and a password).
+-- Meanwhile Lia opened the link: as GoTrue does (signupVerify), a temporary password first, then
+-- the email confirmed. She has not chosen a password yet: still invited.
 update auth.users
-set email_confirmed_at = now(),
-    encrypted_password = extensions.crypt('password-di-prova', extensions.gen_salt('bf', 4))
+set encrypted_password = extensions.crypt('temporanea-di-auth', extensions.gen_salt('bf', 4))
+where id = '00000000-0000-4000-d700-000000000043';
+update auth.users set email_confirmed_at = now() where id = '00000000-0000-4000-d700-000000000043';
+set local role service_role;
+select is(
+  app.operator_cancel_check(pg_temp.op('Lia'), '00000000-0000-4000-d700-000000000043', pg_temp.op('Anna')),
+  true, 'cancel_check: the token verified, no password saved -> still invited, true');
+reset role;
+-- Then she saved her password (updateUser): the invite is accepted.
+update auth.users
+set encrypted_password = extensions.crypt('password-di-prova', extensions.gen_salt('bf', 4))
 where id = '00000000-0000-4000-d700-000000000043';
 set local role service_role;
 select is(
@@ -726,6 +736,75 @@ reset role;
 select is((select count(*)::int from app.operators where name like '% Inviti' and id in
   (pg_temp.op('Gino'), pg_temp.op('Ivo'), pg_temp.op('Lia'), pg_temp.op('Mara'))), 4,
   'resend and cancel never delete a profile');
+
+-- Invite accepted = a password the person saved (SPEC-operators point 2, Open Questions 12) -------
+-- Pia: an Auth user made in the dashboard, confirmed with a password, never linked (point 5, step 2).
+insert into auth.users (id, email, email_confirmed_at, encrypted_password) values
+  ('00000000-0000-4000-d700-000000000051', 'inv.pia@example.com', now(),
+   extensions.crypt('scelta-dalla-dashboard', extensions.gen_salt('bf', 4)));
+select pg_temp.as_user('00000000-0000-4000-d700-000000000001');
+set local role authenticated;
+select is(
+  pg_temp.begin_invite(51, 'Pia Inviti', 'inv.pia@example.com', 'admin') - 'existing_user_id' - 'invited_by_name',
+  '{"status": "proceed", "existing_confirmed": true, "existing_has_password": true}'::jsonb,
+  'begin: a confirmed user with a password -> proceed, existing_confirmed and existing_has_password');
+reset role;
+-- The function replaces the password with a random one and sends a recovery link; then finish.
+update auth.users
+set encrypted_password = extensions.crypt('casuale-della-funzione', extensions.gen_salt('bf', 4))
+where id = '00000000-0000-4000-d700-000000000051';
+set local role service_role;
+select is(
+  app.operator_invite_finish(pg_temp.opid(51), '00000000-0000-4000-d700-000000000051')->>'status',
+  'done', 'finish links the confirmed user');
+reset role;
+select is((select status from private.operator_rows(pg_temp.op('Pia'))), 'invited',
+  'confirmed with a password nobody knows: invited, not active');
+select pg_temp.as_user('00000000-0000-4000-d700-000000000001');
+set local role authenticated;
+select is(app.operator_resend_begin(pg_temp.op('Pia'))->>'email_confirmed', 'true',
+  'resend_begin accepts her, with email_confirmed (a recovery link)');
+select is(app.operator_cancel_begin(pg_temp.op('Pia'))->>'user_id', '00000000-0000-4000-d700-000000000051',
+  'cancel_begin accepts her');
+reset role;
+set local role service_role;
+select is(
+  app.operator_cancel_check(pg_temp.op('Pia'), '00000000-0000-4000-d700-000000000051', pg_temp.op('Anna')),
+  true, 'cancel_check: still invited -> true');
+reset role;
+
+-- Quinto: a new invitee who opens the link and leaves before saving a password.
+select pg_temp.new_user(52, 'inv.quinto@example.com');
+select pg_temp.as_user('00000000-0000-4000-d700-000000000001');
+set local role authenticated;
+select is(pg_temp.begin_invite(52, 'Quinto Inviti', 'inv.quinto@example.com', 'operator')->>'status',
+  'proceed', 'begin: Quinto -> proceed');
+reset role;
+set local role service_role;
+select is(
+  app.operator_invite_finish(pg_temp.opid(52), '00000000-0000-4000-d700-000000000052')->>'status',
+  'done', 'finish creates Quinto');
+reset role;
+-- GoTrue verifies the token (signupVerify): a temporary password, then the email confirmed.
+update auth.users
+set encrypted_password = extensions.crypt('temporanea-di-auth', extensions.gen_salt('bf', 4))
+where id = '00000000-0000-4000-d700-000000000052';
+update auth.users set email_confirmed_at = now() where id = '00000000-0000-4000-d700-000000000052';
+select is((select status from private.operator_rows(pg_temp.op('Quinto'))), 'invited',
+  'the token verified, the password not saved: invited');
+-- He comes back with a new link and saves his password (updateUser).
+update auth.users
+set encrypted_password = extensions.crypt('scelta-da-quinto', extensions.gen_salt('bf', 4))
+where id = '00000000-0000-4000-d700-000000000052';
+select is((select status from private.operator_rows(pg_temp.op('Quinto'))), 'active',
+  'the password saved: active');
+
+-- EO001: Pia does not count as another admin. Only Anna and Pia are admins for this check.
+update app.operators set role = 'operator'
+where role = 'admin' and id not in (pg_temp.op('Anna'), pg_temp.op('Pia'));
+select throws_ok(
+  $$select private.assert_other_admin(o) from app.operators o where o.id = pg_temp.op('Anna')$$,
+  'EO001', null, 'an invited admin with a password nobody knows does not count for EO001');
 
 select * from finish();
 rollback;

@@ -188,11 +188,9 @@ scripts/reload-auth-templates.sh, tests/integration/operators.test.ts, .github/w
 **Descrizione:** integrazione contro lo stack locale e Mailpit per reinvio e annullamento.
 **Accettazione:**
 - [x] Reinvio → il token vecchio risponde `otp_expired`, il nuovo funziona
-- [ ] Token verificato senza salvare la password → la persona resta `invited`, il reinvio le manda un link che
-      funziona
-      (aperto, da decidere: GoTrue dà una password temporanea casuale a chi verifica il token d'invito senza
-      password, quindi la regola "email confermata e password" del punto 2 la legge `active` e il reinvio
-      risponde 409 `not_invited`; il test di `operators.test.ts` fissa questo comportamento reale)
+- [x] Token verificato senza salvare la password → la persona resta `invited`, il reinvio le manda un link che
+      funziona (GoTrue dà una password temporanea casuale alla verifica: l'invito conta come accettato solo
+      con `invite_accepted_at`, impostato quando la persona sceglie la password; SPEC Open Questions 12)
 - [x] Annullamento → il link già spedito non funziona, profilo `removed`; un nuovo invito con lo stesso nome lo
       ricollega
 **Verifica:** `npm run test:integration -- operators`

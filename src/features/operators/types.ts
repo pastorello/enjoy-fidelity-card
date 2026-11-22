@@ -8,7 +8,7 @@ export type { OperatorBrief };
 
 /**
  * The state of a profile, computed by `app.list_operators` (SPEC-operators point 2): `invited` until
- * the email is confirmed AND a password is set; `removed` when the Auth user was deleted.
+ * the person chooses their own password (Open Questions 12); `removed` when the Auth user was deleted.
  */
 export type OperatorStatus = 'active' | 'invited' | 'deactivated' | 'removed';
 
