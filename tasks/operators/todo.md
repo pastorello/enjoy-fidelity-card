@@ -362,9 +362,9 @@ disabilitato con "Un amministratore si invita dal telefono." nel modulo e "Un am
 telefono." nel dialogo per chi è operatore; nota del modulo con il PIN; sottotitolo della riga "Account, ruoli,
 inviti e PIN".
 **Accettazione:**
-- [ ] Componente (layout simulato): colonna, stati con PIN, radio disabilitato con le note, sottotitolo;
+- [x] Componente (layout simulato): colonna, stati con PIN, radio disabilitato con le note, sottotitolo;
       `admin_from_device` col testo del punto 6
-- [ ] Layout del telefono invariato
+- [x] Layout del telefono invariato
 **Verifica:** `npm test -- operators`
 **Dipendenze:** 18, 19 · **File:** src/features/operators/OperatorsPage.tsx (+ .module.css),
 OperatorsPage.tablet.test.tsx, InviteForm.tsx, OperatorDialog.tsx · **Dimensione:** M
