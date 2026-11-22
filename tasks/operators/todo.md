@@ -210,9 +210,9 @@ ruolo, attivazione, reinvio, annullamento come unioni discriminate); `supabaseOp
 `functions.invoke('operator-invites')`, `serverFaultFor` per primo, mappa codici → risultati: `EO001`–`EO005`,
 `42501`, rete, `upstream`). Guardia `scripts/operatorsBoundary.test.ts`.
 **Accettazione:**
-- [ ] Test del servizio con client finto: ogni codice e ogni esito HTTP della spec mappato; rete →
+- [x] Test del servizio con client finto: ogni codice e ogni esito HTTP della spec mappato; rete →
       `network`
-- [ ] Guardia: solo questo file nomina le RPC e la funzione; niente `getSupabase()` nelle pagine, `console.*`,
+- [x] Guardia: solo questo file nomina le RPC e la funzione; niente `getSupabase()` nelle pagine, `console.*`,
       `localStorage`/`sessionStorage`, email in URL; `src/` non nomina `service_role`, `SUPABASE_SECRET_KEYS`,
       `auth.admin`
 **Verifica:** `npm test -- operators`

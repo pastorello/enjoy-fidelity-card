@@ -139,7 +139,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: unità e integrazione della funzione verdi in locale e in CI; revisione `security-and-hardening` (chiave segreta, origine, compensazione, log)
 
 ### Fase 3: Servizio e componenti condivisi
-- [ ] Task 12: `OperatorsService`, `supabaseOperatorsService`, guardia del confine
+- [x] Task 12: `OperatorsService`, `supabaseOperatorsService`, guardia del confine
 - [ ] Task 13: `fakeOperatorsService`, `OperatorsServiceProvider`, `main.tsx` e `renderApp`
 - [ ] Task 14: `Dialog` (guscio) estratto da `ConfirmDialog`, test invariati, `/dev/ui`
 - [ ] Task 15: `AdminsOnly` condiviso, `OperatorsSettingsRow` prima di "Catalogo premi", rotta `/impostazioni/operatori`
