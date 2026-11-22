@@ -544,10 +544,11 @@ fermarsi e avvisare (domanda aperta 10 della spec).
     test d'integrazione non controllano quell'intestazione (lo fanno i test di `handler.test.ts`, dove la
     funzione non manda mai `*`). Online decide solo la funzione.
 55. GoTrue, verificando il token d'invito (`verifyOtp` con `type: 'invite'`), conferma l'email e dà a chi non
-    ha password una **password temporanea casuale** nella stessa transazione: chi apre il link e chiude la
-    pagina senza "Salva e accedi" risulta "attivo", non "invito inviato", e "Reinvia invito" risponde
-    `not_invited`. La persona usa "Password dimenticata?" (criterio della spec rimasto aperto, commit
-    `aa127f6`).
+    ha password una **password temporanea casuale** nella stessa transazione: in `auth.users` chi ha solo
+    aperto il link e chi ha scelto la password sono indistinguibili. Per questo lo stato "invito inviato" /
+    "attivo" si legge da `app.operators.invite_accepted_at` (trigger su `auth.users` al primo cambio di
+    password con l'email confermata, migrazione `*_operators_invite_accepted.sql`), mai da
+    `email_confirmed_at` (SPEC-operators, Open Questions 12).
 56. `private.operator_invites` conserva le prenotazioni di ogni invito vero (integrazione, E2E): un test che
     ne conta le righe parte da una tabella vuota dentro la propria transazione (`operators_invites.test.sql`).
     L'idempotenza vale per `operation_id`: due inviti con id diversi alla stessa email o allo stesso nome
