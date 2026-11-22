@@ -224,8 +224,8 @@ supabaseOperatorsService.test.ts, scripts/operatorsBoundary.test.ts · **Dimensi
 stessi, `operation_id`, `admin-from-device`, rete giù, registro delle chiamate); `OperatorsServiceProvider` e
 `useOperatorsService()`; montato in `main.tsx` e in `renderApp` (parametro facoltativo in coda).
 **Accettazione:**
-- [ ] Test del finto: stesse risposte del server per i casi della spec
-- [ ] Test del provider: errore chiaro senza provider; `renderApp` esistente invariato per gli altri moduli
+- [x] Test del finto: stesse risposte del server per i casi della spec
+- [x] Test del provider: errore chiaro senza provider; `renderApp` esistente invariato per gli altri moduli
 **Verifica:** `npm test`
 **Dipendenze:** 12 · **File:** src/test/fakeOperatorsService.ts (+ .test.ts),
 src/features/operators/OperatorsServiceProvider.tsx (+ .test.tsx), src/main.tsx, src/test/renderApp.tsx
