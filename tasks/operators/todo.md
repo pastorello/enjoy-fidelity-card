@@ -119,9 +119,9 @@ Origin`; corpo oltre 4 KB, JSON o campi non validi → 400 `invalid_input`; `Aut
 Strumenti: `supabase/functions/**/*.test.ts` in `test.include`, `tsconfig.functions.json` richiamato da
 `npm run typecheck`.
 **Accettazione:**
-- [ ] Unità: origine non ammessa → 403 senza chiamate; `OPTIONS` con `Allow-Headers` uguale a `corsHeaders`,
+- [x] Unità: origine non ammessa → 403 senza chiamate; `OPTIONS` con `Allow-Headers` uguale a `corsHeaders`,
       `Allow-Origin` = origine ammessa e mai `*`; metodo, corpo e campi sbagliati → 400/405; nessun token → 401
-- [ ] `npm run typecheck` controlla `handler.ts` e il test; `handler.ts` non usa globali di Deno
+- [x] `npm run typecheck` controlla `handler.ts` e il test; `handler.ts` non usa globali di Deno
 **Verifica:** `npm test -- operator-invites && npm run typecheck`
 **Dipendenze:** 4 · **File:** supabase/functions/operator-invites/handler.ts, handler.test.ts,
 tsconfig.functions.json, vite.config.ts, package.json · **Dimensione:** M
