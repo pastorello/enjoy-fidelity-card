@@ -404,8 +404,8 @@ abbia almeno una prova esistente, che la chiave segreta locale non compaia in `s
 tracciati e che i documenti del modulo non contengano segreti o contatti reali. PR su `main` senza la riga
 "rami in catena"; deploy e prova sullo staging lasciati all'orchestratore.
 **Accettazione:**
-- [ ] `operatorsCriteria.test.ts` verde; quality bar completa verde in locale e in CI
-- [ ] PR aperta su `main` con le deviazioni dichiarate e le Open Questions da chiedere al titolare (7, 11)
+- [x] `operatorsCriteria.test.ts` verde; quality bar completa verde in locale e in CI
+- [x] PR aperta su `main` con le deviazioni dichiarate e le Open Questions da chiedere al titolare (7, 11)
 **Verifica:** `npm test -- operatorsCriteria && npm run build && npm run check:bundle`; CI sulla PR
 **Dipendenze:** 25 · **File:** scripts/operatorsCriteria.test.ts, tasks/operators/plan.md,
 tasks/operators/todo.md, brain/STATUS.md · **Dimensione:** S
