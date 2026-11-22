@@ -11,8 +11,11 @@ describe('GESTIONE section of the settings', () => {
       within(section).getByRole('heading', { level: 2, name: 'GESTIONE' }),
     ).toBeInTheDocument();
     const rows = within(section).getAllByRole('link');
-    // The "Operatori" row of the wireframe is deferred: the section has the catalogue row only.
-    expect(rows).toHaveLength(1);
+    // As in the wireframe: the "Operatori" row of operators, then the catalogue row of rewards.
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveAccessibleName(/^Operatori/);
+    expect(rows[1]).toHaveAccessibleName(/^Catalogo premi/);
+    expect(within(section).getAllByRole('listitem')).toHaveLength(2);
     const row = within(section).getByRole('link', { name: /Catalogo premi/ });
     expect(row).toHaveTextContent('Premi fissi e punti richiesti');
     expect(row).toHaveAttribute('href', '/impostazioni/premi');
@@ -29,5 +32,6 @@ describe('GESTIONE section of the settings', () => {
     expect(screen.queryByRole('region', { name: 'GESTIONE' })).not.toBeInTheDocument();
     expect(screen.queryByText('GESTIONE')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Catalogo premi/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Operatori/ })).not.toBeInTheDocument();
   });
 });
