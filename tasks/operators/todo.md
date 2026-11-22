@@ -64,13 +64,13 @@ text)` (risposte `jsonb` `proceed` con `invited_by_name` ed eventuali `existing_
 unicità, crea o ricollega il profilo `removed` con lo stesso nome, idempotente), `_fail` (solo da `pending`),
 `_orphan` (utente non confermato e non collegato): queste tre solo `service_role`.
 **Accettazione:**
-- [ ] pgTAP (`operators_invites.test.sql`): ogni risposta di `_begin`; `22023` per lo stesso `operation_id` con
+- [x] pgTAP (`operators_invites.test.sql`): ogni risposta di `_begin`; `22023` per lo stesso `operation_id` con
       dati diversi; altra operazione `pending` recente su stessa email o nome → `in_progress`, più vecchia di 2
       minuti → `proceed`; utente confermato non collegato → `proceed` con `existing_confirmed`
-- [ ] pgTAP: cassiere admin con ruolo `admin` → `EO005`, con `operator` → `proceed`; `_finish` due volte →
+- [x] pgTAP: cassiere admin con ruolo `admin` → `EO005`, con `operator` → `proceed`; `_finish` due volte →
       stesso profilo, con email di `user_id` diversa → rifiutato, nome di un `removed` → ricollegato;
       `_fail` su `done` non cambia; `_orphan` falso per utente confermato o collegato
-- [ ] pgTAP: `_finish`/`_fail`/`_orphan` non eseguibili da `authenticated`; `private.operator_invites`
+- [x] pgTAP: `_finish`/`_fail`/`_orphan` non eseguibili da `authenticated`; `private.operator_invites`
       illeggibile da `authenticated`
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 2 · **File:** supabase/migrations/*_operators.sql, supabase/tests/operators_invites.test.sql,
