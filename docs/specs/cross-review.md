@@ -30,7 +30,7 @@ aggiungono soltanto parti delimitate (colonna "Contributi").
 | Card già di un altro cliente | `/clienti/:id/card` | `cards` | — |
 | Lettura card: primo avvio | (riquadro) | `card-input` | — |
 | Lettura card spenta o non disponibile | (riquadro) | `card-input` | — |
-| Impostazioni (amministratore) | `/impostazioni` | `identity` (pagina e riquadro account) | `settings`, `identity-password`, `rewards`, `export` (sezioni, ordine sotto) |
+| Impostazioni (amministratore) | `/impostazioni` | `identity` (pagina e riquadro account) | `settings`, `identity-password`, `operators`, `rewards`, `export` (sezioni, ordine sotto) |
 | Impostazioni (operatore) | `/impostazioni` | `identity` | `settings` (PUNTI, nota finale), `identity-password` (ACCOUNT) |
 | Catalogo premi | `/impostazioni/premi` | `rewards` | — |
 | Operatori | `/impostazioni/operatori` | `operators` (dal 2026-11-22, [SPEC-operators.md](SPEC-operators.md); prima rinviato) | anche la riga "Operatori" di GESTIONE e il layout "Tablet: operatori" |
@@ -46,7 +46,8 @@ ACCOUNT non aveva una posizione per l'amministratore):
 1. riquadro account: `identity` (sul tablet "Disconnetti il tablet" di `tablet-kiosk`);
 2. PUNTI E CONTROLLI (admin) / PUNTI (operatore): `settings`;
 3. ACCOUNT: "Cambia password" di `identity-password` e "PIN della cassa" di `tablet-kiosk`, nascosta sul tablet;
-4. GESTIONE (solo admin): `rewards`;
+4. GESTIONE (solo admin): riga Operatori di `operators` (`OperatorsSettingsRow`, mostrata da
+   `RewardsSettingsSection` come primo `<li>`), poi Catalogo premi di `rewards`;
 5. LETTORE CARD (solo tablet con cassiere admin): `tablet-kiosk`;
 6. ESPORTA DATI (solo admin): `export`;
 7. nota finale (solo operatore): `settings`.
