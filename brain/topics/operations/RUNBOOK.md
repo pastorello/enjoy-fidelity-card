@@ -482,10 +482,12 @@ fermarsi e avvisare (domanda aperta 10 della spec).
     `tests/integration/localSupabase.ts`), mai contro un progetto online. Nello SQL Editor online si
     leggono come `postgres`; il PIN in chiaro non esiste da nessuna parte (solo l'hash bcrypt).
 47. Il cassiere sta sulla riga del dispositivo: due test che sbloccano lo stesso tablet in parallelo si
-    sostituiscono il cassiere a vicenda. Per questo il seed ha quattro tablet: `cassa@example.com`
+    sostituiscono il cassiere a vicenda. Per questo il seed ha cinque tablet: `cassa@example.com`
     (`e2e/tablet.spec.ts`), `cassa-blocco@example.com` (i 5 PIN errati: il test ne azzera prima il blocco
     con `e2e/db.ts`, così si riesegue entro i 5 minuti), `cassa-pin@example.com` (`e2e/tablet-pin.spec.ts`)
-    e `cassa-layout@example.com` (`e2e/tablet-layout.spec.ts`).
+    e `cassa-layout@example.com` (`e2e/tablet-layout.spec.ts`); il quinto, `cassa-operatori@example.com`, è di
+    `e2e/tablet-operators.spec.ts`, con le persone riservate `turno@example.com` (disattivata alla cassa e
+    riattivata) e `nuovo@example.com` (senza PIN).
     Un E2E tablet nuovo che sblocca un cassiere usa un dispositivo suo nel seed, o uno di questi in serie.
 48. Progetti Playwright: `tablet` (1280×800, touch, `tablet*.spec.ts`; il progetto `phone` li ignora) e
     `tablet-settings` (`tablet-settings.spec.ts`, cambia `usb_uid_format` nella riga condivisa di

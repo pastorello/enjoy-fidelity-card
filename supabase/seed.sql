@@ -13,7 +13,9 @@
 -- operators: disattiva@example.com "Disattiva Prova" and ruolo@example.com "Ruolo Prova" (operators)
 -- and admin-operatori@example.com "Admin Operatori" (admin) are reserved to the E2E of the Operatori
 -- screen, which deactivate them or change their role and restore them; cassa-operatori@example.com
--- a fifth tablet reserved to its tablet E2E. No other test uses them.
+-- a fifth tablet reserved to its tablet E2E, with turno@example.com "Turno Prova" (an operator with a
+-- PIN, deactivated while at that till and reactivated) and nuovo@example.com "Nuovo Prova" (an
+-- operator who never sets a PIN). No other test uses them.
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
@@ -35,7 +37,9 @@ from (values
   ('99999999-9999-4999-8999-999999999999'::uuid, 'disattiva@example.com'),
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'::uuid, 'ruolo@example.com'),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid, 'admin-operatori@example.com'),
-  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid, 'cassa-operatori@example.com')
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid, 'cassa-operatori@example.com'),
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid, 'turno@example.com'),
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'::uuid, 'nuovo@example.com')
 ) as fake (id, email);
 
 insert into auth.identities (
@@ -49,7 +53,8 @@ from auth.users
 where email in ('admin@example.com', 'operatore@example.com', 'recupero@example.com',
                 'pin@example.com', 'cassa@example.com', 'cassa-blocco@example.com',
                 'cassa-pin@example.com', 'cassa-layout@example.com', 'disattiva@example.com',
-                'ruolo@example.com', 'admin-operatori@example.com', 'cassa-operatori@example.com');
+                'ruolo@example.com', 'admin-operatori@example.com', 'cassa-operatori@example.com',
+                'turno@example.com', 'nuovo@example.com');
 
 select private.add_operator('admin@example.com', 'Admin Prova', 'admin');
 select private.add_operator('operatore@example.com', 'Operatore Prova', 'operator');
@@ -58,6 +63,8 @@ select private.add_operator('pin@example.com', 'Pin Prova', 'operator');
 select private.add_operator('disattiva@example.com', 'Disattiva Prova', 'operator');
 select private.add_operator('ruolo@example.com', 'Ruolo Prova', 'operator');
 select private.add_operator('admin-operatori@example.com', 'Admin Operatori', 'admin');
+select private.add_operator('turno@example.com', 'Turno Prova', 'operator');
+select private.add_operator('nuovo@example.com', 'Nuovo Prova', 'operator');
 
 -- Device accounts (tablet-kiosk): no cashier, unlocked.
 select private.add_device('cassa@example.com', 'Tablet cassa');
@@ -68,7 +75,7 @@ select private.add_device('cassa-operatori@example.com', 'Tablet operatori');
 
 -- Fake till PINs (tablet-kiosk), stored as set_my_pin stores them (bcrypt, cost 8):
 -- Admin Prova 2468, Operatore Prova 1357, Recupero Prova 8024, Disattiva Prova 3579,
--- Ruolo Prova 4680, Admin Operatori 9753. Pin Prova has none.
+-- Ruolo Prova 4680, Admin Operatori 9753, Turno Prova 8642. Pin Prova and Nuovo Prova have none.
 insert into private.operator_pins (operator_id, pin_hash)
 select o.id, extensions.crypt(fake.pin, extensions.gen_salt('bf', 8))
 from (values
@@ -77,7 +84,8 @@ from (values
   ('Recupero Prova', '8024'),
   ('Disattiva Prova', '3579'),
   ('Ruolo Prova', '4680'),
-  ('Admin Operatori', '9753')
+  ('Admin Operatori', '9753'),
+  ('Turno Prova', '8642')
 ) as fake (name, pin)
 join app.operators o on o.name = fake.name;
 
