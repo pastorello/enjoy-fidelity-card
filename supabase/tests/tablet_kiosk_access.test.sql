@@ -4,7 +4,7 @@
 -- one, every check and every author column follows the cashier. Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(65);
+select plan(66);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -117,6 +117,9 @@ insert into rpc_calls values
    $$select app.anonymize_customer('00000000-0000-4000-a100-000000000001')$$, 'P0001', 'not_operator'),
   ('associate_card', 'write',
    $$select app.associate_card('00000000-0000-4000-a100-000000000001', 'A0B1C2D3E4F5A8')$$,
+   'P0001', 'not_operator'),
+  ('release_card', 'write',
+   $$select app.release_card(gen_random_uuid(), (select id from app.cards where uid = 'A0B1C2D3E4F5A6'))$$,
    'P0001', 'not_operator'),
   ('deactivate_card', 'write',
    $$select app.deactivate_card((select id from app.cards where uid = 'A0B1C2D3E4F5A6'))$$,
