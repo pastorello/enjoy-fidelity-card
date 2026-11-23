@@ -300,8 +300,8 @@ facoltativo fino al task 22); `customerRow.ts` legge `email`; `supabaseCustomerS
 `supabaseCardsService.createCustomerWithCard` mandano `p_email`; i finti la salvano normalizzata e rifiutano i
 doppioni come il server.
 **Accettazione:**
-- [ ] Unit: create/update/createCustomerWithCard mandano `p_email`; la riga letta porta `email`
-- [ ] Finti: `customer_email_taken` con l'id dell'altro, `email_invalid`, email liberata dall'anonimizzazione
+- [x] Unit: create/update/createCustomerWithCard mandano `p_email`; la riga letta porta `email`
+- [x] Finti: `customer_email_taken` con l'id dell'altro, `email_invalid`, email liberata dall'anonimizzazione
 **Verifica:** `npm test && npm run test:integration`
 **Dipendenze:** 17 · **File:** src/features/customers/types.ts, src/features/customers/customerRow.ts,
 src/features/cards/supabaseCardsService.ts (+test), src/test/fakeCustomerService.ts (+test),

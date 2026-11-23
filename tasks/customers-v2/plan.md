@@ -152,7 +152,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 4: Email al posto del telefono (espandi → passa → contrai)
 - [x] Task 16: Email nelle RPC dei clienti, forma transitoria della migrazione 2
 - [x] Task 17: `normalizeEmail` e codici d'errore `email_invalid`, `customer_email_taken`
-- [ ] Task 18: Dominio e servizi con `email` accanto al telefono
+- [x] Task 18: Dominio e servizi con `email` accanto al telefono
 - [ ] Task 19: Nuovo e Modifica cliente: campo email, errori, «Apri la scheda»; via il campo telefono
 - [ ] Task 20: Scheda: email o «Senza email», niente `mailto:`; testi della cancellazione dati
 - [ ] Task 21: Export CSV clienti: colonna «Email» con `guardFormula`
