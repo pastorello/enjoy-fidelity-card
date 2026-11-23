@@ -225,10 +225,10 @@ cronologia (niente più `setSearchParams` né `?q=`); riquadro della card compat
 nome o email» / «Oppure cerca per nome o email», placeholder «Es. Rossi o rossi@»; tablet: CLIENTI in due
 colonne. Via `useCustomerSearch.ts`, `useServedToday.ts`, `search`/`servedToday` dal contratto e dai finti.
 **Accettazione:**
-- [ ] Componenti: ogni stato del criterio 5; pagina 2 da sentinella e da pulsante con il cursore ricevuto;
+- [x] Componenti: ogni stato del criterio 5; pagina 2 da sentinella e da pulsante con il cursore ricevuto;
       `location.search` mai con `@`; testo ripristinato dopo «Indietro»; riquadro compatto solo da 2 caratteri
-- [ ] Tablet (`HomePage.tablet.test.tsx`): due colonne, lettore USB invariato; E2E esistenti verdi
-- [ ] Impeccable pulito; confronto con Main, Ricerca vuota, Tablet-Cerca; target ≥ 48 px
+- [x] Tablet (`HomePage.tablet.test.tsx`): due colonne, lettore USB invariato; E2E esistenti verdi
+- [x] Impeccable pulito; confronto con Main, Ricerca vuota, Tablet-Cerca; target ≥ 48 px
 **Verifica:** `npm test -- HomePage && npm run e2e`
 **Dipendenze:** 11, 12 · **File:** src/features/customers/HomePage.tsx (+css, +test),
 src/features/customers/HomePage.tablet.test.tsx, src/features/customers/useCustomerSearch.ts e
