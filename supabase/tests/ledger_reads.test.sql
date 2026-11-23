@@ -1,10 +1,11 @@
--- ledger: the real balance in the customer reads of customers (search_customers,
--- get_customer, customers_served_today) and in the public page of cards
--- (card_points). SPEC-ledger.md, "Saldo nelle letture di customers" and criterion
--- 10. Fake data only: invented names, @example.com emails and uids.
+-- ledger: the real balance in the customer reads (get_customer and, since customers-v2,
+-- list_customers) and in the public page of cards (card_points). SPEC-ledger.md, "Saldo
+-- nelle letture di customers" and criterion 10; search_customers and customers_served_today
+-- gave way to list_customers (SPEC-customers-v2.md point 6). Fake data only: invented
+-- names, @example.com emails and uids.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(22);
+select plan(14);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -29,6 +30,7 @@ select set_config(
 --   Vera: no movements                                          → balance 0
 --   Zeno: purchase today, then cancelled                        → balance 0, served at the purchase
 --   Anonimo: purchase today, then anonymized                    → balance 3, never in the list
+-- Rita alone has an email.
 insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
 select fake.id, fake.name, now(), (select id from app.operators where name = 'Admin Letture'), gen_random_uuid()
 from (values
@@ -41,21 +43,13 @@ from (values
   ('00000000-0000-4000-a100-000000000007'::uuid, 'Anonimo Letture')
 ) as fake (id, name);
 
-update app.customers set phone = '+393330007711' where id = '00000000-0000-4000-a100-000000000001';
-
--- 52 fillers with one purchase each between 00:00:00.5 and 00:00:26 today, all
--- before the customers above: only the 50 most recent customers are listed.
-insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
-select ('00000000-0000-4000-a200-' || lpad(n::text, 12, '0'))::uuid, 'Riempitivo ' || lpad(n::text, 2, '0'),
-  now(), (select id from app.operators where name = 'Admin Letture'), gen_random_uuid()
-from generate_series(1, 52) as n;
+update app.customers set email = 'rita.letture@example.com' where id = '00000000-0000-4000-a100-000000000001';
 
 -- Everyone else (the seed, rows left by other runs) is set aside in this
 -- rolled-back transaction, so the list holds only the customers above.
 update app.customers set anonymized_at = now()
 where anonymized_at is null
-  and id::text not like '00000000-0000-4000-a100-%'
-  and id::text not like '00000000-0000-4000-a200-%';
+  and id::text not like '00000000-0000-4000-a100-%';
 
 insert into app.movements
   (id, operation_id, customer_id, kind, amount_cents, points, cents_per_point, reward_id,
@@ -96,13 +90,6 @@ from (values
 ) as m (id, customer_id, kind, amount_cents, points, cents_per_point, description, offset_from_today,
         corrects);
 
-insert into app.movements
-  (operation_id, customer_id, kind, amount_cents, points, cents_per_point, operator_id, created_at)
-select gen_random_uuid(), ('00000000-0000-4000-a200-' || lpad(n::text, 12, '0'))::uuid, 'purchase',
-  100, 1, 100, (select id from app.operators where name = 'Operatore Letture'),
-  current_setting('reads_test.today')::timestamptz + n * interval '500 milliseconds'
-from generate_series(1, 52) as n;
-
 -- A card with a confirmed link for Rita and for Sara (as the operator).
 insert into app.cards (id, uid, customer_id, active, associated_by)
 select fake.id, fake.uid, fake.customer_id, true, (select id from app.operators where name = 'Admin Letture')
@@ -122,23 +109,19 @@ select app.confirm_card_link('00000000-0000-4000-a400-000000000002', current_set
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a700-000000000001","role":"authenticated"}', true);
 select app.anonymize_customer('00000000-0000-4000-a100-000000000007');
 
--- search_customers and get_customer ----------------------------------------------------------
+-- list_customers and get_customer -------------------------------------------------------------
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a700-000000000002","role":"authenticated"}', true);
 
 select results_eq(
-  $$select name, balance, last_served_at from app.search_customers('letture')$$,
-  $$values ('Rita Letture'::text, 2, current_setting('reads_test.today')::timestamptz + interval '1 minute'),
-           ('Sara Letture'::text, 20, current_setting('reads_test.today')::timestamptz + interval '3 minutes'),
-           ('Tino Letture'::text, 8, null::timestamptz),
-           ('Ugo Letture'::text, 0, null::timestamptz),
-           ('Vera Letture'::text, 0, null::timestamptz),
-           ('Zeno Letture'::text, 0, current_setting('reads_test.today')::timestamptz + interval '7 minutes')$$,
-  'search_customers gives the real balance and the last purchase or redemption of today'
+  $$select name, balance from app.list_customers('letture') order by name$$,
+  $$values ('Rita Letture'::text, 2), ('Sara Letture'::text, 20), ('Tino Letture'::text, 8),
+           ('Ugo Letture'::text, 0), ('Vera Letture'::text, 0), ('Zeno Letture'::text, 0)$$,
+  'list_customers gives the real balance; the anonymized customer is not listed'
 );
 select results_eq(
-  $$select name, balance from app.search_customers('333 000 7711')$$,
+  $$select name, balance from app.list_customers('rita.letture@')$$,
   $$values ('Rita Letture'::text, 2)$$,
-  'a search by phone gives the real balance too'
+  'a search by email gives the real balance too'
 );
 select results_eq(
   $$select balance, last_served_at from app.get_customer('00000000-0000-4000-a100-000000000001')$$,
@@ -166,6 +149,11 @@ select results_eq(
   'get_customer: no movements, balance 0'
 );
 select results_eq(
+  $$select balance, last_served_at from app.get_customer('00000000-0000-4000-a100-000000000006')$$,
+  $$values (0, current_setting('reads_test.today')::timestamptz + interval '7 minutes')$$,
+  'get_customer: a cancelled purchase is served today at the purchase, not at the correction'
+);
+select results_eq(
   $$select balance from app.get_customer('00000000-0000-4000-a100-000000000007')$$,
   $$values (3)$$,
   'get_customer: an anonymized customer keeps the balance of the movements'
@@ -176,58 +164,9 @@ select is(
   'the balance is an int'
 );
 
--- customers_served_today -----------------------------------------------------------------------
-select is(
-  (select count(*) from app.customers_served_today()),
-  50::bigint,
-  'at most 50 customers served today'
-);
 select results_eq(
-  $$select id, name, balance, last_served_at from app.customers_served_today() limit 3$$,
-  $$values ('00000000-0000-4000-a100-000000000006'::uuid, 'Zeno Letture'::text, 0,
-            current_setting('reads_test.today')::timestamptz + interval '7 minutes'),
-           ('00000000-0000-4000-a100-000000000002'::uuid, 'Sara Letture'::text, 20,
-            current_setting('reads_test.today')::timestamptz + interval '3 minutes'),
-           ('00000000-0000-4000-a100-000000000001'::uuid, 'Rita Letture'::text, 2,
-            current_setting('reads_test.today')::timestamptz + interval '1 minute')$$,
-  'most recent first; a cancelled purchase counts, the time is the purchase or redemption, not the correction'
-);
-select ok(
-  not exists (select 1 from app.customers_served_today() where id = '00000000-0000-4000-a100-000000000003'),
-  'a purchase at 23:59 yesterday (Rome) is not today'
-);
-select ok(
-  exists (select 1 from app.customers_served_today()
-          where id = '00000000-0000-4000-a100-000000000001'
-            and last_served_at = current_setting('reads_test.today')::timestamptz + interval '1 minute'),
-  'a redemption at 00:01 today (Rome) is today'
-);
-select ok(
-  not exists (select 1 from app.customers_served_today() where id = '00000000-0000-4000-a100-000000000004'),
-  'a correction alone does not make a customer served today'
-);
-select ok(
-  not exists (select 1 from app.customers_served_today() where id = '00000000-0000-4000-a100-000000000007'),
-  'anonymized customers are never listed'
-);
-select ok(
-  not exists (select 1 from app.customers_served_today() where id = '00000000-0000-4000-a100-000000000005'),
-  'a customer without movements is not listed'
-);
-select is(
-  array(select last_served_at from app.customers_served_today()),
-  array(select last_served_at from app.customers_served_today() order by last_served_at desc),
-  'the list is ordered by last_served_at, most recent first'
-);
-select is(
-  array(select name from app.customers_served_today() where name like 'Riempitivo %' order by name),
-  array(select 'Riempitivo ' || lpad(n::text, 2, '0') from generate_series(6, 52) as n),
-  'the limit drops the customers served earliest'
-);
-select results_eq(
-  $$select phone, notes, anonymized_at from app.customers_served_today()
-    where id = '00000000-0000-4000-a100-000000000001'$$,
-  $$values ('+393330007711'::text, null::text, null::timestamptz)$$,
+  $$select email, notes, anonymized_at from app.get_customer('00000000-0000-4000-a100-000000000001')$$,
+  $$values ('rita.letture@example.com'::text, null::text, null::timestamptz)$$,
   'the other fields of customer_summary are the customer''s'
 );
 reset role;
@@ -248,8 +187,8 @@ insert into auth.users (id, email) values ('00000000-0000-4000-a700-000000000003
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-a700-000000000003","role":"authenticated"}', true);
 select throws_ok(
-  $$select * from app.customers_served_today()$$,
-  'P0001', 'not_operator', 'a user without a profile cannot list the customers served today'
+  $$select * from app.list_customers()$$,
+  'P0001', 'not_operator', 'a user without a profile cannot list the customers'
 );
 reset role;
 

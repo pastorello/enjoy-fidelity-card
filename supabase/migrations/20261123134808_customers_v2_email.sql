@@ -1,9 +1,15 @@
--- customers-v2, migration 2 of 4: the optional email of a customer and the home list
--- (SPEC-customers-v2.md points 2 and 6). Transitional form: the customers RPCs take the
--- email and still accept the phone (p_phone default null), customer_summary carries both
--- (email as its last attribute) and export_customers returns both, so the app that still
--- sends p_phone keeps working while it moves to the email in later tasks of this branch.
--- This file reaches its final form (phone dropped) before it is published (plan.md).
+-- customers-v2, migration 2 of 4: the optional email of a customer in the place of the
+-- phone, and the home list (SPEC-customers-v2.md points 1, 2 and 6).
+--
+-- The phone goes everywhere: customer_summary's attribute is renamed to email (same
+-- position, same type), the customers RPCs take p_email in the place of p_phone (drop and
+-- create: a parameter cannot be renamed), export_customers returns the email in its place,
+-- search_customers and customers_served_today give way to list_customers, the stored
+-- phones are cleared, then the column and private.normalize_phone are dropped.
+--
+-- Breaks the old frontend (p_phone, the dropped functions): migrations and frontend are
+-- released together, with the bar closed. After the push, by hand and outside any
+-- transaction: `vacuum full app.customers;` (release notes of the spec).
 
 -- The email -----------------------------------------------------------------------------
 -- Stored lowercase and trimmed (the client and the RPCs normalize it first), 6–254
@@ -161,8 +167,9 @@ revoke execute on function
   from public, anon, authenticated;
 
 -- customer_summary ------------------------------------------------------------------------
--- email last, so every positional constructor below lists it last.
-alter type app.customer_summary add attribute email text;
+-- The phone's attribute becomes the email: same position and type, so the positional
+-- constructors (id, name, email, notes, …) keep their shape.
+alter type app.customer_summary rename attribute phone to email;
 
 -- create_customer -------------------------------------------------------------------------
 -- Checks as before, then the email (SPEC-customers-v2.md point 2): customer_name_taken
@@ -173,10 +180,9 @@ drop function app.create_customer(uuid, text, text, boolean, text);
 create function app.create_customer(
   p_operation_id uuid,
   p_name text,
-  p_phone text default null,
-  p_privacy_consent boolean default null,
-  p_notes text default null,
-  p_email text default null
+  p_email text,
+  p_privacy_consent boolean,
+  p_notes text
 )
 returns app.customer_summary
 language plpgsql
@@ -185,7 +191,6 @@ set search_path = ''
 as $$
 declare
   v_name text := private.clean_name(p_name);
-  v_phone text := nullif(btrim(p_phone, E' \t\n\r\f\v'), '');
   v_email text := private.normalize_email(p_email);
   v_notes text := nullif(btrim(p_notes, E' \t\n\r\f\v'), '');
   v_row app.customers;
@@ -202,7 +207,7 @@ begin
   -- A resent request: return what the first one created.
   select * into v_row from app.customers where create_operation_id = p_operation_id;
   if found then
-    return (v_row.id, v_row.name, v_row.phone, v_row.notes, v_row.anonymized_at, 0, null, v_row.email)
+    return (v_row.id, v_row.name, v_row.email, v_row.notes, v_row.anonymized_at, 0, null)
       ::app.customer_summary;
   end if;
 
@@ -211,12 +216,6 @@ begin
   end if;
   if length(v_name) > 80 then
     raise exception 'name_too_long' using errcode = 'P0001';
-  end if;
-  if v_phone is not null then
-    v_phone := private.normalize_phone(v_phone);
-    if v_phone is null then
-      raise exception 'phone_invalid' using errcode = 'P0001';
-    end if;
   end if;
   if p_privacy_consent is not true then
     raise exception 'consent_required' using errcode = 'P0001';
@@ -235,9 +234,9 @@ begin
 
   begin
     insert into app.customers (
-      name, phone, email, privacy_consent_at, notes, created_by, create_operation_id
+      name, email, privacy_consent_at, notes, created_by, create_operation_id
     )
-    values (v_name, v_phone, v_email, now(), v_notes, private.acting_operator_id(), p_operation_id)
+    values (v_name, v_email, now(), v_notes, private.acting_operator_id(), p_operation_id)
     returning * into v_row;
   exception when unique_violation then
     -- A concurrent request committed first: settle it with the constraint it hit.
@@ -257,13 +256,13 @@ begin
     end if;
   end;
 
-  return (v_row.id, v_row.name, v_row.phone, v_row.notes, v_row.anonymized_at, 0, null, v_row.email)
+  return (v_row.id, v_row.name, v_row.email, v_row.notes, v_row.anonymized_at, 0, null)
     ::app.customer_summary;
 end;
 $$;
 
-revoke execute on function app.create_customer(uuid, text, text, boolean, text, text) from public, anon;
-grant execute on function app.create_customer(uuid, text, text, boolean, text, text) to authenticated;
+revoke execute on function app.create_customer(uuid, text, text, boolean, text) from public, anon;
+grant execute on function app.create_customer(uuid, text, text, boolean, text) to authenticated;
 
 -- update_customer -------------------------------------------------------------------------
 -- An empty email removes it; the customer's own email is not a conflict.
@@ -272,9 +271,8 @@ drop function app.update_customer(uuid, text, text, text);
 create function app.update_customer(
   p_customer_id uuid,
   p_name text,
-  p_phone text default null,
-  p_notes text default null,
-  p_email text default null
+  p_email text,
+  p_notes text
 )
 returns app.customer_summary
 language plpgsql
@@ -283,7 +281,6 @@ set search_path = ''
 as $$
 declare
   v_name text := private.clean_name(p_name);
-  v_phone text := nullif(btrim(p_phone, E' \t\n\r\f\v'), '');
   v_email text := private.normalize_email(p_email);
   v_notes text := nullif(btrim(p_notes, E' \t\n\r\f\v'), '');
   v_row app.customers;
@@ -309,12 +306,6 @@ begin
   if length(v_name) > 80 then
     raise exception 'name_too_long' using errcode = 'P0001';
   end if;
-  if v_phone is not null then
-    v_phone := private.normalize_phone(v_phone);
-    if v_phone is null then
-      raise exception 'phone_invalid' using errcode = 'P0001';
-    end if;
-  end if;
   if length(v_notes) > 500 then
     raise exception 'notes_too_long' using errcode = 'P0001';
   end if;
@@ -331,7 +322,7 @@ begin
 
   begin
     update app.customers
-    set name = v_name, phone = v_phone, email = v_email, notes = v_notes
+    set name = v_name, email = v_email, notes = v_notes
     where id = p_customer_id
     returning * into v_row;
   exception when unique_violation then
@@ -350,13 +341,13 @@ begin
     end if;
   end;
 
-  return (v_row.id, v_row.name, v_row.phone, v_row.notes, v_row.anonymized_at, 0, null, v_row.email)
+  return (v_row.id, v_row.name, v_row.email, v_row.notes, v_row.anonymized_at, 0, null)
     ::app.customer_summary;
 end;
 $$;
 
-revoke execute on function app.update_customer(uuid, text, text, text, text) from public, anon;
-grant execute on function app.update_customer(uuid, text, text, text, text) to authenticated;
+revoke execute on function app.update_customer(uuid, text, text, text) from public, anon;
+grant execute on function app.update_customer(uuid, text, text, text) to authenticated;
 
 -- anonymize_customer ----------------------------------------------------------------------
 -- The email goes with the name and the notes, so another customer may take it at once.
@@ -385,7 +376,6 @@ begin
     begin
       update app.customers
       set name = 'Cliente cancellato ' || left(v_row.id::text, 8),
-          phone = null,
           email = null,
           notes = null,
           anonymized_at = now()
@@ -396,7 +386,6 @@ begin
       -- first 8 characters of the id): the full id is unique.
       update app.customers
       set name = 'Cliente cancellato ' || v_row.id::text,
-          phone = null,
           email = null,
           notes = null,
           anonymized_at = now()
@@ -405,78 +394,13 @@ begin
     end;
   end if;
 
-  return (v_row.id, v_row.name, v_row.phone, v_row.notes, v_row.anonymized_at, 0, null, v_row.email)
+  return (v_row.id, v_row.name, v_row.email, v_row.notes, v_row.anonymized_at, 0, null)
     ::app.customer_summary;
 end;
 $$;
 
--- Reads that return customer_summary ------------------------------------------------------
--- The bodies of ledger, with the email as the last column.
-create or replace function app.search_customers(p_query text)
-returns setof app.customer_summary
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-declare
-  v_text text := private.clean_name(left(coalesce(p_query, ''), 80));
-  v_digits text := regexp_replace(v_text, '[[:space:]+.-]', '', 'g');
-  v_patterns text[];
-begin
-  if not private.is_active_operator() then
-    raise exception 'not_operator' using errcode = 'P0001';
-  end if;
-
-  if v_digits ~ '^[0-9]+$' then
-    if length(v_digits) < 3 then
-      return;
-    end if;
-    -- A leading 00 stands for +, and the + is not among the digits searched.
-    if v_digits like '00%' then
-      v_digits := substr(v_digits, 3);
-    end if;
-    return query
-      select f.id, f.name, f.phone, f.notes, f.anonymized_at,
-             private.customer_balance(f.id), private.last_served_today(f.id), f.email
-      from (
-        select c.id, c.name, c.phone, c.notes, c.anonymized_at, c.name_key, c.email
-        from app.customers c
-        where c.anonymized_at is null
-          and c.phone like '%' || v_digits || '%'
-        order by c.name_key, c.id
-        limit 21
-      ) f
-      order by f.name_key, f.id;
-    return;
-  end if;
-
-  if length(v_text) < 2 then
-    return;
-  end if;
-  -- One pattern per word; \, % and _ are escaped so they are searched literally.
-  select array_agg(
-    '%' || replace(replace(replace(private.customer_name_key(w), '\', '\\'), '%', '\%'), '_', '\_') || '%'
-  )
-  into v_patterns
-  from unnest(string_to_array(v_text, ' ')) as w;
-
-  -- The balance is computed only for the (at most 21) rows returned.
-  return query
-    select f.id, f.name, f.phone, f.notes, f.anonymized_at,
-           private.customer_balance(f.id), private.last_served_today(f.id), f.email
-    from (
-      select c.id, c.name, c.phone, c.notes, c.anonymized_at, c.name_key, c.email
-      from app.customers c
-      where c.anonymized_at is null
-        and c.name_key like all (v_patterns)
-      order by c.name_key, c.id
-      limit 21
-    ) f
-    order by f.name_key, f.id;
-end;
-$$;
-
+-- get_customer --------------------------------------------------------------------------
+-- The body of ledger, with the email in the place of the phone.
 create or replace function app.get_customer(p_customer_id uuid)
 returns setof app.customer_summary
 language plpgsql
@@ -490,41 +414,17 @@ begin
   end if;
 
   return query
-    select c.id, c.name, c.phone, c.notes, c.anonymized_at,
-           private.customer_balance(c.id), private.last_served_today(c.id), c.email
+    select c.id, c.name, c.email, c.notes, c.anonymized_at,
+           private.customer_balance(c.id), private.last_served_today(c.id)
     from app.customers c
     where c.id = p_customer_id;
 end;
 $$;
 
-create or replace function app.customers_served_today()
-returns setof app.customer_summary
-language plpgsql
-stable
-security definer
-set search_path = ''
-as $$
-begin
-  if not private.is_active_operator() then
-    raise exception 'not_operator' using errcode = 'P0001';
-  end if;
-
-  return query
-    select c.id, c.name, c.phone, c.notes, c.anonymized_at,
-           private.customer_balance(c.id), s.last_served_at, c.email
-    from (
-      select m.customer_id, max(m.created_at) as last_served_at
-      from app.movements m, private.today_bounds() b
-      where m.kind in ('purchase', 'redemption')
-        and m.created_at >= b.day_start
-        and m.created_at < b.day_end
-      group by m.customer_id
-    ) s
-    join app.customers c on c.id = s.customer_id and c.anonymized_at is null
-    order by s.last_served_at desc, c.id
-    limit 50;
-end;
-$$;
+-- search_customers and customers_served_today ---------------------------------------------
+-- Replaced by list_customers (the home list, with its filter by name or email).
+drop function app.search_customers(text);
+drop function app.customers_served_today();
 
 -- create_customer_with_card ---------------------------------------------------------------
 -- The body of cards, passing the email on to create_customer by name.
@@ -533,11 +433,10 @@ drop function app.create_customer_with_card(uuid, text, text, boolean, text, tex
 create function app.create_customer_with_card(
   p_operation_id uuid,
   p_name text,
-  p_phone text default null,
-  p_privacy_consent boolean default null,
-  p_notes text default null,
-  p_uid text default null,
-  p_email text default null
+  p_email text,
+  p_privacy_consent boolean,
+  p_notes text,
+  p_uid text
 )
 returns app.customer_summary
 language plpgsql
@@ -557,7 +456,7 @@ begin
 
   select * into v_row from app.customers where create_operation_id = p_operation_id;
   if found then
-    return (v_row.id, v_row.name, v_row.phone, v_row.notes, v_row.anonymized_at, 0, null, v_row.email)
+    return (v_row.id, v_row.name, v_row.email, v_row.notes, v_row.anonymized_at, 0, null)
       ::app.customer_summary;
   end if;
 
@@ -568,30 +467,28 @@ begin
   v_summary := app.create_customer(
     p_operation_id => p_operation_id,
     p_name => p_name,
-    p_phone => p_phone,
+    p_email => p_email,
     p_privacy_consent => p_privacy_consent,
-    p_notes => p_notes,
-    p_email => p_email
+    p_notes => p_notes
   );
   perform private.associate_card_to(v_summary.id, p_uid);
   return v_summary;
 end;
 $$;
 
-revoke execute on function app.create_customer_with_card(uuid, text, text, boolean, text, text, text)
+revoke execute on function app.create_customer_with_card(uuid, text, text, boolean, text, text)
   from public, anon;
-grant execute on function app.create_customer_with_card(uuid, text, text, boolean, text, text, text)
+grant execute on function app.create_customer_with_card(uuid, text, text, boolean, text, text)
   to authenticated;
 
 -- export_customers ------------------------------------------------------------------------
--- The body of export, with the email after the phone; null for anonymized customers.
+-- The body of export, with the email in the place of the phone; null for anonymized customers.
 drop function app.export_customers(uuid, int);
 
 create function app.export_customers(p_after_id uuid default null, p_limit int default 1000)
 returns table (
   id uuid,
   name text,
-  phone text,
   email text,
   active_card_uid text,
   balance_points int,
@@ -618,7 +515,6 @@ begin
     select
       c.id,
       case when c.anonymized_at is null then c.name end,
-      case when c.anonymized_at is null then c.phone end,
       case when c.anonymized_at is null then c.email end,
       case when c.anonymized_at is null then card.uid end,
       private.customer_balance(c.id),
@@ -638,3 +534,11 @@ $$;
 
 revoke execute on function app.export_customers(uuid, int) from public, anon;
 grant execute on function app.export_customers(uuid, int) to authenticated;
+
+-- The phone -------------------------------------------------------------------------------
+-- Cleared first: drop column only hides the values, which stay in the old row versions
+-- until the table is rewritten (vacuum full after the release, by hand). Then the column
+-- (its check constraint goes with it) and the function that normalized it.
+update app.customers set phone = null where phone is not null;
+alter table app.customers drop column phone;
+drop function private.normalize_phone(text);

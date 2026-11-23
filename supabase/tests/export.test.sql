@@ -20,28 +20,28 @@ delete from auth.users where id = '00000000-0000-4000-e000-000000000004';
 
 -- Fake customers, with ids at the very end of the uuid order so the pagination
 -- checks below can start right before them:
---   …0001 Elio:    phone, email, notes, a lost card (deactivated) and the active one that replaced it,
+--   …0001 Elio:    email, notes, a lost card (deactivated) and the active one that replaced it,
 --                  purchase 12 + redemption -5 + its correction → 12
 --   …0002 Fede:    only a deactivated card, no movements → 0 (later: an uncorrected redemption -4)
---   …0003 Anonimo: phone, email, notes, card, purchase 3, then anonymized with the RPC → 3
+--   …0003 Anonimo: email, notes, card, purchase 3, then anonymized with the RPC → 3
 --   …0004 Grezzo:  anonymized_at set by hand on a row that still holds personal data
 --                  and an active card: the function nulls them whatever the row holds
 insert into app.customers
-  (id, name, phone, email, notes, privacy_consent_at, created_by, create_operation_id, anonymized_at)
-select fake.id, fake.name, fake.phone, fake.email, fake.notes, timestamptz '2026-07-01 10:05:00+00',
+  (id, name, email, notes, privacy_consent_at, created_by, create_operation_id, anonymized_at)
+select fake.id, fake.name, fake.email, fake.notes, timestamptz '2026-07-01 10:05:00+00',
   (select id from app.operators where name = 'Operatore Esporta'), gen_random_uuid(), fake.anonymized_at
 from (values
-  ('ffffffff-ffff-4fff-8fff-000000000001'::uuid, 'Elio Esporta', '+393330001111', 'elio.esporta@example.com',
+  ('ffffffff-ffff-4fff-8fff-000000000001'::uuid, 'Elio Esporta', 'elio.esporta@example.com',
    'Nota di prova',
    null::timestamptz),
-  ('ffffffff-ffff-4fff-8fff-000000000002'::uuid, 'Fede Esporta', null, null, null, null),
-  ('ffffffff-ffff-4fff-8fff-000000000003'::uuid, 'Anonimo Esporta', '+393330002222',
+  ('ffffffff-ffff-4fff-8fff-000000000002'::uuid, 'Fede Esporta', null, null, null),
+  ('ffffffff-ffff-4fff-8fff-000000000003'::uuid, 'Anonimo Esporta',
    'anonimo.esporta@example.com', 'Da cancellare',
    null),
-  ('ffffffff-ffff-4fff-8fff-000000000004'::uuid, 'Grezzo Esporta', '+393330003333',
+  ('ffffffff-ffff-4fff-8fff-000000000004'::uuid, 'Grezzo Esporta',
    'grezzo.esporta@example.com', 'Ancora qui',
    now())
-) as fake (id, name, phone, email, notes, anonymized_at);
+) as fake (id, name, email, notes, anonymized_at);
 
 insert into app.cards (uid, customer_id, associated_by)
 select fake.uid, fake.customer_id::uuid, (select id from app.operators where name = 'Operatore Esporta')
@@ -174,7 +174,6 @@ create function public.export_test_customers()
 returns table (
   id uuid,
   name text,
-  phone text,
   email text,
   active_card_uid text,
   balance_points int,
@@ -206,7 +205,7 @@ grant execute on function public.export_test_customers() to authenticated;
 -- Catalogue ---------------------------------------------------------------------------
 select is(
   pg_get_function_result('app.export_customers(uuid, int)'::regprocedure),
-  'TABLE(id uuid, name text, phone text, email text, active_card_uid text, balance_points integer, '
+  'TABLE(id uuid, name text, email text, active_card_uid text, balance_points integer, '
     'privacy_consent_at timestamp with time zone, notes text, created_at timestamp with time zone, '
     'created_by_name text, anonymized_at timestamp with time zone)',
   'export_customers returns the columns of the spec, in order'
@@ -298,20 +297,20 @@ select lives_ok(
 
 -- Admin --------------------------------------------------------------------------------
 select results_eq(
-  $$select id, name, phone, email, active_card_uid, balance_points, privacy_consent_at, notes,
+  $$select id, name, email, active_card_uid, balance_points, privacy_consent_at, notes,
            created_by_name, anonymized_at is not null
     from app.export_customers('ffffffff-ffff-4fff-8fff-000000000000', 1000)
     order by id$$,
   $$values
-    ('ffffffff-ffff-4fff-8fff-000000000001'::uuid, 'Elio Esporta'::text, '+393330001111'::text,
+    ('ffffffff-ffff-4fff-8fff-000000000001'::uuid, 'Elio Esporta'::text,
      'elio.esporta@example.com'::text,
      '04E0000000E001'::text, 12, timestamptz '2026-07-01 10:05:00+00', 'Nota di prova'::text,
      'Operatore Esporta'::text, false),
-    ('ffffffff-ffff-4fff-8fff-000000000002'::uuid, 'Fede Esporta', null, null, null, 0,
+    ('ffffffff-ffff-4fff-8fff-000000000002'::uuid, 'Fede Esporta', null, null, 0,
      timestamptz '2026-07-01 10:05:00+00', null, 'Operatore Esporta', false),
-    ('ffffffff-ffff-4fff-8fff-000000000003'::uuid, null, null, null, null, 3,
+    ('ffffffff-ffff-4fff-8fff-000000000003'::uuid, null, null, null, 3,
      timestamptz '2026-07-01 10:05:00+00', null, 'Operatore Esporta', true),
-    ('ffffffff-ffff-4fff-8fff-000000000004'::uuid, null, null, null, null, 0,
+    ('ffffffff-ffff-4fff-8fff-000000000004'::uuid, null, null, null, 0,
      timestamptz '2026-07-01 10:05:00+00', null, 'Operatore Esporta', true)$$,
   'the admin receives the fake customers with card, balance and creator; anonymized ones without personal data'
 );
@@ -355,10 +354,10 @@ select is(
   'a customer whose only card is deactivated has active_card_uid null'
 );
 select is(
-  (select row(name, phone, email, notes, active_card_uid)::text
+  (select row(name, email, notes, active_card_uid)::text
    from app.export_customers('ffffffff-ffff-4fff-8fff-000000000002', 1)),
-  '(,,,,)',
-  'the anonymized customer comes back with name, phone, notes and card null'
+  '(,,,)',
+  'the anonymized customer comes back with name, email, notes and card null'
 );
 select is(
   (select balance_points from app.export_customers('ffffffff-ffff-4fff-8fff-000000000002', 1)),
@@ -371,9 +370,9 @@ select is(
   'anonymized_at is the anonymization time'
 );
 select is(
-  (select row(name, phone, email, notes, active_card_uid)::text
+  (select row(name, email, notes, active_card_uid)::text
    from app.export_customers('ffffffff-ffff-4fff-8fff-000000000003', 1)),
-  '(,,,,)',
+  '(,,,)',
   'an anonymized row still holding personal data and an active card comes back nulled'
 );
 select ok(
@@ -381,7 +380,7 @@ select ok(
     select 1
     from public.export_test_customers() e
     where e.anonymized_at is not null
-      and (e.name is not null or e.phone is not null or e.email is not null or e.notes is not null
+      and (e.name is not null or e.email is not null or e.notes is not null
            or e.active_card_uid is not null)
   ),
   'no anonymized customer of the whole export carries personal data'

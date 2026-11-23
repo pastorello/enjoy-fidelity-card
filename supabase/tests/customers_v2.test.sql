@@ -4,7 +4,7 @@
 -- (point 6). Fake data only: invented names, @example.com emails.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(101);
+select plan(111);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -190,10 +190,10 @@ select is(
   'customers_home_order_idx orders by activity, then sort_at, then id, without anonymized rows'
 );
 
--- The email column (migration 2, first form: additions only) ----------------------------
+-- The email column (migration 2) ---------------------------------------------------------
 -- SPEC-customers-v2.md point 2: optional, stored lowercase and trimmed, 6–254 characters,
 -- one @ and a dot after it; unique, several nulls allowed. Written directly here as
--- postgres: the customers RPCs take the email in a later task.
+-- postgres; the customers RPCs that take it are tested further down.
 select col_type_is('app', 'customers', 'email', 'text', 'email is text');
 select col_is_null('app', 'customers', 'email', 'email is optional');
 select is(
@@ -528,7 +528,7 @@ select is(
 
 reset role;
 
--- The email in the customers RPCs (migration 2, transitional form) -----------------------
+-- The email in the customers RPCs (migration 2, final form) -------------------------------
 -- SPEC-customers-v2.md point 2 and acceptance criteria 2 and 3. Called by parameter name,
 -- the way the app calls them: these calls hold for the final form too.
 -- Fake customers "Posta", created by the RPCs as the operator.
@@ -548,11 +548,68 @@ end;
 $$;
 grant execute on function pg_temp.error_of(text) to authenticated;
 
+-- Criterion 1: no customer phone left in the schema (migration 2, final form).
+select hasnt_column('app', 'customers', 'phone', 'app.customers has no phone column');
+select hasnt_function('private', 'normalize_phone', 'private.normalize_phone is gone');
+select hasnt_function('app', 'search_customers', 'app.search_customers is gone');
+select hasnt_function('app', 'customers_served_today', 'app.customers_served_today is gone');
 select is(
   (select array_agg(attname::text order by attnum) from pg_attribute
    where attrelid = 'app.customer_summary'::regclass and attnum > 0 and not attisdropped),
-  array['id', 'name', 'phone', 'notes', 'anonymized_at', 'balance', 'last_served_at', 'email'],
-  'customer_summary carries email, as its last attribute'
+  array['id', 'name', 'email', 'notes', 'anonymized_at', 'balance', 'last_served_at'],
+  'customer_summary carries email in the place of the phone'
+);
+select is(
+  (select array_agg(attname::text order by attnum) from pg_attribute
+   where attrelid = 'app.customer_summary'::regclass and attnum > 0 and attisdropped),
+  null,
+  'customer_summary: the phone was renamed, not dropped (no hidden attribute)'
+);
+-- The final signatures: p_email in the place of p_phone, no defaults, nothing else.
+select is(
+  (select array_agg(p.oid::regprocedure::text || ' ' || array_to_string(p.proargnames, ',')
+          || ' defaults=' || p.pronargdefaults order by p.proname)
+   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'app'
+     and p.proname in ('create_customer', 'update_customer', 'create_customer_with_card')),
+  array[
+    'app.create_customer(uuid,text,text,boolean,text) '
+      || 'p_operation_id,p_name,p_email,p_privacy_consent,p_notes defaults=0',
+    'app.create_customer_with_card(uuid,text,text,boolean,text,text) '
+      || 'p_operation_id,p_name,p_email,p_privacy_consent,p_notes,p_uid defaults=0',
+    'app.update_customer(uuid,text,text,text) p_customer_id,p_name,p_email,p_notes defaults=0'
+  ],
+  'create_customer, update_customer and create_customer_with_card: one final signature each'
+);
+select ok(
+  has_function_privilege('authenticated', 'app.create_customer(uuid, text, text, boolean, text)', 'execute')
+  and has_function_privilege('authenticated', 'app.update_customer(uuid, text, text, text)', 'execute')
+  and has_function_privilege('authenticated',
+    'app.create_customer_with_card(uuid, text, text, boolean, text, text)', 'execute')
+  and has_function_privilege('authenticated', 'app.export_customers(uuid, int)', 'execute'),
+  'authenticated executes the final signatures'
+);
+select ok(
+  not has_function_privilege('anon', 'app.create_customer(uuid, text, text, boolean, text)', 'execute')
+  and not has_function_privilege('anon', 'app.update_customer(uuid, text, text, text)', 'execute')
+  and not has_function_privilege('anon',
+    'app.create_customer_with_card(uuid, text, text, boolean, text, text)', 'execute')
+  and not has_function_privilege('anon', 'app.export_customers(uuid, int)', 'execute'),
+  'anon executes none of the final signatures'
+);
+select is(
+  pg_get_function_result('app.export_customers(uuid, int)'::regprocedure),
+  'TABLE(id uuid, name text, email text, active_card_uid text, balance_points integer, '
+    || 'privacy_consent_at timestamp with time zone, notes text, created_at timestamp with time zone, '
+    || 'created_by_name text, anonymized_at timestamp with time zone)',
+  'export_customers returns the email in the place of the phone'
+);
+select is(
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname in ('app', 'private', 'public')
+     and (p.prosrc ~* '\mphone\M' or array_to_string(p.proargnames, ',') ~* 'phone')),
+  0,
+  'no function of app, private or public mentions a phone any more'
 );
 select ok(
   not has_function_privilege('anon', 'private.normalize_email(text)', 'execute')
@@ -653,12 +710,11 @@ select is(
   array[true, true],
   'create_customer: two customers without an email (null, or only spaces)'
 );
--- Transitional only: goes with p_phone when the migration takes its final form.
-select is(
-  (select email from app.create_customer(p_operation_id => gen_random_uuid(),
-     p_name => 'Posta Vecchio Frontend', p_phone => null, p_privacy_consent => true, p_notes => null)),
-  null,
-  'create_customer: a call without p_email (the frontend still sending p_phone) still works'
+select throws_ok(
+  $$select app.create_customer(p_operation_id => gen_random_uuid(), p_name => 'Posta Vecchio Frontend',
+    p_phone => null, p_privacy_consent => true, p_notes => null)$$,
+  '42883', null,
+  'create_customer: a call with p_phone (the old frontend) finds no function'
 );
 
 -- update_customer

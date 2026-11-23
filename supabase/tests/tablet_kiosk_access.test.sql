@@ -4,7 +4,7 @@
 -- one, every check and every author column follows the cashier. Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(68);
+select plan(66);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -95,10 +95,8 @@ select set_config('test.hidden', pg_temp.expected_hidden()::text, true);
 -- kiosk RPCs (tasks 4 and 5) answer devices by design and have their own tests.
 create temp table rpc_calls (name text primary key, kind text, call text, errcode text, message text);
 insert into rpc_calls values
-  ('search_customers', 'read', $$select * from app.search_customers('Cliente')$$, 'P0001', 'not_operator'),
   ('get_customer', 'read',
    $$select * from app.get_customer('00000000-0000-4000-a100-000000000001')$$, 'P0001', 'not_operator'),
-  ('customers_served_today', 'read', $$select * from app.customers_served_today()$$, 'P0001', 'not_operator'),
   ('list_customers', 'read', $$select * from app.list_customers()$$, 'P0001', 'not_operator'),
   ('lookup_card', 'read', $$select * from app.lookup_card('A0B1C2D3E4F5A6')$$, 'P0001', 'not_operator'),
   ('get_card', 'read',
