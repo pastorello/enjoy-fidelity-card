@@ -180,7 +180,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint E: criteri 7–13 provati; revisione `security-and-hardening` del client; Impeccable pulito; E2E telefono e tablet verdi
 
 ### Fase 7: Chiusura
-- [ ] Task 36: Documentazione (RUNBOOK, note di rilascio, prove a mano, documenti senza telefono)
+- [x] Task 36: Documentazione (RUNBOOK, note di rilascio, prove a mano, documenti senza telefono)
 - [ ] Task 37: Verifica dei criteri di successo (`scripts/customersV2Criteria.test.ts`) e PR
 
 ### Checkpoint F: i criteri 1–13 verificati; quality bar completa verde; PR su `main` indipendente da #24, pronta per `code-review-and-quality`

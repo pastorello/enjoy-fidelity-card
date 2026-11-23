@@ -560,8 +560,8 @@ fuori dall'app, tempo di `list_customers` < 500 ms con 1 000/20 000, pagina dei 
 trovate; CLAUDE.md (telefono → email, rotta `/card/:cardId`); `docs/setup-*.md` e spec originali senza il
 telefono del cliente (rimando a SPEC-customers-v2, plan.md Open Questions); `brain/MAP.md`.
 **Accettazione:**
-- [ ] `grep -rniE "phone|telefono" docs`: solo il senso di dispositivo o la storia citata da SPEC-customers-v2
-- [ ] Nessun segreto né dato reale
+- [x] `grep -rniE "phone|telefono" docs`: solo il senso di dispositivo o la storia citata da SPEC-customers-v2
+- [x] Nessun segreto né dato reale
 **Verifica:** rilettura; `npm run format:check`
 **Dipendenze:** 35 · **File:** brain/topics/operations/RUNBOOK.md, CLAUDE.md, docs/setup-accounts.md,
 docs/specs/ (passi sul telefono), brain/MAP.md · **Dimensione:** M
