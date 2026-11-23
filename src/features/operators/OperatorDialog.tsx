@@ -3,7 +3,7 @@ import { Button } from '../../shared/ui/Button';
 import { Dialog } from '../../shared/ui/Dialog';
 import { Icon } from '../../shared/ui/Icon';
 import { NOT_IN_DISPLAY } from '../cards/customerName';
-import { useDevice } from '../identity/AuthProvider';
+import { useAuth, useDevice } from '../identity/AuthProvider';
 import type { Role } from '../identity/types';
 import { AdminPinStep } from './AdminPinStep';
 import styles from './OperatorDialog.module.css';
@@ -111,6 +111,7 @@ export function OperatorDialog({
 }: OperatorDialogProps) {
   const service = useOperatorsService();
   const device = useDevice();
+  const { refreshIdentity } = useAuth();
   const onDevice = device !== null;
   const [step, setStep] = useState<Step>('manage');
   const [role, setRole] = useState<Role>(operator.role);
@@ -235,6 +236,7 @@ export function OperatorDialog({
         cashierName={device?.cashier?.name ?? ''}
         lockSeconds={device?.lockSecondsLeft ?? 0}
         onPin={promoteWithPin}
+        onLocked={() => void refreshIdentity()}
       />
     );
   } else if (step !== 'manage') {

@@ -562,6 +562,13 @@ export function createFakeOperatorsService({
       );
       return { release };
     },
+    /**
+     * The seconds the device's lock of wrong PINs still lasts, as `get_session_identity` reads it
+     * (0: none): a device auth fake can follow it, so both read one lock, as on the server.
+     */
+    pinLockSeconds() {
+      return lockSeconds;
+    },
     /** The device's lock of wrong PINs is over (5 minutes later). */
     endPinLock() {
       lockSeconds = 0;

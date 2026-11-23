@@ -14,15 +14,21 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function renderStep(onPin: (pin: string) => Promise<PinRefusal | null>, lockSeconds = 0) {
+function renderStep(
+  onPin: (pin: string) => Promise<PinRefusal | null>,
+  lockSeconds = 0,
+  onLocked = vi.fn<() => void>(),
+) {
   render(
     <AdminPinStep
       question={QUESTION}
       cashierName="Giulia Prova"
       lockSeconds={lockSeconds}
       onPin={onPin}
+      onLocked={onLocked}
     />,
   );
+  return { onLocked };
 }
 
 function keypad() {
@@ -79,10 +85,22 @@ describe('AdminPinStep', () => {
   });
 
   it('says "PIN errato" with the attempts left, as /cassa', async () => {
-    renderStep(() => Promise.resolve({ status: 'wrong-pin', attemptsLeft: 3 }));
+    const { onLocked } = renderStep(() =>
+      Promise.resolve({ status: 'wrong-pin', attemptsLeft: 3 }),
+    );
     await type('0000');
     expect(await screen.findByRole('alert')).toHaveTextContent('PIN errato. Tentativi rimasti: 3');
     expect(keypad()).toBeEnabled();
+    expect(onLocked).not.toHaveBeenCalled();
+  });
+
+  it('tells the caller when the server locks the till, so the identity is read again', async () => {
+    const { onLocked } = renderStep(() =>
+      Promise.resolve({ status: 'pin-locked', lockSecondsLeft: 300 }),
+    );
+    await type('0000');
+    expect(await screen.findByRole('timer')).toBeVisible();
+    expect(onLocked).toHaveBeenCalledOnce();
   });
 
   it('counts the lock down in minutes and seconds with the keypad off, then lets the PIN in again', async () => {

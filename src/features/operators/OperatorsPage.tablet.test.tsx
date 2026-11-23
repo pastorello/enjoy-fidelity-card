@@ -53,10 +53,14 @@ function renderTablet(path = PATH, layout = true, extra: FakeOperator[] = []) {
     actingId: giulia?.id ?? null,
     onDevice: true,
   });
-  const auth = signedInFake({
-    device: fakeDevice,
+  const auth = signedInFake();
+  // The identity reads the lock of the PIN checks, one lock on the server for both.
+  const turnExpiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000);
+  auth.setDevice(fakeDevice, () => ({
     cashier: { id: giulia?.id ?? '', name: 'Giulia Prova', role: 'admin' },
-  });
+    turnExpiresAt,
+    lockSecondsLeft: fake.pinLockSeconds(),
+  }));
   renderApp(
     path,
     auth,
@@ -248,6 +252,48 @@ describe('OperatorsPage: tablet layout', () => {
     );
     expect(within(pin).getByRole('group', { name: 'Tastierino PIN' })).toBeDisabled();
     expect(fake.emails).toEqual([]);
+  });
+
+  it('invite form: the PIN step opened again after the lock still shows it, the keypad off', async () => {
+    const { fake } = renderTablet();
+    await findList();
+    const aside = await fillAdminInvite();
+    await userEvent.click(within(aside).getByRole('button', { name: 'Invia invito' }));
+    const pin = await screen.findByRole('dialog', { name: PIN_TITLE });
+    await ['0000', '0000', '0000', '0000', '0000'].reduce<Promise<void>>(
+      (previous, wrong) => previous.then(() => typePin(pin, wrong)),
+      Promise.resolve(),
+    );
+    expect(await within(pin).findByRole('timer')).toBeVisible();
+    await userEvent.click(within(pin).getByRole('button', { name: 'Annulla' }));
+    expect(screen.queryByRole('dialog', { name: PIN_TITLE })).toBeNull();
+    await userEvent.click(within(aside).getByRole('button', { name: 'Invia invito' }));
+    const again = await screen.findByRole('dialog', { name: PIN_TITLE });
+    expect(within(again).getByRole('timer')).toHaveTextContent(
+      /^Troppi tentativi: riprova tra (4:5\d|5:00)$/,
+    );
+    expect(within(again).getByRole('group', { name: 'Tastierino PIN' })).toBeDisabled();
+    expect(fake.emails).toEqual([]);
+  });
+
+  it('person dialog: back to the PIN step after the lock, the keypad is still off', async () => {
+    renderTablet();
+    const dialog = await openPerson('Luca Prova');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Amministratore' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salva ruolo' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rendi amministratore' }));
+    await ['0000', '0000', '0000', '0000', '0000'].reduce<Promise<void>>(
+      (previous, wrong) => previous.then(() => typePin(dialog, wrong)),
+      Promise.resolve(),
+    );
+    expect(await within(dialog).findByRole('timer')).toBeVisible();
+    // "Lascia com’è" leaves the PIN step for the person's card; the same steps lead back to it.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    await userEvent.click(await within(dialog).findByRole('radio', { name: 'Amministratore' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salva ruolo' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rendi amministratore' }));
+    expect(within(dialog).getByRole('timer')).toBeVisible();
+    expect(within(dialog).getByRole('group', { name: 'Tastierino PIN' })).toBeDisabled();
   });
 
   it('invite form: admin_from_device (the PIN missing) gets its text under Ruolo', async () => {

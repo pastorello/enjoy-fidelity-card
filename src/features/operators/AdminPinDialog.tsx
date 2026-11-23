@@ -1,5 +1,5 @@
 import { Dialog } from '../../shared/ui/Dialog';
-import { useDevice } from '../identity/AuthProvider';
+import { useAuth, useDevice } from '../identity/AuthProvider';
 import { AdminPinStep } from './AdminPinStep';
 import type { PinRefusal } from './types';
 
@@ -20,6 +20,7 @@ type AdminPinDialogProps = {
  */
 export function AdminPinDialog({ open, question, onPin, onClose }: AdminPinDialogProps) {
   const device = useDevice();
+  const { refreshIdentity } = useAuth();
   return (
     <Dialog open={open} title="Conferma con il PIN" closeLabel="Annulla" onClose={onClose}>
       <AdminPinStep
@@ -27,6 +28,7 @@ export function AdminPinDialog({ open, question, onPin, onClose }: AdminPinDialo
         cashierName={device?.cashier?.name ?? ''}
         lockSeconds={device?.lockSecondsLeft ?? 0}
         onPin={onPin}
+        onLocked={() => void refreshIdentity()}
       />
     </Dialog>
   );

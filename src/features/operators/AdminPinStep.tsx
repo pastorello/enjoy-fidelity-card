@@ -18,6 +18,11 @@ type AdminPinStepProps = {
    * when the caller took over (done, or another answer it shows itself).
    */
   onPin: (pin: string) => Promise<PinRefusal | null>;
+  /**
+   * The server locked the till: the caller reads the identity again (`refreshIdentity`), so a step
+   * opened later (after "Annulla") starts from the lock the server counts, as /cassa.
+   */
+  onLocked: () => void;
 };
 
 /**
@@ -27,7 +32,13 @@ type AdminPinStepProps = {
  * a wrong PIN and the lock of the till (the same counter as /cassa) read as there. The PIN lives
  * only in this component's state and is cleared after every answer.
  */
-export function AdminPinStep({ question, cashierName, lockSeconds, onPin }: AdminPinStepProps) {
+export function AdminPinStep({
+  question,
+  cashierName,
+  lockSeconds,
+  onPin,
+  onLocked,
+}: AdminPinStepProps) {
   const [pin, setPin] = useState('');
   const [checking, setChecking] = useState(false);
   const [attemptsLeft, setAttemptsLeft] = useState<number | null>(null);
@@ -45,7 +56,10 @@ export function AdminPinStep({ question, cashierName, lockSeconds, onPin }: Admi
       setChecking(false);
     }
     if (refusal?.status === 'wrong-pin') setAttemptsLeft(refusal.attemptsLeft);
-    else if (refusal?.status === 'pin-locked') lockFor(refusal.lockSecondsLeft);
+    else if (refusal?.status === 'pin-locked') {
+      lockFor(refusal.lockSecondsLeft);
+      onLocked();
+    }
   }
 
   return (

@@ -232,6 +232,13 @@ test.describe('wrong PINs of an invite', () => {
     await expect(pin.getByRole('button', { name: '0', exact: true })).toBeDisabled();
     expect(tillAttempts()).toBe('0|true');
 
+    // The step opened again still shows the lock, without a new try: the identity read it.
+    await pin.getByRole('button', { name: 'Annulla' }).click();
+    await expect(pin).toBeHidden();
+    await invite.getByRole('button', { name: 'Invia invito' }).click();
+    await expect(pin.getByRole('timer')).toHaveText(/^Troppi tentativi: riprova tra [45]:\d\d$/);
+    await expect(pin.getByRole('button', { name: '0', exact: true })).toBeDisabled();
+
     // The same lock on the till: "Cambia" opens /cassa, which counts it down as well.
     await pin.getByRole('button', { name: 'Annulla' }).click();
     await page.getByRole('link', { name: `Alla cassa: ${ADMIN.name} · Cambia` }).click();
