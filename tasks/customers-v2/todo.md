@@ -104,9 +104,9 @@ firma); `public.card_rewards(p_token)` (`stable security definer`, `no-store`, f
 per ogni caso non valido, `order by r.points, lower(r.name), r.id limit 100`), `revoke … from public`,
 `grant … to anon, authenticated`.
 **Accettazione:**
-- [ ] pgTAP: token valido → solo premi attivi in ordine; token `null`, malformato, in attesa, card disattivata,
+- [x] pgTAP: token valido → solo premi attivi in ordine; token `null`, malformato, in attesa, card disattivata,
       rilasciata, cliente anonimizzato → zero righe; intestazione `no-store`
-- [ ] pgTAP: `card_points.test.sql` invariato nelle attese; allowlist di `anon` = `card_points`,
+- [x] pgTAP: `card_points.test.sql` invariato nelle attese; allowlist di `anon` = `card_points`,
       `card_rewards` in `function_privileges.test.sql`
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 4 · **File:** supabase/migrations/*_card_rewards_public.sql, supabase/tests/card_points.test.sql,
