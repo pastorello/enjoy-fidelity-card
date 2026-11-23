@@ -5,7 +5,7 @@
 -- invented uids, names and @example.com addresses.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(51);
+select plan(85);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -440,6 +440,296 @@ select is(
   null,
   'card_active carries no detail'
 );
+
+-- get_card, reactivate_card and the reactivation from associate_card (task 5) ---------------
+-- Fake customers:
+--   Elena:  a deactivated card (…50) and an active one (…51) with a link, 30 points
+--   Franco: a deactivated card (…60), no active card
+--   Gina:   two deactivated cards (…70, …71), reactivated from associate_card
+--   Ivo:    anonymized; his card (…80) was deactivated by the anonymization
+reset role;
+select pg_temp.as_user('00000000-0000-4000-c700-000000000001');
+insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
+select fake.id, fake.name, now(), current_setting('release_test.admin')::uuid, gen_random_uuid()
+from (values
+  ('00000000-0000-4000-c710-000000000005'::uuid, 'Elena Riattiva'),
+  ('00000000-0000-4000-c710-000000000006'::uuid, 'Franco Riattiva'),
+  ('00000000-0000-4000-c710-000000000007'::uuid, 'Gina Riattiva'),
+  ('00000000-0000-4000-c710-000000000008'::uuid, 'Ivo Riattiva')
+) as fake (id, name);
+
+insert into app.cards (id, uid, customer_id, active, associated_at, associated_by, deactivated_at)
+select fake.id, fake.uid, fake.customer, fake.active, '2026-01-10 10:00+01',
+  current_setting('release_test.admin')::uuid,
+  case when not fake.active then '2026-11-12 10:00+01'::timestamptz end
+from (values
+  ('00000000-0000-4000-c720-000000000050'::uuid, '04C7C7C7C70050', '00000000-0000-4000-c710-000000000005'::uuid, false),
+  ('00000000-0000-4000-c720-000000000051'::uuid, '04C7C7C7C70051', '00000000-0000-4000-c710-000000000005'::uuid, true),
+  ('00000000-0000-4000-c720-000000000060'::uuid, '04C7C7C7C70060', '00000000-0000-4000-c710-000000000006'::uuid, false),
+  ('00000000-0000-4000-c720-000000000070'::uuid, '04C7C7C7C70070', '00000000-0000-4000-c710-000000000007'::uuid, false),
+  ('00000000-0000-4000-c720-000000000071'::uuid, '04C7C7C7C70071', '00000000-0000-4000-c710-000000000007'::uuid, false),
+  ('00000000-0000-4000-c720-000000000080'::uuid, '04C7C7C7C70080', '00000000-0000-4000-c710-000000000008'::uuid, true)
+) as fake (id, uid, customer, active);
+
+insert into private.card_links (card_id, token_hash)
+values ('00000000-0000-4000-c720-000000000051', private.card_token_hash('BBBBBBBBBBBBBBBBBBBBBB'));
+
+insert into app.movements
+  (operation_id, customer_id, kind, amount_cents, points, cents_per_point, operator_id)
+values (gen_random_uuid(), '00000000-0000-4000-c710-000000000005', 'purchase', 3000, 30, 100,
+  current_setting('release_test.admin')::uuid);
+
+update app.customers
+set name = 'Cliente cancellato riattiva', anonymized_at = now()
+where id = '00000000-0000-4000-c710-000000000008';
+
+-- Privileges
+select ok(
+  has_function_privilege('authenticated', 'app.get_card(uuid)', 'execute')
+  and has_function_privilege('authenticated', 'app.reactivate_card(uuid, uuid)', 'execute'),
+  'authenticated can execute get_card and reactivate_card'
+);
+select ok(
+  not has_function_privilege('anon', 'app.get_card(uuid)', 'execute')
+  and not has_function_privilege('anon', 'app.reactivate_card(uuid, uuid)', 'execute'),
+  'anon cannot execute get_card nor reactivate_card'
+);
+select is(
+  (select array_agg(p.proname::text || ':' || p.prosecdef::text || ':' || array_to_string(p.proconfig, ',')
+     || ':' || p.provolatile::text order by p.proname)
+   from pg_proc p where p.oid in ('app.get_card(uuid)'::regprocedure, 'app.reactivate_card(uuid, uuid)'::regprocedure)),
+  array['get_card:true:search_path="":s', 'reactivate_card:true:search_path="":v'],
+  'get_card (stable) and reactivate_card are security definer with an empty search_path'
+);
+
+-- get_card: any active operator -----------------------------------------------------------
+select pg_temp.as_user('00000000-0000-4000-c700-000000000003');
+set local role authenticated;
+select throws_ok(
+  $$select * from app.get_card('00000000-0000-4000-c720-000000000050')$$,
+  'P0001', 'not_operator', 'get_card: a user without an operator is not_operator'
+);
+reset role;
+
+select pg_temp.as_user('00000000-0000-4000-c700-000000000002');
+set local role authenticated;
+select is(
+  (select row(g.card_id, g.uid, g.customer_id, g.customer_name, g.active, g.deactivated_at, g.released_at,
+     g.customer_anonymized, g.customer_balance, g.other_active_card_id, g.other_active_card_uid)::text
+   from app.get_card('00000000-0000-4000-c720-000000000050') g),
+  row('00000000-0000-4000-c720-000000000050'::uuid, '04C7C7C7C70050',
+    '00000000-0000-4000-c710-000000000005'::uuid, 'Elena Riattiva', false,
+    '2026-11-12 10:00+01'::timestamptz, null::timestamptz, false, 30,
+    '00000000-0000-4000-c720-000000000051'::uuid, '04C7C7C7C70051')::text,
+  'get_card: a deactivated card with the other active card of the customer and the balance'
+);
+select is(
+  (select row(g.active, g.other_active_card_id, g.other_active_card_uid)::text
+   from app.get_card('00000000-0000-4000-c720-000000000051') g),
+  row(true, null::uuid, null::text)::text,
+  'get_card: an active card has no other active card'
+);
+select is(
+  (select row(g.customer_name, g.customer_anonymized, g.other_active_card_id)::text
+   from app.get_card('00000000-0000-4000-c720-000000000080') g),
+  row(null::text, true, null::uuid)::text,
+  'get_card: no name for an anonymized customer'
+);
+select is(
+  (select row(g.released_at is not null, g.active, g.other_active_card_id)::text
+   from app.get_card('00000000-0000-4000-c720-000000000000') g),
+  row(true, false, '00000000-0000-4000-c720-000000000001'::uuid)::text,
+  'get_card: a released card says so'
+);
+select is(
+  (select count(*) from app.get_card(gen_random_uuid())),
+  0::bigint,
+  'get_card: no row for an unknown card'
+);
+reset role;
+
+-- reactivate_card: who may call it (criterion 11) ---------------------------------------------
+select pg_temp.as_user('00000000-0000-4000-c700-000000000003');
+set local role authenticated;
+select throws_ok(
+  $$select app.reactivate_card('00000000-0000-4000-c720-000000000060', null)$$,
+  'P0001', 'not_operator', 'reactivate_card: a user without an operator is not_operator'
+);
+reset role;
+
+select pg_temp.as_user('00000000-0000-4000-c700-000000000002');
+set local role authenticated;
+select throws_ok(
+  $$select app.reactivate_card('00000000-0000-4000-c720-000000000060', null)$$,
+  'P0001', 'forbidden', 'reactivate_card: an operator is forbidden'
+);
+select throws_ok(
+  $$select app.reactivate_card(gen_random_uuid(), null)$$,
+  'P0001', 'forbidden', 'reactivate_card: an operator is forbidden before any lookup'
+);
+reset role;
+
+select pg_temp.as_cashier(current_setting('release_test.operator'));
+set local role authenticated;
+select throws_ok(
+  $$select app.reactivate_card('00000000-0000-4000-c720-000000000060', null)$$,
+  'P0001', 'forbidden', 'reactivate_card: the operator cashier of the device is forbidden'
+);
+reset role;
+select is(
+  (select active from app.cards where id = '00000000-0000-4000-c720-000000000060'),
+  false,
+  'a refused reactivation leaves the card deactivated'
+);
+
+select pg_temp.as_cashier(current_setting('release_test.admin'));
+set local role authenticated;
+select is(
+  (select row(r.id, r.active, r.deactivated_at, r.associated_at, r.associated_by, r.link_written_at,
+     r.replaced_card_id)::text
+   from app.reactivate_card('00000000-0000-4000-c720-000000000060', null) r),
+  row('00000000-0000-4000-c720-000000000060'::uuid, true, null::timestamptz, now(),
+    current_setting('release_test.admin')::uuid, null::timestamptz, null::uuid)::text,
+  'reactivate_card: the admin cashier reactivates a card, recorded as the cashier, link not written'
+);
+reset role;
+
+-- An admin: the card already active comes back unchanged.
+select pg_temp.as_user('00000000-0000-4000-c700-000000000001');
+set local role authenticated;
+select is(
+  (select row(r.id, r.active, r.associated_at, r.replaced_card_id)::text
+   from app.reactivate_card('00000000-0000-4000-c720-000000000060', gen_random_uuid()) r),
+  row('00000000-0000-4000-c720-000000000060'::uuid, true, now(), null::uuid)::text,
+  'reactivate_card of a card already active returns it unchanged, whatever the expected card'
+);
+
+-- Errors.
+select throws_ok(
+  $$select app.reactivate_card(gen_random_uuid(), null)$$,
+  'P0001', 'card_not_found', 'reactivate_card of an unknown card is card_not_found'
+);
+select throws_ok(
+  $$select app.reactivate_card('00000000-0000-4000-c720-000000000000', '00000000-0000-4000-c720-000000000001')$$,
+  'P0001', 'card_released', 'reactivate_card of a released card is card_released'
+);
+select throws_ok(
+  $$select app.reactivate_card('00000000-0000-4000-c720-000000000080', null)$$,
+  'P0001', 'customer_anonymized', 'reactivate_card for an anonymized customer is customer_anonymized'
+);
+
+-- The swap: the expected active card must be the current one.
+select throws_ok(
+  $$select app.reactivate_card('00000000-0000-4000-c720-000000000050', null)$$,
+  'P0001', 'active_card_changed', 'reactivate_card with null against an active card is active_card_changed'
+);
+select throws_ok(
+  $$select app.reactivate_card('00000000-0000-4000-c720-000000000050', gen_random_uuid())$$,
+  'P0001', 'active_card_changed', 'reactivate_card with a wrong expected card is active_card_changed'
+);
+reset role;
+select is(
+  (select array_agg(row(id, active)::text order by id) from app.cards
+   where customer_id = '00000000-0000-4000-c710-000000000005'),
+  array[row('00000000-0000-4000-c720-000000000050'::uuid, false)::text,
+        row('00000000-0000-4000-c720-000000000051'::uuid, true)::text],
+  'a refused swap changes nothing'
+);
+select is(
+  (select array_agg(coalesce(nullif(pg_temp.error_detail(e.sql), ''), 'none') order by e.sql)
+   from (values
+     ($$select app.reactivate_card(gen_random_uuid(), null)$$),
+     ($$select app.reactivate_card('00000000-0000-4000-c720-000000000000', null)$$),
+     ($$select app.reactivate_card('00000000-0000-4000-c720-000000000080', null)$$),
+     ($$select app.reactivate_card('00000000-0000-4000-c720-000000000050', null)$$)
+   ) as e (sql)),
+  array['none', 'none', 'none', 'none'],
+  'the errors of reactivate_card carry no detail (no uid)'
+);
+
+set local role authenticated;
+select is(
+  (select row(r.id, r.uid, r.active, r.deactivated_at, r.associated_at, r.associated_by, r.link_written_at,
+     r.link_pending_at, r.replaced_card_id)::text
+   from app.reactivate_card('00000000-0000-4000-c720-000000000050', '00000000-0000-4000-c720-000000000051') r),
+  row('00000000-0000-4000-c720-000000000050'::uuid, '04C7C7C7C70050', true, null::timestamptz, now(),
+    current_setting('release_test.admin')::uuid, null::timestamptz, null::timestamptz,
+    '00000000-0000-4000-c720-000000000051'::uuid)::text,
+  'reactivate_card with the right expected card swaps the cards, link not written'
+);
+reset role;
+select is(
+  (select array_agg(row(id, active, deactivated_at is not null)::text order by id) from app.cards
+   where customer_id = '00000000-0000-4000-c710-000000000005'),
+  array[row('00000000-0000-4000-c720-000000000050'::uuid, true, false)::text,
+        row('00000000-0000-4000-c720-000000000051'::uuid, false, true)::text],
+  'after the swap the other card is deactivated: one active card'
+);
+select is(
+  (select count(*) from private.card_links where card_id in
+    ('00000000-0000-4000-c720-000000000050', '00000000-0000-4000-c720-000000000051')),
+  0::bigint,
+  'after the swap neither card has a link'
+);
+select is(
+  private.customer_balance('00000000-0000-4000-c710-000000000005'),
+  30,
+  'the swap leaves the points of the customer unchanged'
+);
+
+-- Reactivation from associate_card: admins only (criterion 11) ----------------------------------
+select pg_temp.as_user('00000000-0000-4000-c700-000000000002');
+set local role authenticated;
+select throws_ok(
+  $$select app.associate_card('00000000-0000-4000-c710-000000000007', '04C7C7C7C70070')$$,
+  'P0001', 'forbidden', 'associate_card: an operator cannot reactivate a deactivated card'
+);
+select is(
+  nullif(pg_temp.error_detail(
+    $$select app.associate_card('00000000-0000-4000-c710-000000000007', '04C7C7C7C70070')$$), ''),
+  null,
+  'the forbidden of associate_card carries no detail'
+);
+select lives_ok(
+  $$select app.associate_card('00000000-0000-4000-c710-000000000005', '04C7C7C7C70050')$$,
+  'associate_card: an operator still reads back the active card of the same customer'
+);
+reset role;
+
+select pg_temp.as_cashier(current_setting('release_test.operator'));
+set local role authenticated;
+select throws_ok(
+  $$select app.associate_card('00000000-0000-4000-c710-000000000007', '04C7C7C7C70070')$$,
+  'P0001', 'forbidden', 'associate_card: the operator cashier cannot reactivate a deactivated card'
+);
+reset role;
+select is(
+  (select count(*) from app.cards where customer_id = '00000000-0000-4000-c710-000000000007' and active),
+  0::bigint,
+  'a refused reactivation from associate_card changes nothing'
+);
+
+select pg_temp.as_user('00000000-0000-4000-c700-000000000001');
+set local role authenticated;
+select is(
+  (select row(r.id, r.active, r.associated_by, r.replaced_card_id)::text
+   from app.associate_card('00000000-0000-4000-c710-000000000007', '04C7C7C7C70070') r),
+  row('00000000-0000-4000-c720-000000000070'::uuid, true, current_setting('release_test.admin')::uuid,
+    null::uuid)::text,
+  'associate_card: an admin reactivates a deactivated card'
+);
+reset role;
+
+select pg_temp.as_cashier(current_setting('release_test.admin'));
+set local role authenticated;
+select is(
+  (select row(r.id, r.active, r.associated_by, r.replaced_card_id)::text
+   from app.associate_card('00000000-0000-4000-c710-000000000007', '04C7C7C7C70071') r),
+  row('00000000-0000-4000-c720-000000000071'::uuid, true, current_setting('release_test.admin')::uuid,
+    '00000000-0000-4000-c720-000000000070'::uuid)::text,
+  'associate_card: the admin cashier reactivates a deactivated card, replacing the active one'
+);
+reset role;
 
 select * from finish();
 rollback;

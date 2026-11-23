@@ -3,7 +3,8 @@
 -- uid and the customer of the time, for the history; released_at takes it out of
 -- the uid index, so the same uid can get a new row for a new customer. A release is
 -- final: written once, only on an inactive card, and the card never becomes active
--- again. No message, detail or log carries a uid.
+-- again. Only an admin reactivates a deactivated card (app.reactivate_card, or the
+-- reactivation from associate_card). No message, detail or log carries a uid.
 
 -- Columns and constraints -------------------------------------------------------------------
 alter table app.cards
@@ -171,6 +172,11 @@ begin
               v_card.associated_by, v_card.deactivated_at, v_card.link_written_at,
               v_card.link_written_by, v_card.link_pending_at, null)::app.card_association;
     end if;
+    -- The customer's own deactivated card: whoever brings it back may spend the
+    -- points, so only an admin reactivates it (SPEC-customers-v2.md, criterion 11).
+    if not private.is_admin() then
+      raise exception 'forbidden' using errcode = 'P0001';
+    end if;
   end if;
 
   -- Replacement: the active card, if any, stops working before the new one starts.
@@ -277,3 +283,131 @@ $$;
 
 revoke execute on function app.release_card(uuid, uuid) from public, anon;
 grant execute on function app.release_card(uuid, uuid) to authenticated;
+
+-- get_card ------------------------------------------------------------------------------------
+-- The page of an inactive card (/card/:cardId): any active operator, like lookup_card
+-- (an operator already reads these columns from app.cards). No row for an unknown
+-- id; no name for an anonymized customer. The other active card of the customer, if
+-- any, is the one a reactivation would swap out.
+create function app.get_card(p_card_id uuid)
+returns table (
+  card_id uuid,
+  uid text,
+  customer_id uuid,
+  customer_name text,
+  active boolean,
+  deactivated_at timestamptz,
+  released_at timestamptz,
+  customer_anonymized boolean,
+  customer_balance int,
+  other_active_card_id uuid,
+  other_active_card_uid text
+)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+
+  return query
+    select
+      c.id,
+      c.uid,
+      c.customer_id,
+      case when cu.anonymized_at is null then cu.name end,
+      c.active,
+      c.deactivated_at,
+      c.released_at,
+      cu.anonymized_at is not null,
+      private.customer_balance(c.customer_id),
+      o.id,
+      o.uid
+    from app.cards c
+    join app.customers cu on cu.id = c.customer_id
+    left join app.cards o on o.customer_id = c.customer_id and o.active and o.id <> c.id
+    where c.id = p_card_id;
+end;
+$$;
+
+revoke execute on function app.get_card(uuid) from public, anon;
+grant execute on function app.get_card(uuid) to authenticated;
+
+-- reactivate_card -----------------------------------------------------------------------------
+-- An admin brings back a deactivated card of its customer. The swap is confirmed on
+-- the screen: p_expected_active_card_id is the active card the admin saw (null for
+-- none), and anything else is active_card_changed, so no swap other than the
+-- confirmed one ever happens. A card already active comes back unchanged (a resend
+-- after a network error does nothing twice). Same sequence as associate_card_to:
+-- the customer is locked, then the card; the other card stops before this one
+-- starts, from "link not written".
+create function app.reactivate_card(p_card_id uuid, p_expected_active_card_id uuid)
+returns app.card_association
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_customer app.customers;
+  v_customer_id uuid;
+  v_card app.cards;
+  v_active_id uuid;
+begin
+  if not private.is_active_operator() then
+    raise exception 'not_operator' using errcode = 'P0001';
+  end if;
+  if not private.is_admin() then
+    raise exception 'forbidden' using errcode = 'P0001';
+  end if;
+
+  -- customer_id never changes, so it can be read before any lock.
+  select c.customer_id into v_customer_id from app.cards c where c.id = p_card_id;
+  if not found then
+    raise exception 'card_not_found' using errcode = 'P0001';
+  end if;
+  select * into strict v_customer from app.customers where id = v_customer_id for update;
+  select * into strict v_card from app.cards where id = p_card_id for update;
+
+  if v_card.released_at is not null then
+    raise exception 'card_released' using errcode = 'P0001';
+  end if;
+  if v_customer.anonymized_at is not null then
+    raise exception 'customer_anonymized' using errcode = 'P0001';
+  end if;
+  if v_card.active then
+    return (v_card.id, v_card.uid, v_card.customer_id, v_card.active, v_card.associated_at,
+            v_card.associated_by, v_card.deactivated_at, v_card.link_written_at,
+            v_card.link_written_by, v_card.link_pending_at, null)::app.card_association;
+  end if;
+
+  select c.id into v_active_id
+  from app.cards c
+  where c.customer_id = v_customer_id and c.active
+  for update;
+  if v_active_id is distinct from p_expected_active_card_id then
+    raise exception 'active_card_changed' using errcode = 'P0001';
+  end if;
+
+  if v_active_id is not null then
+    update app.cards set active = false, deactivated_at = now() where id = v_active_id;
+  end if;
+
+  update app.cards
+  set active = true,
+      deactivated_at = null,
+      associated_at = now(),
+      associated_by = private.acting_operator_id()
+  where id = p_card_id
+  returning * into v_card;
+
+  return (v_card.id, v_card.uid, v_card.customer_id, v_card.active, v_card.associated_at,
+          v_card.associated_by, v_card.deactivated_at, v_card.link_written_at,
+          v_card.link_written_by, v_card.link_pending_at, v_active_id)::app.card_association;
+end;
+$$;
+
+revoke execute on function app.reactivate_card(uuid, uuid) from public, anon;
+grant execute on function app.reactivate_card(uuid, uuid) to authenticated;

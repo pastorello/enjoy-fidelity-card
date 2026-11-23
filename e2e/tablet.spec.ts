@@ -183,21 +183,15 @@ test.describe('the till tablet, with its own device account', () => {
         { uid: second },
       ),
     ).toBe(`true|${cashier}|none`);
-    // Back to the first card, for the reads below.
-    await page.goto(`/clienti/${customerId}/card`);
-    await expect(page.getByText('Passa la card nuova sul lettore')).toBeVisible();
-    await page.waitForTimeout(REPEAT_WINDOW_MS);
-    await expect(async () => {
-      if (new URL(page.url()).pathname.endsWith('/card')) await passOnUsbReader(page, uid);
-      await expect(page).toHaveURL(`/clienti/${customerId}`, { timeout: 1000 });
-    }).toPass({ timeout: 8000 });
+    // The reads below use the second card, the active one: only an admin may bring the first
+    // one back from Associa card (SPEC-customers-v2.md, criterion 11).
 
-    // The same card, read again from the home with the fake reader: Registra spesa.
+    // The active card, read from the home with the fake reader: Registra spesa.
     await page.goto('/');
     await page.waitForTimeout(REPEAT_WINDOW_MS);
     await expect(async () => {
       if (new URL(page.url()).pathname === '/') {
-        await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+        await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(second));
       }
       await expect(page).toHaveURL(`/clienti/${customerId}/spesa`, { timeout: 1000 });
     }).toPass({ timeout: 8000 });
@@ -207,7 +201,7 @@ test.describe('the till tablet, with its own device account', () => {
     await expect(chip).toBeVisible();
     await page.waitForTimeout(REPEAT_WINDOW_MS);
     const started = Date.now();
-    await readOnUsbReader(page, uid, `/clienti/${customerId}/spesa`);
+    await readOnUsbReader(page, second, `/clienti/${customerId}/spesa`);
     await typeAmount(page, '1250');
     await page.getByRole('button', { name: 'Conferma +12' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Spesa registrata' })).toBeVisible();

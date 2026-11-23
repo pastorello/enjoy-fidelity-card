@@ -3,7 +3,7 @@
 -- e regole di accesso"). Fake data only: invented uids and names.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(124);
+select plan(125);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -415,6 +415,8 @@ select throws_ok(
 );
 
 -- Reactivation of the customer's own deactivated card -------------------------------------------
+-- Only an admin reactivates (SPEC-customers-v2.md, criterion 11): the admin does it here.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000001","role":"authenticated"}', true);
 select set_config(
   'cards_test.r',
   (select row_to_json(r)::text
@@ -435,7 +437,7 @@ select is(
 );
 select is(
   (current_setting('cards_test.r')::jsonb ->> 'associated_by')::uuid,
-  (select id from app.operators where name = 'Operatore Card'),
+  (select id from app.operators where name = 'Admin Card'),
   'the reactivation records who reactivated'
 );
 select is(
@@ -452,6 +454,7 @@ select is(
   1::bigint,
   'after the reactivation the customer has one active card'
 );
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000002","role":"authenticated"}', true);
 
 -- deactivate_card --------------------------------------------------------------------------------
 select set_config(
@@ -486,7 +489,13 @@ select throws_ok(
   'P0001', 'card_not_found', 'deactivate_card without a card'
 );
 
--- A deactivated card of the same customer can be associated again later.
+-- A deactivated card of the same customer can be associated again later, by an admin only
+-- (SPEC-customers-v2.md, criterion 11).
+select throws_ok(
+  $$select * from app.associate_card('00000000-0000-4000-d100-000000000001', '04CCDDEEFF0001')$$,
+  'P0001', 'forbidden', 'an operator cannot get an old card back'
+);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000001","role":"authenticated"}', true);
 select is(
   (select active from app.associate_card('00000000-0000-4000-d100-000000000001', '04CCDDEEFF0001')),
   true,
@@ -497,6 +506,7 @@ select is(
   null,
   'nothing to replace when the card is already active'
 );
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-d000-000000000002","role":"authenticated"}', true);
 
 -- associate_card for a customer without cards; the 7-byte uid is accepted.
 select is(
