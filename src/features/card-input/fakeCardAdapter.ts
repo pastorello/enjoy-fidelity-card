@@ -84,7 +84,8 @@ export function createFakeCard(
   function present(uid: string) {
     const tag = tags.get(uid);
     if (tag?.damaged === true) unreadable?.();
-    else deliver?.(uid, 'hex', 'fake', tag?.urls ?? []);
+    // The fake tags have no erased state: a fake card is never taken for a blank one.
+    else deliver?.(uid, 'hex', 'fake', { urls: tag?.urls ?? [], blank: false });
   }
 
   /**

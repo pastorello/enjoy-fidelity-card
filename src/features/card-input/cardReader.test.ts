@@ -639,8 +639,11 @@ describe('createCardReader: exclusive write session (SPEC point 9)', () => {
     card.read(UID); // same uid at once: still delivered to the writer
 
     expect(onRead).toHaveBeenCalledTimes(2);
-    // An adapter that reports no links (USB, E2E fake) hands the writer an empty list.
-    expect(onRead).toHaveBeenLastCalledWith({ uid: UID, source: 'web-nfc', at: time() }, []);
+    // An adapter that reports no content (USB) hands the writer no links and a card not blank.
+    expect(onRead).toHaveBeenLastCalledWith(
+      { uid: UID, source: 'web-nfc', at: time() },
+      { urls: [], blank: false },
+    );
     expect(consumer).not.toHaveBeenCalled();
     expect(vibrate).not.toHaveBeenCalled();
   });

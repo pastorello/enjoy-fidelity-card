@@ -68,8 +68,8 @@ function setup() {
     /** The links the card holds, as a running write would see them on the next tap. */
     linksOn: (uid: string): readonly string[] | 'unreadable' => {
       let seen: readonly string[] | 'unreadable' = 'unreadable';
-      const session = reader.openWriteSession((_read, urls) => {
-        seen = urls;
+      const session = reader.openWriteSession((_read, content) => {
+        seen = content.urls;
       });
       tap(uid);
       session.close();
@@ -211,6 +211,7 @@ describe('createFakeCard: writes (E2E fake writer)', () => {
       ok: false,
       reason: 'wrong-card',
       otherUid: OTHER_UID,
+      mayHaveWritten: false,
     });
     expect(writes()).toEqual([]);
     expect(linksOn(OTHER_UID)).toEqual([]);

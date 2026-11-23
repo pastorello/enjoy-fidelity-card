@@ -166,19 +166,33 @@ export function createFakeWebNfc(options: FakeWebNfcOptions = {}) {
     visibilityListenerCount: () => visibilityListeners.size,
     /**
      * A card held to the phone: every active scan reports it, like Chrome does. `urls` become `url`
-     * records (UTF-8 bytes, as Chrome hands them), `texts` become `text` records.
+     * records (UTF-8 bytes, as Chrome hands them), `texts` become `text` records, `mimes` become `mime`
+     * records of those media types and `empties` that many `empty` records (no type, no data: what
+     * Chrome reports for a new or erased tag). With no content at all the message has no record.
      */
     read(
       serialNumber: string,
-      content: { urls?: readonly string[]; texts?: readonly string[] } = {},
+      content: {
+        urls?: readonly string[];
+        texts?: readonly string[];
+        mimes?: readonly string[];
+        empties?: number;
+      } = {},
     ) {
       const encoder = new TextEncoder();
       const record = (recordType: string, value: string): NDEFRecord => ({
         recordType,
         data: new DataView(encoder.encode(value).buffer),
       });
-      const records = [
+      const records: NDEFRecord[] = [
+        ...Array.from({ length: content.empties ?? 0 }, (): NDEFRecord => ({
+          recordType: 'empty',
+        })),
         ...(content.texts ?? []).map((text) => record('text', text)),
+        ...(content.mimes ?? []).map((mediaType): NDEFRecord => ({
+          ...record('mime', 'invented bytes'),
+          mediaType,
+        })),
         ...(content.urls ?? []).map((url) => record('url', url)),
       ];
       for (const scan of scans) {

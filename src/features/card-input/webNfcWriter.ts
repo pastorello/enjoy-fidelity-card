@@ -1,4 +1,4 @@
-import type { CardRead, CardReader } from './cardReader';
+import type { CardContent, CardRead, CardReader } from './cardReader';
 import { normalizeUid } from './normalizeUid';
 import type { WebNfcApi } from './webNfcAdapter';
 
@@ -24,9 +24,15 @@ export type CardWriteFailure =
   | 'verify-failed'
   | 'unreadable'
   | 'aborted';
-/** `otherUid` only with `wrong-card`: the card that was read instead of the expected one. */
+/**
+ * `otherUid` is the card read instead of the expected one. `mayHaveWritten` is false when it was read
+ * before `write()` started (nothing written), true from then on: Chrome writes the first tag in the
+ * field, so that card may now hold what was meant for the expected one (SPEC-customers-v2, point 4).
+ */
 export type CardWriteResult =
-  { ok: true } | { ok: false; reason: CardWriteFailure; otherUid?: string };
+  | { ok: true }
+  | { ok: false; reason: 'wrong-card'; otherUid: string; mayHaveWritten: boolean }
+  | { ok: false; reason: Exclude<CardWriteFailure, 'wrong-card'> };
 
 export type WriteUrlOptions = {
   expectedUid: string;
@@ -35,6 +41,7 @@ export type WriteUrlOptions = {
   onStep?: ((step: CardWriteStep) => void) | undefined;
 };
 export type WriteUrl = (url: string, options: WriteUrlOptions) => Promise<CardWriteResult>;
+export type EraseCard = (options: WriteUrlOptions) => Promise<CardWriteResult>;
 
 export type WebNfcWriterOptions = {
   api: Pick<WebNfcApi, 'createWriter'>;
@@ -46,7 +53,30 @@ export type WebNfcWriterOptions = {
   vibrate?: ((ms: number) => unknown) | undefined;
 };
 
-export type WebNfcWriter = { writeUrl: WriteUrl };
+export type WebNfcWriter = { writeUrl: WriteUrl; eraseCard: EraseCard };
+
+/**
+ * What one write puts on the card and how its verification reads the card back: `written` for the
+ * expected card, which must hold exactly what was written; `landedOn` for another card read during
+ * the verification, true when it holds it too (it was written instead of the expected one).
+ */
+type WriteJob = {
+  message: NDEFMessageInit;
+  written: (content: CardContent) => boolean;
+  landedOn: (content: CardContent) => boolean;
+};
+
+/** A blank card (strict: no record or only `empty` ones), the expected one or another one. */
+function blank(content: CardContent): boolean {
+  return content.blank;
+}
+
+/** A programming error, not an outcome: the caller (`cards`) knows the card. */
+function checkUid(expectedUid: string): string {
+  const uid = normalizeUid(expectedUid, 'hex');
+  if (uid === null) throw new TypeError('The expected card uid is not valid.');
+  return uid;
+}
 
 /** Programming errors, not outcomes: the caller (`cards`) builds the link and knows the card. */
 function checkArguments(url: string, expectedUid: string): string {
@@ -62,9 +92,7 @@ function checkArguments(url: string, expectedUid: string): string {
   if (parsed.protocol !== 'https:' || url.trim() !== url) {
     throw new TypeError('The link must be an https URL with no surrounding spaces.');
   }
-  const uid = normalizeUid(expectedUid, 'hex');
-  if (uid === null) throw new TypeError('The expected card uid is not valid.');
-  return uid;
+  return checkUid(expectedUid);
 }
 
 function errorName(error: unknown): string {
@@ -76,7 +104,7 @@ function errorName(error: unknown): string {
  * NotReadableError and NotSupportedError (not an NDEF tag) are all `io`; anything unexpected too, so a
  * write is never reported as done.
  */
-function failureForWriteError(error: unknown): CardWriteFailure {
+function failureForWriteError(error: unknown): 'not-allowed' | 'io' {
   return errorName(error) === 'NotAllowedError' ? 'not-allowed' : 'io';
 }
 
@@ -86,10 +114,11 @@ function onPhone(read: CardRead): boolean {
 }
 
 /**
- * Writes the link on a card (SPEC-card-input, point 9): only on the expected card, recognized on the
- * phone, with exactly one URL record and never `makeReadOnly()`. While writing, the service hands the
- * reads to the writer only. Never retries by itself, never logs or keeps the link (it holds a
- * customer's token) nor the uids.
+ * Writes the link on a card (SPEC-card-input, point 9), or a blank card (SPEC-customers-v2, point 4):
+ * only on the expected card, recognized on the phone, with exactly one record (`url`, or `empty`) and
+ * never `makeReadOnly()`. Both share one engine: the same steps, times and outcomes. While writing,
+ * the service hands the reads to the writer only. Never retries by itself, never logs or keeps the
+ * link (it holds a customer's token) nor the uids.
  */
 export function createWebNfcWriter({
   api,
@@ -100,7 +129,7 @@ export function createWebNfcWriter({
 }: WebNfcWriterOptions): WebNfcWriter {
   let busy = false;
 
-  function run(url: string, expectedUid: string, options: WriteUrlOptions) {
+  function run(job: WriteJob, expectedUid: string, options: WriteUrlOptions) {
     return new Promise<CardWriteResult>((resolve) => {
       const { signal, onStep, allowUnreadable = false } = options;
       // Aborts the running write() when the write ends for any other reason.
@@ -148,11 +177,10 @@ export function createWebNfcWriter({
         enter('writing');
         let written: Promise<void>;
         try {
-          written = api.createWriter().write(
-            // Always one URL record and nothing else, replacing whatever the card holds.
-            { records: [{ recordType: 'url', data: url }] },
-            { overwrite: true, signal: writeControl.signal },
-          );
+          // Always one record and nothing else, replacing whatever the card holds.
+          written = api
+            .createWriter()
+            .write(job.message, { overwrite: true, signal: writeControl.signal });
         } catch (error) {
           finish({ ok: false, reason: failureForWriteError(error) });
           return;
@@ -160,7 +188,7 @@ export function createWebNfcWriter({
         written.then(
           () => {
             if (settled) return;
-            // The link counts as written only once it is read back the same (verification),
+            // The card counts as written only once it is read back the same (verification),
             // which gets its own time.
             startTimer(VERIFY_TIMEOUT_MS);
             enter('verifying');
@@ -180,27 +208,33 @@ export function createWebNfcWriter({
         finish({ ok: true });
       }
 
-      function onRead(read: CardRead, urls: readonly string[]) {
+      function wrongCard(otherUid: string, mayHaveWritten: boolean) {
+        finish({ ok: false, reason: 'wrong-card', otherUid, mayHaveWritten });
+      }
+
+      function onRead(read: CardRead, content: CardContent) {
         if (settled || !onPhone(read)) return;
         const expected = read.uid === expectedUid;
         switch (step) {
           case 'waiting-card':
+            // Nothing written yet: the other card is untouched.
             if (expected) startWrite();
-            else finish({ ok: false, reason: 'wrong-card', otherUid: read.uid });
+            else wrongCard(read.uid, false);
             return;
           case 'writing':
             // write() writes the first tag in the field, whichever it is: another card read now may
-            // already hold the link. The expected card read now is not a verification yet.
-            if (!expected) finish({ ok: false, reason: 'wrong-card', otherUid: read.uid });
+            // already hold what was written. The expected card read now is not a verification yet.
+            if (!expected) wrongCard(read.uid, true);
             return;
           case 'verifying':
             if (expected) {
-              if (urls.includes(url)) succeed();
+              if (job.written(content)) succeed();
               else finish({ ok: false, reason: 'verify-failed' });
-            } else if (urls.includes(url)) {
-              // The link ended up on another card.
-              finish({ ok: false, reason: 'wrong-card', otherUid: read.uid });
+            } else if (job.landedOn(content)) {
+              // write() may have resolved on that card, read only now: it was written instead.
+              wrongCard(read.uid, true);
             }
+            // Another card that does not hold it was not written by us: ignored.
             return;
           default:
             return;
@@ -235,19 +269,46 @@ export function createWebNfcWriter({
     });
   }
 
+  async function start(
+    job: WriteJob,
+    expectedUid: string,
+    options: WriteUrlOptions,
+  ): Promise<CardWriteResult> {
+    if (!canWrite()) return { ok: false, reason: 'cannot-write' };
+    if (busy) return { ok: false, reason: 'busy' };
+    if (options.signal?.aborted === true) return { ok: false, reason: 'aborted' };
+    busy = true;
+    try {
+      return await run(job, expectedUid, options);
+    } catch (error) {
+      busy = false;
+      throw error;
+    }
+  }
+
   return {
     async writeUrl(url, options) {
       const expectedUid = checkArguments(url, options.expectedUid);
-      if (!canWrite()) return { ok: false, reason: 'cannot-write' };
-      if (busy) return { ok: false, reason: 'busy' };
-      if (options.signal?.aborted === true) return { ok: false, reason: 'aborted' };
-      busy = true;
-      try {
-        return await run(url, expectedUid, options);
-      } catch (error) {
-        busy = false;
-        throw error;
-      }
+      const holdsLink = (content: CardContent) => content.urls.includes(url);
+      return await start(
+        {
+          message: { records: [{ recordType: 'url', data: url }] },
+          written: holdsLink,
+          landedOn: holdsLink,
+        },
+        expectedUid,
+        options,
+      );
+    },
+    async eraseCard(options) {
+      const expectedUid = checkUid(options.expectedUid);
+      // Web NFC cannot format a tag and rejects a message with no record: one `empty` record (TNF 0)
+      // is what Chrome reports for a new NTAG215. Never makeReadOnly(): the card stays writable.
+      return await start(
+        { message: { records: [{ recordType: 'empty' }] }, written: blank, landedOn: blank },
+        expectedUid,
+        options,
+      );
     },
   };
 }
