@@ -134,7 +134,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint A: `db:test` e `test:integration` verdi, pgTAP esistenti invariati nel comportamento; revisione `security-and-hardening` del database
 
 ### Fase 2: Scrittura della card vuota (`card-input`)
-- [ ] Task 8: Motore di scrittura: `eraseCard`, `mayHaveWritten`, `blank` dall'adattatore Web NFC
+- [x] Task 8: Motore di scrittura: `eraseCard`, `mayHaveWritten`, `blank` dall'adattatore Web NFC
 - [ ] Task 9: `useCardWriter().eraseCard` e adattatore finto degli E2E con card vuote
 
 ### Checkpoint B: quality bar completa verde; `npm run build && npm run check:bundle` verde

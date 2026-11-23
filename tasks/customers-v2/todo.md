@@ -140,11 +140,11 @@ recordType: 'empty' }] }`, `overwrite: true`, `signal`), verifica "vuota" strett
 `blank` (nessun record o soli `empty`), mai ai consumatori di `useCardRead`; tipi in `web-nfc.d.ts`;
 `fakeWebNfc` capace di card vuote.
 **Accettazione:**
-- [ ] Unit: un solo record `empty` con `overwrite: true`; `verify-failed` se resta un URL, un `text` o un
+- [x] Unit: un solo record `empty` con `overwrite: true`; `verify-failed` se resta un URL, un `text` o un
       `mime`; `wrong-card` con `mayHaveWritten: false` nel passo `waiting-card` e `true` durante `write()`; un
       altro uid letto **vuoto** durante la verifica → `wrong-card` con `mayHaveWritten: true`; uno non vuoto
       ignorato; `unreadable`/`allowUnreadable`; tempi; `makeReadOnly` mai chiamato
-- [ ] Unit: `blank` vero per nessun record e per soli `empty`, falso con `text`, `mime`, `url`; mai a
+- [x] Unit: `blank` vero per nessun record e per soli `empty`, falso con `text`, `mime`, `url`; mai a
       `useCardRead`; `writeUrl` esistente invariato salvo `mayHaveWritten`
 **Verifica:** `npm test -- card-input`
 **Dipendenze:** nessuna · **File:** src/features/card-input/webNfcWriter.ts (+test),
