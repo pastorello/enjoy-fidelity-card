@@ -574,14 +574,15 @@ nel corpo, niente riga "rami in catena"; si dice che è **indipendente dalla PR 
 elencano i file toccati da entrambe, se ce ne sono; in apertura l'Open Question 17 da chiudere prima del merge.
 `brain/STATUS.md` e `brain/HANDOFF.md` aggiornati.
 **Accettazione:**
-- [ ] Ogni criterio ha almeno una prova verificata dallo script
-- [ ] CI verde sulla PR (pgTAP, unit, componenti, integrazione, E2E telefono e tablet, bundle)
-- [ ] Nessuna pubblicazione su progetti remoti (la fa l'orchestratore)
+- [x] Ogni criterio ha almeno una prova verificata dallo script
+- [x] CI verde sulla PR (pgTAP, unit, componenti, integrazione, E2E telefono e tablet, bundle)
+- [x] Nessuna pubblicazione su progetti remoti (la fa l'orchestratore)
 **Verifica:** `npm test -- customersV2Criteria`; CI su GitHub
 **Dipendenze:** 36 · **File:** tasks/customers-v2/plan.md, tasks/customers-v2/todo.md,
 scripts/customersV2Criteria.test.ts, brain/STATUS.md, brain/HANDOFF.md · **Dimensione:** M
 
 ## Checkpoint F
-- [ ] I 13 criteri di successo di SPEC-customers-v2 verificati
-- [ ] PR su `main`, indipendente da #24, pronta per `code-review-and-quality`
+- [x] I 13 criteri di successo di SPEC-customers-v2 verificati
+- [x] PR su `main`, indipendente da #24, pronta per `code-review-and-quality` (PR #25; #24 unita nel
+  frattempo: `main` unito nel ramo, CI verde)
 - [ ] Open Question 17 chiusa con il titolare prima del merge

@@ -10,17 +10,16 @@
 - `customers-v2` (richiesta del titolare del 2026-11-23), task 37: tabella "Verifica dei criteri di successo"
   in `tasks/customers-v2/plan.md` e `scripts/customersV2Criteria.test.ts` (ogni criterio 1-13 cita prove che
   esistono davvero; pgTAP, integrazione, E2E telefono e tablet e passi della CI dove la spec li chiede).
-  Quality bar completa, build e `check:bundle` verdi in locale. PR da `feat/customers-v2` verso `main`,
-  indipendente dalla #24 (`operators`).
+  Quality bar completa, build e `check:bundle` verdi in locale. PR #25 da `feat/customers-v2` verso `main`,
+  nata indipendente dalla #24 (`operators`), poi riallineata a `main` dopo l'unione della #24.
 - Turno precedente archiviato in `handoffs/2026-11-19-0000.md` (`tablet-kiosk`, PR #23).
 
 ## Prima cosa per la prossima finestra
 
 - **Open Question 17** di `docs/specs/SPEC-customers-v2.md`, da chiedere al titolare **prima del merge**:
   «Cancelliamo anche i numeri già salvati? Non si potranno recuperare.»
-- Ordine di merge tra #24 e la PR di `customers-v2`: nessuna dipendenza, ma file in comune (elencati nella
-  PR). Chi arriva secondo si riallinea a `main` e rilancia la quality bar; le migrazioni di #24 hanno
-  timestamp precedenti a quelle di `customers-v2`.
+- La PR #24 (`operators`) è stata unita in `main` mentre questo ramo era aperto: `main` è stato unito in
+  `feat/customers-v2` (merge, nessun force-push) con i conflitti risolti; la PR #25 è di nuovo unibile.
 - Dopo il merge: `db push` delle migrazioni sullo staging, poi in produzione (RUNBOOK, note di rilascio di
   `customers-v2`); prove a mano su Android (Riformatta, pagina pubblica con i premi).
 
