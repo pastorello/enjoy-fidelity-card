@@ -463,8 +463,8 @@ fermarsi e avvisare (domanda aperta 10 della spec).
 44. Il modulo `cards` non chiama Supabase dai componenti (`getSupabase()` solo in `supabaseCardsService.ts`
     e `public/cardPointsService.ts`), non registra uid, token o link (`console.*`, `localStorage`,
     `sessionStorage`, `location.href` vietati in `src/features/cards/`), non chiama mai `makeReadOnly` e
-    chiama `card_points` solo in `POST` (mai `{ get: true }`, che metterebbe il token nell'URL della
-    richiesta): lo controlla `scripts/cardsBoundary.test.ts`. I titoli nuovi in Enjoy Display (costanti
+    chiama `card_points` e `card_rewards` solo in `POST` (mai `{ get: true }`, che metterebbe il token
+    nell'URL della richiesta): lo controlla `scripts/cardsBoundary.test.ts`. I titoli nuovi in Enjoy Display (costanti
     `…TITLE`, `title:` degli avvisi, `CardLinkScreen`) li controlla `scripts/displayGlyphs.test.ts`.
 45. Un ref che tiene "l'ultima" callback o l'ultimo valore per un gestore di eventi, una lettura card o la
     risposta di una promessa si aggiorna con `useLatest` (`src/lib/useLatest.ts`, fase di layout), mai in un

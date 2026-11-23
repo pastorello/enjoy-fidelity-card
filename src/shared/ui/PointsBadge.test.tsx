@@ -19,4 +19,12 @@ describe('PointsBadge', () => {
     render(<PointsBadge points={45} label="Saldo" />);
     expect(screen.getByText('Saldo: 45 punti')).toBeInTheDocument();
   });
+
+  it('can spell the unit out for whoever does not know "pt", grouped as it-IT', () => {
+    const { container, rerender } = render(<PointsBadge points={1250} unit="words" />);
+    // Once only: the visible text is what a screen reader says.
+    expect(container.textContent).toBe('1.250 punti');
+    rerender(<PointsBadge points={1} unit="words" />);
+    expect(container.textContent).toBe('1 punto');
+  });
 });

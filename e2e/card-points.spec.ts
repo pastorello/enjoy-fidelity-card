@@ -75,22 +75,57 @@ async function pageText(page: Page): Promise<string> {
 }
 
 /**
- * What the public page may do with the network and the browser (SPEC-cards, Security): one POST to
- * `rpc/card_points` per load, the token never in a request URL or referrer besides the page's own,
- * and no service worker.
+ * The active rewards of the seed (supabase/seed.sql), cheapest first; «Dolce del giorno» is
+ * inactive. Other specs add rewards with a unique suffix while this one runs, so the list is
+ * checked for these in this order, not for these alone.
+ */
+const SEED_ACTIVE_REWARDS = [
+  'Caffè 50 punti',
+  'Cornetto e cappuccino 100 punti',
+  'Colazione per due 180 punti',
+  'Aperitivo 200 punti',
+];
+
+const HINT = 'Mostra la card alla cassa per usare i tuoi punti.';
+const NOTE = 'Questa pagina mostra i punti della card e i premi del bar, senza dati personali.';
+
+/** The rows of the PREMI section, top to bottom, spaces collapsed. */
+async function rewardRows(page: Page): Promise<string[]> {
+  const rows = await page
+    .getByRole('region', { name: 'PREMI' })
+    .getByRole('listitem')
+    .allInnerTexts();
+  return rows.map((row) => row.replace(/\s+/g, ' ').trim());
+}
+
+/** Where each row of the PREMI section is drawn. */
+async function rowBoxes(page: Page) {
+  const rows = await page.getByRole('region', { name: 'PREMI' }).getByRole('listitem').all();
+  return Promise.all(rows.map((row) => row.boundingBox()));
+}
+
+/** The points of a row «Caffè 50 punti». */
+function rowPoints(row: string): number {
+  const digits = / ([\d.]+) punt[io]$/.exec(row)?.[1];
+  if (digits === undefined) throw new Error(`Not a reward row: ${row}`);
+  return Number(digits.replaceAll('.', ''));
+}
+
+/**
+ * What the public page may do with the network and the browser (SPEC-cards, Security, and
+ * SPEC-customers-v2 point 3): one POST to `rpc/card_points` and one to `rpc/card_rewards` per load
+ * and nothing else, the token never in a request URL or referrer besides the page's own, and no
+ * service worker.
  */
 async function expectOnlyCardPoints(visit: Visit, token: string) {
   const { page, requests } = visit;
   await page.waitForLoadState('load');
 
-  const supabase = requests.filter(isSupabase);
-  expect(supabase.length).toBeGreaterThan(0);
-  for (const request of supabase) {
-    expect({ method: request.method(), path: new URL(request.url()).pathname }).toEqual({
-      method: 'POST',
-      path: '/rest/v1/rpc/card_points',
-    });
-  }
+  const supabase = requests
+    .filter(isSupabase)
+    .map((request) => `${request.method()} ${new URL(request.url()).pathname}`)
+    .toSorted();
+  expect(supabase).toEqual(['POST /rest/v1/rpc/card_points', 'POST /rest/v1/rpc/card_rewards']);
 
   const others = requests.filter((request) => request.url() !== page.url());
   const sent = await Promise.all(
@@ -139,9 +174,10 @@ test('the link written on a new card shows «ENJOY YOUR POINTS» and 0 without a
     expect(text).not.toContain(customer.name);
     expect(text).not.toContain(customer.name.split(' ')[0] ?? customer.name);
     expect(text).not.toContain(uid.slice(-4));
+    // Logo, points, PREMI with its rows, the two sentences, the footer: nothing else.
+    const rows = await rewardRows(customerPage);
     expect(text).toBe(
-      'ENJOY YOUR POINTS 0 punti Mostra la card alla cassa per usare i tuoi punti. ' +
-        'Questa pagina mostra solo i punti della card, senza dati personali. Enjoy Bar · Gaeta',
+      `ENJOY YOUR POINTS 0 punti PREMI ${rows.join(' ')} ${HINT} ${NOTE} Enjoy Bar · Gaeta`,
     );
     await expect(customerPage.getByRole('link')).toHaveCount(0);
     await expect(customerPage).not.toHaveTitle(new RegExp(token));
@@ -215,6 +251,63 @@ test('an invented token shows the same neutral «Card non attiva», without sayi
     );
     await expect(page.getByRole('button')).toHaveCount(0);
     await expectOnlyCardPoints(visit, token);
+  } finally {
+    await visit.close();
+  }
+});
+
+test('the page lists the active rewards of the seed under the points, cheapest first (criterion 7)', async ({
+  page,
+  browser,
+}) => {
+  await stubWebNfc(page);
+  await signIn(page);
+  const uid = freshUid();
+  await customerWithCard(page, 'Card Premi E2E', uid);
+  const link = (await fakeCardWrites(page)).find((entry) => entry.uid === uid)?.url ?? '';
+
+  const visit = await openAsCustomer(browser, openable(link));
+  try {
+    const { page: customerPage } = visit;
+    const section = customerPage.getByRole('region', { name: 'PREMI' });
+    await expect(section.getByRole('heading', { level: 2, name: 'PREMI' })).toBeVisible();
+
+    const rows = await rewardRows(customerPage);
+    // The seed's active rewards, in their order; the inactive one never.
+    expect(rows.filter((row) => SEED_ACTIVE_REWARDS.includes(row))).toEqual(SEED_ACTIVE_REWARDS);
+    expect(rows.some((row) => row.startsWith('Dolce del giorno'))).toBe(false);
+    // Every row, the other specs' too, by points from the cheapest.
+    const points = rows.map(rowPoints);
+    expect(points).toEqual(points.toSorted((a, b) => a - b));
+
+    // Rows to read, not to touch, between the points and the hint.
+    await expect(section.getByRole('link')).toHaveCount(0);
+    await expect(section.getByRole('button')).toHaveCount(0);
+    for (const box of await rowBoxes(customerPage)) {
+      expect(box?.height).toBeGreaterThanOrEqual(56);
+    }
+    const order = await customerPage.evaluate(() =>
+      ['ENJOY YOUR POINTS', 'PREMI', 'Mostra la card'].map((needle) =>
+        document.body.innerText.indexOf(needle),
+      ),
+    );
+    expect(order).toEqual(order.toSorted((a, b) => a - b));
+    expect(order[0]).toBeGreaterThanOrEqual(0);
+
+    await expectOnlyCardPoints(visit, tokenOf(link));
+
+    // Readable on the narrowest phones: nothing wider than 320 px, every row still whole.
+    await customerPage.setViewportSize({ width: 320, height: 640 });
+    const widths = await customerPage.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+    for (const box of await rowBoxes(customerPage)) {
+      expect(box?.height).toBeGreaterThanOrEqual(56);
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(320);
+    }
+    expect(await rewardRows(customerPage)).toEqual(rows);
   } finally {
     await visit.close();
   }

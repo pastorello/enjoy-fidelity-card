@@ -2,17 +2,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { formatInteger } from '../../../shared/format';
 import { Icon } from '../../../shared/ui/Icon';
+import { PointsBadge } from '../../../shared/ui/PointsBadge';
 import { StatusView } from '../../../shared/ui/StatusView';
-import { fetchCardPoints, isCardToken } from './cardPointsService';
+import {
+  fetchCardPoints,
+  fetchCardRewards,
+  isCardToken,
+  type PublicReward,
+} from './cardPointsService';
 import styles from './CardPointsPage.module.css';
 
 // The customer's page behind the link on the card (/s/:token, boards "Saldo-punti" and
-// "Saldo-card-non-attiva"). Public: no account, no AuthProvider, no card reading, no link to the
+// "Saldo-card-non-attiva", with the PREMI section of SPEC-customers-v2 point 3). Public: no account, no AuthProvider, no card reading, no link to the
 // operators' screens. The token stays in the path: never stored, logged, or put in the title.
 
 type Load =
   | { status: 'loading' }
-  | { status: 'points'; points: number }
+  | { status: 'points'; points: number; rewards: PublicReward[] }
   | { status: 'inactive' }
   | { status: 'error' };
 
@@ -31,8 +37,11 @@ function useCardPoints(token: string): { load: Load; retry: () => void } {
     const settle = (load: Load) => {
       if (latest.current === id) setAnswer({ token: wanted, load });
     };
-    fetchCardPoints(wanted).then(
-      (points) => settle(points === null ? { status: 'inactive' } : { status: 'points', points }),
+    // Both functions at once; one failure is the page's only error state, never half a page.
+    Promise.all([fetchCardPoints(wanted), fetchCardRewards(wanted)]).then(
+      ([points, rewards]) =>
+        // A link without points shows no rewards ("Card non attiva" stays as it was).
+        settle(points === null ? { status: 'inactive' } : { status: 'points', points, rewards }),
       () => settle({ status: 'error' }),
     );
   }, []);
@@ -88,7 +97,7 @@ export function CardPointsPage() {
             />
           </div>
         )}
-        {load.status === 'points' && <PointsPanel points={load.points} />}
+        {load.status === 'points' && <PointsPanel points={load.points} rewards={load.rewards} />}
         {load.status === 'inactive' && <InactivePanel />}
       </main>
       <footer className={styles.footer}>
@@ -98,7 +107,7 @@ export function CardPointsPage() {
   );
 }
 
-function PointsPanel({ points }: { points: number }) {
+function PointsPanel({ points, rewards }: { points: number; rewards: PublicReward[] }) {
   return (
     <>
       <section aria-labelledby="card-points-title" className={styles.pointsPanel}>
@@ -110,13 +119,34 @@ function PointsPanel({ points }: { points: number }) {
           <span className={styles.unit}>{points === 1 ? 'punto' : 'punti'}</span>
         </p>
       </section>
+      {rewards.length > 0 && <RewardsSection rewards={rewards} />}
       <div className={styles.text}>
         <p className={styles.hint}>Mostra la card alla cassa per usare i tuoi punti.</p>
         <p className={styles.note}>
-          Questa pagina mostra solo i punti della card, senza dati personali.
+          Questa pagina mostra i punti della card e i premi del bar, senza dati personali.
         </p>
       </div>
     </>
+  );
+}
+
+/** The active rewards, as the server orders them: name and points, nothing to touch. */
+function RewardsSection({ rewards }: { rewards: PublicReward[] }) {
+  return (
+    <section aria-labelledby="rewards-title" className={styles.rewards}>
+      <h2 id="rewards-title" className={styles.rewardsTitle}>
+        PREMI
+      </h2>
+      <ul className={styles.rewardList}>
+        {rewards.map((reward) => (
+          // Reward names are unique in the catalogue (rewards_name_key, case-insensitive).
+          <li key={reward.name} className={styles.reward}>
+            <span className={styles.rewardName}>{reward.name}</span>
+            <PointsBadge points={reward.points} unit="words" />
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
