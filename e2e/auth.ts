@@ -25,6 +25,8 @@ export const seedDevices = {
   pinTill: { email: 'cassa-pin@example.com', name: 'Tablet cambio PIN' },
   /** Reserved to e2e/tablet-layout.spec.ts, which keeps an admin at its till. */
   layoutTill: { email: 'cassa-layout@example.com', name: 'Tablet layout' },
+  /** Reserved to the «Card non attiva» test of e2e/tablet.spec.ts, with an admin at its till. */
+  cardTill: { email: 'cassa-card@example.com', name: 'Tablet card non attiva' },
 } as const;
 
 /** Fake till PINs of the seed operators (supabase/seed.sql). */

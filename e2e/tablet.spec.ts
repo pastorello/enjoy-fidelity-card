@@ -277,3 +277,63 @@ test('5 wrong PINs lock the till, even after a reload; the 6th, right, is refuse
   expect(cashierOf(seedDevices.lockedTill.name)).toBe('');
   await expect(page).toHaveURL(/\/cassa$/);
 });
+
+test('a deactivated card on the USB reader, an admin at the till: «Card non attiva», Riattiva, «Link non scritto» (SPEC-customers-v2, criterion 12)', async ({
+  page,
+}) => {
+  const till = seedDevices.cardTill;
+  resetDevice(till.name);
+  await signInDevice(page, till.email);
+  await operatorButton(page, seedAccounts.admin.name).click();
+  await tapPin(page, SEED_PINS.admin);
+  await expect(page).toHaveURL(/\/$/);
+
+  // A customer with a first card, then a second one from Associa card: the first is deactivated.
+  const first = freshUid();
+  await readOnUsbReader(page, first, '/clienti/nuovo');
+  const name = uniqueName('Rita Riattiva E2E');
+  await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
+  await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
+  await page.getByRole('button', { name: 'Salva cliente' }).click();
+  await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}\/spesa$/);
+  const customerId = /\/clienti\/([0-9a-f-]{36})\/spesa$/.exec(page.url())?.[1];
+  if (customerId === undefined) throw new Error('No customer id in the URL');
+  const second = freshUid();
+  await page.goto(`/clienti/${customerId}/card`);
+  await expect(page.getByText('Passa la card nuova sul lettore')).toBeVisible();
+  await expect(async () => {
+    if (new URL(page.url()).pathname.endsWith('/card')) await passOnUsbReader(page, second);
+    await expect(page).toHaveURL(`/clienti/${customerId}`, { timeout: 1000 });
+  }).toPass({ timeout: 8000 });
+  const firstId = runSql(
+    `select id from app.cards where uid = :'uid' and not active and released_at is null;`,
+    { uid: first },
+  );
+  expect(firstId).toMatch(/^[0-9a-f-]{36}$/);
+
+  // The first card on the USB reader from the home: «Card non attiva», by the id of its row.
+  await page.goto('/');
+  await readOnUsbReader(page, first, `/card/${firstId}`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Card non attiva' })).toBeVisible();
+  const column = page.locator('[data-tablet-column="inactive-card"]');
+  await expect(column.getByText(`Card …${first.slice(-4)}`)).toBeVisible();
+  await expect(column.getByText(/serve un telefono Android con l’NFC attivo/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Riformatta la card' })).toHaveCount(0);
+
+  // Riattiva, a swap with the second card: the customer page, the link not written.
+  await column.getByRole('button', { name: 'Riattiva la card' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Scambia le card' }).click();
+  await expect(page).toHaveURL(`/clienti/${customerId}`);
+  await expect(page.getByRole('status')).toContainText(
+    `Card …${first.slice(-4)} riattivata. Link non scritto.`,
+  );
+  expect(
+    runSql(
+      `select uid || '|' || active || '|' || coalesce(link_written_at::text, 'none')
+       from app.cards where customer_id = :'id' order by uid = :'first' desc;`,
+      { id: customerId, first },
+    ),
+  ).toBe(`${first}|true|none\n${second}|false|none`);
+
+  resetDevice(till.name);
+});

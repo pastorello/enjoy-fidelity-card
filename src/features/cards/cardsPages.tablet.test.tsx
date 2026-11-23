@@ -1,10 +1,11 @@
-import { screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fakeDevice } from '../../test/fakeAuthService';
 import { createTestCardReader } from '../../test/fakeCardReader';
 import { createFakeCardsService, fakeCard } from '../../test/fakeCardsService';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
+import { driveLinkWrites } from '../../test/fakeLinkWrites';
 import { createFakeRewardsService, fakeReward } from '../../test/fakeRewardsService';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
@@ -43,6 +44,11 @@ function column(name: string): HTMLElement {
   const found = document.querySelector<HTMLElement>(`[data-tablet-column="${name}"]`);
   if (!found) throw new Error(`no ${name} column`);
   return found;
+}
+
+/** The column once the page has rendered it (a route loaded after a read). */
+function findColumn(name: string): Promise<HTMLElement> {
+  return waitFor(() => column(name));
 }
 
 afterEach(() => {
@@ -136,5 +142,84 @@ describe('«Card non attiva» at 1280×800 (SPEC-customers-v2, point 4)', () => 
       within(column('inactive-card')).getByRole('button', { name: 'Riattiva la card' }),
     ).toBeInTheDocument();
     expect(screen.queryByRole('contentinfo')).toBeNull();
+  });
+});
+
+const LOST_UID = '04112233445566';
+const DEVICE_NOTE =
+  'Per riformattare la card serve un telefono Android con l’NFC attivo: apri Enjoy Card sul telefono e avvicina la card.';
+
+/** A USB reader in keyboard emulation: a fast burst of keys closed by Enter. */
+function usbBurst(text: string) {
+  act(() => {
+    for (const key of text) fireEvent.keyDown(document.body, { key });
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+  });
+}
+
+/**
+ * The till with an admin cashier and Maria's deactivated card; Web NFC answers too, as Chrome may
+ * on a tablet: the till still never writes (the USB reader comes from the device session).
+ */
+function renderTillWithLostCard(path: (cardId: string) => string) {
+  const customers = createFakeCustomerService({ customers: [MARIA] });
+  const lost = fakeCard({
+    uid: LOST_UID,
+    customerId: MARIA.id,
+    active: false,
+    deactivatedAt: '2026-11-12T10:00:00.000Z',
+  });
+  const cards = createFakeCardsService({ customers, cards: [lost] });
+  const reader = createTestCardReader();
+  const writes = driveLinkWrites(reader.reader);
+  const rendered = renderApp(
+    path(lost.id),
+    signedInFake({ device: fakeDevice, cashier: admin }),
+    createFakeSettingsService(),
+    customers,
+    createFakeRewardsService(),
+    reader,
+    cards,
+  );
+  return { ...rendered, lost, cards, writes };
+}
+
+describe('«Card non attiva» from the USB reader of the till (SPEC-customers-v2, criterion 12)', () => {
+  it('a deactivated card read on the home opens the page: Riattiva, the note in place of Riformatta', async () => {
+    stubLayout(true);
+    const { router, lost } = renderTillWithLostCard(() => '/');
+    await screen.findByRole('searchbox');
+    await waitFor(() => {
+      if (router.state.location.pathname === '/') usbBurst(LOST_UID);
+      expect(router.state.location.pathname).toBe(`/card/${lost.id}`);
+    });
+    const wide = await findColumn('inactive-card');
+    expect(await within(wide).findByText('Card …5566')).toBeInTheDocument();
+    expect(within(wide).getByText(DEVICE_NOTE)).toBeInTheDocument();
+    expect(within(wide).getByRole('button', { name: 'Riattiva la card' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Riformatta la card' })).toBeNull();
+    // The uid never reaches the URL.
+    expect(router.state.location.pathname).not.toContain(LOST_UID);
+  });
+
+  it('Riattiva, confirmed: the customer page in place of this one, «Link non scritto.»', async () => {
+    stubLayout(true);
+    const { router, cards, writes } = renderTillWithLostCard((id) => `/card/${id}`);
+    const wide = await findColumn('inactive-card');
+    await userEvent.click(await within(wide).findByRole('button', { name: 'Riattiva la card' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' }),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
+    expect(router.state.historyAction).toBe('REPLACE');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Card …5566 riattivata. Link non scritto.',
+      ),
+    );
+    // The till never writes: no link issued, nothing written on the card.
+    expect(writes).toHaveLength(0);
+    expect(cards.service.issueLink).not.toHaveBeenCalled();
+    expect(cards.calls.filter((call) => call.method === 'reactivateCard')).toHaveLength(1);
   });
 });

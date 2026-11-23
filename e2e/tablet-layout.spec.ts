@@ -1,7 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 import { SEED_PINS, seedAccounts, seedDevices, signInDevice } from './auth';
+import { runSql } from './db';
 import { expect, homeCustomers, test } from './fixtures';
-import { uniqueName } from './nfc';
+import { freshUid, uniqueName } from './nfc';
 import { operatorButton, resetDevice, tapPin } from './tablet';
 
 /**
@@ -193,6 +194,33 @@ test('every screen of the tablet wireframes at 1280×800 (criterion 7)', async (
     expect(Math.abs(box.width - 560)).toBeLessThanOrEqual(TOLERANCE);
     expect(Math.abs(box.x + box.width / 2 - 640)).toBeLessThanOrEqual(TOLERANCE);
     await expectTabletScreen(page, wide.getByRole('link', { name: 'Annulla' }));
+  });
+
+  await test.step('«Card non attiva»: one 560 px column in the middle, Riattiva, no Riformatta', async () => {
+    // A deactivated card of the customer, as Associa card leaves the old one (SPEC-customers-v2,
+    // point 4): the till reaches the page from the USB reader (e2e/tablet.spec.ts).
+    const cardId = runSql(
+      `insert into app.cards (uid, customer_id, active, deactivated_at, associated_by)
+       values (:'uid', :'customer', false, now(),
+               (select id from app.operators where name = :'admin'))
+       returning id;`,
+      {
+        uid: freshUid(),
+        customer: customerPath.split('/').pop() ?? '',
+        admin: seedAccounts.admin.name,
+      },
+    );
+    await page.goto(`/card/${cardId}`);
+    const wide = page.locator('[data-tablet-column="inactive-card"]');
+    const reactivate = wide.getByRole('button', { name: 'Riattiva la card' });
+    await expect(reactivate).toBeVisible();
+    await expect(wide.getByText(/serve un telefono Android con l’NFC attivo/)).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Riformatta la card' })).toHaveCount(0);
+    const box = await wide.boundingBox();
+    if (!box) throw new Error('No «Card non attiva» column');
+    expect(Math.abs(box.width - 560)).toBeLessThanOrEqual(TOLERANCE);
+    expect(Math.abs(box.x + box.width / 2 - 640)).toBeLessThanOrEqual(TOLERANCE);
+    await expectTabletScreen(page, reactivate);
   });
 
   await test.step('Movimenti', async () => {
