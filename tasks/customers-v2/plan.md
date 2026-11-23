@@ -125,7 +125,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Fase 1: Database, solo aggiunte (rischio più alto)
 - [x] Task 1: Ultima attività: `last_activity_at`, colonne generate, riempimento, trigger sui movimenti, indice
 - [x] Task 2: Colonna `email` (vincolo, indice unico) e `app.list_customers` a chiave
-- [ ] Task 3: Piano di `list_customers` con 1 000 clienti e 20 000 movimenti (`explain` in pgTAP)
+- [x] Task 3: Piano di `list_customers` con 1 000 clienti e 20 000 movimenti (`explain` in pgTAP)
 - [ ] Task 4: Card riformattate: colonne `released_*`, indice parziale `cards_uid_key`, ricerche per uid, `release_card`
 - [ ] Task 5: `get_card`, `reactivate_card` e riattivazione da Associa card solo per amministratori
 - [ ] Task 6: `private.card_customer_for_token`, `card_points` riscritta, `public.card_rewards`

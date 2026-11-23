@@ -54,8 +54,8 @@ supabase/tests/tablet_kiosk_access.test.sql · **Dimensione:** M
 del corpo) e verifica `Index Only Scan` o `Index Scan` su `customers_home_order_idx`. Nessuna asserzione di
 tempo (criterio 6: il tempo si misura a mano, task 36).
 **Accettazione:**
-- [ ] pgTAP: i tre piani usano `customers_home_order_idx`
-- [ ] Nessun dato lasciato nel database dopo il test; durata del file accettabile in CI
+- [x] pgTAP: i tre piani usano `customers_home_order_idx`
+- [x] Nessun dato lasciato nel database dopo il test; durata del file accettabile in CI
 **Verifica:** `npm run db:test`
 **Dipendenze:** 2 · **File:** supabase/tests/customers_v2_plan.test.sql · **Dimensione:** S
 
