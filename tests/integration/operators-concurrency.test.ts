@@ -7,7 +7,9 @@ import { holdOpenAs, localSupabase, memoryClient, runSql, waitForBlocked } from 
 // on two connections. Criterion 8: two admins demoting or deactivating each other never leave
 // the bar without an admin. Criterion 7: a deactivation racing unlock_cashier of the same person never
 // deadlocks and never leaves a working till turn. Point 5: two invites to the same email never
-// reach Auth together. Every account is made here and removed at the end, so the seed accounts
+// reach Auth together. Point 7 and Open Questions 11: the PIN asked again for an admin action
+// from the tablet is the PIN of the admin whose rights were checked, even when the till changes
+// hands in between. Every account is made here and removed at the end, so the seed accounts
 // reserved to the E2E are never touched.
 const local = localSupabase();
 const secret = memoryClient(local.url, local.secretKey);
@@ -30,10 +32,14 @@ const adminB = account('corsa-admin-b', 'Corsa Admin B');
 /** Invites and deactivates; never part of the race between A and B. */
 const adminC = account('corsa-admin-c', 'Corsa Admin C');
 const cashier = account('corsa-cassiere', 'Corsa Cassiere');
+/** An operator that the admin actions from the tablet try to promote. */
+const promotee = account('corsa-bersaglio', 'Corsa Bersaglio');
 const device = account('corsa-tablet', 'Corsa Tablet');
-const operators = [adminA, adminB, adminC, cashier];
+const operators = [adminA, adminB, adminC, cashier, promotee];
 // A fake PIN.
 const PIN = '5937';
+// A fake PIN of adminA, the admin at the till.
+const ADMIN_PIN = '8264';
 // A race is microseconds wide: several rounds, each from the same starting state.
 const ROUNDS = 10;
 // How long a transaction held open in psql keeps the API call queued behind it.
@@ -214,6 +220,7 @@ beforeAll(async () => {
     [adminB, 'admin'],
     [adminC, 'admin'],
     [cashier, 'operator'],
+    [promotee, 'operator'],
   ] as const) {
     of.id = runSql(`select private.add_operator(:'email', :'name', :'role');`, {
       email: of.email,
@@ -228,6 +235,8 @@ beforeAll(async () => {
   await Promise.all([...operators, device].map(signIn));
   const pin = await rpc(cashier, 'set_my_pin', { p_pin: PIN });
   if (pin.code !== 'ok') throw new Error(`set_my_pin answered ${pin.code}`);
+  const adminPin = await rpc(adminA, 'set_my_pin', { p_pin: ADMIN_PIN });
+  if (adminPin.code !== 'ok') throw new Error(`set_my_pin answered ${adminPin.code}`);
 });
 
 afterAll(async () => {
@@ -472,5 +481,88 @@ describe('two invites to the same email with different operation_ids (point 5)',
       invite(adminC, randomUUID(), name, `invito-nome-due-${run}@example.com`),
     ]);
     expect(outcomes.map(statusOf).toSorted()).toEqual(['in_progress', 'proceed']);
+  });
+});
+
+/** adminA at the till, no wrong PIN counted, the target an operator again. */
+function adminAtTheTill(): void {
+  runSql(
+    `update app.devices set cashier_operator_id = :'admin'::uuid, cashier_since = now(),
+       failed_pin_attempts = 0, locked_until = null
+     where user_id = :'device'::uuid;
+     update app.operators set role = 'operator' where id = :'target'::uuid;`,
+    { admin: adminA.id, device: device.userId, target: promotee.id },
+  );
+}
+
+/**
+ * The till handed to the operator `cashier` and not committed yet, as unlock_cashier does once
+ * the PIN is right: the admin action checks its rights with adminA, then queues on the device.
+ */
+const handTillToOperator = () =>
+  holdOpenAs(
+    device.userId,
+    `update app.devices set cashier_operator_id = :'cashier'::uuid, cashier_since = now()
+     where user_id = :'device'::uuid`,
+    { cashier: cashier.id, device: device.userId },
+    HOLD_SECONDS,
+  );
+
+function pinCounter(): string {
+  return runSql(
+    `select failed_pin_attempts || '|' || (locked_until is not null) from app.devices
+     where user_id = :'device'::uuid;`,
+    { device: device.userId },
+  );
+}
+
+describe('the till changes hands during an admin action with the PIN (point 7, Open Questions 11)', () => {
+  afterAll(() => {
+    adminAtTheTill();
+    restoreCashier();
+  });
+
+  it('naming an admin: the PIN of the operator who took the till authorises nothing', async () => {
+    adminAtTheTill();
+    const { released } = await handTillToOperator();
+    const promoted = rpc(device, 'set_operator_role_with_pin', {
+      p_operator_id: promotee.id,
+      p_role: 'admin',
+      p_pin: PIN,
+    });
+    await waitForBlocked(1);
+    await released;
+    expect((await promoted).code).toBe('42501');
+    expect(roleOf(promotee)).toBe('operator');
+    expect(pinCounter()).toBe('0|false');
+  });
+
+  it('inviting an admin: refused the same way, and nothing reserved', async () => {
+    adminAtTheTill();
+    const email = `invito-cassa-cambiata-${run}@example.com`;
+    const { released } = await handTillToOperator();
+    const invited = rpc(device, 'operator_invite_begin', {
+      p_operation_id: randomUUID(),
+      p_name: `Invito Cassa Cambiata ${run}`,
+      p_email: email,
+      p_role: 'admin',
+      p_pin: PIN,
+    });
+    await waitForBlocked(1);
+    await released;
+    expect((await invited).code).toBe('42501');
+    expect(pendingFor(email)).toBe(0);
+    expect(pinCounter()).toBe('0|false');
+  });
+
+  it('the same admin still at the till: the PIN asked again names the admin', async () => {
+    adminAtTheTill();
+    const promoted = await rpc(device, 'set_operator_role_with_pin', {
+      p_operator_id: promotee.id,
+      p_role: 'admin',
+      p_pin: ADMIN_PIN,
+    });
+    expect(statusOf(promoted)).toBe('ok');
+    expect(roleOf(promotee)).toBe('admin');
   });
 });

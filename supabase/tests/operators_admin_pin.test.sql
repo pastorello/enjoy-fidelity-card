@@ -6,7 +6,7 @@
 -- session never sends one. The PIN is never stored outside private.operator_pins. Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(56);
+select plan(62);
 
 delete from private.operator_invites;
 
@@ -103,7 +103,7 @@ select is(
    where p.oid in ('app.set_operator_role_with_pin(uuid, text, text)'::regprocedure,
                    'app.set_operator_active_with_pin(uuid, boolean, text)'::regprocedure,
                    'app.operator_invite_begin(uuid, text, text, text, text)'::regprocedure,
-                   'private.check_cashier_pin(text)'::regprocedure)),
+                   'private.check_cashier_pin(text, uuid)'::regprocedure)),
   true,
   'the PIN functions are security definer with an empty search_path'
 );
@@ -114,19 +114,21 @@ select is(
     cross join (values ('app.set_operator_role_with_pin(uuid, text, text)'),
                        ('app.set_operator_active_with_pin(uuid, boolean, text)'),
                        ('app.operator_invite_begin(uuid, text, text, text, text)'),
-                       ('private.check_cashier_pin(text)')) f (fn)
+                       ('private.check_cashier_pin(text, uuid)')) f (fn)
     order by 1
   ),
   array['anon:app.operator_invite_begin(uuid, text, text, text, text):false',
         'anon:app.set_operator_active_with_pin(uuid, boolean, text):false',
         'anon:app.set_operator_role_with_pin(uuid, text, text):false',
-        'anon:private.check_cashier_pin(text):false',
+        'anon:private.check_cashier_pin(text, uuid):false',
         'authenticated:app.operator_invite_begin(uuid, text, text, text, text):true',
         'authenticated:app.set_operator_active_with_pin(uuid, boolean, text):true',
         'authenticated:app.set_operator_role_with_pin(uuid, text, text):true',
-        'authenticated:private.check_cashier_pin(text):false'],
+        'authenticated:private.check_cashier_pin(text, uuid):false'],
   'authenticated runs the three RPCs but never the PIN check alone; anon nothing'
 );
+select hasnt_function('private', 'check_cashier_pin', array['text'],
+  'the PIN check always names the operator whose rights were checked');
 select is(
   (select count(*)::int from information_schema.columns
    where table_schema = 'private' and table_name = 'operator_invites' and column_name ilike '%pin%'),
@@ -308,6 +310,29 @@ select is(app.operator_invite_begin(pg_temp.opid(7), 'Nuovo 7 PIN Ripetuto',
     'pin.nuovo7@example.com', 'operator') ->> 'status', 'proceed',
   'an operator is invited from a device without a PIN');
 reset role;
+
+-- The PIN is the one of the operator whose rights were checked ---------------------------------
+-- A race: the with_pin RPCs and operator_invite_begin check the rights with the cashier of that
+-- moment, then wait on the device row while unlock_cashier hands the till to someone else. The
+-- check then names the operator who passed the rights check, and refuses (42501, before any
+-- PIN is compared or counted) when the cashier is no longer that operator, or no longer an admin.
+-- Simulated here by changing the cashier between the two steps.
+update app.devices
+set failed_pin_attempts = 0, locked_until = null,
+    cashier_operator_id = pg_temp.op('Dora'), cashier_since = now()
+where name = 'Tablet PIN Ripetuto';
+select pg_temp.as_user(11);
+select throws_ok(format($$select private.check_cashier_pin('1357', %L)$$, pg_temp.op('Alba')),
+  '42501', null, 'the cashier changed after the rights check: the right PIN of the new one is refused');
+select throws_ok(format($$select private.check_cashier_pin('0000', %L)$$, pg_temp.op('Alba')),
+  '42501', null, 'and so is a wrong PIN');
+select throws_ok(format($$select private.check_cashier_pin('1357', %L)$$, pg_temp.op('Dora')),
+  '42501', null, 'the PIN of a cashier who is no admin authorises nothing');
+select is(pg_temp.attempts('Tablet'), '0|false', 'none of them compared or counted a PIN');
+update app.devices set cashier_operator_id = pg_temp.op('Alba'), cashier_since = now()
+where name = 'Tablet PIN Ripetuto';
+select is(private.check_cashier_pin('2468', pg_temp.op('Alba')), null,
+  'the same admin still at the till: the right PIN passes');
 
 select * from finish();
 rollback;

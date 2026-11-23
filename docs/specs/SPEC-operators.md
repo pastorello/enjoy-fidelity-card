@@ -213,7 +213,8 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
      dispositivo (`private.current_device_id() is not null`) `operator_invite_begin` con `role = 'admin'`
      chiede il quinto argomento `p_pin` (il PIN del cassiere, passato dalla funzione e **mai** scritto in
      `private.operator_invites`): senza PIN → `EO005`; con il PIN lo verifica `private.check_cashier_pin`
-     prima di prenotare, nella stessa transazione, contro `private.operator_pins`, con il contatore e il blocco
+     (per l'amministratore che ha superato il controllo dei diritti, `requested_by`: se nel frattempo la cassa
+     è passata a un altro → `42501`) prima di prenotare, nella stessa transazione, contro `private.operator_pins`, con il contatore e il blocco
      di `unlock_cashier` (5 errori di fila, tra `/cassa` e queste azioni → 5 minuti; durante il blocco nessun
      PIN è controllato): risponde `wrong_pin {attempts_left}` o `locked {lock_seconds_left}` come dati (non
      eccezioni, così il conteggio resta scritto) e non prenota nulla; un PIN giusto azzera il contatore. Un PIN
@@ -389,7 +390,11 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
         `app.set_operator_active_with_pin(p_operator_id, p_active, p_pin)` fanno gli stessi controlli 1–2,
         poi verificano il PIN del cassiere a **ogni** chiamata (`private.check_cashier_pin`, stesso contatore e
         blocco di `unlock_cashier`; lock: righe di `operators`, poi del dispositivo, poi del PIN `for share`,
-        lo stesso ordine della disattivazione e di `unlock_cashier`), poi 3–4; rispondono in `jsonb`
+        lo stesso ordine della disattivazione e di `unlock_cashier`). Il PIN verificato è quello
+        dell'amministratore che ha superato i controlli dei diritti: `check_cashier_pin` riceve quell'operatore
+        e, preso il lock del dispositivo, rifiuta con `42501` (senza confrontare né contare il PIN) se nel
+        frattempo la cassa è passata a un altro o lui non è più amministratore; il controllo "non su di sé"
+        (`EO002`) è ripetuto con lo stesso operatore. Poi 3–4; rispondono in `jsonb`
         `{status: 'ok', operator}` oppure `wrong_pin {attempts_left}` / `locked {lock_seconds_left}` senza
         modificare nulla (non eccezioni: il conteggio resta scritto); da un telefono `22023`, senza PIN
         `EO005`;
