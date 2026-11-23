@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ErrorScreen } from './ErrorScreen';
+import { fakeDevice } from '../test/fakeAuthService';
 import { createTestCardReader } from '../test/fakeCardReader';
 import { renderApp, signedInFake } from '../test/renderApp';
 import { rootRoute, routes } from './routes';
@@ -41,6 +42,37 @@ describe('routes', () => {
   it('keeps /cassa behind the sign-in: signed out → /accedi', async () => {
     const { router } = renderApp('/cassa');
     await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+  });
+
+  describe('inactive card page /card/:cardId (SPEC-customers-v2, point 4)', () => {
+    const CARD_ID = '00000000-0000-4000-a000-000000000001';
+
+    it('opens «Card non attiva» for a signed-in operator', async () => {
+      const { router } = renderApp(`/card/${CARD_ID}`, signedInFake());
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Card non attiva' }),
+      ).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe(`/card/${CARD_ID}`);
+    });
+
+    it('is behind the sign-in: signed out → /accedi', async () => {
+      const { router } = renderApp(`/card/${CARD_ID}`);
+      await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    });
+
+    it('is behind RequireCashier: a device without a cashier → /cassa', async () => {
+      const { router } = renderApp(`/card/${CARD_ID}`, signedInFake({ device: fakeDevice }));
+      await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
+      expect(screen.queryByRole('heading', { name: 'Card non attiva' })).not.toBeInTheDocument();
+    });
+
+    it('sits with the cashier routes, next to clienti/:id/card', () => {
+      const auth = routes[0]?.children?.find((route) => route.path === undefined && route.children);
+      const cashier = auth?.children?.find((route) => route.path === undefined && route.children);
+      const paths = cashier?.children?.map((route) => route.path);
+      expect(paths).toContain('card/:cardId');
+      expect(paths).toContain('clienti/:id/card');
+    });
   });
 
   describe('fallback recovery link on site_url', () => {

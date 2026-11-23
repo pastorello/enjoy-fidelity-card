@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router';
 import { AssociateCardPage } from '../features/cards/AssociateCardPage';
+import { InactiveCardPage } from '../features/cards/InactiveCardPage';
 import { EditCustomerPage } from '../features/customers/EditCustomerPage';
 import { CustomerPage } from '../features/customers/CustomerPage';
 import { HomePage } from '../features/customers/HomePage';
@@ -61,6 +62,8 @@ export const routes: RouteObject[] = [
               { path: 'clienti/:id', Component: CustomerPage },
               { path: 'clienti/:id/modifica', Component: EditCustomerPage },
               { path: 'clienti/:id/card', Component: AssociateCardPage },
+              // A card that is not active, by the id of its row: never the uid (SPEC-customers-v2, 4).
+              { path: 'card/:cardId', Component: InactiveCardPage },
               { path: 'clienti/:id/spesa', Component: PurchasePage },
               { path: 'clienti/:id/premi', Component: RedeemPage },
               { path: 'clienti/:id/movimenti', Component: MovementsPage },

@@ -45,8 +45,9 @@ function contentFor(status: NfcStatus, title: string, description: string): Cont
 }
 
 /**
- * What the screen says about the last card it read (e.g. "Card disattivata" on the home): shown in
- * place of the active state's text, as an alert, while reading is active.
+ * What the screen says about the last card it read (e.g. "Card non attiva: chiedi a un
+ * amministratore" on the home): shown in place of the active state's text, as an alert, while
+ * reading is active.
  */
 export type CardReadNotice = {
   title?: string | undefined;

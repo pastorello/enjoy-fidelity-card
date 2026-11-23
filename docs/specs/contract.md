@@ -67,8 +67,9 @@ written in parallel fit together. If a source contradicts this file, the source 
 `/clienti/nuovo` (optional card uid in the history state `{ card: UID }`, never `?card=`:
 SPEC-customers-v2 point 6) · `/clienti/:id` scheda · `/clienti/:id/modifica` ·
 `/clienti/:id/card` associa/sostituisci · `/clienti/:id/spesa` importo · `/clienti/:id/premi` ·
-`/clienti/:id/movimenti` · `/impostazioni` (sections added by modules) · `/impostazioni/premi`
-(catalogo, admin) · `/accedi` · `/password-dimenticata` · `/imposta-password`.
+`/clienti/:id/movimenti` · `/card/:cardId` Card non attiva (admin: Riattiva/Riformatta; the id of
+the `app.cards` row, never the uid: SPEC-customers-v2 point 4) · `/impostazioni` (sections added by
+modules) · `/impostazioni/premi` (catalogo, admin) · `/accedi` · `/password-dimenticata` · `/imposta-password`.
 Tablet screens: only in `tablet-kiosk` (responsive ≥ 1024 px layouts or dedicated routes, its choice).
 
 ## Card input (module card-input)

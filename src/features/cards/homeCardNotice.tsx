@@ -14,17 +14,20 @@ export function cardReadErrorText(error: unknown): string {
   return 'Card non letta: riprova.';
 }
 
+/** The title of a card that is not active, read by an operator (SPEC-customers-v2, point 4). */
+const NOT_ACTIVE_TITLE = 'Card non attiva: chiedi a un amministratore';
+
 /**
- * What the card panel of the home says about the last card read (SPEC-cards, point 1), or null when
- * it shows its own text. "Lettura della card…" is the panel's description instead (see HomePage).
+ * What the card panel of the home says about the last card read (SPEC-cards, point 1, and
+ * SPEC-customers-v2, point 4), or null when it shows its own text. "Lettura della card…" is the panel's description instead (see HomePage).
  */
 export function homeCardNotice(read: HomeCardRead): CardReadNotice | null {
   if (read.status === 'idle' || read.status === 'reading') return null;
   if (read.status === 'inactive') {
     const name = firstName(read.customerName);
     return {
-      title: 'Card disattivata',
-      text: `Questa card non è più attiva: era di ${read.customerName}. Cerca il cliente per nome o email.`,
+      title: NOT_ACTIVE_TITLE,
+      text: `Era la card di ${read.customerName}. Per servirla adesso cercala per nome o email.`,
       action: (
         <ButtonLink to={`/clienti/${read.customerId}`} variant="secondary" block>
           {/* One flex item: the button's gap must not widen the space before the name. */}
@@ -38,8 +41,8 @@ export function homeCardNotice(read: HomeCardRead): CardReadNotice | null {
   }
   if (read.status === 'anonymized') {
     return {
-      title: 'Card non più valida',
-      text: 'I dati del cliente di questa card sono stati cancellati. Usa un’altra card.',
+      title: NOT_ACTIVE_TITLE,
+      text: 'I dati del cliente di questa card sono stati cancellati.',
     };
   }
   return {
