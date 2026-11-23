@@ -209,8 +209,8 @@ src/features/customers/useCustomerList.ts (+test) · **Dimensione:** M
 trova il campo di ricerca della home; gli E2E che oggi cercano «Cerca per nome o telefono» / «Oppure cerca per
 nome o telefono» lo usano, così il cambio d'etichetta del task 13 tocca un punto solo.
 **Accettazione:**
-- [ ] Nessuna spec E2E nomina più l'etichetta del campo fuori dall'helper
-- [ ] E2E verdi senza altre modifiche
+- [x] Nessuna spec E2E nomina più l'etichetta del campo fuori dall'helper
+- [x] E2E verdi senza altre modifiche
 **Verifica:** `npm run e2e`
 **Dipendenze:** nessuna · **File:** e2e/fixtures.ts, e2e/card-input.spec.ts, e2e/identity.spec.ts,
 e2e/password.spec.ts, e2e/customers.spec.ts · **Dimensione:** M
