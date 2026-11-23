@@ -314,10 +314,10 @@ src/test/fakeCardsService.ts (+test) · **Dimensione:** M
 un cliente con questa email.» + «Apri la scheda», fuoco sul primo campo errato; via il campo telefono e il suo
 testo. Modifica cliente mostra l'email salvata e la si può svuotare. Vale anche per Nuovo cliente da card.
 **Accettazione:**
-- [ ] Componenti: attributi del campo, i due errori, «Apri la scheda» porta alla scheda dell'altro, email
+- [x] Componenti: attributi del campo, i due errori, «Apri la scheda» porta alla scheda dell'altro, email
       svuotata in Modifica
-- [ ] Impeccable pulito; confronto con Nuovo cliente, Nome già usato, Modifica cliente, Tablet-Nuovo-cliente
-- [ ] E2E esistenti verdi (quelli che scrivevano un telefono non lo scrivono più)
+- [x] Impeccable pulito; confronto con Nuovo cliente, Nome già usato, Modifica cliente, Tablet-Nuovo-cliente
+- [x] E2E esistenti verdi (quelli che scrivevano un telefono non lo scrivono più)
 **Verifica:** `npm test -- customers && npm run e2e`
 **Dipendenze:** 18 · **File:** src/features/customers/CustomerForm.tsx (+css, +test),
 src/features/customers/useCustomerSubmit.ts (+test), src/features/customers/useSaveCustomer.ts,
