@@ -365,8 +365,8 @@ src/test/fakeCustomerService.ts e fakeCardsService.ts · **Dimensione:** M
 (creazione con email normalizzata, doppione, `email_invalid`, ricerca per parte dell'email tramite `list`,
 due `create_customer` contemporanee con la stessa email → uno solo, l'altro `customer_email_taken`).
 **Accettazione:**
-- [ ] Integrazione verde; nessun `+39…` né «telefono» del cliente nei file
-- [ ] Concorrenza sull'email provata (spec, Testing Strategy)
+- [x] Integrazione verde; nessun `+39…` né «telefono» del cliente nei file
+- [x] Concorrenza sull'email provata (spec, Testing Strategy)
 **Verifica:** `npm run test:integration`
 **Dipendenze:** 22 · **File:** tests/integration/customers.test.ts, tests/integration/cards.test.ts,
 tests/integration/export.test.ts, tests/integration/tablet-kiosk.test.ts, tests/integration/ledger*.test.ts
