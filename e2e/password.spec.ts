@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import { SEED_PASSWORD, seedAccounts } from './auth';
-import { expect, test } from './fixtures';
+import { expect, homeSearch, test } from './fixtures';
 import { linkHref, messagesTo, waitForMessageTo } from './mailpit';
 
 /**
@@ -54,7 +54,7 @@ test('a forgotten password is replaced through the emailed link, which works onc
   await expect(page.getByRole('heading', { name: 'Scegli una nuova password' })).toBeVisible();
   await chooseNewPassword(page, newPassword);
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('searchbox', { name: 'Cerca per nome o telefono' })).toBeVisible();
+  await expect(homeSearch(page)).toBeVisible();
 
   await page.getByRole('link', { name: `Account e impostazioni: ${name}` }).click();
   await page.getByRole('button', { name: 'Esci' }).click();
@@ -77,7 +77,7 @@ test('a forgotten password is replaced through the emailed link, which works onc
   await page.goto('/accedi');
   await submitSignIn(page, email, newPassword);
   await expect(page).toHaveURL('/');
-  await expect(page.getByRole('searchbox', { name: 'Cerca per nome o telefono' })).toBeVisible();
+  await expect(homeSearch(page)).toBeVisible();
 });
 
 test('an unknown email gets the same confirmation and no email', async ({ page }) => {

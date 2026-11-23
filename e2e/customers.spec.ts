@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { seedAccounts, signIn } from './auth';
-import { expect, test } from './fixtures';
+import { expect, homeSearch, test } from './fixtures';
 
 /**
  * Customers end to end (SPEC-customers). Names carry a suffix unique to the run, so the suite also
@@ -34,7 +34,7 @@ async function createCustomer(page: Page, name: string, phone?: string) {
 
 /** Types in the home search (the results come after a short pause). */
 async function search(page: Page, text: string) {
-  await page.getByLabel('Cerca per nome o telefono').fill(text);
+  await homeSearch(page).fill(text);
 }
 
 function resultRow(page: Page, name: string) {

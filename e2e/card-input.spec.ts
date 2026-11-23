@@ -1,5 +1,5 @@
 import { signIn } from './auth';
-import { expect, test } from './fixtures';
+import { expect, homeSearch, test } from './fixtures';
 import { fakeCardErasures, fakeCardWrites, stubWebNfc } from './nfc';
 
 /**
@@ -44,7 +44,7 @@ test.describe('the card panel on the home', () => {
     await expect(panel).toContainText(
       'Serve una volta sola: il telefono chiede il permesso di usare l’NFC.',
     );
-    const field = page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' });
+    const field = homeSearch(page, 'full');
     await expect(field).toBeVisible();
     const panelBox = await panel.boundingBox();
     const fieldBox = await field.boundingBox();
@@ -70,7 +70,7 @@ test.describe('the card panel on the home', () => {
     expect((await retry.boundingBox())?.height).toBeGreaterThanOrEqual(48);
 
     // A seed customer (supabase/seed.sql) is found by name.
-    await page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }).fill('bianchi');
+    await homeSearch(page, 'full').fill('bianchi');
     await expect(
       page.getByRole('list', { name: 'Risultati della ricerca' }).getByRole('link', {
         name: /^Giulia Bianchi\b/,
@@ -89,7 +89,7 @@ test.describe('the card panel on the home', () => {
     await expect(panel).toContainText('Lettura card spenta');
     await expect(panel).toContainText(OFF_TEXT);
     await expect(panel.getByRole('button')).toHaveCount(0);
-    await page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }).fill('bianchi');
+    await homeSearch(page, 'full').fill('bianchi');
     await expect(page.getByRole('list', { name: 'Risultati della ricerca' })).toBeVisible();
   });
 
@@ -100,12 +100,10 @@ test.describe('the card panel on the home', () => {
     await signIn(page);
     const panel = page.getByRole('region', { name: 'Lettura card' });
     await expect(panel).toContainText(HOME_TITLE);
-    await page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }).fill('zzzz');
+    await homeSearch(page, 'full').fill('zzzz');
     await expect(page.getByRole('heading', { name: 'Nessun cliente trovato' })).toBeVisible();
     await expect(panel).toHaveText('Lettura attiva: puoi anche avvicinare la card');
-    await expect(
-      page.getByRole('searchbox', { name: 'Cerca per nome o telefono', exact: true }),
-    ).toBeVisible();
+    await expect(homeSearch(page, 'compact')).toBeVisible();
     await page.getByRole('button', { name: 'Cancella la ricerca' }).click();
     await expect(panel).toContainText(HOME_TITLE);
   });
@@ -136,13 +134,11 @@ test.describe('the USB reader on the home (keyboard wedge, format hex)', () => {
   test('typing at a human pace in the search stays in the field', async ({ page }) => {
     await stubWebNfc(page);
     await signIn(page);
-    const field = page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' });
+    const field = homeSearch(page, 'full');
     await field.focus();
     await page.keyboard.type('04A1B2C3', { delay: 120 });
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('searchbox', { name: /cerca per nome o telefono$/i })).toHaveValue(
-      '04A1B2C3',
-    );
+    await expect(homeSearch(page)).toHaveValue('04A1B2C3');
     await expect(page).toHaveURL(/\/\?q=04A1B2C3$/);
   });
 });
