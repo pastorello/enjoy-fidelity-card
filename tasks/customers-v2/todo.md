@@ -273,11 +273,11 @@ dell'altro (anche da `unique_violation` su `customers_email_key`), controllo dop
 in coda ad `app.customer_summary` con le funzioni che lo costruiscono; `export_customers` con `email`. I pgTAP
 esistenti passano `null` come telefono.
 **Accettazione:**
-- [ ] pgTAP (criterio 2): `'  Rossi@Example.COM '` → `rossi@example.com`; `ROSSI@example.com` →
+- [x] pgTAP (criterio 2): `'  Rossi@Example.COM '` → `rossi@example.com`; `ROSSI@example.com` →
       `customer_email_taken` con `detail`; `rossi@` → `email_invalid`; nome ed email già usati → solo
       `customer_name_taken`; due clienti senza email
-- [ ] pgTAP (criterio 3): l'anonimizzazione azzera nome, email, note e un altro cliente riusa l'email
-- [ ] App ed E2E esistenti verdi senza modifiche (il frontend manda ancora `p_phone`)
+- [x] pgTAP (criterio 3): l'anonimizzazione azzera nome, email, note e un altro cliente riusa l'email
+- [x] App ed E2E esistenti verdi senza modifiche (il frontend manda ancora `p_phone`)
 **Verifica:** `npm run db:reset && npm run db:test && npm run e2e`
 **Dipendenze:** 2 · **File:** supabase/migrations/*_customers_v2_email.sql, supabase/tests/customers_v2.test.sql,
 supabase/tests/customers.test.sql, supabase/tests/export.test.sql, supabase/tests/cards.test.sql

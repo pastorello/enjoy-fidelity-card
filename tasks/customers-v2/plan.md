@@ -150,7 +150,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint C: home verde in componenti ed E2E (telefono e tablet); Impeccable pulito; confronto con Main, Ricerca vuota, Tablet-Cerca
 
 ### Fase 4: Email al posto del telefono (espandi → passa → contrai)
-- [ ] Task 16: Email nelle RPC dei clienti, forma transitoria della migrazione 2
+- [x] Task 16: Email nelle RPC dei clienti, forma transitoria della migrazione 2
 - [ ] Task 17: `normalizeEmail` e codici d'errore `email_invalid`, `customer_email_taken`
 - [ ] Task 18: Dominio e servizi con `email` accanto al telefono
 - [ ] Task 19: Nuovo e Modifica cliente: campo email, errori, «Apri la scheda»; via il campo telefono
