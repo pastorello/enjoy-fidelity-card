@@ -118,9 +118,9 @@ pagine tramite PostgREST (cursore come stringhe ricevute); due `reactivate_card`
 dello stesso cliente → una sola attiva; `release_card` contro `reactivate_card` sulla stessa card → una sola
 vince; `card_rewards` chiamata da `anon` con token valido e non valido; operatore → `forbidden` su HTTP.
 **Accettazione:**
-- [ ] Concorrenza provata in parallelo, senza stalli (criterio 8)
-- [ ] `anon` legge i premi solo con un token valido; nessuna risposta contiene uid o token (criterio 7)
-- [ ] Il cursore restituito da PostgREST, rimandato com'è, non perde né ripete righe (criterio 5)
+- [x] Concorrenza provata in parallelo, senza stalli (criterio 8)
+- [x] `anon` legge i premi solo con un token valido; nessuna risposta contiene uid o token (criterio 7)
+- [x] Il cursore restituito da PostgREST, rimandato com'è, non perde né ripete righe (criterio 5)
 **Verifica:** `npm run test:integration`
 **Dipendenze:** 2, 5, 6 · **File:** tests/integration/customers-v2.test.ts, tests/integration/cards.test.ts,
 tests/integration/localSupabase.ts (solo se serve un helper) · **Dimensione:** M

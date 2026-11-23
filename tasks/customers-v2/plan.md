@@ -129,7 +129,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 4: Card riformattate: colonne `released_*`, indice parziale `cards_uid_key`, ricerche per uid, `release_card`
 - [x] Task 5: `get_card`, `reactivate_card` e riattivazione da Associa card solo per amministratori
 - [x] Task 6: `private.card_customer_for_token`, `card_points` riscritta, `public.card_rewards`
-- [ ] Task 7: Integrazione su HTTP e concorrenza delle RPC nuove
+- [x] Task 7: Integrazione su HTTP e concorrenza delle RPC nuove
 
 ### Checkpoint A: `db:test` e `test:integration` verdi, pgTAP esistenti invariati nel comportamento; revisione `security-and-hardening` del database
 
