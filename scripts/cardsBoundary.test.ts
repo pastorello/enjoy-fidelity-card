@@ -21,6 +21,9 @@ const RPCS = [
   'create_customer_with_card',
   'issue_card_link',
   'confirm_card_link',
+  'get_card',
+  'reactivate_card',
+  'release_card',
 ];
 // Test support (fake services and fake NDEFReader): never imported by the app, never in a build.
 const TEST_SUPPORT = 'src/test/';

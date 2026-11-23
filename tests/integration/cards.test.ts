@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { supabaseCardsService as service } from '../../src/features/cards/supabaseCardsService';
-import { CardTakenError } from '../../src/features/cards/types';
+import { CardForbiddenError, CardTakenError } from '../../src/features/cards/types';
 import { supabaseCustomerService as customers } from '../../src/features/customers/supabaseCustomerService';
 import { localSupabase, memoryClient, runSql } from './localSupabase';
 
@@ -389,5 +389,60 @@ describe('an operator over HTTP (SPEC-customers-v2 criterion 11)', () => {
       appRpc(operatorClient, 'associate_card', { p_customer_id: customerId, p_uid: uid }),
     ).resolves.toEqual(forbidden);
     expect(cardState(card.id)).toBe('f|f');
+  });
+});
+
+describe('the inactive card page services against the real server (SPEC-customers-v2)', () => {
+  it('getCard, reactivateCard with the confirmed swap, releaseCard and their typed errors', async () => {
+    current.client = operatorClient;
+    const customerId = await newCustomer('servizi pagina card');
+    const oldUid = newUid();
+    const old = (await service.associate(customerId, oldUid)).card;
+    const activeNow = (await service.associate(customerId, newUid())).card;
+
+    await expect(service.getCard(randomUUID())).resolves.toBeNull();
+    await expect(service.getCard(old.id)).resolves.toMatchObject({
+      id: old.id,
+      uid: oldUid,
+      customerId,
+      customerName: `Card servizi pagina card ${SUFFIX}`,
+      customerAnonymized: false,
+      customerBalance: 0,
+      active: false,
+      releasedAt: null,
+      otherActiveCard: { id: activeNow.id, uid: activeNow.uid },
+    });
+    // An operator reads the card, but neither reactivates nor releases it.
+    await expect(service.reactivateCard(old.id, activeNow.id)).rejects.toBeInstanceOf(
+      CardForbiddenError,
+    );
+    await expect(service.releaseCard(randomUUID(), old.id)).rejects.toMatchObject({
+      kind: 'forbidden',
+    });
+
+    current.client = adminClient;
+    await expect(service.reactivateCard(old.id, null)).rejects.toMatchObject({
+      kind: 'active_card_changed',
+    });
+    await expect(service.reactivateCard(old.id, activeNow.id)).resolves.toMatchObject({
+      card: { id: old.id, active: true, linkState: 'not-written' },
+      replacedCardId: activeNow.id,
+    });
+    await expect(service.releaseCard(randomUUID(), old.id)).rejects.toMatchObject({
+      kind: 'card_active',
+    });
+
+    const operationId = randomUUID();
+    const released = await service.releaseCard(operationId, activeNow.id);
+    expect(released).toMatchObject({ id: activeNow.id, active: false });
+    await expect(service.releaseCard(operationId, activeNow.id)).resolves.toEqual(released);
+    await expect(service.getCard(activeNow.id)).resolves.toMatchObject({
+      releasedAt: expect.any(String),
+      otherActiveCard: { id: old.id },
+    });
+    await expect(service.reactivateCard(activeNow.id, old.id)).rejects.toMatchObject({
+      kind: 'card_released',
+    });
+    await expect(service.lookup(activeNow.uid)).resolves.toEqual({ status: 'unknown' });
   });
 });

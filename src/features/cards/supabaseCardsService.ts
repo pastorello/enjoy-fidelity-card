@@ -5,8 +5,12 @@ import { isCustomerErrorCode, pointsAtExistingCustomer } from '../customers/erro
 import { CustomerError } from '../customers/types';
 import { linkStateOf } from './linkState';
 import {
+  ActiveCardChangedError,
+  CardActiveError,
+  CardForbiddenError,
   CardInactiveError,
   CardNotFoundError,
+  CardReleasedError,
   CardTakenError,
   CardsError,
   CustomerUnavailableError,
@@ -15,7 +19,14 @@ import {
   NetworkError,
   NotOperatorError,
 } from './types';
-import type { CardLookup, CardOwner, CardSummary, CardsService } from './types';
+import type {
+  CardAssociation,
+  CardDetail,
+  CardLookup,
+  CardOwner,
+  CardSummary,
+  CardsService,
+} from './types';
 
 // The only module that reads app.cards or calls the cards RPCs. No message it produces carries a
 // uid, a token or a name: errors are built from the server's code alone, never from its text.
@@ -47,6 +58,11 @@ export const CARD_ERROR_CODES = [
   'card_not_found',
   'card_inactive',
   'link_token_mismatch',
+  'card_released',
+  'card_active',
+  'active_card_changed',
+  // Before the customers codes: a card refusal is not the CustomerError of the data erasure.
+  'forbidden',
 ] as const;
 
 type CardErrorCode = (typeof CARD_ERROR_CODES)[number];
@@ -61,6 +77,10 @@ const TRANSLATIONS: Record<CardErrorCode, (details: string | null) => CardsError
   card_not_found: () => new CardNotFoundError(),
   card_inactive: () => new CardInactiveError(),
   link_token_mismatch: () => new LinkTokenMismatchError(),
+  card_released: () => new CardReleasedError(),
+  card_active: () => new CardActiveError(),
+  active_card_changed: () => new ActiveCardChangedError(),
+  forbidden: () => new CardForbiddenError(),
 };
 
 function isCardErrorCode(value: string): value is CardErrorCode {
@@ -138,6 +158,46 @@ function toLookup(data: unknown): CardLookup | null {
   return { status: active ? 'active' : 'inactive', cardId, customerId, customerName };
 }
 
+/** Maps a row of `app.get_card`, or null when its shape is unexpected. */
+function toDetail(data: unknown): CardDetail | null {
+  const row = record(data);
+  if (!row) return null;
+  const { card_id: id, uid, customer_id: customerId, customer_name: customerName } = row;
+  const { customer_anonymized: customerAnonymized, customer_balance: customerBalance } = row;
+  const { active, deactivated_at: deactivatedAt, released_at: releasedAt } = row;
+  const { other_active_card_id: otherId, other_active_card_uid: otherUid } = row;
+  if (typeof id !== 'string' || !UUID.test(id) || typeof uid !== 'string') return null;
+  if (typeof customerId !== 'string' || typeof active !== 'boolean') return null;
+  if (typeof customerAnonymized !== 'boolean') return null;
+  // A name exactly when the customer was not anonymized.
+  if (!isNullableString(customerName) || customerAnonymized !== (customerName === null))
+    return null;
+  if (typeof customerBalance !== 'number' || !Number.isInteger(customerBalance)) return null;
+  if (!isNullableString(deactivatedAt) || !isNullableString(releasedAt)) return null;
+  if (!isNullableString(otherId) || !isNullableString(otherUid)) return null;
+  if ((otherId === null) !== (otherUid === null)) return null;
+  return {
+    id,
+    uid,
+    customerId,
+    customerName,
+    customerAnonymized,
+    customerBalance,
+    active,
+    deactivatedAt,
+    releasedAt,
+    otherActiveCard: otherId === null || otherUid === null ? null : { id: otherId, uid: otherUid },
+  };
+}
+
+/** Maps a row of `app.card_association`: the card, and the card it replaced. */
+function toAssociation(data: unknown): CardAssociation {
+  const card = expected(toCard(data));
+  const replaced = record(data)?.replaced_card_id;
+  if (replaced !== null && typeof replaced !== 'string') throw new CardsError('unknown');
+  return { card, replacedCardId: replaced };
+}
+
 /** The error to reject with, or null when the answer carries data. */
 function failureOf(answer: Answer): Error | null {
   const { error, status } = answer;
@@ -203,12 +263,17 @@ export const supabaseCardsService: CardsService = {
     return rows.length === 0 ? null : expected(toCard(rows[0]));
   },
 
+  async getCard(cardId) {
+    // The id comes from the URL: one that is not a uuid is no card, without asking.
+    if (!UUID.test(cardId)) return null;
+    const data = await call('get_card', { p_card_id: cardId });
+    if (!Array.isArray(data) || data.length > 1) throw new CardsError('unknown');
+    const rows: unknown[] = data;
+    return rows.length === 0 ? null : expected(toDetail(rows[0]));
+  },
+
   async associate(customerId, uid) {
-    const data = await call('associate_card', { p_customer_id: customerId, p_uid: uid });
-    const card = expected(toCard(data));
-    const replaced = record(data)?.replaced_card_id;
-    if (replaced !== null && typeof replaced !== 'string') throw new CardsError('unknown');
-    return { card, replacedCardId: replaced };
+    return toAssociation(await call('associate_card', { p_customer_id: customerId, p_uid: uid }));
   },
 
   async deactivate(cardId) {
@@ -235,5 +300,19 @@ export const supabaseCardsService: CardsService = {
 
   async confirmLink(cardId, token) {
     return expected(toCard(await call('confirm_card_link', { p_card_id: cardId, p_token: token })));
+  },
+
+  async reactivateCard(cardId, expectedActiveCardId) {
+    return toAssociation(
+      await call('reactivate_card', {
+        p_card_id: cardId,
+        p_expected_active_card_id: expectedActiveCardId,
+      }),
+    );
+  },
+
+  async releaseCard(operationId, cardId) {
+    const data = await call('release_card', { p_operation_id: operationId, p_card_id: cardId });
+    return expected(toCard(data));
   },
 };

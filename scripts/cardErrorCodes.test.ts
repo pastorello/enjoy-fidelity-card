@@ -14,17 +14,6 @@ import { liveFunctionsIn, raisedMessageCodes } from './migrationFunctions';
 const CARD_MIGRATIONS = /_cards[a-z0-9_]*\.sql$/;
 const CUSTOMER_MIGRATIONS = /_customers[a-z0-9_]*\.sql$/;
 
-/**
- * The codes cards_v2_release raises that the app does not translate yet: task 28 of
- * tasks/customers-v2 adds them to CARD_ERROR_CODES, each with its typed error, and empties this list.
- */
-const AWAITING_TRANSLATION: ReadonlySet<string> = new Set([
-  'active_card_changed',
-  'card_active',
-  'card_released',
-  'forbidden',
-]);
-
 const sorted = (codes: readonly string[]) => codes.toSorted((a, b) => a.localeCompare(b));
 
 describe('card error codes', () => {
@@ -32,15 +21,13 @@ describe('card error codes', () => {
   // functions of cards and cards_v2_release.
   it('lists exactly the codes the cards migration raises, once each', () => {
     expect(new Set(CARD_ERROR_CODES).size).toBe(CARD_ERROR_CODES.length);
-    const raised = raisedMessageCodes(liveFunctionsIn(CARD_MIGRATIONS));
-    expect(raised).toEqual(expect.arrayContaining([...AWAITING_TRANSLATION]));
-    expect(sorted(CARD_ERROR_CODES)).toEqual(
-      raised.filter((code) => !AWAITING_TRANSLATION.has(code)),
-    );
+    expect(sorted(CARD_ERROR_CODES)).toEqual(raisedMessageCodes(liveFunctionsIn(CARD_MIGRATIONS)));
   });
 
-  it('keeps the list of codes awaiting translation honest: none is translated yet', () => {
-    expect(CARD_ERROR_CODES.filter((code) => AWAITING_TRANSLATION.has(code))).toEqual([]);
+  it('includes the codes of reactivate_card and release_card (SPEC-customers-v2)', () => {
+    expect(CARD_ERROR_CODES).toEqual(
+      expect.arrayContaining(['active_card_changed', 'card_active', 'card_released', 'forbidden']),
+    );
   });
 
   it('translates every code the live customers functions raise inside create_customer_with_card', () => {

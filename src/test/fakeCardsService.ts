@@ -1,8 +1,12 @@
 import { vi } from 'vitest';
 import { linkStateOf } from '../features/cards/linkState';
 import {
+  ActiveCardChangedError,
+  CardActiveError,
+  CardForbiddenError,
   CardInactiveError,
   CardNotFoundError,
+  CardReleasedError,
   CardTakenError,
   CardsError,
   CustomerUnavailableError,
@@ -13,6 +17,7 @@ import {
 } from '../features/cards/types';
 import type {
   CardAssociation,
+  CardDetail,
   CardLookup,
   CardSummary,
   CardsErrorKind,
@@ -42,17 +47,28 @@ type FakeOptions = {
   cards?: CardSummary[];
   /** False: the account is not an active operator, and every call is `not_operator`. */
   operator?: boolean;
+  /**
+   * The caller's role (default admin): an operator gets `forbidden` from `reactivateCard`,
+   * `releaseCard` and the reactivation of a deactivated card in `associate`, like on the server.
+   */
+  role?: 'admin' | 'operator';
 };
 
-/** A card as the fake keeps it: the row, and the two tokens the server keeps as fingerprints. */
+/**
+ * A card as the fake keeps it: the row, the two tokens the server keeps as fingerprints, and its
+ * release (`released_at`, `release_operation_id`).
+ */
 type StoredCard = Omit<CardSummary, 'linkState'> & {
   written: string | null;
   pending: string | null;
+  releasedAt: string | null;
+  releaseOperationId: string | null;
 };
 
 // private.is_card_uid: upper-case hex, no separators, 4 to 10 whole bytes, not all zeros.
 const CARD_UID = /^(?:[0-9A-F]{2}){4,10}$/;
 const TOKEN = /^[A-Za-z0-9_-]{22}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLOCK_START = Date.parse('2026-11-17T12:00:00.000Z');
 let nextFixture = 0;
 
@@ -78,7 +94,7 @@ export function fakeCard(overrides: Partial<CardSummary> = {}): CardSummary {
 }
 
 function summary(card: StoredCard): CardSummary {
-  const { written: _written, pending: _pending, ...row } = card;
+  const { written: _w, pending: _p, releasedAt: _r, releaseOperationId: _o, ...row } = card;
   return { ...row, linkState: linkStateOf(row.linkWrittenAt, row.linkPendingAt) };
 }
 
@@ -92,6 +108,10 @@ const ERRORS: Record<CardsErrorKind, () => CardsError> = {
   card_not_found: () => new CardNotFoundError(),
   card_inactive: () => new CardInactiveError(),
   link_token_mismatch: () => new LinkTokenMismatchError(),
+  card_released: () => new CardReleasedError(),
+  card_active: () => new CardActiveError(),
+  active_card_changed: () => new ActiveCardChangedError(),
+  forbidden: () => new CardForbiddenError(),
   network: () => new NetworkError(),
   unknown: () => new CardsError('unknown'),
 };
@@ -105,6 +125,9 @@ function perMethod<T>(make: () => T): Record<Method, T> {
     createCustomerWithCard: make(),
     issueLink: make(),
     confirmLink: make(),
+    getCard: make(),
+    reactivateCard: make(),
+    releaseCard: make(),
   };
 }
 
@@ -115,7 +138,11 @@ function perMethod<T>(make: () => T): Record<Method, T> {
  * card is reactivated), any deactivation clears the link, the anonymization of a customer in the
  * customers fake deactivates its card, a pending token becomes the written link only when
  * confirmed, `createCustomerWithCard` is all or nothing and idempotent on `operationId` (it
- * creates the customer in the customers fake). Every method is a `vi.fn` and every call is also
+ * creates the customer in the customers fake). Reactivating (`reactivateCard`, or `associate` on
+ * the customer's own deactivated card) and releasing are for admins (`forbidden`); a swap happens
+ * only with the active card confirmed (`active_card_changed`); `releaseCard` is idempotent on
+ * `operationId` (reused on another card: `unknown`, the server's 22023), keeps the row and frees
+ * its uid (`lookup` no longer finds it, a new row can take it). Every method is a `vi.fn` and every call is also
  * logged in `calls`. `failNext` programs a failure (also an answer lost after the call was
  * applied), `holdNext` delays an answer until released, `setNetworkDown` makes every call fail
  * with `network`.
@@ -124,11 +151,12 @@ export function createFakeCardsService({
   customers = createFakeCustomerService(),
   cards: initial = [],
   operator = true,
+  role = 'admin',
 }: FakeOptions = {}) {
   const stored = new Map<string, StoredCard>(
     initial.map(({ linkState: _linkState, ...row }) => [
       row.id,
-      { ...row, written: null, pending: null },
+      { ...row, written: null, pending: null, releasedAt: null, releaseOperationId: null },
     ]),
   );
   let created = 0;
@@ -168,8 +196,21 @@ export function createFakeCardsService({
     }
   }
 
+  /** The card bound to this uid: a released card is bound to none. */
   function byUid(uid: string): StoredCard | null {
-    return [...stored.values()].find((card) => card.uid === uid) ?? null;
+    return (
+      [...stored.values()].find((card) => card.uid === uid && card.releasedAt === null) ?? null
+    );
+  }
+
+  function activeCardOf(customerId: string): StoredCard | null {
+    return (
+      [...stored.values()].find((card) => card.customerId === customerId && card.active) ?? null
+    );
+  }
+
+  function requireAdmin() {
+    if (role !== 'admin') throw new CardForbiddenError();
   }
 
   function byId(cardId: string): StoredCard {
@@ -200,9 +241,9 @@ export function createFakeCardsService({
   function associate(customerId: string, uid: string): CardAssociation {
     const existing = checkAssociation(customerId, uid);
     if (existing?.active) return { card: summary(existing), replacedCardId: null };
-    const replaced = [...stored.values()].find(
-      (card) => card.customerId === customerId && card.active,
-    );
+    // The customer's own deactivated card: only an admin reactivates it.
+    if (existing) requireAdmin();
+    const replaced = activeCardOf(customerId);
     if (replaced) deactivate(replaced);
     let card = existing;
     if (card) {
@@ -220,6 +261,8 @@ export function createFakeCardsService({
         linkPendingAt: null,
         written: null,
         pending: null,
+        releasedAt: null,
+        releaseOperationId: null,
       };
       stored.set(card.id, card);
     }
@@ -230,6 +273,59 @@ export function createFakeCardsService({
     const card = byId(cardId);
     if (!card.active) throw new CardInactiveError();
     return card;
+  }
+
+  function detail(card: StoredCard): CardDetail {
+    const customer = customerOf(card.customerId);
+    if (!customer) throw new Error('fakeCardsService: a card of a missing customer');
+    const anonymized = customer.anonymizedAt !== null;
+    const other = activeCardOf(card.customerId);
+    return {
+      id: card.id,
+      uid: card.uid,
+      customerId: card.customerId,
+      customerName: anonymized ? null : customer.name,
+      customerAnonymized: anonymized,
+      customerBalance: customer.balance,
+      active: card.active,
+      deactivatedAt: card.deactivatedAt,
+      releasedAt: card.releasedAt,
+      otherActiveCard: other && other.id !== card.id ? { id: other.id, uid: other.uid } : null,
+    };
+  }
+
+  /** `app.reactivate_card`, in its order. */
+  function reactivate(cardId: string, expectedActiveCardId: string | null): CardAssociation {
+    requireAdmin();
+    const card = byId(cardId);
+    if (card.releasedAt !== null) throw new CardReleasedError();
+    if (customerOf(card.customerId)?.anonymizedAt !== null) {
+      throw new CustomerUnavailableError('anonymized');
+    }
+    if (card.active) return { card: summary(card), replacedCardId: null };
+    const replaced = activeCardOf(card.customerId);
+    if ((replaced?.id ?? null) !== expectedActiveCardId) throw new ActiveCardChangedError();
+    if (replaced) deactivate(replaced);
+    Object.assign(card, { active: true, deactivatedAt: null, associatedAt: now() });
+    return { card: summary(card), replacedCardId: replaced?.id ?? null };
+  }
+
+  /** `app.release_card`, in its order. */
+  function releaseRow(operationId: string, cardId: string): CardSummary {
+    requireAdmin();
+    const card = byId(cardId);
+    if (card.releasedAt !== null) return summary(card);
+    const reused = [...stored.values()].some((row) => row.releaseOperationId === operationId);
+    // The server's 22023 (operation_id already used for another card), which the service maps to unknown.
+    if (reused) throw new CardsError('unknown');
+    if (card.active) throw new CardActiveError();
+    Object.assign(card, {
+      releasedAt: now(),
+      releaseOperationId: operationId,
+      written: null,
+      pending: null,
+    });
+    return summary(card);
   }
 
   /** A fresh 22-character token in the alphabet of the real ones. */
@@ -289,6 +385,21 @@ export function createFakeCardsService({
         if (card.active) deactivate(card);
         return summary(card);
       }),
+    ),
+    getCard: vi.fn<CardsService['getCard']>((cardId) =>
+      run('getCard', [cardId], () => {
+        if (!UUID.test(cardId)) return null;
+        const card = stored.get(cardId);
+        return card ? detail(card) : null;
+      }),
+    ),
+    reactivateCard: vi.fn<CardsService['reactivateCard']>((cardId, expectedActiveCardId) =>
+      run('reactivateCard', [cardId, expectedActiveCardId], () =>
+        reactivate(cardId, expectedActiveCardId),
+      ),
+    ),
+    releaseCard: vi.fn<CardsService['releaseCard']>((operationId, cardId) =>
+      run('releaseCard', [operationId, cardId], () => releaseRow(operationId, cardId)),
     ),
     createCustomerWithCard: vi.fn<CardsService['createCustomerWithCard']>((input) =>
       run('createCustomerWithCard', [input], () => {
