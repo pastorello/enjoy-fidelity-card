@@ -6,6 +6,7 @@ import { createTestCardReader } from '../../test/fakeCardReader';
 import { createFakeCardsService, fakeCard } from '../../test/fakeCardsService';
 import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
 import { createFakeRewardsService } from '../../test/fakeRewardsService';
+import { fakeOperator } from '../../test/fakeAuthService';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
@@ -51,14 +52,18 @@ function setup({
   auth = signedInFake(),
   writable = true,
   mariaLinkWritten = false,
+  role = 'admin',
 }: {
   auth?: ReturnType<typeof signedInFake>;
   writable?: boolean;
   mariaLinkWritten?: boolean;
+  /** The role the cards service answers to (an operator: reactivating is `forbidden`). */
+  role?: 'admin' | 'operator';
 } = {}) {
   const customers = createFakeCustomerService({ customers: [MARIA, GIULIA, ANTONIO, ERASED] });
   const cards = createFakeCardsService({
     customers,
+    role,
     cards: [
       fakeCard({
         id: MARIA_CARD_ID,
@@ -239,6 +244,54 @@ describe('AssociateCardPage: what the association answers (SPEC-cards, point 4)'
     await expectConfirmation('Card …5566 associata');
     expect(cardOf(fixture, LOST.uid)?.active).toBe(true);
     expect(cardOf(fixture, OF_MARIA.uid)?.active).toBe(false);
+  });
+
+  it('an operator reading the customer’s own deactivated card: «Card non attiva: chiedi a un amministratore.» (criterion 11)', async () => {
+    const fixture = setup({
+      auth: signedInFake({ operator: { ...fakeOperator, role: 'operator' } }),
+      role: 'operator',
+    });
+    const { router } = await renderReading(fixture);
+    tap(fixture, LOST.read);
+
+    const panel = screen.getByRole('region', { name: 'Lettura card' });
+    expect(
+      await within(panel).findByText('Card non attiva: chiedi a un amministratore.'),
+    ).toBeInTheDocument();
+    // Not the text of the data erasure, nor a "Riprova" that would be refused again.
+    expect(screen.queryByText(/cancellare i dati/)).not.toBeInTheDocument();
+    expect(within(panel).queryByRole('button', { name: 'Riprova' })).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}/card`);
+    expect(fixture.writes).toHaveLength(0);
+    // Nothing changed: the lost card stays off, the active one stays on.
+    expect(cardOf(fixture, LOST.uid)?.active).toBe(false);
+    expect(cardOf(fixture, OF_MARIA.uid)?.active).toBe(true);
+
+    // Reading stays on: a new card is associated as usual.
+    tap(fixture, NEW_ONE.read);
+    const write = await currentWrite(fixture);
+    expect(associations(fixture)).toEqual([
+      [MARIA.id, LOST.uid],
+      [MARIA.id, NEW_ONE.uid],
+    ]);
+    await write.finish({ ok: true });
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
+    await expectConfirmation('Card …0001 associata');
+  });
+
+  it('a reformatted card reads as unknown: associated as a new card to another customer', async () => {
+    const fixture = setup();
+    const lost = cardOf(fixture, LOST.uid);
+    if (!lost) throw new Error('no lost card');
+    await fixture.cards.service.releaseCard('00000000-0000-4000-8000-0000000000aa', lost.id);
+    const { router } = await renderReading(fixture, GIULIA.id);
+    tap(fixture, LOST.read);
+    const write = await currentWrite(fixture);
+    expect(write.options.expectedUid).toBe(LOST.uid);
+    await write.finish({ ok: true });
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${GIULIA.id}`));
+    await expectConfirmation('Card …5566 associata');
+    expect(screen.queryByText(ONE_CUSTOMER)).not.toBeInTheDocument();
   });
 
   it('the card already active for this customer, link not written: said, and the link is written at once', async () => {
