@@ -503,9 +503,9 @@ spec (i due testi di `wrong-card` secondo `mayHaveWritten`, «Riformatta comunqu
 «Card svuotata ma non liberata…» con «Riprova» senza riavvicinare la card; `card_active`; `canWrite` falso →
 nota del telefono Android al posto del pulsante.
 **Accettazione:**
-- [ ] Componenti: ogni esito; reinvio con lo stesso `operation_id`; nessuna `release_card` prima della
+- [x] Componenti: ogni esito; reinvio con lo stesso `operation_id`; nessuna `release_card` prima della
       verifica (criteri 9, 10)
-- [ ] Impeccable pulito
+- [x] Impeccable pulito
 **Verifica:** `npm test -- cards`
 **Dipendenze:** 9, 31 · **File:** src/features/cards/InactiveCardPage.tsx (+test),
 src/features/cards/useReformatCard.ts (+test), src/features/customers/homeNotice.ts · **Dimensione:** M
