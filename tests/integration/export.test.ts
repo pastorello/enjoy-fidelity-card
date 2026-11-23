@@ -157,7 +157,7 @@ describe('an admin', () => {
         operationId: randomUUID(),
         name: `Esporta Leggibile ${SUFFIX}`,
         phone: '',
-        email: '',
+        email: `esporta-${SUFFIX}@example.com`,
         privacyConsent: true,
         notes: '',
       }),
@@ -210,6 +210,7 @@ describe('an admin', () => {
       expect.objectContaining({
         id: customerId,
         name: `Esporta Leggibile ${SUFFIX}`,
+        email: `esporta-${SUFFIX}@example.com`,
         balancePoints: 12,
         anonymizedAt: null,
       }),
@@ -236,6 +237,7 @@ describe('an anonymized customer (criterion 5)', () => {
   // Fake Italian mobile number and card uid, random so that runs never collide.
   const phoneDigits = `333${String(randomBytes(4).readUInt32BE() % 10_000_000).padStart(7, '0')}`;
   const uid = `04${randomBytes(6).toString('hex').toUpperCase()}`;
+  const email = `riservata-${SUFFIX}@example.com`;
   let customerId: string;
 
   beforeAll(async () => {
@@ -244,7 +246,7 @@ describe('an anonymized customer (criterion 5)', () => {
         operationId: randomUUID(),
         name,
         phone: phoneDigits,
-        email: '',
+        email,
         privacyConsent: true,
         notes,
       }),
@@ -268,6 +270,7 @@ describe('an anonymized customer (criterion 5)', () => {
     expect(theirRows[0]).toMatchObject({
       name: null,
       phone: null,
+      email: null,
       notes: null,
       active_card_uid: null,
     });
@@ -283,6 +286,7 @@ describe('an anonymized customer (criterion 5)', () => {
       expect(body.includes(name), 'original name in an HTTP body').toBe(false);
       expect(body.includes(notes), 'original notes in an HTTP body').toBe(false);
       expect(body.includes(phoneDigits), 'phone in an HTTP body').toBe(false);
+      expect(body.includes(email), 'email in an HTTP body').toBe(false);
       expect(body.includes(uid), 'card uid in an HTTP body').toBe(false);
       expect(body.includes(placeholder), 'anonymized placeholder name in an HTTP body').toBe(false);
     }
@@ -292,7 +296,7 @@ describe('an anonymized customer (criterion 5)', () => {
     const rows = await as(adminClient, () => service.fetchCustomers());
     expect(rows.find((row) => row.id === customerId)).toMatchObject({
       name: null,
-      phone: null,
+      email: null,
       notes: null,
       activeCardUid: null,
       balancePoints: 12,

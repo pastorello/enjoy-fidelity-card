@@ -10,8 +10,8 @@ const RECORD_END = '\r\n';
 const NEEDS_QUOTES = /[;"\r\n]/;
 // OWASP CSV injection: a cell starting with one of these may be read as a formula.
 const FORMULA_TRIGGERS = new Set(['=', '+', '-', '@', '\t', '\r']);
-// A phone number in E.164 or a card uid; anything else is not trusted as a formula literal.
-const EXCEL_TEXT_SAFE = /^\+?[0-9A-F]{1,20}$/;
+// A card uid (upper-case hex); anything else is not trusted as a formula literal.
+const EXCEL_TEXT_SAFE = /^[0-9A-F]{1,20}$/;
 
 /** Quotes a field only if it holds ';', '"', CR or LF, doubling the quotes inside (RFC 4180). */
 export function escapeField(value: string): string {
@@ -24,9 +24,9 @@ export function guardFormula(value: string): string {
 }
 
 /**
- * A phone number or a card uid as an Excel text formula (`="+39…"`), so Excel keeps the "+" and the
- * leading zeros. Only values made of digits and upper-case hex, with an optional leading "+", take that
- * form; anything else is written as guarded free text.
+ * A card uid as an Excel text formula (`="04A1…"`), so Excel keeps the leading zeros and never reads
+ * it as a number. Only values made of digits and upper-case hex take that form; anything else is
+ * written as guarded free text.
  */
 export function excelText(value: string): string {
   return EXCEL_TEXT_SAFE.test(value) ? `="${value}"` : guardFormula(value);

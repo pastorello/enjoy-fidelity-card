@@ -57,14 +57,17 @@ function kindOf(value: unknown): MovementExportKind | null {
   return value === 'purchase' || value === 'redemption' || value === 'correction' ? value : null;
 }
 
-/** Maps a row of `app.export_customers` (snake_case), or null when its shape is unexpected. */
+/**
+ * Maps a row of `app.export_customers` (snake_case), or null when its shape is unexpected. Only the
+ * columns listed here are read: any other column the server sends is left out of the row.
+ */
 function toCustomer(data: unknown): CustomerExportRow | null {
   const row = record(data);
   if (!row) return null;
   const {
     id,
     name,
-    phone,
+    email,
     active_card_uid: activeCardUid,
     balance_points: balancePoints,
     privacy_consent_at: privacyConsentAt,
@@ -76,7 +79,7 @@ function toCustomer(data: unknown): CustomerExportRow | null {
   if (
     !isString(id) ||
     !isNullableString(name) ||
-    !isNullableString(phone) ||
+    !isNullableString(email) ||
     !isNullableString(activeCardUid) ||
     !isInteger(balancePoints) ||
     !isString(privacyConsentAt) ||
@@ -90,7 +93,7 @@ function toCustomer(data: unknown): CustomerExportRow | null {
   return {
     id,
     name,
-    phone,
+    email,
     activeCardUid,
     balancePoints,
     privacyConsentAt,

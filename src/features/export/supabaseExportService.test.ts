@@ -52,7 +52,7 @@ const CORRECTION = '1c2d3e4f-5a6b-4c7d-8e9f-0a1b2c3d4e5f';
 const customerRow = (overrides: Record<string, unknown> = {}) => ({
   id: CUSTOMER,
   name: 'Cliente di prova',
-  phone: '+39 333 000 0000',
+  email: 'cliente.prova@example.com',
   active_card_uid: '04A1B2C3D4E5F6',
   balance_points: 112,
   privacy_consent_at: '2026-11-01T09:00:00+00:00',
@@ -66,7 +66,7 @@ const customerRow = (overrides: Record<string, unknown> = {}) => ({
 const customer: CustomerExportRow = {
   id: CUSTOMER,
   name: 'Cliente di prova',
-  phone: '+39 333 000 0000',
+  email: 'cliente.prova@example.com',
   activeCardUid: '04A1B2C3D4E5F6',
   balancePoints: 112,
   privacyConsentAt: '2026-11-01T09:00:00+00:00',
@@ -175,7 +175,7 @@ describe('fetchCustomers', () => {
   it('keeps the personal fields null for an anonymized customer, with the balance', async () => {
     const anonymized = customerRow({
       name: null,
-      phone: null,
+      email: null,
       notes: null,
       active_card_uid: null,
       balance_points: 0,
@@ -186,7 +186,7 @@ describe('fetchCustomers', () => {
       {
         ...customer,
         name: null,
-        phone: null,
+        email: null,
         notes: null,
         activeCardUid: null,
         balancePoints: 0,
@@ -213,6 +213,11 @@ describe('fetchCustomers', () => {
     answers(ok([customerRow({ created_by_name: null })]));
     expect(await exportErrorOf(service.fetchCustomers())).toBe('unknown');
     answers(ok({ id: CUSTOMER }));
+    expect(await exportErrorOf(service.fetchCustomers())).toBe('unknown');
+    answers(ok([customerRow({ email: 42 })]));
+    expect(await exportErrorOf(service.fetchCustomers())).toBe('unknown');
+    const { email: _missing, ...withoutEmail } = customerRow();
+    answers(ok([withoutEmail]));
     expect(await exportErrorOf(service.fetchCustomers())).toBe('unknown');
   });
 });

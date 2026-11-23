@@ -4,7 +4,7 @@ import { BOM } from './csv';
 import type { CustomerExportRow } from './types';
 
 const HEADER_LINE =
-  'Codice cliente;Nome;Telefono;Card attiva;Saldo punti;Consenso privacy;Note;Creato il;' +
+  'Codice cliente;Nome;Email;Card attiva;Saldo punti;Consenso privacy;Note;Creato il;' +
   'Creato da;Anonimizzato il\r\n';
 
 let nextId = 0;
@@ -14,7 +14,7 @@ function customer(overrides: Partial<CustomerExportRow> = {}): CustomerExportRow
   return {
     id: `00000000-0000-4000-8000-${String(nextId).padStart(12, '0')}`,
     name: 'Mario Prova',
-    phone: '+393331234567',
+    email: 'mario.prova@example.com',
     activeCardUid: '04A1B2C3D4E5F6',
     balancePoints: 42,
     privacyConsentAt: '2026-01-15T10:05:00+00:00',
@@ -37,7 +37,7 @@ describe('buildCustomersCsv', () => {
     expect(CUSTOMERS_HEADER).toHaveLength(10);
   });
 
-  it('writes the columns in the order of the spec, phone and uid as Excel text', () => {
+  it('writes the columns in the order of the spec, the email after the name and the uid as Excel text', () => {
     const row = customer({
       id: '00000000-0000-4000-8000-0000000000c1',
       notes: 'Preferisce il decaffeinato',
@@ -47,7 +47,7 @@ describe('buildCustomersCsv', () => {
     expect(record).toEqual([
       '00000000-0000-4000-8000-0000000000c1',
       'Mario Prova',
-      '="+393331234567"',
+      'mario.prova@example.com',
       '="04A1B2C3D4E5F6"',
       '42',
       '01/07/2026 12:05:00',
@@ -58,9 +58,9 @@ describe('buildCustomersCsv', () => {
     ]);
   });
 
-  it('leaves phone and card blank when missing and writes a negative balance as a number', () => {
+  it('leaves email and card blank when missing and writes a negative balance as a number', () => {
     const [, record] = records(
-      buildCustomersCsv([customer({ phone: null, activeCardUid: null, balancePoints: -3 })]),
+      buildCustomersCsv([customer({ email: null, activeCardUid: null, balancePoints: -3 })]),
     );
     expect(record?.slice(2, 5)).toEqual(['', '', '-3']);
   });
@@ -70,7 +70,7 @@ describe('buildCustomersCsv', () => {
       buildCustomersCsv([
         customer({
           name: 'Nome Residuo',
-          phone: '+393330000000',
+          email: 'residuo@example.com',
           activeCardUid: '04FFFFFFFFFFFF',
           notes: 'Nota residua',
           balancePoints: 17,
@@ -93,6 +93,12 @@ describe('buildCustomersCsv', () => {
     expect(record?.[1]).toBe("'=1+1");
     expect(record?.[6]).toBe("'-nota");
     expect(record?.[8]).toBe("'@Anna");
+  });
+
+  it('guards an email whose local part starts a formula (criterion 4)', () => {
+    const emails = ['=cmd@example.com', '+somma@example.com', '-meno@example.com'];
+    const cells = emails.map((email) => records(buildCustomersCsv([customer({ email })]))[1]?.[2]);
+    expect(cells).toEqual(["'=cmd@example.com", "'+somma@example.com", "'-meno@example.com"]);
   });
 
   it('reads back a name with ";" and quotes as one identical field (criterion 6)', () => {
