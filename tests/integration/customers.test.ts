@@ -235,6 +235,29 @@ describe('email (customers-v2)', () => {
     expect(other.email).toBe(`terza.${SUFFIX}@example.com`);
   });
 
+  it('list finds a customer by part of the email, and never returns the email in the rows', async () => {
+    const owner = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Cercata ${SUFFIX}`,
+      email: `cercata.${SUFFIX}@example.com`,
+    });
+    toErase.push(owner.id);
+    for (const query of [
+      `cercata.${SUFFIX}@exa`,
+      `CERCATA.${SUFFIX}`,
+      ` cercata.${SUFFIX}@example.com `,
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- one query at a time keeps the failure readable.
+      const page = await service.list({ query, after: null });
+      expect(page.customers.map((customer) => customer.id)).toEqual([owner.id]);
+      expect(page.customers[0]).not.toHaveProperty('email');
+    }
+    await expect(
+      service.list({ query: `nessuna.${SUFFIX}@example.com`, after: null }),
+    ).resolves.toEqual({ customers: [], hasMore: false });
+  });
+
   it('the anonymization clears the email and frees it', async () => {
     const erased = await service.create({
       ...base,
@@ -296,7 +319,7 @@ describe('admin', () => {
 });
 
 /**
- * Two phones saving at the same moment: the pre-check of the RPC does not see a row another
+ * Two operators saving at the same moment: the pre-check of the RPC does not see a row another
  * transaction has inserted but not committed yet, so the INSERT or UPDATE waits on the unique
  * index and then hits unique_violation. The RPC must settle it with the constraint it hit, never
  * with a raw 23505 (which the app would show as a network error).
@@ -370,6 +393,39 @@ describe('concurrent saves', () => {
     expect(again).toMatchObject({ id: held.id, name: held.name });
     await done;
     expect(rowsWithOperation(held.operationId)).toBe('1');
+  });
+
+  it('create: the same email twice at the same moment makes one customer, the other is taken', async () => {
+    // Different names and operation ids: only the email collides. The two calls go out together,
+    // so one of them meets the other's uncommitted row on customers_email_key.
+    const email = `gara.doppia.${SUFFIX}@example.com`;
+    const attempts = [`Gara Doppia Uno ${SUFFIX}`, `Gara Doppia Due ${SUFFIX}`].map((name, index) =>
+      service.create({
+        operationId: randomUUID(),
+        name,
+        email: index === 0 ? email : `  ${email.toUpperCase()} `,
+        privacyConsent: true,
+        notes: '',
+      }),
+    );
+    const results = await Promise.allSettled(attempts);
+    const created = results.flatMap((result) =>
+      result.status === 'fulfilled' ? [result.value] : [],
+    );
+    const refused = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : [],
+    );
+    expect(created).toHaveLength(1);
+    const [winner] = created;
+    if (!winner) throw new Error('No customer was created');
+    toErase.push(winner.id);
+    expect(winner.email).toBe(email);
+    expect(refused).toEqual([
+      expect.objectContaining({ kind: 'customer_email_taken', existingCustomerId: winner.id }),
+    ]);
+    expect(runSql(`select count(*) from app.customers where email = :'email';`, { email })).toBe(
+      '1',
+    );
   });
 
   it('update: a name committed meanwhile is customer_name_taken with its id', async () => {

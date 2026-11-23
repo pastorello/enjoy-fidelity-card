@@ -327,7 +327,7 @@ describe('card_rewards over HTTP with the anon key (criterion 7)', () => {
 
 describe('the email over HTTP (criterion 2)', () => {
   /**
-   * Two phones saving the same email at the same moment: the pre-check of the RPC does not see a
+   * Two operators saving the same email at the same moment: the pre-check of the RPC does not see a
    * row another transaction has inserted but not committed yet, so the INSERT waits on
    * customers_email_key and then hits unique_violation. The RPC must answer customer_email_taken
    * with the other customer's id, never a raw 23505, and never echo the email.
