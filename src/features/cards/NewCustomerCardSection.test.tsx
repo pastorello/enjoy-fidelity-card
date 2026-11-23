@@ -12,13 +12,13 @@ import { renderApp, signedInFake } from '../../test/renderApp';
 import { CardTakenError } from './types';
 
 const NAME = 'Nome e cognome';
-const PHONE = 'Telefono (facoltativo)';
+const EMAIL = 'Email (facoltativa)';
 const CONSENT = /Ha letto l’informativa privacy/;
 const SECTION_TEXT =
   'Lettura attiva: avvicina una card nuova per associarla adesso, oppure fallo più tardi dalla scheda.';
 const ONE_CUSTOMER = 'Una card può essere di un solo cliente: usa un’altra card.';
 
-const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393330004521', balance: 120 });
+const MARIA = fakeCustomer({ name: 'Maria Rossi', email: 'maria@example.com', balance: 120 });
 const ERASED = fakeCustomer({ name: 'cancellato-7f3a', anonymizedAt: '2026-11-17T09:00:00.000Z' });
 
 /** Uids as Web NFC gives them, and as the app keeps them. Invented. */
@@ -106,9 +106,9 @@ function tap(fixture: Fixture, read: string) {
   });
 }
 
-async function fillValid(name = 'Giulia Bianchi', phone = '333 123 9876') {
+async function fillValid(name = 'Giulia Bianchi', email = 'giulia@example.com') {
   await userEvent.type(screen.getByRole('textbox', { name: NAME }), name);
-  if (phone !== '') await userEvent.type(screen.getByRole('textbox', { name: PHONE }), phone);
+  if (email !== '') await userEvent.type(screen.getByRole('textbox', { name: EMAIL }), email);
   await userEvent.click(screen.getByRole('checkbox', { name: CONSENT }));
 }
 
@@ -222,7 +222,7 @@ describe('Nuovo cliente senza card: the section "Card (facoltativa)"', () => {
       );
       expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: NAME })).toHaveValue('Giulia Bianchi');
-      expect(screen.getByRole('textbox', { name: PHONE })).toHaveValue('333 123 9876');
+      expect(screen.getByRole('textbox', { name: EMAIL })).toHaveValue('giulia@example.com');
       expect(screen.getByRole('checkbox', { name: CONSENT })).toBeChecked();
       expect(router.state.location.pathname).toBe('/clienti/nuovo');
 

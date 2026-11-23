@@ -20,12 +20,12 @@ function escapeRegExp(text: string): string {
 }
 
 /** Nuovo cliente from the home's button, filled and saved: ends on the new customer's page. */
-async function createCustomer(page: Page, name: string, phone?: string) {
+async function createCustomer(page: Page, name: string, email?: string) {
   await page.goto('/');
   await page.getByRole('link', { name: 'Nuovo cliente' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Nuovo cliente' })).toBeVisible();
   await page.getByLabel('Nome e cognome').fill(name);
-  if (phone !== undefined) await page.getByLabel('Telefono (facoltativo)').fill(phone);
+  if (email !== undefined) await page.getByLabel('Email (facoltativa)').fill(email);
   await page.getByText('Ha letto l’informativa privacy').click();
   await page.getByRole('button', { name: 'Salva cliente' }).click();
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
@@ -52,34 +52,43 @@ test.describe('administrator', () => {
     const name = `Nicolò Prova E2E ${suffix}`;
     await signIn(page, seedAccounts.admin.email);
 
-    await createCustomer(page, name, '333 123 4521');
-    await expect(page.getByText('Tel. 333 ••• 4521')).toBeVisible();
+    // Stored trimmed and lowercase by the server (SPEC-customers-v2, point 2).
+    const email = `nicolo.${suffix}@example.com`;
+    await createCustomer(page, name, `  Nicolo.${suffix}@Example.COM `);
     await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
     const customerUrl = page.url();
 
-    // Found without the accent in CLIENTI, which never shows the phone (SPEC-customers-v2 point
+    // Found without the accent in CLIENTI, which never shows the email (SPEC-customers-v2 point
     // 6). The search names this run's customer in full: customers left by other runs never push
     // it past the first page.
     await page.goto('/');
     await search(page, `nicolo prova e2e ${suffix}`);
     await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
     await expect(resultRow(page, name)).toContainText('Nessun movimento');
-    await expect(resultRow(page, name)).not.toContainText('4521');
+    await expect(resultRow(page, name)).not.toContainText('@');
     // The text stays out of the URL.
     expect(new URL(page.url()).search).toBe('');
     await resultRow(page, name).click();
     await expect(page).toHaveURL(customerUrl);
     await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
-    await expect(page.getByText('Tel. 333 ••• 4521')).toBeVisible();
 
-    // Modifica cliente: a new phone is saved and the page shows it.
+    // Modifica cliente shows the stored email; a new one is saved, and emptied it is removed.
     await page.getByRole('link', { name: 'Modifica cliente' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Modifica cliente' })).toBeVisible();
-    await expect(page.getByLabel('Telefono (facoltativo)')).toHaveValue('333 123 4521');
-    await page.getByLabel('Telefono (facoltativo)').fill('347 765 4321');
+    await expect(page.getByLabel('Email (facoltativa)')).toHaveValue(email);
+    await page.getByLabel('Email (facoltativa)').fill(`nicolo.bar.${suffix}@example.com`);
     await page.getByRole('button', { name: 'Salva modifiche' }).click();
     await expect(page).toHaveURL(customerUrl);
-    await expect(page.getByText('Tel. 347 ••• 4321')).toBeVisible();
+    await page.getByRole('link', { name: 'Modifica cliente' }).click();
+    await expect(page.getByLabel('Email (facoltativa)')).toHaveValue(
+      `nicolo.bar.${suffix}@example.com`,
+    );
+    await page.getByLabel('Email (facoltativa)').fill('');
+    await page.getByRole('button', { name: 'Salva modifiche' }).click();
+    await expect(page).toHaveURL(customerUrl);
+    await page.getByRole('link', { name: 'Modifica cliente' }).click();
+    await expect(page.getByLabel('Email (facoltativa)')).toHaveValue('');
+    await page.goto(customerUrl);
 
     // A name already used is refused, under the name field, and nothing changes.
     await page.getByRole('link', { name: 'Modifica cliente' }).click();
@@ -166,7 +175,7 @@ test('Nuovo cliente: touch targets are at least 48 px and the notice opens and c
     [
       page.getByRole('link', { name: 'Indietro' }),
       page.getByLabel('Nome e cognome'),
-      page.getByLabel('Telefono (facoltativo)'),
+      page.getByLabel('Email (facoltativa)'),
       // The touch area of the checkbox is its whole label row.
       page.locator('label', { has: consent }),
       page.getByRole('button', { name: 'Mostra l’informativa' }),
@@ -214,13 +223,14 @@ test('Scheda cliente: the saved customer opens with SALDO, and the header button
   await signIn(page);
   await page.goto('/clienti/nuovo');
   await page.getByLabel('Nome e cognome').fill(name);
-  await page.getByLabel('Telefono (facoltativo)').fill('333 000 9876');
+  await page
+    .getByLabel('Email (facoltativa)')
+    .fill(`scheda.${Date.now().toString(36)}@example.com`);
   await page.getByText('Ha letto l’informativa privacy').click();
   await page.getByRole('button', { name: 'Salva cliente' }).click();
 
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
   await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}$/);
-  await expect(page.getByText('Tel. 333 ••• 9876')).toBeVisible();
   await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
 
   const boxes = await Promise.all(

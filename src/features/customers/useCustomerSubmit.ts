@@ -85,8 +85,12 @@ export function useCustomerSubmit(options: CustomerSubmitOptions): CustomerSubmi
           onSettled?.();
           if (onRefused?.(error)) return;
           if (!notOperator(error)) {
-            if (error.kind === 'customer_name_taken') {
-              setRefusal({ kind: 'name_taken', existingCustomerId: error.existingCustomerId });
+            if (error.kind === 'customer_name_taken' || error.kind === 'customer_email_taken') {
+              setRefusal({
+                kind: 'taken',
+                field: error.kind === 'customer_name_taken' ? 'name' : 'email',
+                existingCustomerId: error.existingCustomerId,
+              });
             } else {
               const field = customerErrorField(error.kind);
               const text = customerErrorText(error.kind);

@@ -107,8 +107,8 @@ async function saveTaken(fixture: ReturnType<typeof setup>) {
   const rendered = await renderNewFromCard(undefined, fixture);
   await fillValid('Maria Rossi');
   await userEvent.type(
-    screen.getByRole('textbox', { name: 'Telefono (facoltativo)' }),
-    '333 123 4521',
+    screen.getByRole('textbox', { name: 'Email (facoltativa)' }),
+    'maria.rossi@example.com',
   );
   save();
   const notice = await screen.findByRole('alert');
@@ -116,6 +116,30 @@ async function saveTaken(fixture: ReturnType<typeof setup>) {
 }
 
 describe('Nuovo cliente da card nuova (/clienti/nuovo, card in the history state)', () => {
+  it('email already used: refused with the card, the error under the email and "Apri la scheda"', async () => {
+    const existing = fakeCustomer({ name: 'Anna Verdi', email: 'anna@example.com' });
+    const fixture = setup({ customers: createFakeCustomerService({ customers: [existing] }) });
+    await renderNewFromCard(undefined, fixture);
+    await fillValid('Anna Bianchi');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Email (facoltativa)' }),
+      'ANNA@example.com',
+    );
+    save();
+
+    const link = await screen.findByRole('link', { name: 'Apri la scheda' });
+    expect(link).toHaveAttribute('href', `/clienti/${existing.id}`);
+    const email = screen.getByRole('textbox', { name: 'Email (facoltativa)' });
+    expect(email).toHaveFocus();
+    expect(email).toHaveAccessibleDescription(
+      'Esiste già un cliente con questa email. Apri la scheda',
+    );
+    expect(fixture.cards.service.createCustomerWithCard).toHaveBeenCalledTimes(1);
+    expect(fixture.cards.cards()).toEqual([]);
+    // The card read stays: the next save sends it again.
+    expect(screen.getByRole('region', { name: 'Card letta' })).toBeVisible();
+  });
+
   it('shows "Card letta" with the full code above the form, and the hint to the home', async () => {
     await renderNewFromCard();
     expect(screen.getByRole('heading', { level: 1, name: 'Nuovo cliente' })).toBeInTheDocument();
@@ -157,8 +181,8 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo, card in the history state
     const { router, writes } = await renderNewFromCard(undefined, fixture);
     await fillValid();
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'Telefono (facoltativo)' }),
-      '333 123 4521',
+      screen.getByRole('textbox', { name: 'Email (facoltativa)' }),
+      'Giulia@Example.com',
     );
     save();
 
@@ -171,7 +195,9 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo, card in the history state
     expect(fixture.cards.service.createCustomerWithCard.mock.calls[0]?.[0]).toMatchObject({
       uid: UID,
       name: 'Maria Rossi',
-      phone: '333 123 4521',
+      phone: '',
+      // As typed: the server normalizes it.
+      email: 'Giulia@Example.com',
       privacyConsent: true,
       notes: '',
     });
@@ -232,8 +258,8 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo, card in the history state
       expect(fixture.customers.customers()).toEqual([]);
       expect(router.state.location.state).toEqual({ card: UID });
       expect(screen.getByRole('textbox', { name: NAME })).toHaveValue('Maria Rossi');
-      expect(screen.getByRole('textbox', { name: 'Telefono (facoltativo)' })).toHaveValue(
-        '333 123 4521',
+      expect(screen.getByRole('textbox', { name: 'Email (facoltativa)' })).toHaveValue(
+        'maria.rossi@example.com',
       );
       expect(screen.getByRole('checkbox', { name: CONSENT })).toBeChecked();
     });

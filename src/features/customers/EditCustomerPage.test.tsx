@@ -7,19 +7,18 @@ import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
 const NAME = 'Nome e cognome';
-const PHONE = 'Telefono (facoltativo)';
+const EMAIL = 'Email (facoltativa)';
 const NOTES = 'Note (facoltative)';
 const SAVE = 'Salva modifiche';
 const NETWORK_TEXT = 'Modifiche non salvate: controlla la connessione e riprova.';
 
 const MARIA = fakeCustomer({
   name: 'Maria Rossi',
-  phone: '+393331234521',
   email: 'maria.rossi@example.com',
   notes: 'Preferisce il caffè d’orzo',
 });
-const LUCA = fakeCustomer({ name: 'Luca Bianchi', phone: '+447911123456', notes: null });
-const ROSA = fakeCustomer({ name: 'Rosa Verdi', phone: null, notes: null });
+const LUCA = fakeCustomer({ name: 'Luca Bianchi', email: 'luca@example.com', notes: null });
+const ROSA = fakeCustomer({ name: 'Rosa Verdi', email: null, notes: null });
 const ERASED = fakeCustomer({
   name: 'Cliente cancellato abcdef12',
   anonymizedAt: '2026-11-17T12:00:00.000Z',
@@ -60,7 +59,9 @@ describe('EditCustomerPage: Modifica cliente', () => {
     expect(
       within(screen.getByRole('banner')).getByRole('link', { name: 'Indietro' }),
     ).toHaveAttribute('href', `/clienti/${MARIA.id}`);
-    expect(screen.getByRole('textbox', { name: PHONE })).toHaveValue('333 123 4521');
+    // The stored email as it is (already lowercase).
+    expect(screen.getByRole('textbox', { name: EMAIL })).toHaveValue('maria.rossi@example.com');
+    expect(screen.queryByRole('textbox', { name: /Telefono/ })).not.toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: NOTES })).toHaveValue('Preferisce il caffè d’orzo');
     expect(screen.getByRole('button', { name: SAVE })).toBeInTheDocument();
   });
@@ -75,21 +76,17 @@ describe('EditCustomerPage: Modifica cliente', () => {
     expect(screen.queryByText(/Il nome identifica il cliente/)).not.toBeInTheDocument();
   });
 
-  it('a foreign phone is shown in E.164, a missing phone and notes as empty fields', async () => {
-    renderEdit(LUCA.id);
-    await nameField();
-    expect(screen.getByRole('textbox', { name: PHONE })).toHaveValue('+447911123456');
-    cleanup();
+  it('a missing email and missing notes are empty fields', async () => {
     renderEdit(ROSA.id);
     expect(await nameField()).toHaveValue('Rosa Verdi');
-    expect(screen.getByRole('textbox', { name: PHONE })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: EMAIL })).toHaveValue('');
     expect(screen.getByRole('textbox', { name: NOTES })).toHaveValue('');
   });
 
   it('saves the changes and opens the customer page, replacing Modifica in the history', async () => {
     const { customers, router } = renderEdit(MARIA.id);
     await nameField();
-    await retype(PHONE, '333 765 4321');
+    await retype(EMAIL, 'Maria.Rossi@Example.it');
     fireEvent.click(screen.getByRole('button', { name: SAVE }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
@@ -97,37 +94,76 @@ describe('EditCustomerPage: Modifica cliente', () => {
     expect(customers.service.update).toHaveBeenCalledWith({
       id: MARIA.id,
       name: 'Maria Rossi',
-      phone: '333 765 4321',
-      // Shown by the form from task 19 of customers-v2: until then the stored email goes back as is.
-      email: 'maria.rossi@example.com',
+      // No phone field any more: nothing to send until `phone` leaves the input (task 22).
+      phone: '',
+      // As typed: the server normalizes it.
+      email: 'Maria.Rossi@Example.it',
       notes: 'Preferisce il caffè d’orzo',
     });
-    expect(stored(customers, MARIA.id)?.email).toBe('maria.rossi@example.com');
-    expect(await screen.findByText('Tel. 333 ••• 4321')).toBeInTheDocument();
+    expect(stored(customers, MARIA.id)?.email).toBe('maria.rossi@example.it');
   });
 
-  it('an emptied phone is sent as empty and removes it', async () => {
+  it('an unchanged email goes back as stored', async () => {
     const { customers, router } = renderEdit(MARIA.id);
     await nameField();
-    await retype(PHONE, '');
     fireEvent.click(screen.getByRole('button', { name: SAVE }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
-    expect(customers.service.update.mock.calls[0]?.[0]).toMatchObject({ phone: '' });
-    expect(stored(customers, MARIA.id)?.phone).toBeNull();
+    expect(customers.service.update.mock.calls[0]?.[0]).toMatchObject({
+      email: 'maria.rossi@example.com',
+    });
+    expect(stored(customers, MARIA.id)?.email).toBe('maria.rossi@example.com');
+  });
+
+  it('an emptied email is sent as empty and removes it', async () => {
+    const { customers, router } = renderEdit(MARIA.id);
+    await nameField();
+    await retype(EMAIL, '');
+    fireEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
+    expect(customers.service.update.mock.calls[0]?.[0]).toMatchObject({ email: '' });
+    expect(stored(customers, MARIA.id)?.email).toBeNull();
+  });
+
+  it('email already used: the error and "Apri la scheda" to the other customer', async () => {
+    const { customers } = renderEdit(MARIA.id);
+    await nameField();
+    await retype(EMAIL, 'LUCA@example.com');
+    fireEvent.click(screen.getByRole('button', { name: SAVE }));
+
+    const link = await screen.findByRole('link', { name: 'Apri la scheda' });
+    expect(link).toHaveAttribute('href', `/clienti/${LUCA.id}`);
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(email).toHaveFocus();
+    expect(email).toHaveAccessibleDescription(
+      'Esiste già un cliente con questa email. Apri la scheda',
+    );
+    expect(screen.getByRole('textbox', { name: NAME })).not.toHaveAttribute('aria-invalid');
+    expect(stored(customers, MARIA.id)?.email).toBe('maria.rossi@example.com');
+  });
+
+  it('an email in the wrong format is refused in the app: no call', async () => {
+    const { customers } = renderEdit(MARIA.id);
+    await nameField();
+    await retype(EMAIL, 'maria@');
+    fireEvent.click(screen.getByRole('button', { name: SAVE }));
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    expect(email).toHaveAccessibleDescription('Email non valida: controlla come è scritta.');
+    expect(email).toHaveFocus();
+    expect(customers.service.update).not.toHaveBeenCalled();
   });
 
   it('checks the form in the app: an empty name calls no service', async () => {
     const { customers } = renderEdit(MARIA.id);
     await nameField();
     await retype(NAME, '');
-    await retype(PHONE, '12');
+    await retype(EMAIL, 'maria');
     fireEvent.click(screen.getByRole('button', { name: SAVE }));
     expect(screen.getByRole('textbox', { name: NAME })).toHaveFocus();
     expect(screen.getByText('Scrivi nome e cognome.')).toBeInTheDocument();
-    expect(
-      screen.getByText('Numero non valido: scrivi solo le cifre, con o senza prefisso.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Email non valida: controlla come è scritta.')).toBeInTheDocument();
     expect(customers.service.update).not.toHaveBeenCalled();
   });
 
@@ -169,16 +205,14 @@ describe('EditCustomerPage: Modifica cliente', () => {
     const customers = customersFake();
     renderEdit(MARIA.id, customers);
     await nameField();
-    customers.failNext('update', 'phone_invalid');
+    customers.failNext('update', 'email_invalid');
     fireEvent.click(screen.getByRole('button', { name: SAVE }));
 
-    const phone = screen.getByRole('textbox', { name: PHONE });
+    const email = screen.getByRole('textbox', { name: EMAIL });
     await waitFor(() =>
-      expect(phone).toHaveAccessibleDescription(
-        'Numero non valido: scrivi solo le cifre, con o senza prefisso.',
-      ),
+      expect(email).toHaveAccessibleDescription('Email non valida: controlla come è scritta.'),
     );
-    expect(phone).toHaveFocus();
+    expect(email).toHaveFocus();
   });
 
   it('network error: "Modifiche non salvate…" and "Riprova", which sends the changes again', async () => {
