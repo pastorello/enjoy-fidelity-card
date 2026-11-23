@@ -173,7 +173,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 30: Schermata «Card non attiva»: dati e stati
 - [x] Task 31: Riattiva (conferma, scambio, `active_card_changed`, scrittura del link)
 - [x] Task 32: Riformatta (conferma, passi, esiti, `release_card` con lo stesso `operation_id`)
-- [ ] Task 33: Associa card: riattivazione rifiutata all'operatore con il testo giusto
+- [x] Task 33: Associa card: riattivazione rifiutata all'operatore con il testo giusto
 - [ ] Task 34: Tablet: «Card non attiva» a 1280×800, nota al posto di Riformatta, E2E dal lettore USB
 - [ ] Task 35: E2E telefono: riattiva con scambio, riformatta, operatore
 

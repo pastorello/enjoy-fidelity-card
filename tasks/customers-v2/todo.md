@@ -515,8 +515,8 @@ src/features/cards/useReformatCard.ts (+test), src/features/customers/homeNotice
 vede «Card non attiva: chiedi a un amministratore.»; l'admin la riattiva come oggi; una card riformattata vi
 appare come sconosciuta.
 **Accettazione:**
-- [ ] Componenti: operatore → testo nuovo; admin → riattivata (criterio 11)
-- [ ] E2E `cards` verdi
+- [x] Componenti: operatore → testo nuovo; admin → riattivata (criterio 11)
+- [x] E2E `cards` verdi
 **Verifica:** `npm test -- AssociateCardPage && npm run e2e`
 **Dipendenze:** 28 · **File:** src/features/cards/AssociateCardPage.tsx (+test), src/features/cards/useAssociateCard.ts
 · **Dimensione:** S
