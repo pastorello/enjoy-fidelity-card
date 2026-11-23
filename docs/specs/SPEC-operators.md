@@ -1,7 +1,7 @@
 # Spec: operators — Schermata Operatori e inviti via email
 
-Status: bozza (2026-11-22) — le Open Questions adottano un default conservativo; da chiamare con il titolare
-solo quelle che lo richiedono
+Status: bozza (2026-11-22) — le Open Questions adottano un default conservativo; il titolare ha risposto alle
+Open Questions 7 e 11 il 2026-11-23 (link d'invito di 24 ore; amministratori dal tablet con il PIN ripetuto)
 Modulo: `operators` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity`
 ([SPEC-identity.md](SPEC-identity.md)), `identity-password` ([SPEC-identity-password.md](SPEC-identity-password.md):
 `/imposta-password`, template e SMTP), `tablet-kiosk` ([SPEC-tablet-kiosk.md](SPEC-tablet-kiosk.md): helper estesi al
@@ -9,7 +9,8 @@ cassiere, PIN) · Fonti: specifiche ufficiali, sezione "Ruoli e account" e model
 ruolo, PIN (hash), attivo, data creazione"; wireframe "Operatori" (390×844), "Tablet: operatori" (1280×800, colonna
 480 px), "Impostazioni (amministratore)" (GESTIONE → "Operatori · Account, ruoli e inviti"), "Tablet: impostazioni"
 ("Account, ruoli, inviti e PIN"), "Invito: scegli la password", "Accesso"; note n3, n5, n6 della tela ·
-Decisione: `brain/DECISIONS.md`, 2026-11-22 "Schermata Operatori nell'app, con invito via email".
+Decisioni: `brain/DECISIONS.md`, 2026-11-22 "Schermata Operatori nell'app, con invito via email" e 2026-11-23
+"Amministratori dal tablet con PIN ripetuto; link d'invito di 24 ore".
 
 > **Differenza da `SPEC-identity.md`**: la V1 rinviava inviti, schermata Operatori e cambio di ruolo dall'app
 > (account a mano in Supabase). Questa spec li porta nell'app. `private.add_operator` resta per il **primo
@@ -19,8 +20,8 @@ Decisione: `brain/DECISIONS.md`, 2026-11-22 "Schermata Operatori nell'app, con i
 > e la frase sugli inviti della nota di Accesso; qui si aggiungono.
 >
 > **Differenza da `SPEC-tablet-kiosk.md`** (punto 13 e Out of Scope): la schermata Operatori ora esiste anche sul
-> tablet, con un cassiere amministratore; dal tablet però non si invita né si promuove un **amministratore**
-> (punti 3, 5, 7; Open Questions 11).
+> tablet, con un cassiere amministratore; dal tablet un **amministratore** si invita, si promuove o si riattiva solo
+> dopo che il cassiere ha inserito **di nuovo il proprio PIN** (punti 3, 5, 7; Open Questions 11).
 >
 > **Differenza da `contract.md`**: una rotta nuova, `/impostazioni/operatori`; colonne nuove in `app.operators`;
 > la prima Edge Function del progetto (`supabase/functions/operator-invites`); codici d'errore `EO001`–`EO004`.
@@ -35,7 +36,7 @@ password** su `/imposta-password`: nessuno, oltre a lei, la conosce. Dalla stess
 chi lavora al bar, cambia il ruolo, disattiva e riattiva un account e rimanda l'invito a chi non è ancora entrato.
 
 **Utenti**: amministratori (titolari), dal telefono o dal tablet della cassa con un cassiere amministratore (dal
-tablet senza poter nominare amministratori, Open Questions 11). Gli operatori non vedono la schermata. La persona invitata usa solo l'email e `/imposta-password`.
+tablet gli amministratori solo col PIN ripetuto del cassiere, Open Questions 11). Gli operatori non vedono la schermata. La persona invitata usa solo l'email e `/imposta-password`.
 
 **Successo**: dal telefono, Impostazioni → Operatori → Nome, Email, Ruolo "Amministratore" → "Invia invito"; la
 persona apre l'email, sceglie la password ed entra nell'app come amministratore, in meno di 3 minuti, senza che
@@ -93,10 +94,9 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
        movimenti restano nello storico; puoi riattivarlo quando vuoi.", conferma "Disattiva".
      - `deactivated`: pulsante "Riattiva" (stile secondario; **non nel wireframe**, Open Questions 2) →
        `ConfirmDialog` `tone="primary"`: "Riattivare {nome}?" / "Potrà di nuovo accedere con la sua
-       password." / "Riattiva". Dal tablet (layout tablet o account di dispositivo) un amministratore
-       disattivato non ha "Riattiva": sotto lo stato la nota "Un amministratore si riattiva dal telefono."
-       (anche nel dialogo della persona; punto 7, `EO005`, con lo stesso testo nel dialogo se il server
-       rifiuta).
+       password." / "Riattiva". Da un account di dispositivo (il tablet, qualunque sia il layout) la
+       conferma della riattivazione di un **amministratore** disattivato apre il passo del PIN
+       ("Conferma con il PIN", punto 3 bis; Open Questions 11); un operatore disattivato si riattiva senza PIN.
      - `removed`: nessuna azione (non esiste più un account da riattivare); per rimetterlo si invita di nuovo
        con lo **stesso nome** (punto 3, ricollegamento come `add_operator`).
      - **Gestione della persona** (deviazione: il wireframe non mostra come si cambia ruolo né come si
@@ -113,9 +113,9 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
          conferma nello stesso dialogo: "Rendere {nome} amministratore? Potrà gestire operatori, premi,
          punti ed esportazioni e annullare i movimenti." / "Rendi amministratore". Retrocedere: "Rendere
          {nome} operatore? Non vedrà più le impostazioni da amministratore." / "Rendi operatore".
-         **Nel layout tablet** (dispositivo con cassiere) il radio "Amministratore" è disabilitato per chi è
-         operatore, con la nota "Un amministratore si nomina dal telefono." (il server rifiuta comunque,
-         punto 7; Open Questions 11);
+         **Da un dispositivo** (il tablet) "Rendi amministratore" apre, nello stesso dialogo, il passo del PIN
+         (punto 3 bis): "Per rendere {nome} amministratore dal tablet serve il tuo PIN."; "Lascia com'è" torna
+         alla persona. Retrocedere non chiede il PIN (punto 7; Open Questions 11);
        - solo per `invited`: "Reinvia invito" (secondario) con la nota "Il link precedente smette di
          funzionare." (verificato: un nuovo invito invalida il token precedente, `otp_expired`);
        - solo per `invited`: "Annulla invito" (stile pericoloso; **non nel wireframe**, deviazione dichiarata)
@@ -139,9 +139,19 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
    `fieldset` **Ruolo** (radio "Operatore" scelto di default, "Amministratore"), pulsante primario **"Invia
    invito"** con stato `busy`, nota "Riceverà un'email per scegliere la password." (tablet: "…; il PIN per il
    tablet lo imposta dal proprio telefono.").
-   - **Nel layout tablet** il radio "Amministratore" è disabilitato, con la nota "Un amministratore si invita
-     dal telefono." (il server rifiuta comunque l'invito di un amministratore da un dispositivo, punto 5;
-     Open Questions 11).
+   - **Da un dispositivo** (il tablet) "Invia invito" con il ruolo "Amministratore" apre "Conferma con il PIN"
+     (punto 3 bis): "Per invitare {nome} come amministratore dal tablet serve il tuo PIN."; il PIN parte con
+     quella sola richiesta e non resta nell'operazione (un nuovo tocco dopo un errore di rete lo chiede di
+     nuovo). "Annulla" chiude senza inviare e i campi restano. Dal telefono nessun PIN (punto 5; Open
+     Questions 11).
+   - **3 bis. Passo del PIN** (deciso il 2026-11-23, Open Questions 11): il `PinPad` di `/cassa` (4 punti,
+     tasti da 88 px) in un `Dialog` "Conferma con il PIN" (invito e riattivazione) o nel dialogo della persona
+     (promozione), con la domanda, il titolo "PIN di {cassiere}" e la nota "Dopo 5 PIN errati il tablet si
+     blocca per qualche minuto."; il PIN parte alla quarta cifra. PIN errato → "PIN errato. Tentativi rimasti:
+     {n}" (il passo resta aperto); blocco → "Troppi tentativi: riprova tra {m:ss}" con il conto alla rovescia
+     dai secondi del server, tastierino spento: gli stessi testi e lo stesso contatore di `/cassa`. Ogni altro
+     esito chiude il passo e si mostra come senza PIN. Il PIN vive solo nello stato del passo: mai salvato,
+     mai nei log, mai in un URL né nei registri dei servizi finti.
    - Validazione locale: nome vuoto → "Inserisci il nome"; oltre 60 caratteri → "Al massimo 60 caratteri";
      email vuota → "Inserisci l'email"; email senza forma `x@y.z` o oltre 254 caratteri → "Email non valida".
      Il nome si pulisce come sul server (`private.clean_name`: spazi Unicode compressi e tolti ai bordi).
@@ -188,7 +198,8 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
 5. **Edge Function `operator-invites`** (unico punto che usa la chiave segreta, mai l'app né Vercel):
    - `POST /functions/v1/operator-invites` con `Authorization: Bearer <token della sessione>` (lo aggiunge
      `supabase.functions.invoke`), corpo JSON:
-     `{ "action": "invite", "operation_id": uuid, "name": string, "email": string, "role": "admin" | "operator" }`
+     `{ "action": "invite", "operation_id": uuid, "name": string, "email": string, "role": "admin" | "operator" }` (dal tablet
+     anche `"pin": "nnnn"`, Open Questions 11)
      oppure `{ "action": "resend" | "cancel", "operator_id": uuid }`. Corpo oltre 4 KB, JSON non valido o campi sbagliati
      → 400 `invalid_input`. Solo `POST` e `OPTIONS`.
    - **Chi chiama**: la funzione non decide nulla da sola sul ruolo. Crea un client con la chiave pubblicabile
@@ -198,14 +209,19 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
      amministratore e turno valido: estensione di `tablet-kiosk`). Verificato sullo stack locale: con
      `verify_jwt` attivo il gateway accetta anche la chiave `anon` (è un JWT valido) e rifiuta solo un token
      malformato o assente; quindi `verify_jwt` **non** basta e l'autorizzazione sta tutta nelle RPC.
-   - **Niente amministratori dal tablet**: `operator_invite_begin` con `role = 'admin'` solleva `EO005` se
-     `private.current_device_id() is not null` (dispositivo, anche con cassiere amministratore). Codice proprio
-     e non `42501`, perché per l'app `42501` vuol dire "ruolo perso" (`reportNotEnabled()`), mentre il
-     cassiere amministratore resta tale. Motivo: il
-     turno dura 12 ore senza chiusura per inattività e il PIN è di 4 cifre (SPEC-tablet-kiosk, Open Questions
-     1 e 2); chi trova il tablet sbloccato da un titolare, o ne indovina il PIN, otterrebbe altrimenti un
-     account amministratore permanente con la propria email, da remoto e oltre la fine del turno. Stessa
-     regola in `set_operator_role(…, 'admin')` (punto 7). Open Questions 11.
+   - **Amministratori dal tablet solo col PIN ripetuto** (Open Questions 11, deciso il 2026-11-23): da un
+     dispositivo (`private.current_device_id() is not null`) `operator_invite_begin` con `role = 'admin'`
+     chiede il quinto argomento `p_pin` (il PIN del cassiere, passato dalla funzione e **mai** scritto in
+     `private.operator_invites`): senza PIN → `EO005`; con il PIN lo verifica `private.check_cashier_pin`
+     prima di prenotare, nella stessa transazione, contro `private.operator_pins`, con il contatore e il blocco
+     di `unlock_cashier` (5 errori di fila, tra `/cassa` e queste azioni → 5 minuti; durante il blocco nessun
+     PIN è controllato): risponde `wrong_pin {attempts_left}` o `locked {lock_seconds_left}` come dati (non
+     eccezioni, così il conteggio resta scritto) e non prenota nulla; un PIN giusto azzera il contatore. Un PIN
+     da una sessione del telefono → `22023`. `EO005` resta un codice proprio e non `42501`, perché per l'app
+     `42501` vuol dire "ruolo perso" (`reportNotEnabled()`). Motivo del PIN: il turno dura 12 ore senza
+     chiusura per inattività (SPEC-tablet-kiosk, Open Questions 1 e 2); chi trova il tablet sbloccato da un
+     titolare otterrebbe altrimenti un account amministratore permanente con la propria email, da remoto e
+     oltre la fine del turno. Stessa regola per la promozione e la riattivazione di un amministratore (punto 7).
    - **Chiavi**: dall'ambiente dell'Edge runtime, mai dal repo. Verificato con `supabase functions serve`
      (edge-runtime 1.79.1, Deno 2.1.4, CLI 3.2.0): sono già presenti `SUPABASE_URL`,
      `SUPABASE_PUBLISHABLE_KEYS` e `SUPABASE_SECRET_KEYS` (dizionari JSON con la chiave `default`),
@@ -227,7 +243,8 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
      verificato; sui progetti online no), quindi un preflight rotto non si vede in locale: lo copre il test
      di unità sull'`OPTIONS`.
    - **Invito** (`action: "invite"`), in quest'ordine:
-     1. `app.operator_invite_begin(operation_id, name, email, role)` con il token del chiamante. Risposte
+     1. `app.operator_invite_begin(operation_id, name, email, role[, pin])` con il token del chiamante (`pin`
+        solo dal tablet, sopra; il corpo della funzione ha allora il campo `pin`, 4 cifre). Risposte
         `jsonb` (non eccezioni, così la prenotazione resta scritta):
         `proceed` (con `invited_by_name`; con `existing_user_id` se l'email ha già un utente di Auth non
         collegato né a un operatore né a un dispositivo; in quel caso anche `existing_confirmed` e
@@ -235,7 +252,8 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
         **nessuna nuova email**), `in_progress` (stesso `operation_id` prenotato da meno di 2 minuti, oppure
         un'**altra** operazione `pending` recente con la stessa email o lo stesso nome), `name_taken`,
         `email_taken` (con `deactivated: true` se l'email è di una persona disattivata), `email_is_device`.
-        Eccezioni: `42501` non amministratore, `EO005` dispositivo con `role = 'admin'`, `22023` input non valido o
+        Dal tablet anche `wrong_pin` / `locked` (sopra). Eccezioni: `42501` non amministratore, `EO005`
+        dispositivo con `role = 'admin'` senza PIN, `22023` input non valido, PIN non di 4 cifre o da un telefono,
         stesso `operation_id` con nome, email o ruolo diversi.
      2. Se `existing_user_id`: `auth.admin.updateUserById(id, { user_metadata })` (verificato: un nuovo invito a
         un utente non confermato **non** aggiorna i metadati, li lascia quelli del primo). Se
@@ -286,7 +304,7 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
      `invited_by = p_requested_by` e `invited_at`). Niente idempotenza: un secondo reinvio manda un'altra
      email e vale l'ultima (il pulsante è `busy`; il limite di frequenza di Auth fa il resto).
    - **Annullamento** (`action: "cancel"`, solo per `invited`): rimedio a un invito partito verso l'email
-     sbagliata. Disattivare non basta: il link già spedito resta valido per un'ora, chi lo apre sceglie la
+     sbagliata. Disattivare non basta: il link già spedito resta valido per 24 ore, chi lo apre sceglie la
      password e basta poi un "Riattiva" o un "Reinvia invito" (che riparte verso lo stesso indirizzo) perché
      un estraneo entri; e il profilo occuperebbe il nome. Passi: `app.operator_cancel_begin(operator_id)` con
      il token del chiamante (`42501`, `EO002`, `P0002`, `EO004` come il reinvio) → `{ user_id,
@@ -311,7 +329,9 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
      | email del tablet | 409 | `email_is_device` |
      | persona non in attesa d'invito | 409 | `not_invited` |
      | non amministratore, sé stessi, origine non ammessa | 403 | `forbidden` / `self` / `forbidden_origin` |
-     | amministratore invitato da un dispositivo (`EO005`) | 403 | `admin_from_device` |
+     | amministratore invitato da un dispositivo senza PIN (`EO005`) | 403 | `admin_from_device` |
+     | PIN del cassiere errato (dal tablet) | 403 | `wrong_pin` (con `attempts_left`) |
+     | tablet bloccato da 5 PIN errati | 403 | `pin_locked` (con `lock_seconds_left`) |
      | token assente o non valido | 401 | `unauthorized` |
      | input non valido | 400 | `invalid_input` |
      | limite di email di Auth (`429`, `over_email_send_rate_limit`) | 429 | `rate_limited` |
@@ -339,7 +359,8 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
    | `last_admin` (`EO001`) | nel dialogo | "Serve almeno un amministratore attivo: prima rendi amministratore un'altra persona." |
    | `self` (`EO002`) | nel dialogo | "Non puoi cambiare il tuo account da qui." (non dovrebbe accadere: nessuna azione su "(tu)") |
    | `not_invited` (`EO004`) | nel dialogo | "{nome} ha già accettato l'invito o non è attivo: ricarica l'elenco." |
-   | `admin_from_device` (`EO005`) | sotto Ruolo / nel dialogo | "Un amministratore si nomina dal telefono." (non dovrebbe accadere: il radio è disabilitato sul tablet) |
+   | `admin_from_device` (`EO005`) | sotto Ruolo / nel dialogo | "Dal tablet un amministratore si conferma con il tuo PIN: riprova." (non dovrebbe accadere: l'app chiede sempre il PIN sul tablet) |
+   | `wrong_pin` / `pin_locked` | nel passo del PIN | "PIN errato. Tentativi rimasti: {n}" / "Troppi tentativi: riprova tra {m:ss}" (punto 3 bis) |
    | `upstream`, altro | dove è partita l'azione | "Operazione non riuscita. Riprova tra poco." |
 
    Il limite di email: in locale `email_sent = 100` l'ora (`config.toml`); sui progetti online è quello della
@@ -359,11 +380,19 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
         `private.is_admin()` altrimenti `42501`; bersaglio inesistente `P0002`; bersaglio =
         `acting_operator_id()` → `EO002`; bersaglio `removed` (senza account) → `EO003`;
         `set_operator_role(…, 'admin')` da un dispositivo (`private.current_device_id() is not null`, anche con
-        cassiere amministratore) → `EO005`, come l'invito di un amministratore (punto 5): `EO002` blocca solo
-        il cassiere stesso, non un operatore che gli sta accanto e promuove il proprio profilo; per lo stesso
-        motivo `set_operator_active(…, true)` su un amministratore disattivato da un dispositivo → `EO005`
-        (riattivarlo ridarebbe un account amministratore permanente con la sua password); un operatore
-        disattivato si riattiva anche dal tablet;
+        cassiere amministratore) → `EO005` (manca il PIN), come l'invito di un amministratore (punto 5):
+        `EO002` blocca solo il cassiere stesso, non un operatore che gli sta accanto e promuove il proprio
+        profilo; per lo stesso motivo `set_operator_active(…, true)` su un amministratore disattivato da un
+        dispositivo → `EO005` (riattivarlo ridarebbe un account amministratore permanente con la sua
+        password); un operatore disattivato si riattiva anche dal tablet senza PIN. **Col PIN** (Open Questions
+        11, deciso il 2026-11-23): `app.set_operator_role_with_pin(p_operator_id, p_role, p_pin)` e
+        `app.set_operator_active_with_pin(p_operator_id, p_active, p_pin)` fanno gli stessi controlli 1–2,
+        poi verificano il PIN del cassiere a **ogni** chiamata (`private.check_cashier_pin`, stesso contatore e
+        blocco di `unlock_cashier`; lock: righe di `operators`, poi del dispositivo, poi del PIN `for share`,
+        lo stesso ordine della disattivazione e di `unlock_cashier`), poi 3–4; rispondono in `jsonb`
+        `{status: 'ok', operator}` oppure `wrong_pin {attempts_left}` / `locked {lock_seconds_left}` senza
+        modificare nulla (non eccezioni: il conteggio resta scritto); da un telefono `22023`, senza PIN
+        `EO005`;
      3. regola dell'ultimo amministratore: se l'operazione toglie a un amministratore attivo il ruolo o
         l'accesso, deve restare almeno un **altro** amministratore attivo con l'invito accettato secondo la
         regola del punto 2 (`email_confirmed_at` non nullo **e** password impostata **e** `invite_accepted_at`),
@@ -405,7 +434,7 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
 8. **Template dell'email d'invito** (`supabase/templates/invite.html`, oggetto **"Enjoy Card: il tuo
    invito"**), HTML semplice in italiano con i colori di `recovery.html`, senza immagini esterne:
    "Ciao {{ .Data.name }}," · "{{ .Data.invited_by }} ti ha invitato come {{ .Data.role_label }} dell'Enjoy
-   Card, la fidelity card dell'Enjoy Bar. Tocca il pulsante per scegliere la password: il link vale un'ora e si
+   Card, la fidelity card dell'Enjoy Bar. Tocca il pulsante per scegliere la password: il link vale 24 ore e si
    usa una volta sola." · pulsante "Scegli la password" con
    `href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite#nome={{ .Data.name }}&da={{ .Data.invited_by }}&ruolo={{ .Data.role_label }}"`
    · "Se il link è scaduto, chiedi a chi ti ha invitato di mandarne un altro. Se non lavori all'Enjoy Bar,
@@ -414,8 +443,10 @@ nessuno abbia aperto Supabase. Il bar non resta mai senza un amministratore atti
      `html/template`): nel testo `Zoë & <b>Co</b>` diventa `Zoë &amp; &lt;b&gt;Co&lt;/b&gt;`, nel frammento
      dell'`href` `Zo%c3%ab%20%26%20%3cb%3eCo%3c%2fb%3e`. Un nome non può quindi iniettare HTML nell'email né
      rompere il link.
-   - Verificato: il link d'invito scade con `otp_expiry` (3600 s, lo stesso del recupero: un token d'invito
-     vecchio di 61 minuti risponde `otp_expired`).
+   - Il link d'invito scade con `otp_expiry`, lo stesso del recupero: **86400 s (24 ore)** dal 2026-11-23 (Open
+     Questions 7). Verificato sullo stack locale (`tests/integration/operators.test.ts`, `password.test.ts`):
+     un invito o un link di recupero inviato 23 ore prima funziona, uno di 25 ore prima risponde `otp_expired`
+     (prima, con 3600 s, bastavano 61 minuti).
    - `user_metadata` è modificabile dall'utente: serve **solo** ai testi dell'email e della pagina, mai a
      un'autorizzazione (ruolo e nome veri stanno in `app.operators`).
 
@@ -481,7 +512,8 @@ create unique index on private.operator_invites (lower(name)) where status = 'pe
     vecchia → torna `pending` con `updated_at = now()` e `proceed`. Nome, email e ruolo diversi da quelli
     prenotati → `22023`.
   - Codici d'errore del modulo: `EO001` ultimo amministratore, `EO002` sé stessi, `EO003` profilo senza
-    account, `EO004` non in attesa d'invito, `EO005` amministratore da un dispositivo; più `42501`, `22023`,
+    account, `EO004` non in attesa d'invito, `EO005` amministratore da un dispositivo senza il PIN del cassiere;
+    più `42501`, `22023`,
     `P0002` standard.
 - `app.operators` resta in sola lettura dall'API (nessun `insert/update/delete` per `authenticated`); la
   policy di lettura non cambia.
@@ -498,6 +530,7 @@ create unique index on private.operator_invites (lower(name)) where status = 'pe
 | `[functions.operator-invites]` | `verify_jwt = true` | idem (dal deploy) | idem |
 | `APP_ORIGINS` | `supabase/functions/.env` (ignorato da git; modello `supabase/functions/.env.example`): `http://localhost:5173,http://localhost:4173` | `http://localhost:5173` + `APP_PREVIEW_ORIGIN` delle anteprime | `https://enjoy-fidelity-card.vercel.app` |
 | Limite email l'ora | 100 (solo locale) | dashboard, invariato | dashboard, invariato |
+| Scadenza dei link (`otp_expiry`, vale per invito **e** recupero) | `86400` in `config.toml` | Auth → "Email OTP Expiration" = `86400` | idem |
 
 - Verificato: `supabase functions serve` carica da solo `supabase/functions/.env`, già ignorato da `.env`/`.env.*`
   di `.gitignore` (controllato con `git check-ignore`); `supabase/functions/.env.example` si committa
@@ -535,6 +568,9 @@ create unique index on private.operator_invites (lower(name)) where status = 'pe
    ogni azione passa dalle RPC, dove PostgREST verifica il token e `is_admin()` il ruolo.
 5. Redirect URLs: nessuna voce nuova (`/imposta-password` c'è già); lo staging non riceve mai l'URL di
    produzione. Rate Limits: non cambiare (Ask first).
+5 bis. Authentication → Providers → Email (o Sign In / Providers) → **Email OTP Expiration** = `86400` (24 ore,
+   Open Questions 7): vale anche per il link di recupero. Migrazione `*_operators_admin_pin_from_device.sql`
+   con il PIN degli amministratori dal tablet (Open Questions 11): parte col `db push` del passo 1.
 6. Prova reale sullo staging (prima della produzione): da un'anteprima, come amministratore, invitare un
    **secondo indirizzo dell'utente** (mai un collega vero sullo staging), aprire l'email (mittente
    `info@enjoygaeta.it`), scegliere la password, entrare; poi disattivare e riattivare quell'account. In
@@ -545,7 +581,8 @@ create unique index on private.operator_invites (lower(name)) where status = 'pe
    come riserva), il RUNBOOK (procedura e trappola dei template), `docs/specs/contract.md` (rotta
    `/impostazioni/operatori`, colonne nuove di `app.operators`, `supabase/functions/operator-invites`, codici
    `EO001`–`EO005`) e `CLAUDE.md` (Ruoli: account creati dalla schermata Operatori con invito via email;
-   `add_operator` solo per il primo amministratore e come riserva; niente amministratori dal tablet).
+   `add_operator` solo per il primo amministratore e come riserva; dal tablet gli amministratori solo col PIN
+   ripetuto del cassiere).
 
 ## Commands
 
@@ -599,12 +636,12 @@ export type InviteResult =
 
 | Livello | Cosa copre |
 |---|---|
-| pgTAP (`operators.test.sql`) | `list_operators` solo admin (operatore, dispositivo senza cassiere e con cassiere operatore → `42501`; cassiere admin → ok), stati `active`/`invited`/`deactivated`/`removed`, `is_me` del cassiere; `set_operator_role`/`set_operator_active`: non admin `42501`, sé stessi `EO002`, `removed` `EO003`, ultimo amministratore `EO001`, idempotenza; disattivato: 0 righe da ogni tabella `app`, RPC di scrittura rifiutate, `get_session_identity()` null, turno di cassa chiuso, assente da `list_cashiers`, `unlock_cashier` → `no_pin`; riattivato: tutto torna; movimenti invariati (conteggio e somma prima/dopo); `operator_invite_begin`: `proceed`/`done`/`in_progress`/`name_taken`/`email_taken`/`email_is_device`, `22023` per payload diverso; stato `invited` anche con email confermata e password vuota (token verificato, salvataggio saltato): `list_operators` lo mostra `invited`, `operator_resend_begin` lo accetta con `email_confirmed: true`, non conta per `EO001`; `operator_invite_begin` con un'altra operazione `pending` recente sulla stessa email o sullo stesso nome → `in_progress`, con una più vecchia di 2 minuti → `proceed`; utente di Auth confermato e non collegato → `proceed` con `existing_confirmed`; `_finish` idempotente (`done` due volte, stesso profilo) e con email di `user_id` diversa da quella prenotata rifiutato; `_fail` su un'operazione `done` non la cambia; `_orphan` falso per un utente confermato o collegato; cassiere amministratore: invito con ruolo `admin` e `set_operator_role(…, 'admin')` → `EO005`, invito `operator` ok; `operator_cancel_begin` solo per `invited` (`EO004` altrimenti); `_cancel_check` falso se nel frattempo la persona ha accettato; `_finish`/`_fail`/`_orphan`/`_resend_finish`/`_cancel_check` non eseguibili da `authenticated`; `private.operator_invites` illeggibile da `authenticated`; `add_operator` riattiva |
+| pgTAP (`operators.test.sql`) | `list_operators` solo admin (operatore, dispositivo senza cassiere e con cassiere operatore → `42501`; cassiere admin → ok), stati `active`/`invited`/`deactivated`/`removed`, `is_me` del cassiere; `set_operator_role`/`set_operator_active`: non admin `42501`, sé stessi `EO002`, `removed` `EO003`, ultimo amministratore `EO001`, idempotenza; disattivato: 0 righe da ogni tabella `app`, RPC di scrittura rifiutate, `get_session_identity()` null, turno di cassa chiuso, assente da `list_cashiers`, `unlock_cashier` → `no_pin`; riattivato: tutto torna; movimenti invariati (conteggio e somma prima/dopo); `operator_invite_begin`: `proceed`/`done`/`in_progress`/`name_taken`/`email_taken`/`email_is_device`, `22023` per payload diverso; stato `invited` anche con email confermata e password vuota (token verificato, salvataggio saltato): `list_operators` lo mostra `invited`, `operator_resend_begin` lo accetta con `email_confirmed: true`, non conta per `EO001`; `operator_invite_begin` con un'altra operazione `pending` recente sulla stessa email o sullo stesso nome → `in_progress`, con una più vecchia di 2 minuti → `proceed`; utente di Auth confermato e non collegato → `proceed` con `existing_confirmed`; `_finish` idempotente (`done` due volte, stesso profilo) e con email di `user_id` diversa da quella prenotata rifiutato; `_fail` su un'operazione `done` non la cambia; `_orphan` falso per un utente confermato o collegato; cassiere amministratore: invito con ruolo `admin` e `set_operator_role(…, 'admin')` senza PIN → `EO005`, invito `operator` ok; col PIN (`operators_admin_pin.test.sql`): PIN giusto → azione fatta e contatore azzerato, PIN errato → `wrong_pin` contato e nulla cambiato, contatore condiviso con `unlock_cashier`, quinto errore → `locked` (anche il PIN giusto rifiutato, anche `/cassa`), nessuna prenotazione con PIN errato o tablet bloccato, PIN da telefono → `22023`, cassiere operatore → `42501` senza toccare il contatore, PIN mai scritto in `private.operator_invites`; `operator_cancel_begin` solo per `invited` (`EO004` altrimenti); `_cancel_check` falso se nel frattempo la persona ha accettato; `_finish`/`_fail`/`_orphan`/`_resend_finish`/`_cancel_check` non eseguibili da `authenticated`; `private.operator_invites` illeggibile da `authenticated`; `add_operator` riattiva |
 | Concorrenza (integrazione, due connessioni) | A retrocede B mentre B retrocede A → una riesce, l'altra `42501`; disattivazione durante `unlock_cashier` dello stesso operatore → nessun deadlock e, dopo la corsa, il dispositivo non legge nulla e `get_session_identity()` dà cassiere nullo (si verifica questo, non che `cashier_operator_id` sia null: punto 7); due inviti alla stessa email con `operation_id` diversi in parallelo → uno `proceed`, l'altro `in_progress`, una sola email |
 | Unità (Vitest su `handler.ts` con client finti) | origine non ammessa → 403 senza chiamate; `OPTIONS`: `Allow-Headers` uguale a quello di `corsHeaders` di `@supabase/supabase-js/cors`, `Allow-Origin` = origine ammessa e mai `*`; ordine begin → metadati → invito → finish; `done` → nessun invito; 429 di Auth → `rate_limited` e `operator_invite_fail`; 422 `email_exists` → `email_taken`; finish `name_taken` → compensazione `deleteUser` solo se l'utente è nuovo **e** `operator_invite_orphan` risponde `true`; `existing_confirmed` → nessun `inviteUserByEmail`, `resetPasswordForEmail` con lo stesso `redirectTo`, password casuale solo se `existing_has_password`; reinvio: `operator_resend_finish` riceve `requested_by` restituito da `operator_resend_begin`, link di recupero se `email_confirmed`; annullamento: `deleteUser` solo con `operator_cancel_check` vero, altrimenti 409 `not_invited`; `redirectTo` dall'`Origin`, mai dal corpo; nessuna email nei log |
-| Integrazione (Vitest + stack locale + `functions serve` + Mailpit) | invito reale: una email, un profilo `invited`, metadati corretti; stesso `operation_id` due volte (anche in parallelo) → una sola email e un solo profilo; reinvio → token vecchio `otp_expired`; token d'invito verificato senza salvare la password → la persona resta `invited` e il reinvio le manda un link che funziona; annullamento → il link già spedito non funziona più e il profilo è `removed`, un nuovo invito con lo stesso nome lo ricollega; operatore → 403; email di un dispositivo → `email_is_device`; token `anon` → 401/403 senza effetti |
-| Componenti (Vitest + fake) | elenco, stati, "(tu)" senza azioni, PIN solo nel layout tablet; dialoghi di conferma; dialogo persona (ruolo, reinvio solo `invited`); modulo: validazioni, `busy`, reinvio con lo stesso `operation_id` dopo rete e nuovo id se i campi cambiano; ogni errore della tabella del punto 6; `AdminsOnly` per l'operatore; `ResetPasswordPage` invito: testi dal frammento, valori non validi → testi generici, un nome che contiene "error" (es. "Terrore") non fa scadere il link, chiave `error`/`error_code` sì, link scaduto → "Vai all'accesso"; `Dialog` (guscio) e `ConfirmDialog` ricostruito, test esistenti invariati; `AdminsOnly` condiviso; layout tablet: radio "Amministratore" disabilitato con la nota; "Annulla invito" solo per `invited`; inoltro di `/?type=invite` con frammento; controllo dell'identità al cambio di rotta per un operatore |
-| E2E (Playwright, 390×844 e 1280×800) | admin invita `invito-<casuale>@example.com` → email da Mailpit → link → "Ciao, …" → password → home con il ruolo scelto; cambio ruolo e ritorno; disattivazione di `disattiva@example.com` con una seconda sessione aperta che al cambio di rotta torna su `/accedi` con il messaggio, poi riattivazione e nuovo accesso; tablet con cassiere admin: elenco con "PIN impostato/da impostare" e colonna 480 px |
+| Integrazione (Vitest + stack locale + `functions serve` + Mailpit) | invito reale: una email, un profilo `invited`, metadati corretti; stesso `operation_id` due volte (anche in parallelo) → una sola email e un solo profilo; reinvio → token vecchio `otp_expired`; token d'invito verificato senza salvare la password → la persona resta `invited` e il reinvio le manda un link che funziona; annullamento → il link già spedito non funziona più e il profilo è `removed`, un nuovo invito con lo stesso nome lo ricollega; operatore → 403; email di un dispositivo → `email_is_device`; token `anon` → 401/403 senza effetti; dal tablet con cassiere admin: invito di un amministratore senza PIN → 403 `admin_from_device`, PIN errato → 403 `wrong_pin` contato sul dispositivo dopo la richiesta, PIN giusto → una email; 5 errori → `pin_locked` anche col PIN giusto e su `unlock_cashier`; link d'invito e di recupero di 23 ore validi, di 25 ore `otp_expired` |
+| Componenti (Vitest + fake) | elenco, stati, "(tu)" senza azioni, PIN solo nel layout tablet; dialoghi di conferma; dialogo persona (ruolo, reinvio solo `invited`); modulo: validazioni, `busy`, reinvio con lo stesso `operation_id` dopo rete e nuovo id se i campi cambiano; ogni errore della tabella del punto 6; `AdminsOnly` per l'operatore; `ResetPasswordPage` invito: testi dal frammento, valori non validi → testi generici, un nome che contiene "error" (es. "Terrore") non fa scadere il link, chiave `error`/`error_code` sì, link scaduto → "Vai all'accesso"; `Dialog` (guscio) e `ConfirmDialog` ricostruito, test esistenti invariati; `AdminsOnly` condiviso; passo del PIN (`AdminPinStep`): PIN alla quarta cifra, "PIN errato", blocco con conto alla rovescia; dal tablet invito, promozione e riattivazione di un amministratore solo dopo il PIN, retrocessione e operatori senza; dal telefono mai il PIN; "Annulla invito" solo per `invited`; inoltro di `/?type=invite` con frammento; controllo dell'identità al cambio di rotta per un operatore |
+| E2E (Playwright, 390×844 e 1280×800) | admin invita `invito-<casuale>@example.com` → email da Mailpit → link → "Ciao, …" → password → home con il ruolo scelto; cambio ruolo e ritorno; disattivazione di `disattiva@example.com` con una seconda sessione aperta che al cambio di rotta torna su `/accedi` con il messaggio, poi riattivazione e nuovo accesso; tablet con cassiere admin: elenco con "PIN impostato/da impostare" e colonna 480 px; promozione, invito e riattivazione di un amministratore col PIN (uno errato contato), 5 PIN errati → blocco anche su `/cassa` |
 
 Regole E2E (`fullyParallel`): account del seed riservati (`disattiva@example.com` "Disattiva Prova",
 `ruolo@example.com` "Ruolo Prova", operatori; `admin-operatori@example.com` "Admin Operatori", admin), nessun
@@ -617,7 +654,7 @@ RUNBOOK trappola 47). Solo `@example.com`.
 - **Always**: ogni controllo di ruolo e ogni regola (ultimo admin, sé stessi, unicità, dispositivo) sul server;
   chiave segreta solo nell'ambiente dell'Edge runtime; `redirectTo` dall'origine ammessa; prova sullo staging
   prima della produzione; solo `@example.com` nei test e nel seed; profili mai cancellati.
-- **Ask first**: durata del link d'invito diversa da un'ora (cambia anche il recupero); alzare il limite di
+- **Ask first**: durata del link d'invito diversa da 24 ore (cambia anche il recupero); alzare il limite di
   email online; bloccare (`ban`) gli utenti di Auth alla disattivazione; gestione dei dispositivi dall'app;
   cambio email di un account; nuovi ruoli.
 - **Never**: chiave segreta o `service_role` nell'app, in Vercel, nei log o nel repo; autorizzazioni basate su
@@ -648,10 +685,12 @@ RUNBOOK trappola 47). Solo `@example.com`.
 9. "Reinvia invito" solo per chi non ha accettato; il link precedente diventa `otp_expired`.
 10. Sul tablet (1280×800) con cassiere amministratore la schermata ha elenco e colonna "Invita operatore" da
     480 px, stati con PIN e "(tu)" sul cassiere; nessuno scorrimento orizzontale, target ≥ 48 px; un
-    amministratore non si invita né si promuove da lì (`EO005`, pgTAP + componente).
+    amministratore si invita, si promuove o si riattiva da lì solo dopo il PIN del cassiere inserito di nuovo,
+    verificato sul server nella stessa transazione con il contatore e il blocco di `/cassa`; senza PIN `EO005`
+    (pgTAP, integrazione, componente, E2E tablet).
 11. Schermate conformi ai wireframe a 390×844 con le deviazioni dichiarate (dialogo persona, "Riattiva",
     "Reinvia invito", "Annulla invito", stato "invito inviato", niente campo Email in `/imposta-password` (come
-    nel recupero), radio "Amministratore" disabilitato nel layout tablet); detector Impeccable pulito; nota di `/accedi` del wireframe.
+    nel recupero), passo del PIN sul tablet); detector Impeccable pulito; nota di `/accedi` del wireframe.
 12. CI verde con pgTAP, unità, integrazione con la funzione servita in locale, E2E telefono e tablet; deploy e
     prova reale sullo staging documentati ed eseguiti prima della produzione.
 
@@ -690,10 +729,12 @@ Ognuna ha un default già adottato; serve il titolare solo dove indicato.
 6. **Messaggio per chi viene disattivato mentre è collegato** (nota n6). Default: il testo V1 "Account non
    abilitato: chiedi a un amministratore." (nessun nuovo stato in `get_session_identity`). Alternativa: "Il tuo
    account è stato disattivato: chiedi a un amministratore." distinguendo i due casi sul server.
-7. **Invito scaduto**. Il link vale un'ora (`otp_expiry` 3600, condiviso con il recupero; verificato). Default:
-   un'ora; la persona chiede un nuovo invito e l'amministratore usa "Reinvia invito"; "Password dimenticata"
-   non serve a chi non ha mai accettato. Allungarlo (massimo 24 ore) cambierebbe anche il link di recupero:
-   **da chiedere al titolare** se un'ora è troppo poco per i camerieri.
+7. **Invito scaduto**. Il link valeva un'ora (`otp_expiry` 3600, condiviso con il recupero; verificato).
+   **Risposta del titolare (2026-11-23): 24 ore.** `otp_expiry = 86400` in `supabase/config.toml` e, sui
+   progetti online, Auth "Email OTP Expiration" = 86400 (note di deploy, passo 5 bis); vale anche per il link
+   di "Password dimenticata" (testi di `/password-dimenticata` e dei due template aggiornati: "il link vale 24
+   ore"). Scaduto: la persona chiede un nuovo invito e l'amministratore usa "Reinvia invito"; "Password
+   dimenticata" non serve a chi non ha mai accettato.
 8. **Invito con le iscrizioni chiuse sui progetti online**. Verificato in locale (GoTrue v2.198.0): funziona.
    `docs/setup-accounts.md` §4 dice che "Invite user" della dashboard risponde "Signups not allowed", senza
    prova registrata. Default: si verifica nella prova sullo staging (note di deploy, passo 6); se online fosse
@@ -706,15 +747,23 @@ Ognuna ha un default già adottato; serve il titolare solo dove indicato.
     partita resta col ruolo vecchio; vale quello del server all'accesso; "Reinvia invito" manda il testo
     aggiornato.
 11. **Amministratori dal tablet** (il wireframe "Tablet: operatori" mostra la schermata completa, con il ruolo
-    "Amministratore" nel modulo). Default: **no** — da un dispositivo, anche con cassiere amministratore, non si
+    "Amministratore" nel modulo). **Risposta del titolare (2026-11-23): "Sì, chiedendo di nuovo il PIN".** Dal
+    tablet con un cassiere amministratore si invita un amministratore, si promuove qualcuno ad amministratore e
+    si riattiva un amministratore disattivato, ma solo dopo che il cassiere ha inserito di nuovo il proprio PIN,
+    verificato sul server **dentro la stessa RPC** (`operator_invite_begin` col quinto argomento,
+    `set_operator_role_with_pin`, `set_operator_active_with_pin`) contro `private.operator_pins`, con il
+    contatore e il blocco di `unlock_cashier` (un PIN errato conta; bloccato → rifiutato); senza PIN `EO005`;
+    il PIN non si salva mai (né nel client, né in un URL, né in `private.operator_invites`, né nei registri dei
+    finti). Dal telefono nessun PIN. Interfaccia: passo del PIN (punto 3 bis). Testo storico del default, ora
+    sostituito: **no** — da un dispositivo, anche con cassiere amministratore, non si
     invita un amministratore, né si promuove qualcuno ad amministratore, né si riattiva un amministratore
     disattivato (`EO005`, radio disabilitato o "Riattiva" assente, con la nota). Motivo: turno di 12 ore senza chiusura per inattività e PIN di 4 cifre indovinabile in pochi giorni
     (SPEC-tablet-kiosk, Open Questions 1 e 2); senza questa regola chi trova il tablet sbloccato da un titolare
     otterrebbe un accesso amministratore permanente e da remoto (dati dei clienti, export, annullamenti).
     Restano sul tablet elenco, inviti di operatori, retrocessioni, disattivazioni, riattivazioni di operatori,
     reinvii e annullamenti. Rischio residuo da conoscere: un invito come **operatore** con la propria email dà comunque
-    accesso da remoto da operatore. Alternative: chiedere di nuovo il PIN dentro la RPC (stesso contatore di
-    blocco di `unlock_cashier`), oppure nessun invito dal tablet. **Da chiedere al titolare.**
+    accesso da remoto da operatore (resta anche col PIN). Alternative considerate: chiedere di nuovo il PIN
+    dentro la RPC (stesso contatore di blocco di `unlock_cashier`: **scelta**), oppure nessun invito dal tablet.
 12. **Quando un invito è accettato** (emerso dai test sullo stack reale: GoTrue dà una password temporanea
     casuale a chi verifica il token d'invito, quindi "email confermata e password" del punto 2 leggeva
     `active` chi aveva solo aperto il link, e chi aveva un utente creato dalla dashboard con una password).

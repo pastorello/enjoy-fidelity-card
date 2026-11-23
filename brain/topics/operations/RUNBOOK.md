@@ -66,6 +66,11 @@ Solo il **primo amministratore** (e la riserva, se l'invito non è disponibile) 
 `select private.add_operator('<email>', '<nome>', 'admin' | 'operator');` nello SQL Editor. Nei progetti
 online lo schema `app` va esposto nella Data API (§3 della stessa guida); migrazione, Edge Function e
 template "Invite user" li pubblica l'orchestratore ("Note di deploy" di `docs/specs/SPEC-operators.md`).
+Sui progetti online (staging e produzione) Auth → **Email OTP Expiration** = `86400` (24 ore, link d'invito e
+di recupero: `docs/setup-accounts.md` §6 passo 3; in locale `otp_expiry` di `supabase/config.toml`, che
+vale solo dopo `npx supabase stop` e un nuovo `start`). Dal tablet un amministratore si invita, si promuove o
+si riattiva solo col PIN del cassiere ripetuto (stesso contatore di `/cassa`); se il tablet resta in
+"Troppi tentativi", vale la riga di §3.
 
 Edge Function in locale (`supabase/functions/operator-invites/`):
 1. stack acceso (comando sopra, Mailpit compreso) e `./scripts/reload-auth-templates.sh`;
@@ -344,7 +349,7 @@ fermarsi e avvisare (domanda aperta 10 della spec).
 | Online: "Servizio momentaneamente non disponibile" | Data API in ricarica (503 `PGRST002`), di solito dopo aver cambiato gli schemi esposti | attendere un minuto e riprovare |
 | Online: "Account non abilitato" | Profilo collegato? `select * from app.operators;` nello SQL Editor | `private.add_operator` (§4 della guida) |
 | In locale l'email di recupero non arriva | Mailpit acceso? http://127.0.0.1:54324 (`npx supabase status`) | riavviare lo stack senza `mailpit` tra gli esclusi (`-x`); dopo modifiche a `config.toml`: `npx supabase stop && npm run db:start` |
-| Online: il link dell'email apre "Il link è scaduto o è già stato usato." | Template "Reset password" ancora quello predefinito (`#error_code=…` nell'URL)? | `docs/setup-accounts.md` §6 passo 2; link davvero usato o più vecchio di un'ora |
+| Online: il link dell'email apre "Il link è scaduto o è già stato usato." | Template "Reset password" ancora quello predefinito (`#error_code=…` nell'URL)? | `docs/setup-accounts.md` §6 passo 2; link davvero usato o più vecchio di 24 ore (Email OTP Expiration = 86400, §6 passo 3) |
 | Online: il link apre la home e non `/imposta-password` | Redirect URLs del progetto | `docs/setup-accounts.md` §6 passo 1 (l'app inoltra comunque a `/imposta-password`) |
 | In locale "Invia invito" non riesce, o l'integrazione dice "operator-invites is not served" | `npx supabase functions serve` acceso? `supabase/functions/.env` presente? | RUNBOOK §1 "Operatori", passi 2–3 |
 | In locale arriva "You've been invited" invece di "Enjoy Card: il tuo invito", o nessuna email d'invito | `docker logs supabase_auth_enjoy-card-app` (`templatemailer_template_body_http_error`) | trappole 28 e 53 |
@@ -558,3 +563,8 @@ fermarsi e avvisare (domanda aperta 10 della spec).
     "Servizio momentaneamente non disponibile: riprova tra poco.", pagina dei punti con "Non riesco a caricare
     i punti."): Auth e Data API stanno ancora ripartendo. Non è un difetto dell'app: attendere qualche
     secondo (o rieseguire) prima degli E2E; dopo un reset rieseguire anche `./scripts/reload-auth-templates.sh`.
+58. `otp_expiry` di `supabase/config.toml` (86400 dal 2026-11-23) entra in Auth solo alla creazione del
+    container: dopo averlo cambiato servono `npx supabase stop` e di nuovo `npx supabase start -x …` (poi
+    `./scripts/reload-auth-templates.sh` e `npx supabase functions serve`, che lo `stop` ferma); `docker
+    inspect supabase_auth_enjoy-card-app` mostra `GOTRUE_MAILER_OTP_EXP`. Sui progetti online la voce è Auth →
+    Email OTP Expiration e vale anche per il link di recupero.

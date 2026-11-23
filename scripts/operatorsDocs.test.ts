@@ -75,15 +75,46 @@ describe('docs/setup-accounts.md §4', () => {
     expect(text).toContain("select private.add_operator('<email>', '<nome>', 'admin');");
   });
 
-  it('says an admin is not invited or promoted from the tablet, and points to the deploy notes', () => {
+  it('says an admin is invited, promoted or reactivated from the tablet only with the PIN again, and points to the deploy notes', () => {
     const text = accounts();
     expect(text).toMatch(/dal tablet/i);
+    expect(text).toContain('Conferma con il PIN');
+    expect(text).not.toContain('si invita dal telefono');
+    expect(text).not.toContain('si riattiva dal telefono');
     expect(text).toContain('SPEC-operators.md');
     expect(text).toContain('Note di deploy');
   });
 
+  it('says the invite link lasts 24 hours', () => {
+    expect(accounts()).toContain('**24 ore**');
+    expect(accounts()).not.toMatch(/un'ora/);
+  });
+
   it('keeps the device account section of tablet-kiosk', () => {
     expect(section(SETUP_ACCOUNTS, '### Tablet della cassa (account di dispositivo)')).not.toBe('');
+  });
+});
+
+// SPEC-operators Open Questions 7 (2026-11-23): otp_expiry 86400, the invite and the recovery link.
+describe('the 24-hour links', () => {
+  it('sets otp_expiry to 86400 in the local config', () => {
+    expect(read('supabase/config.toml')).toMatch(/^otp_expiry = 86400$/m);
+  });
+
+  it('says 24 hours in both email templates, never an hour', () => {
+    for (const template of ['supabase/templates/invite.html', 'supabase/templates/recovery.html']) {
+      const text = read(template).replace(/\s+/g, ' ');
+      expect(text).toContain('il link vale 24 ore e si usa una volta sola.');
+      expect(text).not.toContain('un’ora');
+    }
+  });
+
+  it('asks Email OTP Expiration = 86400 on the hosted projects, in setup-accounts and the RUNBOOK', () => {
+    const setup = read(SETUP_ACCOUNTS);
+    expect(setup).toContain('Email OTP Expiration');
+    expect(setup).toMatch(/Email OTP Expiration\*\*: `86400`/);
+    expect(setup).not.toMatch(/\| 3600 secondi/);
+    expect(read(RUNBOOK)).toMatch(/Email OTP Expiration[^\n]*86400/);
   });
 });
 

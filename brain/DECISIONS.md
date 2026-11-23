@@ -10,6 +10,33 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-23 — Amministratori dal tablet con PIN ripetuto; link d'invito di 24 ore
+
+- **Decisione**: (1) dal tablet della cassa, con un cassiere amministratore, si invita un amministratore,
+  si promuove una persona ad amministratore e si riattiva un amministratore disattivato, ma solo dopo che
+  il cassiere ha **inserito di nuovo il proprio PIN**. Il PIN si verifica sul server nella stessa
+  transazione dell'azione, con lo stesso contatore e lo stesso blocco di `/cassa` (5 errori → 5 minuti);
+  senza PIN il server rifiuta (`EO005`). Dal telefono nulla cambia: nessun PIN. (2) Il link dell'email
+  d'invito vale **24 ore** (`otp_expiry` = 86400): la stessa durata vale anche per il link di "Password
+  dimenticata", che in Supabase condivide l'impostazione.
+- **Perché**: risposte del titolare alle Open Questions 11 ("Sì, chiedendo di nuovo il PIN") e 7 (24 ore)
+  di `docs/specs/SPEC-operators.md`. Il PIN ripetuto impedisce che chi trova il tablet sbloccato da un
+  titolare (turno di 12 ore senza chiusura per inattività) si crei un account amministratore permanente;
+  un'ora era poca per un cameriere che apre l'email a fine turno.
+- **Alternative scartate (Rejected alternatives)**:
+  - Nessun amministratore dal tablet (il default conservativo della spec, `EO005` sempre): costringeva a
+    prendere il telefono anche per riattivare un titolare.
+  - Amministratori dal tablet senza altre verifiche: il turno lungo e il PIN di 4 cifre bastavano per un
+    account permanente.
+  - Lasciare il link a un'ora (default di Supabase) o allungarlo oltre le 24 ore: troppo poco per chi lo
+    apre dopo il lavoro; oltre, il link di recupero resterebbe valido troppo a lungo.
+- **Ambito**: modulo `operators` (RPC `set_operator_role_with_pin`, `set_operator_active_with_pin`,
+  `operator_invite_begin` col PIN, funzione `operator-invites`, passo del PIN sul tablet); `identity`
+  (testi del link di recupero); `supabase/config.toml` e, sui progetti online, Auth "Email OTP Expiration"
+  = 86400 (staging e produzione, a cura dell'orchestratore).
+- **Contesto**: sostituisce il default "niente amministratori dal tablet" della voce del 2026-11-22 e
+  della spec (Open Questions 11) e l'ora di validità del link (Open Questions 7).
+
 ### 2026-11-22 — Schermata Operatori nell'app, con invito via email
 
 - **Decisione**: un amministratore aggiunge, dall'app, altri amministratori e operatori (nome, email,

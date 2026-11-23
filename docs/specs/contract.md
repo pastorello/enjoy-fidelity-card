@@ -97,8 +97,13 @@ Built after the other modules; no existing table, RPC or route is renamed.
   app, Vercel, logs or the repo. The app calls it only from `supabaseOperatorsService.ts`
   (`functions.invoke('operator-invites')`).
 - **Error codes** of the module: `EO001` last active admin, `EO002` oneself, `EO003` profile without an
-  account, `EO004` not waiting for an invite, `EO005` an admin from a device (invite or promotion); plus the
-  standard `42501`, `22023`, `P0002`.
+  account, `EO004` not waiting for an invite, `EO005` an admin from a device (invite, promotion or
+  reactivation) without the cashier's PIN; plus the standard `42501`, `22023`, `P0002`. With the PIN (till
+  tablet only, decided 2026-11-23): `app.set_operator_role_with_pin(p_operator_id, p_role, p_pin)`,
+  `app.set_operator_active_with_pin(p_operator_id, p_active, p_pin)` (jsonb `{status: 'ok', operator}` |
+  `wrong_pin {attempts_left}` | `locked {lock_seconds_left}`, the counter and lock of `unlock_cashier`) and
+  the fifth argument `p_pin` of `app.operator_invite_begin` (the function body's `pin`; 403 `wrong_pin` /
+  `pin_locked`).
 
 ## Card input (module card-input)
 One app-wide reader service with adapters: Web NFC (Chrome Android), USB keyboard-wedge (tablet),

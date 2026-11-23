@@ -76,8 +76,11 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
   Annulla invito; mai azioni su sé stessi, sempre almeno un amministratore attivo (`EO001`). Gli inviti
   passano dalla Edge Function `supabase/functions/operator-invites`, l'unico posto con la chiave segreta
   (mai nell'app, su Vercel o nel repo). `private.add_operator` (pannello di Supabase + SQL Editor,
-  `docs/setup-accounts.md` §4) resta solo per il **primo amministratore** e come riserva. **Dal tablet**,
-  anche con un cassiere amministratore, non si invita né si promuove un amministratore (`EO005`). Le email
+  `docs/setup-accounts.md` §4) resta solo per il **primo amministratore** e come riserva. **Dal tablet**, con
+  un cassiere amministratore, un amministratore si invita, si promuove o si riattiva solo dopo il **PIN del
+  cassiere inserito di nuovo**, verificato nella stessa RPC con il contatore e il blocco di `/cassa`
+  (`EO005` senza PIN; `brain/DECISIONS.md` 2026-11-23). Il link d'invito e quello di recupero valgono **24
+  ore** (`otp_expiry` 86400; online Auth "Email OTP Expiration"). Le email
   di Auth (invito e recupero) partono da `info@enjoygaeta.it`; "Password dimenticata" e "Cambia password":
   `docs/specs/SPEC-identity-password.md`.
   Sessione persistente sul telefono; sul tablet condiviso: account di dispositivo + cambio operatore con

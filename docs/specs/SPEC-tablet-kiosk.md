@@ -150,8 +150,9 @@ chi è alla cassa. Le card si leggono con un lettore NFC USB in emulazione tasti
     nell'app, con invito via email"): la riga "Operatori · Account, ruoli, inviti e PIN" in GESTIONE e la
     schermata esistono anche sul tablet, per un cassiere amministratore, e appartengono al modulo
     `operators` ([SPEC-operators.md](SPEC-operators.md)); questo modulo ne dà solo l'impaginazione (colonna
-    "Invita operatore" da 480 px) e lo stato "PIN impostato / da impostare". Dal tablet non si nomina un
-    amministratore (SPEC-operators, Open Questions 11). Solo i dispositivi si gestiscono ancora in Supabase
+    "Invita operatore" da 480 px) e lo stato "PIN impostato / da impostare". Dal tablet un amministratore si
+    nomina solo col PIN del cassiere ripetuto, con il contatore e il blocco di `unlock_cashier`
+    (SPEC-operators, Open Questions 11, deciso il 2026-11-23). Solo i dispositivi si gestiscono ancora in Supabase
     (`private.add_device`).
 14. **Tastiera virtuale di Android**: con il lettore USB collegato Android nasconde la tastiera a
     schermo; per cercare per nome va attivata "Mostra tastiera virtuale" nelle impostazioni del tablet.

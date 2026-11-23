@@ -112,7 +112,7 @@ Da qui in poi gli altri account li crea questo amministratore dall'app.
 3. La persona riceve l'email "Enjoy Card: il tuo invito" (se non arriva, guardi nello spam), tocca il
    pulsante e su `/imposta-password` vede "Ciao, {nome}", sceglie la password (almeno 8 caratteri) e tocca
    **Salva e accedi**: entra nell'app con il ruolo scelto e nell'elenco la riga diventa "attivo".
-4. Il link vale **un'ora** ed è usabile una volta. Scaduto o perso: tocca il nome della persona
+4. Il link vale **24 ore** ed è usabile una volta. Scaduto o perso: tocca il nome della persona
    nell'elenco → **Reinvia invito** (il link precedente smette di funzionare).
 5. Email sbagliata: tocca il nome → **Annulla invito** → conferma; poi invita di nuovo con lo stesso nome e
    l'email giusta.
@@ -148,11 +148,14 @@ prima, e il profilo viene ricollegato con il suo storico (come `private.add_oper
 ### Dal tablet della cassa
 
 Con un amministratore alla cassa, **Impostazioni → GESTIONE → Operatori** mostra la stessa schermata (con
-lo stato del PIN di ognuno) e la colonna **Invita operatore** a destra. Dal tablet però **non si invita, non si
-promuove e non si riattiva un amministratore**: "Amministratore" è disabilitato con la nota "Un
-amministratore si invita dal telefono." e un amministratore disattivato non ha **Riattiva** ("Un
-amministratore si riattiva dal telefono."); lo rifiuta anche il server. Il resto (inviti di operatori,
-retrocessioni, Disattiva, Riattiva di un operatore, Reinvia invito, Annulla invito) si fa anche da lì. Il PIN ognuno lo imposta dal proprio telefono
+lo stato del PIN di ognuno) e la colonna **Invita operatore** a destra. Dal tablet **un amministratore si
+invita, si promuove o si riattiva solo con il PIN**: dopo **Invia invito** (ruolo "Amministratore"), **Rendi
+amministratore** o **Riattiva** di un amministratore si apre **Conferma con il PIN**, dove chi è alla cassa
+inserisce di nuovo il proprio PIN. Un PIN sbagliato dice "PIN errato. Tentativi rimasti: …" e conta come a
+"Chi è alla cassa?": dopo 5 errori il tablet si blocca per 5 minuti, anche per il cambio operatore. Il
+controllo lo fa il server (decisione del 2026-11-23, `docs/specs/SPEC-operators.md` Open Questions 11). Il
+resto (inviti di operatori, retrocessioni, Disattiva, Riattiva di un operatore, Reinvia invito, Annulla
+invito) si fa da lì senza PIN; dal telefono il PIN non serve mai. Il PIN ognuno lo imposta dal proprio telefono
 (`docs/setup-tablet.md` §4).
 
 ### Password dimenticata
@@ -259,7 +262,7 @@ aggiungere è quindi
 | Site URL | `http://localhost:5173` | `https://enjoy-fidelity-card.vercel.app` |
 | Redirect URLs | `http://localhost:5173/imposta-password` e `https://enjoy-fidelity-card-*-<team>.vercel.app/imposta-password` | `https://enjoy-fidelity-card.vercel.app/imposta-password` |
 | Lunghezza minima della password | 8 | 8 |
-| Scadenza del link (Email OTP Expiration) | 3600 secondi | 3600 secondi |
+| Scadenza del link (Email OTP Expiration) | 86400 secondi (24 ore) | 86400 secondi (24 ore) |
 
 > **Lo staging non riceve mai l'URL di produzione** (né come Site URL né tra le Redirect URLs): un link di
 > prova non deve portare ai dati veri. L'asterisco delle anteprime accetterebbe anche un progetto Vercel
@@ -283,7 +286,9 @@ Per ciascun progetto, in quest'ordine:
      e limita gli invii a pochi indirizzi.
 3. **Authentication → Sign In / Providers** → riga **Email** (si apre un pannello):
    - **Minimum password length**: `8`;
-   - **Email OTP Expiration**: `3600` (secondi, un'ora);
+   - **Email OTP Expiration**: `86400` (secondi, 24 ore: è la durata del link d'invito **e** di quello di
+     "Password dimenticata", decisione del 2026-11-23, `docs/specs/SPEC-operators.md` Open Questions 7;
+     in locale `otp_expiry` di `supabase/config.toml`);
    - **Save**. Nelle versioni più vecchie della dashboard la pagina si chiama **Authentication → Providers →
      Email** e la lunghezza minima può stare in **Authentication → Policies** o **Attack Protection**.
 4. **Authentication → Rate Limits**: non cambiare nulla. Il limite di email l'ora dei progetti online resta
