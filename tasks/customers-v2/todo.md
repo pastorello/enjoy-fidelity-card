@@ -19,11 +19,11 @@ riscatti (anche annullati; correzioni escluse); trigger `after insert on app.mov
 `customers_home_order_idx (has_activity desc, sort_at desc, id desc) where anonymized_at is null`; nessun grant
 di scrittura.
 **Accettazione:**
-- [ ] pgTAP: spesa e riscatto aggiornano `last_activity_at`, la correzione no, un movimento più vecchio non la
+- [x] pgTAP: spesa e riscatto aggiornano `last_activity_at`, la correzione no, un movimento più vecchio non la
       fa tornare indietro; spesa annullata conta (Open Question 1)
-- [ ] pgTAP: il riempimento valorizza i clienti del seed con movimenti e lascia `null` gli altri; colonne
+- [x] pgTAP: il riempimento valorizza i clienti del seed con movimenti e lascia `null` gli altri; colonne
       generate coerenti; `authenticated` non scrive `last_activity_at`
-- [ ] pgTAP esistenti (ledger compreso) invariati
+- [x] pgTAP esistenti (ledger compreso) invariati
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** nessuna · **File:** supabase/migrations/*_customers_v2_activity.sql,
 supabase/tests/customers_v2.test.sql · **Dimensione:** S
