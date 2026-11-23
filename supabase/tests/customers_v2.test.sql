@@ -4,7 +4,7 @@
 -- (point 6). Fake data only: invented names, @example.com emails.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(70);
+select plan(101);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -524,6 +524,257 @@ select is(
   (current_setting('list_test.page1')::json -> -1 ->> 'last_activity_at')::timestamptz,
   current_setting('activity_test.t0')::timestamptz + interval '5 minutes',
   'keyset: the cursor keeps the microseconds'
+);
+
+reset role;
+
+-- The email in the customers RPCs (migration 2, transitional form) -----------------------
+-- SPEC-customers-v2.md point 2 and acceptance criteria 2 and 3. Called by parameter name,
+-- the way the app calls them: these calls hold for the final form too.
+-- Fake customers "Posta", created by the RPCs as the operator.
+
+-- The message and the detail of the error a statement raises, or null when it succeeds.
+create function pg_temp.error_of(p_sql text) returns text language plpgsql as $$
+declare
+  v_message text;
+  v_detail text;
+begin
+  execute p_sql;
+  return null;
+exception when others then
+  get stacked diagnostics v_message = message_text, v_detail = pg_exception_detail;
+  return v_message || ' | ' || coalesce(v_detail, '');
+end;
+$$;
+grant execute on function pg_temp.error_of(text) to authenticated;
+
+select is(
+  (select array_agg(attname::text order by attnum) from pg_attribute
+   where attrelid = 'app.customer_summary'::regclass and attnum > 0 and not attisdropped),
+  array['id', 'name', 'phone', 'notes', 'anonymized_at', 'balance', 'last_served_at', 'email'],
+  'customer_summary carries email, as its last attribute'
+);
+select ok(
+  not has_function_privilege('anon', 'private.normalize_email(text)', 'execute')
+  and not has_function_privilege('authenticated', 'private.normalize_email(text)', 'execute'),
+  'no API role executes normalize_email'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-a800-000000000002","role":"authenticated"}', true);
+
+select is(
+  (select row(s.name, s.email)::text from app.create_customer(
+     p_operation_id => '00000000-0000-4000-a820-000000000001', p_name => 'Posta Rossi',
+     p_email => '  Rossi@Example.COM ', p_privacy_consent => true, p_notes => null) s),
+  '("Posta Rossi",rossi@example.com)',
+  'create_customer: the email is trimmed and lowercased'
+);
+select is(
+  (select email from app.customers where create_operation_id = '00000000-0000-4000-a820-000000000001'),
+  'rossi@example.com',
+  'create_customer: the email is stored normalized'
+);
+select is(
+  (select email from app.create_customer(
+     p_operation_id => '00000000-0000-4000-a820-000000000001', p_name => 'Posta Rossi',
+     p_email => '  Rossi@Example.COM ', p_privacy_consent => true, p_notes => null)),
+  'rossi@example.com',
+  'create_customer: a resent operation returns the email too'
+);
+select is(
+  (select email from app.get_customer(
+     (select id from app.customers where create_operation_id = '00000000-0000-4000-a820-000000000001'))),
+  'rossi@example.com',
+  'get_customer returns the email'
+);
+select is(
+  (select email from app.create_customer(
+     p_operation_id => gen_random_uuid(), p_name => 'Posta Unicode',
+     p_email => E' 　Unicode@Example.COM ​﻿\t', p_privacy_consent => true,
+     p_notes => null)),
+  'unicode@example.com',
+  'create_customer: Unicode spaces at the edges are trimmed too'
+);
+select is(
+  pg_temp.error_of($$select app.create_customer(p_operation_id => gen_random_uuid(),
+    p_name => 'Posta Bianchi', p_email => 'ROSSI@example.com', p_privacy_consent => true,
+    p_notes => null)$$),
+  'customer_email_taken | '
+    || (select id::text from app.customers
+        where create_operation_id = '00000000-0000-4000-a820-000000000001'),
+  'create_customer: the same email in other case is taken, detail = the other customer''s id'
+);
+select throws_ok(
+  $$select app.create_customer(p_operation_id => gen_random_uuid(), p_name => 'Posta Bianchi',
+    p_email => 'rossi@', p_privacy_consent => true, p_notes => null)$$,
+  'P0001', 'email_invalid',
+  'create_customer: a malformed email is refused'
+);
+select throws_ok(
+  $$select app.create_customer(p_operation_id => gen_random_uuid(), p_name => 'Posta Bianchi',
+    p_email => 'a@b.c', p_privacy_consent => true, p_notes => null)$$,
+  'P0001', 'email_invalid',
+  'create_customer: an email shorter than 6 characters is refused'
+);
+select throws_ok(
+  format($$select app.create_customer(p_operation_id => gen_random_uuid(), p_name => 'Posta Bianchi',
+    p_email => %L, p_privacy_consent => true, p_notes => null)$$,
+    repeat('a', 64) || '@' || repeat('b', 186) || '.com'),
+  'P0001', 'email_invalid',
+  'create_customer: an email longer than 254 characters is refused'
+);
+select is(
+  pg_temp.error_of($$select app.create_customer(p_operation_id => gen_random_uuid(),
+    p_name => 'posta rossi', p_email => 'rossi@example.com', p_privacy_consent => true,
+    p_notes => null)$$),
+  'customer_name_taken | '
+    || (select id::text from app.customers
+        where create_operation_id = '00000000-0000-4000-a820-000000000001'),
+  'create_customer: name and email both taken → only customer_name_taken (the first check)'
+);
+select is(
+  pg_temp.error_of($$select app.create_customer(p_operation_id => gen_random_uuid(),
+    p_name => 'Posta Rossi', p_email => 'rossi@', p_privacy_consent => true, p_notes => null)$$),
+  'customer_name_taken | '
+    || (select id::text from app.customers
+        where create_operation_id = '00000000-0000-4000-a820-000000000001'),
+  'create_customer: a taken name is reported before a malformed email'
+);
+select is(
+  (select array_agg(s.email is null) from (
+     select email from app.create_customer(p_operation_id => gen_random_uuid(),
+       p_name => 'Posta Senza Uno', p_email => null, p_privacy_consent => true, p_notes => null)
+     union all
+     select email from app.create_customer(p_operation_id => gen_random_uuid(),
+       p_name => 'Posta Senza Due', p_email => E'  ', p_privacy_consent => true, p_notes => null)
+   ) s),
+  array[true, true],
+  'create_customer: two customers without an email (null, or only spaces)'
+);
+-- Transitional only: goes with p_phone when the migration takes its final form.
+select is(
+  (select email from app.create_customer(p_operation_id => gen_random_uuid(),
+     p_name => 'Posta Vecchio Frontend', p_phone => null, p_privacy_consent => true, p_notes => null)),
+  null,
+  'create_customer: a call without p_email (the frontend still sending p_phone) still works'
+);
+
+-- update_customer
+select set_config('email_test.bianchi', (select id::text from app.create_customer(
+  p_operation_id => gen_random_uuid(), p_name => 'Posta Bianchi', p_email => 'bianchi@example.com',
+  p_privacy_consent => true, p_notes => null)), true);
+select is(
+  (select email from app.update_customer(p_customer_id => current_setting('email_test.bianchi')::uuid,
+     p_name => 'Posta Bianchi Due', p_email => 'BIANCHI@example.com ', p_notes => null)),
+  'bianchi@example.com',
+  'update_customer: renaming with its own email (any case) is not a conflict'
+);
+select is(
+  pg_temp.error_of($$select app.update_customer(p_customer_id => current_setting('email_test.bianchi')::uuid,
+    p_name => 'Posta Bianchi Due', p_email => ' Rossi@Example.com', p_notes => null)$$),
+  'customer_email_taken | '
+    || (select id::text from app.customers
+        where create_operation_id = '00000000-0000-4000-a820-000000000001'),
+  'update_customer: another customer''s email is taken, detail = their id'
+);
+select throws_ok(
+  $$select app.update_customer(p_customer_id => current_setting('email_test.bianchi')::uuid,
+    p_name => 'Posta Bianchi Due', p_email => 'bianchi@example', p_notes => null)$$,
+  'P0001', 'email_invalid',
+  'update_customer: a malformed email is refused'
+);
+select is(
+  pg_temp.error_of($$select app.update_customer(p_customer_id => current_setting('email_test.bianchi')::uuid,
+    p_name => 'Posta Rossi', p_email => 'rossi@example.com', p_notes => null)$$),
+  'customer_name_taken | '
+    || (select id::text from app.customers
+        where create_operation_id = '00000000-0000-4000-a820-000000000001'),
+  'update_customer: name and email both taken → only customer_name_taken'
+);
+select is(
+  (select email from app.update_customer(p_customer_id => current_setting('email_test.bianchi')::uuid,
+     p_name => 'Posta Bianchi Due', p_email => '   ', p_notes => null)),
+  null,
+  'update_customer: an empty email removes it'
+);
+select is(
+  (select email from app.customers where id = current_setting('email_test.bianchi')::uuid),
+  null,
+  'update_customer: the removed email is no longer stored'
+);
+
+-- create_customer_with_card
+select is(
+  (select email from app.create_customer_with_card(p_operation_id => gen_random_uuid(),
+     p_name => 'Posta Card', p_email => ' Card@Example.com', p_privacy_consent => true, p_notes => null,
+     p_uid => '04EE0000000E01')),
+  'card@example.com',
+  'create_customer_with_card: the email is normalized and returned'
+);
+select is(
+  pg_temp.error_of($$select app.create_customer_with_card(p_operation_id => gen_random_uuid(),
+    p_name => 'Posta Card Due', p_email => 'CARD@example.com', p_privacy_consent => true,
+    p_notes => null, p_uid => '04EE0000000E02')$$),
+  'customer_email_taken | ' || (select id::text from app.customers where name = 'Posta Card'),
+  'create_customer_with_card: a taken email is refused with the other customer''s id'
+);
+select is(
+  (select count(*)::int from app.cards where uid = '04EE0000000E02'),
+  0,
+  'create_customer_with_card: a refused email leaves no card behind'
+);
+select throws_ok(
+  $$select app.create_customer_with_card(p_operation_id => gen_random_uuid(),
+    p_name => 'Posta Card Due', p_email => '@example.com', p_privacy_consent => true,
+    p_notes => null, p_uid => '04EE0000000E02')$$,
+  'P0001', 'email_invalid',
+  'create_customer_with_card: a malformed email is refused'
+);
+
+-- Criterion 3: the erasure clears name, email and notes; the email is free again.
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-4000-a800-000000000001","role":"authenticated"}', true);
+select set_config('email_test.erased', (select id::text from app.create_customer(
+  p_operation_id => gen_random_uuid(), p_name => 'Posta Cancellata', p_email => 'via@example.com',
+  p_privacy_consent => true, p_notes => 'Nota di prova')), true);
+select is(
+  (select row(s.name like 'Cliente cancellato %', s.email, s.notes, s.anonymized_at is not null)::text
+   from app.anonymize_customer(current_setting('email_test.erased')::uuid) s),
+  '(t,,,t)',
+  'anonymize_customer: name replaced, email and notes cleared'
+);
+select is(
+  (select row(name like 'Cliente cancellato %', email, notes)::text
+   from app.customers where id = current_setting('email_test.erased')::uuid),
+  '(t,,)',
+  'anonymize_customer: the stored row keeps neither name, email nor notes'
+);
+select is(
+  (select email from app.create_customer(p_operation_id => gen_random_uuid(),
+     p_name => 'Posta Riusa', p_email => 'VIA@example.com', p_privacy_consent => true, p_notes => null)),
+  'via@example.com',
+  'after the erasure another customer reuses the email'
+);
+select is(
+  (select email from app.get_customer(current_setting('email_test.erased')::uuid)),
+  null,
+  'get_customer: the anonymized customer has no email'
+);
+
+-- export_customers
+select is(
+  (select e.email from app.export_customers(null, 1000) e
+   where e.id = (select id from app.customers where create_operation_id = '00000000-0000-4000-a820-000000000001')),
+  'rossi@example.com',
+  'export_customers: the admin receives the email'
+);
+select is(
+  (select e.email from app.export_customers(null, 1000) e
+   where e.id = current_setting('email_test.erased')::uuid),
+  null,
+  'export_customers: an anonymized customer has no email'
 );
 
 reset role;

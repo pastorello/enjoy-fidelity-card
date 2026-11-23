@@ -535,11 +535,11 @@ select is(
 
 -- create_customer_with_card ----------------------------------------------------------------------
 select ok(
-  has_function_privilege('authenticated', 'app.create_customer_with_card(uuid, text, text, boolean, text, text)', 'execute'),
+  has_function_privilege('authenticated', 'app.create_customer_with_card(uuid, text, text, boolean, text, text, text)', 'execute'),
   'authenticated can execute create_customer_with_card'
 );
 select ok(
-  not has_function_privilege('anon', 'app.create_customer_with_card(uuid, text, text, boolean, text, text)', 'execute'),
+  not has_function_privilege('anon', 'app.create_customer_with_card(uuid, text, text, boolean, text, text, text)', 'execute'),
   'anon cannot execute create_customer_with_card'
 );
 

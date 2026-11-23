@@ -56,11 +56,11 @@ select ok(
   'anon cannot execute acting_operator_id'
 );
 select ok(
-  has_function_privilege('authenticated', 'app.create_customer(uuid, text, text, boolean, text)', 'execute'),
+  has_function_privilege('authenticated', 'app.create_customer(uuid, text, text, boolean, text, text)', 'execute'),
   'authenticated can execute create_customer'
 );
 select ok(
-  not has_function_privilege('anon', 'app.create_customer(uuid, text, text, boolean, text)', 'execute'),
+  not has_function_privilege('anon', 'app.create_customer(uuid, text, text, boolean, text, text)', 'execute'),
   'anon cannot execute create_customer'
 );
 
@@ -324,7 +324,7 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000002","role":"authenticated"}', true);
 select ok(
-  has_function_privilege('authenticated', 'app.update_customer(uuid, text, text, text)', 'execute'),
+  has_function_privilege('authenticated', 'app.update_customer(uuid, text, text, text, text)', 'execute'),
   'authenticated can execute update_customer'
 );
 select ok(

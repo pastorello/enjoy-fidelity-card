@@ -1,10 +1,11 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { localSupabase, memoryClient, runSql } from './localSupabase';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { localSupabase, memoryClient, runSql, runSqlInBackground } from './localSupabase';
 
-// customers-v2 over HTTP (SPEC-customers-v2.md, criteria 5 and 7): the home list paged through
-// PostgREST with the cursor sent back as received, and the rewards of the public page for anon.
+// customers-v2 over HTTP (SPEC-customers-v2.md, criteria 2, 5 and 7): the email taken in a race,
+// the home list paged through PostgREST with the cursor sent back as received, and the rewards of
+// the public page for anon.
 // Card races (criterion 8) are in cards.test.ts, next to the other card races.
 
 const local = localSupabase();
@@ -321,5 +322,65 @@ describe('card_rewards over HTTP with the anon key (criterion 7)', () => {
         id: cardId,
       }),
     ).toBe('f|t');
+  });
+});
+
+describe('the email over HTTP (criterion 2)', () => {
+  /**
+   * Two phones saving the same email at the same moment: the pre-check of the RPC does not see a
+   * row another transaction has inserted but not committed yet, so the INSERT waits on
+   * customers_email_key and then hits unique_violation. The RPC must answer customer_email_taken
+   * with the other customer's id, never a raw 23505, and never echo the email.
+   */
+  it('an email committed meanwhile is customer_email_taken with its id', async () => {
+    const held = {
+      id: randomUUID(),
+      name: `Gara Email ${SUFFIX}`,
+      email: `gara.${SUFFIX}@example.com`,
+    };
+    const marker = `race-${randomUUID()}`;
+    const done = runSqlInBackground(
+      `begin;
+       insert into app.customers (id, name, email, privacy_consent_at, created_by, create_operation_id)
+       values (:'id'::uuid, :'name', :'email', now(),
+               (select id from app.operators order by created_at limit 1), gen_random_uuid());
+       select pg_sleep(1.5) /* ${marker} */;
+       commit;`,
+      held,
+    );
+    toErase.push(held.id);
+    await vi.waitFor(
+      () => {
+        const sleeping = runSql(
+          `select count(*) from pg_stat_activity
+           where pid <> pg_backend_pid() and query like '%pg_sleep%' and query like :'pattern';`,
+          { pattern: `%${marker}%` },
+        );
+        if (sleeping !== '1') throw new Error('The held transaction has not inserted its row yet');
+      },
+      { timeout: 2000, interval: 20 },
+    );
+
+    const answer = await rawRpc(operatorClient, 'app', 'create_customer', {
+      p_operation_id: randomUUID(),
+      p_name: `Gara Email Seconda ${SUFFIX}`,
+      p_email: `  GARA.${SUFFIX}@Example.com`,
+      p_privacy_consent: true,
+      p_notes: null,
+    });
+    await done;
+
+    expect(answer.status).toBe(400);
+    expect(JSON.parse(answer.body)).toMatchObject({
+      code: 'P0001',
+      message: 'customer_email_taken',
+      details: held.id,
+    });
+    expect(answer.body.toLowerCase()).not.toContain(held.email);
+    expect(
+      runSql(`select count(*) from app.customers where name = :'name';`, {
+        name: `Gara Email Seconda ${SUFFIX}`,
+      }),
+    ).toBe('0');
   });
 });
