@@ -186,7 +186,7 @@ corrects_movement_id  uuid null unique references app.movements(id)  -- solo cor
 -- check per kind sulle colonne sopra; index (customer_id, created_at desc), index (created_at, id)
 ```
 
-- Nessun dato personale del cliente (nome, telefono) si copia nei movimenti (`SPEC-customers.md`):
+- Nessun dato personale del cliente (nome, email) si copia nei movimenti (`SPEC-customers.md`):
   l'anonimizzazione non li raggiungerebbe.
 - **Accesso**: RLS attiva (event trigger di `platform`); policy `select` per
   `(select private.is_active_operator())`; `revoke insert, update, delete, truncate` da `authenticated` e
@@ -291,7 +291,7 @@ const op = useOperation(() => service.recordPurchase({ customerId, amountCents }
 - **Always**: importi in centesimi interi; punti per difetto calcolati **sul server**; saldo controllato
   sotto lock nella stessa transazione; `operation_id` dall'app e riuso nel reinvio; operatore da
   `private.acting_operator_id()`; ruoli verificati sul server; solo dati finti nei test e nel seed
-  (`@example.com`, nomi inventati, telefoni `+39333000…`, uid finti); nessun segreto nel repo.
+  (`@example.com`, nomi inventati, uid finti; nessun telefono dei clienti, `SPEC-customers-v2.md`); nessun segreto nel repo.
 - **Ask first**: coda offline o reinvio automatico in background; cambiare la finestra di 10 s; permettere
   l'annullo di una correzione; correzioni manuali di punti; mostrare al cliente altro oltre al saldo della pagina pubblica di `cards`
   (`/s/:token`); limiti diversi

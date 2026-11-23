@@ -70,7 +70,9 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
 - Una card sconosciuta letta dalla schermata principale apre Nuovo cliente con la card già associata.
 - Card disattivata riletta alla cassa: solo un **amministratore** la **riattiva** (scambio con l'eventuale
   altra card attiva, dopo conferma) o la **riformatta** (card vuota, dissociata per sempre dal cliente e di
-  nuovo disponibile). Card di un cliente con dati cancellati: solo riformattare.
+  nuovo disponibile). Card di un cliente con dati cancellati: solo riformattare. Schermata «Card non
+  attiva» sulla rotta `/card/:cardId` (id della riga di `app.cards`, mai l'uid; `SPEC-customers-v2.md`
+  punto 4); Riformatta solo dal telefono Android, non dal tablet.
 
 ## Ruoli
 - **Amministratore** (titolari): tutto, più operatori, catalogo premi, rapporto euro/punto, soglia di

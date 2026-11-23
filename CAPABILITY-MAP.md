@@ -9,7 +9,7 @@ revisione incrociata: `docs/specs/`.
 | `platform` | Scheletro PWA, Supabase (UE), CI e deploy su Vercel, token del design system, struttura comune delle schermate | — | [SPEC-platform.md](docs/specs/SPEC-platform.md) (approvata) |
 | `identity` | Accesso, uscita, sessione scaduta, ruoli; account creati a mano in Supabase (niente inviti); password dimenticata e cambio password con link via email | platform | [SPEC-identity.md](docs/specs/SPEC-identity.md) (V1), [SPEC-identity-password.md](docs/specs/SPEC-identity-password.md) (recupero password; procedura remota in `docs/setup-accounts.md` §6) |
 | `settings` | Rapporto euro/punto, soglia di conferma importo, formato del lettore USB | identity | [SPEC-settings.md](docs/specs/SPEC-settings.md) |
-| `customers` | Nuovo cliente (nome unico, telefono facoltativo, consenso), ricerca, modifica, anonimizzazione | identity | [SPEC-customers.md](docs/specs/SPEC-customers.md) |
+| `customers` | Nuovo cliente (nome unico, email facoltativa da `customers-v2`, consenso), ricerca, modifica, anonimizzazione | identity | [SPEC-customers.md](docs/specs/SPEC-customers.md) |
 | `card-input` | Unico ingresso per la lettura card: Web NFC, permesso e NFC spento, normalizzazione uid, adattatore finto per i test | platform, settings | [SPEC-card-input.md](docs/specs/SPEC-card-input.md) |
 | `cards` | Associa/sostituisci card, una card attiva per cliente, card già associata, card sconosciuta → nuovo cliente; link ai punti scritto sulla card e pagina pubblica del saldo `/s/:token` | customers, card-input | [SPEC-cards.md](docs/specs/SPEC-cards.md) |
 | `rewards` | Catalogo premi (nome, punti, attivo) | identity | [SPEC-rewards.md](docs/specs/SPEC-rewards.md) |

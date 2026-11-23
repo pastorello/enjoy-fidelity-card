@@ -69,8 +69,10 @@ describe('customers data boundary', () => {
 
 // SPEC-customers-v2, point 1 and Success Criterion 1: the customer's phone is gone. No identifier,
 // interface text or E.164-like literal of it may come back in src/, e2e/, tests/, scripts/ or the
-// seed. This file is excluded: it has to spell the patterns out.
+// seed. This file and the documents' test (scripts/customersV2Docs.test.ts, task 36) are excluded:
+// both have to spell the patterns out.
 const SELF = 'scripts/customersBoundary.test.ts';
+const DOCS_TEST = 'scripts/customersV2Docs.test.ts';
 const PHONE_ROOTS = ['src', 'e2e', 'tests', 'scripts'];
 const SEED = 'supabase/seed.sql';
 
@@ -112,7 +114,9 @@ function phoneMatches(text: string): string[] {
   return PHONE_PATTERNS.filter(({ pattern }) => pattern.test(text)).map(({ label }) => label);
 }
 
-const phoneScope = [...PHONE_ROOTS.flatMap(allFiles), SEED].filter((path) => path !== SELF);
+const phoneScope = [...PHONE_ROOTS.flatMap(allFiles), SEED].filter(
+  (path) => path !== SELF && path !== DOCS_TEST,
+);
 
 describe('customers v2: no customer phone left', () => {
   it('scans src, e2e, tests, scripts and the seed, without this file', () => {
@@ -121,6 +125,7 @@ describe('customers v2: no customer phone left', () => {
     );
     expect(phoneScope.some((path) => path.startsWith('tests/integration/'))).toBe(true);
     expect(phoneScope).not.toContain(SELF);
+    expect(phoneScope).not.toContain(DOCS_TEST);
   });
 
   it('finds no phone identifier, phone text or phone number', () => {

@@ -18,6 +18,7 @@ npm run db:reset                            # riapplica migrazioni + seed
 npm run db:test                             # test pgTAP in supabase/tests/
 npm run test:integration                    # Vitest contro lo stack locale (tests/integration/), Supabase acceso
 ./scripts/reload-auth-templates.sh          # se arriva l'email "Reset your password" (trappola 28)
+docker exec -i supabase_db_enjoy-card-app psql -U postgres -d postgres < scripts/measure-list-customers.sql   # tempo di list_customers (customers-v2, criterio 6)
 npx supabase migration new <nome> </dev/null   # nuova migrazione (vedi trappola 5)
 npm run tokens                              # rigenera src/styles/tokens.css da design/tokens.json
 npm run icons                               # rigenera le icone PWA da design/enjoy-badge-solo-negative.png
@@ -212,7 +213,8 @@ Nessun uid, token, link o nome di cliente vero nelle note.
 4. Fermare il cronometro su "Spesa registrata". Esito atteso: **meno di 10 s**, una seconda vibrazione
    (circa 0,2 s) all'arrivo della conferma, "+12 punti a …" e il nuovo saldo.
 5. Senza toccare nulla: conto alla rovescia "Torno alla lettura delle card tra …" e, dopo 10 s, ritorno
-   alla home con la lettura attiva; il cliente compare in "Serviti oggi".
+   alla home con la lettura attiva; il cliente compare in cima a CLIENTI con «Oggi, HH:MM» (da
+   `customers-v2`; prima era "Serviti oggi").
 6. Ripetere con 1-5-0-0-1 (con la soglia predefinita di 150,00 €): "Importo insolito", "Conferma 150,01 €".
 7. Ripetere 3 volte di seguito; annotare il tempo peggiore e se la vibrazione è mancata (Android con
    vibrazione disattivata nelle impostazioni: nessuna vibrazione, ed è corretto).
@@ -236,11 +238,11 @@ Gli E2E scaricano e leggono i due file in Chromium desktop (`e2e/export.spec.ts`
 che dipende dal telefono vero: il download da PWA installata in Chrome Android e l'apertura del file in
 Excel o Fogli Google. Una volta per rilascio di `export`, con l'utente. Stesse condizioni delle prove
 sopra: **anteprima HTTPS della PR** (staging, mai produzione), account **amministratore** di prova, solo
-**clienti di prova** con nomi inventati (mai un cliente vero). Nessun nome, telefono, uid o codice
+**clienti di prova** con nomi inventati (mai un cliente vero). Nessun nome, email, uid o codice
 copiato nelle note.
 
 **Preparazione** (sullo staging, dall'app): almeno un cliente di prova con un nome accentato (per esempio
-"Niccolò Àlvarez"), uno con telefono e card attiva, uno con una nota che inizia con `=` (per esempio
+"Niccolò Àlvarez"), uno con email e card attiva, uno con una nota che inizia con `=` (per esempio
 `=1+1`), una spesa con centesimi (12,50 €), un riscatto e una spesa annullata dall'amministratore; un
 cliente di prova anonimizzato (Modifica cliente → "Cancella i dati del cliente").
 
@@ -263,11 +265,12 @@ cliente di prova anonimizzato (Modifica cliente → "Cancella i dati del cliente
 - Gli **accenti** si leggono giusti ("Niccolò", non "NiccolÃ²"): il BOM UTF-8 funziona.
 - **Importo €** "12,50" ed **Euro per punto** "1,00" sono numeri (allineati a destra, sommabili); i
   **punti** negativi del riscatto e della correzione sono numeri con il segno.
-- **Telefono** con il "+" e **Card attiva** con gli zeri iniziali, come testo (non in notazione
-  scientifica).
+- **Email** come testo intero (da `customers-v2`, al posto della colonna del numero) e **Card attiva** con
+  gli zeri iniziali, come testo (non in notazione scientifica). Un'email di prova che inizia con `=` (per
+  esempio `=prova@example.com`) compare con l'apostrofo davanti, mai come formula.
 - **Date** in `gg/mm/aaaa hh:mm:ss`, nell'ora italiana (confrontare con l'ora della spesa di prova).
 - La nota `=1+1` compare come testo `'=1+1` o `=1+1`, **mai** come il risultato `2`.
-- Il cliente anonimizzato ha Nome, Telefono, Note e Card attiva vuoti; nei movimenti la sua colonna
+- Il cliente anonimizzato ha Nome, Email, Note e Card attiva vuoti; nei movimenti la sua colonna
   Cliente è vuota, ma codice, saldo e movimenti restano.
 - La spesa annullata ha "Annullato da" con il codice della correzione; la correzione ha "Annulla il
   movimento" con il codice della spesa.
@@ -277,7 +280,7 @@ cliente di prova anonimizzato (Modifica cliente → "Cancella i dati del cliente
 Fogli Google). Un file che non si scarica dalla PWA o che si apre con colonne o accenti sbagliati diventa
 una trappola al §4 e una nota per il modulo. Quando tutti i passi sono ok, segnare il criterio 10 come
 verificato in `tasks/export/plan.md`. **Dopo la prova**, cancellare i due file dai Download del telefono
-(il file Clienti contiene nomi e telefoni: SPEC-export, domanda aperta 10).
+(il file Clienti contiene nomi ed email: SPEC-export, domanda aperta 10).
 
 ### Tablet della cassa (`tablet-kiosk`, fase 3)
 
@@ -305,6 +308,112 @@ card di prova associate a clienti di prova; mai uid, link, PIN o nomi veri nelle
 esempio "tablet.2"), con modello del tablet, versione di Android e di Chrome. Un comportamento diverso
 diventa una trappola al §4. Densità sotto 1024×600 o un lettore che non funziona in nessuno dei 4 formati:
 fermarsi e avvisare (domanda aperta 10 della spec).
+
+### Rilascio di `customers-v2` (note di rilascio)
+
+Da `SPEC-customers-v2.md`, "Note di rilascio". Le migrazioni sono quattro e vanno insieme:
+`*_customers_v2_activity.sql`, `*_customers_v2_email.sql`, `*_cards_v2_release.sql`,
+`*_card_rewards_public.sql`. La seconda **rompe l'app vecchia** (parametri `p_phone`, funzioni
+`search_customers` e `customers_served_today` eliminate) e **cancella i numeri già salvati**: irreversibile.
+
+1. **Prima del merge — Open Question 17.** Serve la risposta esplicita del titolare alla domanda «Cancelliamo
+   anche i numeri già salvati? Non si potranno recuperare.» Senza un sì la migrazione 2 non si rilascia e la PR
+   non si unisce (se il titolare vuole conservarli, la migrazione 2 va rifatta senza il `drop column`, come
+   dice la spec). Annotare la risposta in `brain/DECISIONS.md`.
+2. **Staging.** `npx supabase link --project-ref <staging>` → `npx supabase db push` → prova sull'anteprima
+   della PR (prova manuale qui sotto) → controllo delle note e `vacuum full` sullo staging (passi 4 e 5).
+3. **Produzione, a bar chiuso** (fuori dall'orario di apertura). Dopo la migrazione 2 l'app vecchia non cerca,
+   non crea e non modifica clienti finché Vercel non pubblica `main`: `npx supabase link --project-ref <prod>`
+   → `npx supabase db push` e **subito dopo** il merge della PR su `main` (o viceversa, entro pochi minuti).
+   Poi, su ogni telefono e sul tablet della cassa, chiudere e riaprire l'app (o ricaricarla): il service worker
+   prende la versione nuova al riavvio. Nessun dispositivo deve restare con l'app vecchia aperta.
+4. **Numeri scritti a mano nelle note** (dopo il `db push`, **prima** del `vacuum full`). Un amministratore,
+   dallo SQL Editor del progetto:
+
+   ```sql
+   select id, name from app.customers where anonymized_at is null and notes ~ '\+?\d[\d .-]{7,}';
+   ```
+
+   Per ogni cliente trovato apre la scheda nell'app → Modifica cliente → toglie il numero dalle note → «Salva
+   modifiche». Mai un `update` a mano sul testo; la query non stampa le note e nessuno le copia altrove. Una
+   riga trovata che non è un numero di telefono (un importo, un codice) si lascia com'è.
+5. **`vacuum full`**, finito il passo 4, dallo SQL Editor:
+
+   ```sql
+   vacuum full app.customers;
+   ```
+
+   Riscrive la tabella senza le versioni vecchie delle righe che contenevano i numeri (il `drop column` li
+   rende solo invisibili). Blocco esclusivo di pochi millisecondi su qualche centinaio di righe. Se lo SQL Editor
+   lo rifiuta perché lo avvolge in una transazione («VACUUM cannot run inside a transaction block»), eseguirlo
+   con `psql` sulla stringa di connessione del progetto (Project Settings → Database). Le copie di sicurezza
+   automatiche di Supabase che contengono ancora i numeri scadono da sole: nessuna azione, da citare al
+   consulente.
+6. **Card già consegnate**: nessun cambiamento (stesso link, stesso token; `card_points` identica).
+7. **Informativa**: `PRIVACY_NOTICE_STATUS` resta `'draft'` finché il consulente non approva il testo con
+   l'email al posto del numero (punti per il consulente in `SPEC-customers-v2.md`).
+8. **Wireframe**: aggiungere alla tela "Saldo-punti-premi", "Card-non-attiva-admin" (telefono e tablet) e la
+   home con CLIENTI al posto di SERVITI OGGI; togliere il numero del cliente dalle tavole dei moduli.
+
+Annotare data, progetto (staging o produzione), esito di ogni passo e numero di clienti corretti al passo 4
+(solo il numero, mai i nomi) nella tabella della prova di `card-input` (sopra), criterio "v2.rilascio.passo".
+
+### Prova manuale di `customers-v2` (criteri 6, 7, 9 e 10)
+
+Gli E2E provano tutto con la card finta (`e2e/cards-v2.spec.ts`, `e2e/customers-list.spec.ts`,
+`e2e/card-points.spec.ts`, tablet in `e2e/tablet.spec.ts`); qui si prova ciò che dipende dalle card e dai
+telefoni veri, una volta per rilascio di `customers-v2`, con l'utente. Condizioni: **anteprima HTTPS della
+PR** (staging, mai produzione), account **amministratore** e **operatore** di prova, **NTAG215 di prova**
+(mai una card consegnata a un cliente), solo clienti di prova con nomi inventati ed email `@example.com`.
+Nessun uid, token, link, email o nome di cliente vero nelle note.
+
+**Riformatta su Android (criteri 9 e 10)**
+
+1. Card di prova A associata a un cliente di prova con il link scritto; da Modifica cliente «Disattiva card».
+2. Da amministratore, home in "Avvicina la card": appoggiare la card A → «Card non attiva» (`/card/…`) con
+   «Riattiva la card» e «Riformatta la card».
+3. «Riformatta la card» → conferma → tenere la card appoggiata: passi "Avvicina la card" → scrittura →
+   verifica; esito «Card …XXXX riformattata: ora è libera.» e ritorno alla home. Annotare se è servito
+   riavvicinare la card per la verifica.
+4. **Fuori dall'app**: con l'app chiusa (o in background), avvicinare la card A a un **secondo Android** e a un
+   **iPhone XS o successivo**, schermo sbloccato: **non si apre nulla** (nessuna pagina, nessuna notifica).
+   Con un'app di lettura NFC, se disponibile, la card mostra un solo record vuoto e nessun link.
+5. App aperta in home sul telefono dell'amministratore: riappoggiare la card A → si apre **Nuovo cliente**
+   con la card già associata. Salvare un **nuovo** cliente di prova → il link si scrive (nuovo token).
+6. Dal secondo Android: avvicinare la card A → la pagina dei punti del **nuovo** cliente (`0` punti).
+7. Card di un cliente di prova con i dati cancellati: offre solo «Riformatta la card»; stesso esito dei
+   passi 3–5.
+8. Da **operatore**: una card disattivata in home dà «Card non attiva: chiedi a un amministratore», senza
+   pulsanti di Riattiva né Riformatta.
+
+**Pagina dei punti a 320 px (criterio 7)**
+
+1. Su un telefono qualsiasi (anche iPhone), aprire con la card il link di un cliente di prova attivo: sotto i
+   punti la sezione «PREMI» con nome e punti dei soli premi attivi, dal meno caro; nessun dato personale.
+2. Stessa pagina a **320 px** di larghezza (telefono piccolo, oppure Chrome desktop con gli strumenti per
+   sviluppatori, dispositivo personalizzato 320×640): nessuno scorrimento orizzontale, nomi lunghi dei premi a
+   capo, righe alte almeno 48 px, testo leggibile.
+3. Disattivare tutti i premi da `/impostazioni/premi` (solo sullo staging) e ricaricare: la sezione «PREMI»
+   non c'è. Riattivarli subito dopo.
+
+**Tempo di `list_customers` (criterio 6)**
+
+Il controllo bloccante è il piano in pgTAP (`supabase/tests/customers_v2_plan.test.sql`); il tempo si misura a
+mano, sullo stack **locale** acceso, con 1 000 clienti e 20 000 movimenti finti creati e cancellati in una
+transazione:
+
+```bash
+docker exec -i supabase_db_enjoy-card-app psql -U postgres -d postgres < scripts/measure-list-customers.sql
+```
+
+Esito atteso: tre righe `NOTICE` (prima pagina, pagina centrale, ricerca), ognuna con 20 righe e la più lenta
+di 5 chiamate **sotto 500 ms**. Prima misura (2026-11-23, Mac di sviluppo, stack locale): 8,4 ms, 0,9 ms e
+3,9 ms. Un tempo oltre 500 ms con il piano pgTAP verde è una trappola al §4 e una nota per la spec.
+
+**Dove annotare l'esito**: nella tabella della prova di `card-input` (sopra), criterio "v2.9.passo",
+"v2.10.passo", "v2.7.passo" o "v2.6", con telefono, versione di Android o iOS e di Chrome. Un telefono che
+apre qualcosa con la card vuota diventa una trappola al §4. Quando tutti i passi sono ok, annotarlo in
+`tasks/customers-v2/plan.md`, tabella dei criteri.
 
 ## 2. Controllo di salute
 
@@ -510,3 +619,34 @@ fermarsi e avvisare (domanda aperta 10 della spec).
 52. Il layout del tablet dipende dalla finestra in punti CSS (almeno 1024×600, `useTabletLayout`), non
     dall'account né dai pixel fisici: con la densità di Android un 1280×800 fisico può dare il layout del
     telefono. Si misura sul tablet vero (`docs/setup-tablet.md` §5); negli E2E vale il viewport del progetto.
+
+53. Il `drop column` di Postgres non cancella fisicamente i valori: li rende invisibili finché le righe non
+    vengono riscritte. Per questo `customers_v2_email.sql` azzera i numeri **prima** del `drop column` e dopo
+    il `db push` serve `vacuum full app.customers;` a mano (§1, «Rilascio di `customers-v2`»): `VACUUM` non
+    gira dentro la transazione di una migrazione né, a volte, nello SQL Editor (allora `psql`).
+54. Le trappole 34 e 35 parlano di `search_customers` e `customers_served_today`: da `customers-v2` non
+    esistono più. L'elenco della home è `app.list_customers` a pagine con un cursore a chiave
+    (`last_activity_at`/`created_at`, `id`); il cursore torna al server **com'è arrivato**, stringhe di
+    PostgREST con i microsecondi: convertito in `Date` di JavaScript perde i microsecondi e salta o ripete righe
+    (`customerListRow.ts`, test di integrazione con timestamp uguali al millisecondo).
+55. Negli E2E l'elenco CLIENTI **senza filtro** cambia per gli altri test in parallelo sullo stesso database:
+    si prova solo filtrato con il prefisso unico della corsa (`uniqueName`, `e2e/customers-list.spec.ts`);
+    l'elenco completo si prova nei test di componente con il servizio finto.
+56. Testo della ricerca e uid della card nuova stanno nello **stato della cronologia** (`{ q }`, `{ card }`),
+    mai in `?q=` o `?card=`: email e uid non devono finire nell'URL, nella cronologia del browser né nei log
+    delle richieste. Un vecchio segnalibro con `?card=` apre Nuovo cliente senza card, ed è voluto.
+57. `cards_uid_key` è un indice unico **parziale** (`where released_at is null`): ogni ricerca per uid e ogni
+    `on conflict` sull'uid deve portare `released_at is null`, altrimenti una card riformattata risulta ancora
+    del cliente di prima o l'inserimento fallisce. La riga riformattata resta (uid, cliente di allora,
+    `released_at`) e il trigger vieta di togliere `released_at` o di riattivarla.
+58. I test dei codici d'errore (`scripts/customerErrorCodes.test.ts`, `cardErrorCodes.test.ts`) leggono le
+    migrazioni con `scripts/migrationFunctions.ts`, che le riapplica in ordine e tiene l'ultima definizione di
+    ogni funzione ancora presente: una funzione eliminata o una firma sostituita non contano più. Una funzione
+    ridefinita in una migrazione nuova si controlla da sola, senza elenchi di codici "in pensione".
+59. Gli E2E che misurano un elemento dell'intestazione (chip del cassiere, pulsanti) aspettano prima il
+    titolo della pagina caricata: l'intestazione si ridisegna all'arrivo del cliente e un `boundingBox` preso
+    prima può trovare l'elemento staccato ("received undefined", a intermittenza sul progetto `tablet`).
+60. Riformatta si fa solo con un dispositivo che scrive (`canWrite`: Android con Web NFC attivo): sul tablet,
+    su iPhone e con l'NFC spento la pagina «Card non attiva» mostra la nota «Per riformattare la card serve un
+    telefono Android…» al posto del pulsante. La card si svuota e si verifica **prima** di `release_card`; se `release_card` non
+    risponde, «Riprova» rimanda lo **stesso** `operation_id` senza riscrivere la card.
