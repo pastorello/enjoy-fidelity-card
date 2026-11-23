@@ -157,10 +157,10 @@ src/features/card-input/webNfcAdapter.ts (+test), src/features/card-input/web-nf
 una card svuotata, `failNextWrite(...)` anche per `eraseCard`; helper in `e2e/nfc.ts` per leggere il registro
 delle scritture vuote. Controllo del bundle invariato.
 **Accettazione:**
-- [ ] Test del hook: `eraseCard` con `canWrite` falso → `cannot-write`; sessione esclusiva con la lettura
-- [ ] Test dell'adattatore finto: card svuotata riletta come vuota; registro con `url: null`;
+- [x] Test del hook: `eraseCard` con `canWrite` falso → `cannot-write`; sessione esclusiva con la lettura
+- [x] Test dell'adattatore finto: card svuotata riletta come vuota; registro con `url: null`;
       `failNextWrite` vale per la cancellazione
-- [ ] `npm run build && npm run check:bundle` verde (nessun `__enjoyFakeCard` in `dist/`)
+- [x] `npm run build && npm run check:bundle` verde (nessun `__enjoyFakeCard` in `dist/`)
 **Verifica:** `npm test -- card-input && npm run build && npm run check:bundle`
 **Dipendenze:** 8 · **File:** src/features/card-input/useCardWriter.ts (+test),
 src/features/card-input/fakeCardAdapter.ts (+test), e2e/nfc.ts, scripts/cardInputBoundary.test.ts
