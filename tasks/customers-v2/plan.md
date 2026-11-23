@@ -145,7 +145,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 12: Campo di ricerca della home negli E2E tramite un solo helper
 - [x] Task 13: Home: sezione CLIENTI, ricerca nello stato della cronologia, «nome o email», tablet a due colonne
 - [x] Task 14: Card sconosciuta dalla home a Nuovo cliente tramite lo stato della cronologia
-- [ ] Task 15: E2E dell'elenco (45 clienti a prefisso unico) e criterio 3 di `ledger`
+- [x] Task 15: E2E dell'elenco (45 clienti a prefisso unico) e criterio 3 di `ledger`
 
 ### Checkpoint C: home verde in componenti ed E2E (telefono e tablet); Impeccable pulito; confronto con Main, Ricerca vuota, Tablet-Cerca
 

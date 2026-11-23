@@ -252,8 +252,8 @@ e2e/card-input.spec.ts · **Dimensione:** M
 → 20 righe, poi le altre scorrendo, nessun doppione, fine al 45°; il cliente appena servito sale in cima.
 `ledger.spec.ts`, criterio 3: dopo la spesa il cliente è in cima a CLIENTI con «Oggi, HH:MM».
 **Accettazione:**
-- [ ] E2E: scorrimento, fine elenco, nessun doppione, servito in cima (criterio 5)
-- [ ] E2E `ledger` aggiornato e verde; tempo card → conferma invariato (< 10 s)
+- [x] E2E: scorrimento, fine elenco, nessun doppione, servito in cima (criterio 5)
+- [x] E2E `ledger` aggiornato e verde; tempo card → conferma invariato (< 10 s)
 **Verifica:** `npm run e2e`
 **Dipendenze:** 13 · **File:** e2e/customers-list.spec.ts, e2e/ledger.spec.ts, e2e/db.ts (solo se serve creare
 i clienti in blocco) · **Dimensione:** S
