@@ -64,7 +64,7 @@ export type CustomerErrorKind = CustomerErrorCode | 'network' | 'unknown';
  */
 export class CustomerError extends Error {
   readonly kind: CustomerErrorKind;
-  /** For `customer_name_taken`: the customer that already has the name, when the server says. */
+  /** For `customer_name_taken` and `customer_email_taken`: the customer that already has the value. */
   readonly existingCustomerId: string | null;
 
   constructor(kind: CustomerErrorKind, existingCustomerId: string | null = null) {

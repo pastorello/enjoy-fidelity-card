@@ -2,7 +2,7 @@ import { ServerFaultError, serverFaultFor } from '../../lib/serverFault';
 import { getSupabase } from '../../lib/supabase';
 import { parseCustomerList } from './customerListRow';
 import { toCustomerSummary } from './customerRow';
-import { isCustomerErrorCode } from './errorCodes';
+import { isCustomerErrorCode, pointsAtExistingCustomer } from './errorCodes';
 import { CUSTOMER_LIST_PAGE_SIZE, CustomerError } from './types';
 import type { CustomerService, CustomerSummary } from './types';
 
@@ -27,7 +27,7 @@ function failureOf(answer: Answer): Error | null {
   if (fault) return new ServerFaultError(fault);
   const code = error.message ?? '';
   if (error.code !== 'P0001' || !isCustomerErrorCode(code)) return new CustomerError('unknown');
-  if (code !== 'customer_name_taken') return new CustomerError(code);
+  if (!pointsAtExistingCustomer(code)) return new CustomerError(code);
   const existing = error.details ?? '';
   return new CustomerError(code, UUID.test(existing) ? existing : null);
 }

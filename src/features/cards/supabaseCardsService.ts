@@ -1,7 +1,7 @@
 import { ServerFaultError, serverFaultFor } from '../../lib/serverFault';
 import { getSupabase } from '../../lib/supabase';
 import { toCustomerSummary } from '../customers/customerRow';
-import { isCustomerErrorCode } from '../customers/errorCodes';
+import { isCustomerErrorCode, pointsAtExistingCustomer } from '../customers/errorCodes';
 import { CustomerError } from '../customers/types';
 import { linkStateOf } from './linkState';
 import {
@@ -151,7 +151,7 @@ function failureOf(answer: Answer): Error | null {
   if (isCardErrorCode(code)) return TRANSLATIONS[code](error.details ?? null);
   // create_customer_with_card runs app.create_customer: its refusals belong to the customer form.
   if (isCustomerErrorCode(code)) {
-    const existing = code === 'customer_name_taken' ? (error.details ?? '') : '';
+    const existing = pointsAtExistingCustomer(code) ? (error.details ?? '') : '';
     return new CustomerError(code, UUID.test(existing) ? existing : null);
   }
   return new CardsError('unknown');

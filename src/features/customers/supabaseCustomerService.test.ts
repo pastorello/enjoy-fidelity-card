@@ -215,6 +215,13 @@ describe.each(calls)('$name', ({ run, rpc, data, result }) => {
     expect((await customerError(run())).kind).toBe('unknown');
   });
 
+  it.each(CUSTOMER_ERROR_CODES)('keeps the email out of a raised %s', async (code) => {
+    db.rpc.mockResolvedValue(raised(code, 'maria.rossi@example.com'));
+    const error = await customerError(run());
+    expect(error.message).not.toMatch(/maria|example/i);
+    expect(error.existingCustomerId).toBeNull();
+  });
+
   it('keeps names and phones out of the error message', async () => {
     db.rpc.mockResolvedValue({
       data: null,
@@ -256,6 +263,32 @@ describe('customer_name_taken', () => {
     expect((await customerError(supabaseCustomerService.anonymize(ID))).existingCustomerId).toBe(
       null,
     );
+  });
+});
+
+describe('customer_email_taken', () => {
+  it('carries the id of the customer that has the email from the detail', async () => {
+    db.rpc.mockResolvedValue(raised('customer_email_taken', OTHER_ID));
+    const error = await customerError(
+      supabaseCustomerService.update({ id: ID, name: 'Maria Rossi', phone: '', notes: '' }),
+    );
+    expect(error.kind).toBe('customer_email_taken');
+    expect(error.existingCustomerId).toBe(OTHER_ID);
+    expect(error.message).not.toContain(OTHER_ID);
+  });
+
+  it('a detail that is not a uuid gives no id', async () => {
+    db.rpc.mockResolvedValue(raised('customer_email_taken', 'rossi@example.com'));
+    const error = await customerError(supabaseCustomerService.anonymize(ID));
+    expect(error.kind).toBe('customer_email_taken');
+    expect(error.existingCustomerId).toBeNull();
+  });
+
+  it('email_invalid carries no id', async () => {
+    db.rpc.mockResolvedValue(raised('email_invalid', OTHER_ID));
+    const error = await customerError(supabaseCustomerService.anonymize(ID));
+    expect(error.kind).toBe('email_invalid');
+    expect(error.existingCustomerId).toBeNull();
   });
 });
 

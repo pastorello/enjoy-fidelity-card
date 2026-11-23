@@ -20,7 +20,7 @@ export type CustomerFormErrors = Partial<Record<CustomerField, string>>;
 
 const NAME_MAX = 80;
 const NOTES_MAX = 500;
-const FIELD_ORDER: CustomerField[] = ['name', 'phone', 'consent', 'notes'];
+const FIELD_ORDER: CustomerField[] = ['name', 'phone', 'email', 'consent', 'notes'];
 
 const EMPTY: CustomerFormValues = { name: '', phone: '', notes: '', privacyConsent: false };
 
@@ -127,12 +127,16 @@ export function CustomerForm({
   const [noticeOpen, setNoticeOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
+  // Not attached yet: the email field arrives with task 19 of customers-v2; until then no save
+  // sends an email, so the server never refuses one.
+  const emailRef = useRef<HTMLInputElement>(null);
   const consentRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLInputElement>(null);
   const consentErrorId = useId();
   const refs: Record<CustomerField, RefObject<HTMLInputElement | null>> = {
     name: nameRef,
     phone: phoneRef,
+    email: emailRef,
     consent: consentRef,
     notes: notesRef,
   };
@@ -141,7 +145,13 @@ export function CustomerForm({
   useEffect(() => {
     if (!refusal) return;
     const field = refusal.kind === 'name_taken' ? 'name' : refusal.field;
-    const target = { name: nameRef, phone: phoneRef, consent: consentRef, notes: notesRef }[field];
+    const target = {
+      name: nameRef,
+      phone: phoneRef,
+      email: emailRef,
+      consent: consentRef,
+      notes: notesRef,
+    }[field];
     target.current?.focus();
   }, [refusal]);
 

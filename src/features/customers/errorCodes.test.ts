@@ -4,6 +4,7 @@ import {
   customerErrorField,
   customerErrorText,
   isCustomerErrorCode,
+  pointsAtExistingCustomer,
 } from './errorCodes';
 
 describe('customer error codes', () => {
@@ -14,6 +15,8 @@ describe('customer error codes', () => {
     ['consent_required', 'Serve il consenso privacy per registrare il cliente.'],
     ['notes_too_long', 'Al massimo 500 caratteri.'],
     ['customer_name_taken', 'Esiste già un cliente con questo nome.'],
+    ['email_invalid', 'Email non valida: controlla come è scritta.'],
+    ['customer_email_taken', 'Esiste già un cliente con questa email.'],
     ['customer_not_found', 'Cliente non trovato'],
     ['forbidden', 'Solo un amministratore può cancellare i dati di un cliente.'],
     ['not_operator', 'Account non abilitato: chiedi a un amministratore.'],
@@ -29,6 +32,8 @@ describe('customer error codes', () => {
     ['name_required', 'name'],
     ['name_too_long', 'name'],
     ['customer_name_taken', 'name'],
+    ['email_invalid', 'email'],
+    ['customer_email_taken', 'email'],
     ['phone_invalid', 'phone'],
     ['consent_required', 'consent'],
     ['notes_too_long', 'notes'],
@@ -38,6 +43,14 @@ describe('customer error codes', () => {
     ['customer_anonymized', null],
   ] as const)('%s belongs to field %s', (code, field) => {
     expect(customerErrorField(code)).toBe(field);
+  });
+
+  it('only the two "taken" codes point at another customer', () => {
+    const pointing = CUSTOMER_ERROR_CODES.filter(pointsAtExistingCustomer);
+    expect(pointing.toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'customer_email_taken',
+      'customer_name_taken',
+    ]);
   });
 
   it('recognises only the listed codes', () => {

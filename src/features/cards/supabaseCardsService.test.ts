@@ -492,6 +492,22 @@ describe('createCustomerWithCard', () => {
     },
   );
 
+  it('customer_email_taken carries the customer that has the email', async () => {
+    answerWith(raised('customer_email_taken', OWNER_ID));
+    expect(await rejection(supabaseCardsService.createCustomerWithCard(input))).toMatchObject({
+      kind: 'customer_email_taken',
+      existingCustomerId: OWNER_ID,
+    });
+  });
+
+  it('email_invalid is a CustomerError without an id', async () => {
+    answerWith(raised('email_invalid', OWNER_ID));
+    expect(await rejection(supabaseCardsService.createCustomerWithCard(input))).toMatchObject({
+      kind: 'email_invalid',
+      existingCustomerId: null,
+    });
+  });
+
   it('customer_name_taken carries the existing customer', async () => {
     answerWith(raised('customer_name_taken', OWNER_ID));
     expect(await rejection(supabaseCardsService.createCustomerWithCard(input))).toMatchObject({
