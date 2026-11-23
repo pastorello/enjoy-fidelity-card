@@ -487,9 +487,9 @@ conferma; riuscita → `role="status"` e `CardLinkWriter` (esiti e «Salta, lo s
 card) → scheda con «Card …E5F6 riattivata» (o «… Link non scritto.»); `canWrite` falso → subito la scheda;
 errori della spec con «Riprova» sicuro.
 **Accettazione:**
-- [ ] Componenti: nessuna chiamata a `reactivate_card` prima del tocco su «Riattiva»; scambio con l'id della
+- [x] Componenti: nessuna chiamata a `reactivate_card` prima del tocco su «Riattiva»; scambio con l'id della
       card attiva; `active_card_changed`; `forbidden`; scrittura del link (criterio 8)
-- [ ] Impeccable pulito
+- [x] Impeccable pulito
 **Verifica:** `npm test -- cards`
 **Dipendenze:** 30 · **File:** src/features/cards/InactiveCardPage.tsx (+test),
 src/features/cards/useInactiveCard.ts, src/features/customers/homeNotice.ts (messaggio della scheda) · **Dimensione:** M
