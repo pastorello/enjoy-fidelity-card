@@ -153,7 +153,8 @@ test.describe('the till tablet, with its own device account', () => {
 
     // An unknown card on the USB reader: Nuovo cliente with the card.
     const uid = freshUid();
-    await readOnUsbReader(page, uid, `/clienti/nuovo?card=${uid}`);
+    await readOnUsbReader(page, uid, '/clienti/nuovo');
+    await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(`Codice ${uid}:`);
     const name = uniqueName('Tina Tablet E2E');
     await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
     await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();

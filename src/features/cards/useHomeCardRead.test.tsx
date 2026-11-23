@@ -105,7 +105,10 @@ describe('useHomeCardRead: a card read on the home', () => {
     tap(fixture, UNKNOWN.read);
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/clienti/nuovo'));
-    expect(router.state.location.search).toBe(`?card=${UNKNOWN.uid}`);
+    // The uid travels in the history state, never in the URL (SPEC-customers-v2 point 6).
+    expect(router.state.location.search).not.toContain(UNKNOWN.uid);
+    expect(router.state.location.search).toBe('');
+    expect(router.state.location.state).toEqual({ card: UNKNOWN.uid });
   });
 
   it('a deactivated card does not open the purchase: "Card disattivata" with the customer (criterion 6)', async () => {

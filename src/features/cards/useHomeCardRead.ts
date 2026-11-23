@@ -4,6 +4,7 @@ import type { CardRead } from '../card-input/cardReader';
 import { useCardRead } from '../card-input/useCardRead';
 import { useAuth } from '../identity/AuthProvider';
 import { useCardsService } from './CardsServiceProvider';
+import { newCustomerCardState } from './newCustomerCardState';
 import { CardsError } from './types';
 
 /** What the home shows about the last card read (SPEC-cards, point 1). */
@@ -22,7 +23,8 @@ export type HomeCardRead = HomeCardState & { retry: () => void };
 
 /**
  * The card reads of the home "Cerca cliente": an active card opens Registra spesa of its customer
- * (`/clienti/:id/spesa`), an unknown one Nuovo cliente with the card (`/clienti/nuovo?card=UID`);
+ * (`/clienti/:id/spesa`), an unknown one Nuovo cliente with the card (`/clienti/nuovo`,
+ * the uid in the history state);
  * a deactivated card or one of an erased customer becomes a notice and reading stays on. The
  * consumer is off while a lookup runs, so a card held meanwhile is neither looked up nor vibrated.
  * Nothing here issues or writes a link (criterion 14). A `not_operator` refusal goes to
@@ -60,7 +62,8 @@ export function useHomeCardRead(): HomeCardRead {
               void navigate(`/clienti/${found.customerId}/spesa`);
               return;
             case 'unknown':
-              void navigate(`/clienti/nuovo?${new URLSearchParams({ card: uid }).toString()}`);
+              // The uid in the history state, never in the URL (SPEC-customers-v2 point 6).
+              void navigate('/clienti/nuovo', { state: newCustomerCardState(uid) });
               return;
             case 'inactive':
               setState({

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { normalizeUid } from '../card-input/normalizeUid';
 import type { CustomerSummary } from '../customers/types';
 import type { SaveCustomerVia } from '../customers/useSaveCustomer';
 import { useAuth } from '../identity/AuthProvider';
 import { useCardsService } from './CardsServiceProvider';
+import { newCustomerCardState, readNewCustomerCard } from './newCustomerCardState';
 import { CardTakenError, CardsError, type CardLookup, type CardOwner } from './types';
 
 /** The lookup of the last card read on the page (SPEC-cards, point 3). */
@@ -20,7 +21,7 @@ export type NewCustomerSaved = {
   customer: CustomerSummary;
   /** Canonical uid of the card saved with the customer. */
   uid: string;
-  /** Registra spesa with `?card`, the customer page otherwise. */
+  /** Registra spesa with the card from the home, the customer page otherwise. */
   destination: string;
 };
 
@@ -28,8 +29,8 @@ export type NewCustomerCard = {
   /** The canonical uid saved with the customer, or null (the form has no card). */
   uid: string | null;
   /**
-   * `link`: `?card=UID` from the home (point 2), Registra spesa opens after the save; `read`: read
-   * on this page without `?card` (point 3), the customer page opens as in `customers`.
+   * `link`: the card of the home, in the history state (point 2), Registra spesa opens after the
+   * save; `read`: read on this page without it (point 3), the customer page opens as in `customers`.
    */
   source: 'link' | 'read' | null;
   /** "Card già associata": the card read is known, or `card_taken` refused the save. */
@@ -42,7 +43,7 @@ export type NewCustomerCard = {
   /** A card read on the page (canonical uid): the last one read counts. */
   read: (uid: string) => void;
   retryLookup: () => void;
-  /** "Continua senza card": drops `?card` and stays in the form, its data intact. */
+  /** "Continua senza card": drops the card of the home and stays in the form, its data intact. */
   continueWithoutCard: () => void;
 };
 
@@ -59,12 +60,13 @@ function ownerOf(found: Exclude<CardLookup, { status: 'unknown' }>): CardOwner {
 }
 
 /**
- * The card of Nuovo cliente (SPEC-cards, points 2 and 3). `?card=UID` (from the home, normalized
- * like a Web NFC read; an invalid one is ignored) or a card read on the page is created with the
- * customer by `createCustomerWithCard` with the form's `operation_id`. A read is looked up: an
- * unknown card becomes the card of the form (on `?card`, it replaces the link's card), a known one
- * (active, deactivated, of an erased customer) shows "Card già associata" and leaves the form
- * without a card. `card_taken` creates nothing: the page shows the owner; with `?card` the operator
+ * The card of Nuovo cliente (SPEC-cards, points 2 and 3). The card of the home (`state.card` in
+ * the history state, never `?card=` in the URL: SPEC-customers-v2 point 6; normalized like a Web
+ * NFC read, an invalid one is ignored) or a card read on the page is created with the customer by
+ * `createCustomerWithCard` with the form's `operation_id`. A read is looked up: an unknown card
+ * becomes the card of the form (with the home's card, it replaces it in the history state), a
+ * known one (active, deactivated, of an erased customer) shows "Card già associata" and leaves the
+ * form without a card. `card_taken` creates nothing: the page shows the owner; with the home's card the operator
  * continues without the card explicitly, whose save reuses the same `operation_id`. Once saved
  * with the card, `saved` holds the customer and its destination: the page writes the link first.
  * A `not_operator` refusal goes to `AuthProvider`.
@@ -72,8 +74,9 @@ function ownerOf(found: Exclude<CardLookup, { status: 'unknown' }>): CardOwner {
 export function useNewCustomerCard(): NewCustomerCard {
   const service = useCardsService();
   const { reportNotEnabled } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const raw = searchParams.get('card');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const raw = readNewCustomerCard(location.state);
   const linkUid = raw === null ? null : normalizeUid(raw, 'hex');
   const [readUid, setReadUid] = useState<string | null>(null);
   const [taken, setTaken] = useState<NewCustomerCard['taken']>(null);
@@ -94,19 +97,16 @@ export function useNewCustomerCard(): NewCustomerCard {
     };
   }, []);
 
+  // The same entry (path and query kept), its history state changed in place.
+  const { pathname, search } = location;
   const setLinkCard = useCallback(
     (card: string | null) => {
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          if (card === null) next.delete('card');
-          else next.set('card', card);
-          return next;
-        },
-        { replace: true },
+      void navigate(
+        { pathname, search },
+        { replace: true, state: card === null ? null : newCustomerCardState(card) },
       );
     },
-    [setSearchParams],
+    [navigate, pathname, search],
   );
 
   const read = useCallback(
@@ -165,7 +165,7 @@ export function useNewCustomerCard(): NewCustomerCard {
       onOtherError: (error) => {
         if (error instanceof CardTakenError) {
           setTaken({ owner: error.owner });
-          // A card read on the page is dropped with the notice; `?card` waits for "Continua senza card".
+          // A card read on the page is dropped with the notice; the home's card waits for "Continua senza card".
           setReadUid(null);
           return true;
         }

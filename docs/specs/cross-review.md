@@ -24,7 +24,7 @@ aggiungono soltanto parti delimitate (colonna "Contributi").
 | Movimenti: conferma di annullamento | `/clienti/:id/movimenti` | `ledger` | — |
 | Nuovo cliente senza card | `/clienti/nuovo` | `customers` | `cards` (sezione "Card (facoltativa)") |
 | Nome già usato | `/clienti/nuovo` | `customers` | — |
-| Card sconosciuta: nuovo cliente | `/clienti/nuovo?card=` | `cards` | usa il form di `customers` |
+| Card sconosciuta: nuovo cliente | `/clienti/nuovo` (`state.card`) | `cards` | usa il form di `customers` |
 | Modifica cliente | `/clienti/:id/modifica` | `customers` | `cards` (sezione CARD) |
 | Associa o sostituisci card | `/clienti/:id/card` | `cards` | `card-input` (`CardReadPanel`) |
 | Card già di un altro cliente | `/clienti/:id/card` | `cards` | — |

@@ -28,10 +28,16 @@ test('a new card on the home opens Nuovo cliente with it, its link is written, t
   const firstRead = Date.now();
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
 
-  await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
-  await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(
+  // The uid travels in the history state, never in the URL (SPEC-customers-v2 point 6).
+  await expect(page).toHaveURL('/clienti/nuovo');
+  const cardRead = page.getByRole('region', { name: 'Card letta' });
+  await expect(cardRead).toContainText(
     `Codice ${uid}: non è di nessun cliente, verrà associata a questo.`,
   );
+  // The history state survives a reload, as ?card= did.
+  await page.reload();
+  await expect(cardRead).toContainText(`Codice ${uid}:`);
+  expect(page.url()).not.toContain(uid);
 
   const name = uniqueName('Card Nuova E2E');
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
@@ -288,7 +294,8 @@ test('a link not written at the till is written later from Modifica cliente (cri
     'Avvicina la card',
   );
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
-  await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
+  await expect(page).toHaveURL('/clienti/nuovo');
+  await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(`Codice ${uid}:`);
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(uniqueName('Maria Dopo E2E'));
   await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
   // The card moves away while the link is written.

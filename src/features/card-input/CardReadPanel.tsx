@@ -7,7 +7,7 @@ import { useCardReaderState } from './useCardRead';
 
 const OFF_TITLE = 'Lettura card spenta';
 const OFF_TEXT =
-  'Attiva l’NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o telefono.';
+  'Attiva l’NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o email.';
 const DENIED_TEXT =
   'Il permesso NFC è negato: consentilo a Enjoy Card nelle impostazioni di Chrome (Impostazioni sito → NFC) e riprova.';
 const COMPACT_TEXT = 'Lettura attiva: puoi anche avvicinare la card';

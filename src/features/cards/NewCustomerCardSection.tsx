@@ -88,8 +88,8 @@ export function NewCustomerCardSection({ lookup, onRetry }: NewCustomerCardSecti
 
 /**
  * What follows the form of Nuovo cliente about the card (SPEC-cards, point 3): a lookup in progress
- * or without answer, over any earlier outcome; then, without `?card` (whose card and notice are above
- * the form, point 2), "Card già associata", the card read, or the section to read one.
+ * or without answer, over any earlier outcome; then, without the card of the home (whose card and
+ * notice are above the form, point 2), "Card già associata", the card read, or the section to read one.
  */
 export function NewCustomerCardBelowForm({ card }: { card: NewCustomerCard }) {
   if (card.lookup.status !== 'idle') {
@@ -126,7 +126,7 @@ function CardNotAssociated({ uid, name }: { uid: string; name: string }) {
 /**
  * After «Salva cliente» with a card (SPEC-cards, points 2, 3 and 8): the link is written on the
  * card just saved (usually still on the phone), as in Associa card, then the destination opens in
- * place of Nuovo cliente — Registra spesa with `?card`, the customer page otherwise — with the link
+ * place of Nuovo cliente — Registra spesa with the card of the home, the customer page otherwise — with the link
  * written, after «Salta», «Più tardi», a failure, or on a phone that does not write: customer and
  * card stay saved either way. The card is loaded first (the save answers with the customer only);
  * without an answer, «Riprova» loads it again and «Più tardi» opens the destination. A card that is

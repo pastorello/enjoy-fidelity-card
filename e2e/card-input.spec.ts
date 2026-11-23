@@ -33,7 +33,7 @@ test('the E2E build exposes the fake writer: an empty write log and the test con
 
 const HOME_TITLE = 'Avvicina la card';
 const OFF_TEXT =
-  'Attiva l’NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o telefono.';
+  'Attiva l’NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o email.';
 
 test.describe('the card panel on the home', () => {
   test('first start: "Attiva la lettura" turns reading on, above the search', async ({ page }) => {
@@ -124,7 +124,10 @@ test.describe('the USB reader on the home (keyboard wedge, format hex)', () => {
     await page.keyboard.press('Enter');
     // Enter stopped by the wedge: the burst is a read, which the home hands to `cards` (an unknown
     // card opens Nuovo cliente with it), and the link was not followed: one step back is the home.
-    await expect(page).toHaveURL(/\/clienti\/nuovo\?card=04A1B2C3D4E5F6$/);
+    await expect(page).toHaveURL(/\/clienti\/nuovo$/);
+    await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(
+      'Codice 04A1B2C3D4E5F6:',
+    );
     await page.goBack();
     await expect(page).toHaveURL(/\/$/);
 

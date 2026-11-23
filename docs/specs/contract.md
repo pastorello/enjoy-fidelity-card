@@ -64,7 +64,8 @@ written in parallel fit together. If a source contradicts this file, the source 
 
 ## Frontend routes (phone, all behind RequireAuth except auth pages)
 `/` Cerca cliente (card reading + search + "Serviti oggi" + "Nuovo cliente") ·
-`/clienti/nuovo` (optional `?card=<UID>`) · `/clienti/:id` scheda · `/clienti/:id/modifica` ·
+`/clienti/nuovo` (optional card uid in the history state `{ card: UID }`, never `?card=`:
+SPEC-customers-v2 point 6) · `/clienti/:id` scheda · `/clienti/:id/modifica` ·
 `/clienti/:id/card` associa/sostituisci · `/clienti/:id/spesa` importo · `/clienti/:id/premi` ·
 `/clienti/:id/movimenti` · `/impostazioni` (sections added by modules) · `/impostazioni/premi`
 (catalogo, admin) · `/accedi` · `/password-dimenticata` · `/imposta-password`.

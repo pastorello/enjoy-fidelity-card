@@ -89,7 +89,8 @@ test('an administrator at the till switches the reader to Decimale, a decimal re
 
   // A customer with a card, read in the initial format (hex).
   const uid = freshUid();
-  await readOnUsbReader(page, uid, `/clienti/nuovo?card=${uid}`);
+  await readOnUsbReader(page, uid, '/clienti/nuovo');
+  await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(`Codice ${uid}:`);
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(uniqueName('Dora Decimale E2E'));
   await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
   await page.getByRole('button', { name: 'Salva cliente' }).click();

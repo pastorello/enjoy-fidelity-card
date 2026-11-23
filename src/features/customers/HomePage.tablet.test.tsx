@@ -181,7 +181,8 @@ describe('HomePage at 1280×800 (wireframe "Tablet: cerca cliente")', () => {
     usbBurst(UNKNOWN_UID);
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/clienti/nuovo'));
-    expect(router.state.location.search).toBe(`?card=${UNKNOWN_UID}`);
+    expect(router.state.location.search).toBe('');
+    expect(router.state.location.state).toEqual({ card: UNKNOWN_UID });
   });
 
   it('keeps the USB reader panel on the till tablet in a narrow window (portrait, split screen)', async () => {

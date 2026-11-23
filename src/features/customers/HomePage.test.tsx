@@ -667,7 +667,9 @@ describe('HomePage: Lettura card', () => {
     });
     expect(card.vibrate).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(router.state.location.pathname).toBe('/clienti/nuovo'));
-    expect(router.state.location.search).toBe('?card=04A1B2C3D4E5F6');
+    // The uid travels in the history state, never in the URL (SPEC-customers-v2 point 6).
+    expect(router.state.location.search).toBe('');
+    expect(router.state.location.state).toEqual({ card: '04A1B2C3D4E5F6' });
   });
 
   it('reads a card while the first page of CLIENTI is still on its way', async () => {

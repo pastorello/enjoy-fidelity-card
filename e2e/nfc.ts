@@ -155,7 +155,8 @@ export async function customerWithCard(page: Page, prefix: string, uid: string) 
   );
   const firstTap = Date.now();
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
-  await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
+  await expect(page).toHaveURL('/clienti/nuovo');
+  await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(`Codice ${uid}:`);
   const name = uniqueName(prefix);
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
   await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
