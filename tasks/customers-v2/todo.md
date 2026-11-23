@@ -37,13 +37,13 @@ created_at)` (senza `email`: plan.md), `stable security definer`, `not_operator`
 nome **oppure** testo intero nell'email" con `%`/`_`/`\` alla lettera, condizione di riga e `order by` della
 spec, saldo solo per le righe restituite. Classificata come lettura in `tablet_kiosk_access.test.sql`.
 **Accettazione:**
-- [ ] pgTAP: ordine (attività più recente, poi senza movimenti per creazione, poi `id`), anonimizzati mai
+- [x] pgTAP: ordine (attività più recente, poi senza movimenti per creazione, poi `id`), anonimizzati mai
       presenti, filtro per parole del nome e per parte dell'email, caratteri speciali alla lettera, meno di 2
       caratteri = elenco completo
-- [ ] pgTAP: 3 pagine senza doppioni né buchi su dati fermi anche con `created_at` uguali al microsecondo;
+- [x] pgTAP: 3 pagine senza doppioni né buchi su dati fermi anche con `created_at` uguali al microsecondo;
       `invalid_cursor` (`p_after_id` null con un timestamp; `p_after_id` senza `p_after_created_at`),
       `invalid_limit`, `not_operator`; dispositivo senza cassiere rifiutato
-- [ ] pgTAP: vincolo email (minuscolo, senza spazi ai bordi, 6–254, formato) e unicità; più `null` ammessi
+- [x] pgTAP: vincolo email (minuscolo, senza spazi ai bordi, 6–254, formato) e unicità; più `null` ammessi
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1 · **File:** supabase/migrations/*_customers_v2_email.sql, supabase/tests/customers_v2.test.sql,
 supabase/tests/tablet_kiosk_access.test.sql · **Dimensione:** M
