@@ -34,7 +34,6 @@ async function newCustomer(label: string): Promise<string> {
   const created = await customers.create({
     operationId: randomUUID(),
     name: `Card ${label} ${SUFFIX}`,
-    phone: '',
     email: '',
     privacyConsent: true,
     notes: '',

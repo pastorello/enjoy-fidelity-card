@@ -10,7 +10,7 @@ import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 import type { Movement } from './types';
 
-const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393330004521', balance: 120 });
+const MARIA = fakeCustomer({ name: 'Maria Rossi', balance: 120 });
 const ROSA = fakeCustomer({ name: 'Rosa Bianchi', balance: 0 });
 const ERASED = fakeCustomer({
   name: 'cancellato-7f3a',

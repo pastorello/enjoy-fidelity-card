@@ -81,11 +81,11 @@ describe('NewCustomerPage', () => {
     const [input] = customers.service.create.mock.calls[0] ?? [];
     expect(input).toMatchObject({
       name: 'Maria Rossi',
-      phone: '',
       email: 'Rossi@Bar.it',
       privacyConsent: true,
       notes: '',
     });
+    expect(input).not.toHaveProperty('phone');
     expect(input?.operationId).toMatch(/^[0-9a-f-]{36}$/);
   });
 

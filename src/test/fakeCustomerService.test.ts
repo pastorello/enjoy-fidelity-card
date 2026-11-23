@@ -11,7 +11,6 @@ function newCustomer(overrides: Partial<CreateCustomerInput> = {}): CreateCustom
   return {
     operationId: OP_1,
     name: 'Maria Rossi',
-    phone: '',
     email: '',
     privacyConsent: true,
     notes: '',
@@ -29,15 +28,15 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
 }
 
 describe('createFakeCustomerService', () => {
-  it('creates a customer that get and list then find, normalizing name and phone', async () => {
+  it('creates a customer that get and list then find, normalizing the name, without a phone', async () => {
     const { service } = createFakeCustomerService();
     const created = await service.create(
-      newCustomer({ name: '  Maria   Rossi ', phone: '333 123 4521', notes: '  Al banco ' }),
+      newCustomer({ name: '  Maria   Rossi ', notes: '  Al banco ' }),
     );
 
+    expect(created).not.toHaveProperty('phone');
     expect(created).toMatchObject({
       name: 'Maria Rossi',
-      phone: '+393331234521',
       notes: 'Al banco',
       anonymizedAt: null,
       balance: 0,
@@ -60,11 +59,11 @@ describe('createFakeCustomerService', () => {
 
     const other = await service.create(newCustomer({ operationId: OP_2, name: 'Luca Bianchi' }));
     await expect(
-      service.update({ id: other.id, name: 'NICOLO d’angelo', phone: '', email: '', notes: '' }),
+      service.update({ id: other.id, name: 'NICOLO d’angelo', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_name_taken', existingCustomerId: existing.id });
     // Renaming a customer to another spelling of its own name is fine.
     await expect(
-      service.update({ id: existing.id, name: 'Nicolo D’Angelo', phone: '', email: '', notes: '' }),
+      service.update({ id: existing.id, name: 'Nicolo D’Angelo', email: '', notes: '' }),
     ).resolves.toMatchObject({ name: 'Nicolo D’Angelo' });
   });
 
@@ -87,25 +86,24 @@ describe('createFakeCustomerService', () => {
 
     expect(await kind({ name: '   ' })).toBe('name_required');
     expect(await kind({ name: 'x'.repeat(81) })).toBe('name_too_long');
-    expect(await kind({ phone: '12ab' })).toBe('phone_invalid');
     expect(await kind({ privacyConsent: false })).toBe('consent_required');
     expect(await kind({ notes: 'n'.repeat(501) })).toBe('notes_too_long');
     await expect(service.create(newCustomer({ name: 'x'.repeat(80) }))).resolves.toBeDefined();
   });
 
-  it('update clears a blank phone, refuses unknown and anonymized customers', async () => {
-    const kept = fakeCustomer({ name: 'Anna Verdi', phone: '+393331234521' });
+  it('update clears blank notes, refuses unknown and anonymized customers', async () => {
+    const kept = fakeCustomer({ name: 'Anna Verdi', notes: 'Al banco' });
     const erased = fakeCustomer({ name: 'Cliente cancellato abcdef12', anonymizedAt: 'x' });
     const { service } = createFakeCustomerService({ customers: [kept, erased] });
 
     await expect(
-      service.update({ id: kept.id, name: 'Anna Verdi', phone: ' ', email: '', notes: '' }),
-    ).resolves.toMatchObject({ phone: null, notes: null });
+      service.update({ id: kept.id, name: 'Anna Verdi', email: '', notes: ' ' }),
+    ).resolves.toEqual({ ...kept, notes: null });
     await expect(
-      service.update({ id: erased.id, name: 'Nuovo', phone: '', email: '', notes: '' }),
+      service.update({ id: erased.id, name: 'Nuovo', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_anonymized' });
     await expect(
-      service.update({ id: OP_2, name: 'Nuovo', phone: '', email: '', notes: '' }),
+      service.update({ id: OP_2, name: 'Nuovo', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_not_found' });
     await expect(service.get(OP_2)).resolves.toBeNull();
   });
@@ -113,7 +111,6 @@ describe('createFakeCustomerService', () => {
   it('anonymize: admins only, clears the data, idempotent, gone from the list', async () => {
     const customer = fakeCustomer({
       name: 'Paolo Neri',
-      phone: '+393331234521',
       email: 'paolo.neri@example.com',
       notes: 'Note',
     });
@@ -128,7 +125,8 @@ describe('createFakeCustomerService', () => {
       'Paolo Neri',
     ]);
     const erased = await service.anonymize(customer.id);
-    expect(erased).toMatchObject({ phone: null, email: null, notes: null });
+    expect(erased).toMatchObject({ email: null, notes: null });
+    expect(erased).not.toHaveProperty('phone');
     expect(erased.name).toBe(`Cliente cancellato ${customer.id.slice(0, 8)}`);
     expect(erased.anonymizedAt).not.toBeNull();
     await expect(service.anonymize(customer.id)).resolves.toEqual(erased);
@@ -170,7 +168,7 @@ describe('createFakeCustomerService', () => {
     expect(await kind({ email: 'maria', name: 'anna verdi' })).toBe('customer_name_taken');
     expect(customers()).toHaveLength(1);
     await expect(
-      service.update({ id: existing.id, name: 'Anna Verdi', phone: '', email: 'x@y', notes: '' }),
+      service.update({ id: existing.id, name: 'Anna Verdi', email: 'x@y', notes: '' }),
     ).rejects.toMatchObject({ kind: 'email_invalid', existingCustomerId: null });
   });
 
@@ -189,7 +187,6 @@ describe('createFakeCustomerService', () => {
       service.update({
         id: anna.id,
         name: 'Anna Verdi',
-        phone: '',
         email: ' maria.rossi@example.com',
         notes: '',
       }),
@@ -203,19 +200,17 @@ describe('createFakeCustomerService', () => {
       service.update({
         id: maria.id,
         name: 'Maria Rossi',
-        phone: '',
         email: 'Maria.Rossi@example.com',
         notes: '',
       }),
     ).resolves.toMatchObject({ email: 'maria.rossi@example.com' });
     await expect(
-      service.update({ id: maria.id, name: 'Maria Rossi', phone: '', email: ' ', notes: '' }),
+      service.update({ id: maria.id, name: 'Maria Rossi', email: ' ', notes: '' }),
     ).resolves.toMatchObject({ email: null });
     await expect(
       service.update({
         id: anna.id,
         name: 'Anna Verdi',
-        phone: '',
         email: 'maria.rossi@example.com',
         notes: '',
       }),

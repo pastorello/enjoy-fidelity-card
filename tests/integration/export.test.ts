@@ -156,7 +156,6 @@ describe('an admin', () => {
       customers.create({
         operationId: randomUUID(),
         name: `Esporta Leggibile ${SUFFIX}`,
-        phone: '',
         email: `esporta-${SUFFIX}@example.com`,
         privacyConsent: true,
         notes: '',
@@ -234,8 +233,7 @@ describe('an anonymized customer (criterion 5)', () => {
   // Plain ASCII, so the JSON body spells them exactly like this.
   const name = `Nome Riservato Export ${SUFFIX}`;
   const notes = `Nota riservata export ${SUFFIX}`;
-  // Fake Italian mobile number and card uid, random so that runs never collide.
-  const phoneDigits = `333${String(randomBytes(4).readUInt32BE() % 10_000_000).padStart(7, '0')}`;
+  // Fake card uid, random so that runs never collide.
   const uid = `04${randomBytes(6).toString('hex').toUpperCase()}`;
   const email = `riservata-${SUFFIX}@example.com`;
   let customerId: string;
@@ -245,7 +243,6 @@ describe('an anonymized customer (criterion 5)', () => {
       customers.create({
         operationId: randomUUID(),
         name,
-        phone: phoneDigits,
         email,
         privacyConsent: true,
         notes,
@@ -269,7 +266,6 @@ describe('an anonymized customer (criterion 5)', () => {
     expect(theirRows).toHaveLength(1);
     expect(theirRows[0]).toMatchObject({
       name: null,
-      phone: null,
       email: null,
       notes: null,
       active_card_uid: null,
@@ -285,7 +281,6 @@ describe('an anonymized customer (criterion 5)', () => {
       // Booleans, so a failure does not print every row of the stack.
       expect(body.includes(name), 'original name in an HTTP body').toBe(false);
       expect(body.includes(notes), 'original notes in an HTTP body').toBe(false);
-      expect(body.includes(phoneDigits), 'phone in an HTTP body').toBe(false);
       expect(body.includes(email), 'email in an HTTP body').toBe(false);
       expect(body.includes(uid), 'card uid in an HTTP body').toBe(false);
       expect(body.includes(placeholder), 'anonymized placeholder name in an HTTP body').toBe(false);

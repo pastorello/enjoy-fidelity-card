@@ -19,9 +19,6 @@ export function useUpdateCustomer(id: string): CustomerSubmit {
       service.update({
         id,
         name: values.name,
-        // No phone field any more (SPEC-customers-v2, point 1): blank removes a stored one, as the
-        // migration does for every customer. `phone` leaves the input with task 22.
-        phone: '',
         email: values.email,
         notes: values.notes,
       }),

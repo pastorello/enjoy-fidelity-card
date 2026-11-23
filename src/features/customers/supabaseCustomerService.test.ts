@@ -22,7 +22,6 @@ const OPERATION_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
 const row = {
   id: ID,
   name: 'Maria Rossi',
-  phone: '+393330000001',
   notes: null,
   anonymized_at: null,
   balance: 0,
@@ -48,7 +47,6 @@ const listed: CustomerListRow = {
 const customer: CustomerSummary = {
   id: ID,
   name: 'Maria Rossi',
-  phone: '+393330000001',
   notes: null,
   anonymizedAt: null,
   balance: 0,
@@ -112,7 +110,6 @@ const calls = [
       supabaseCustomerService.create({
         operationId: OPERATION_ID,
         name: 'Maria Rossi',
-        phone: '333 000 0001',
         email: ' Maria.Rossi@Example.com ',
         privacyConsent: true,
         notes: '',
@@ -122,7 +119,6 @@ const calls = [
       {
         p_operation_id: OPERATION_ID,
         p_name: 'Maria Rossi',
-        p_phone: '333 000 0001',
         p_email: ' Maria.Rossi@Example.com ',
         p_privacy_consent: true,
         p_notes: '',
@@ -137,13 +133,12 @@ const calls = [
       supabaseCustomerService.update({
         id: ID,
         name: 'Maria Rossi',
-        phone: '',
         email: '',
         notes: 'Tavolo 4',
       }),
     rpc: [
       'update_customer',
-      { p_customer_id: ID, p_name: 'Maria Rossi', p_phone: '', p_email: '', p_notes: 'Tavolo 4' },
+      { p_customer_id: ID, p_name: 'Maria Rossi', p_email: '', p_notes: 'Tavolo 4' },
     ],
     data: row,
     result: customer,
@@ -152,8 +147,8 @@ const calls = [
     name: 'anonymize',
     run: () => supabaseCustomerService.anonymize(ID),
     rpc: ['anonymize_customer', { p_customer_id: ID }],
-    data: { ...row, name: 'Cliente cancellato 6f1c2a5e', phone: null, email: null },
-    result: { ...customer, name: 'Cliente cancellato 6f1c2a5e', phone: null, email: null },
+    data: { ...row, name: 'Cliente cancellato 6f1c2a5e', email: null },
+    result: { ...customer, name: 'Cliente cancellato 6f1c2a5e', email: null },
   },
 ] as const;
 
@@ -238,14 +233,25 @@ describe.each(calls)('$name', ({ run, rpc, data, result }) => {
     expect(error.existingCustomerId).toBeNull();
   });
 
-  it('keeps names and phones out of the error message', async () => {
+  it('keeps names and emails out of the error message', async () => {
     db.rpc.mockResolvedValue({
       data: null,
-      error: { code: 'XX000', message: 'Maria Rossi +393330000001', details: null, hint: null },
+      error: {
+        code: 'XX000',
+        message: 'Maria Rossi maria.rossi@example.com',
+        details: null,
+        hint: null,
+      },
       status: 500,
     });
     const error = await customerError(run());
-    expect(error.message).not.toMatch(/Maria|3330000001/);
+    expect(error.message).not.toMatch(/Maria|example/i);
+  });
+
+  it('sends no phone argument (SPEC-customers-v2, point 1)', async () => {
+    db.rpc.mockResolvedValue({ data, error: null, status: 200 });
+    await run();
+    for (const [, args] of db.rpc.mock.calls) expect(args).not.toHaveProperty('p_phone');
   });
 });
 
@@ -256,7 +262,6 @@ describe('customer_name_taken', () => {
       supabaseCustomerService.create({
         operationId: OPERATION_ID,
         name: 'maria rossi',
-        phone: '',
         email: '',
         privacyConsent: true,
         notes: '',
@@ -272,7 +277,6 @@ describe('customer_name_taken', () => {
       supabaseCustomerService.update({
         id: ID,
         name: 'Maria Rossi',
-        phone: '',
         email: '',
         notes: '',
       }),
@@ -296,7 +300,6 @@ describe('customer_email_taken', () => {
       supabaseCustomerService.update({
         id: ID,
         name: 'Maria Rossi',
-        phone: '',
         email: '',
         notes: '',
       }),
@@ -333,7 +336,6 @@ describe('reads', () => {
         {
           ...row,
           name: 'Cliente cancellato 6f1c2a5e',
-          phone: null,
           email: null,
           notes: null,
           anonymized_at: '2026-11-17T10:00:00+00:00',
@@ -347,12 +349,18 @@ describe('reads', () => {
     await expect(supabaseCustomerService.get(ID)).resolves.toEqual({
       ...customer,
       name: 'Cliente cancellato 6f1c2a5e',
-      phone: null,
       email: null,
       anonymizedAt: '2026-11-17T10:00:00+00:00',
       balance: 12,
       lastServedAt: '2026-11-18T09:58:00+00:00',
     });
+  });
+
+  it('drops the phone the transitional customer_summary still carries (gone with task 25)', async () => {
+    db.rpc.mockResolvedValue({ data: [{ ...row, phone: null }], error: null, status: 200 });
+    const read = await supabaseCustomerService.get(ID);
+    expect(read).toEqual(customer);
+    expect(read).not.toHaveProperty('phone');
   });
 
   it('a get answer that is not an array is unknown', async () => {

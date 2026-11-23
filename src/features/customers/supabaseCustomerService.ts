@@ -84,22 +84,20 @@ export const supabaseCustomerService: CustomerService = {
     return customer;
   },
 
-  create({ operationId, name, phone, email, privacyConsent, notes }) {
+  create({ operationId, name, email, privacyConsent, notes }) {
     return one('create_customer', {
       p_operation_id: operationId,
       p_name: name,
-      p_phone: phone,
       p_email: email,
       p_privacy_consent: privacyConsent,
       p_notes: notes,
     });
   },
 
-  update({ id, name, phone, email, notes }) {
+  update({ id, name, email, notes }) {
     return one('update_customer', {
       p_customer_id: id,
       p_name: name,
-      p_phone: phone,
       p_email: email,
       p_notes: notes,
     });

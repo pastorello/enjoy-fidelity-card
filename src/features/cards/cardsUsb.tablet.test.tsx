@@ -24,7 +24,7 @@ const NEW_CUSTOMER_TEXT =
 const ASSOCIATE_TITLE = 'Passa la card nuova sul lettore';
 const ASSOCIATE_TEXT = 'L’app legge solo il codice della card: non ci scrive nulla.';
 
-const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393330004521', balance: 120 });
+const MARIA = fakeCustomer({ name: 'Maria Rossi', balance: 120 });
 /** As a USB reader in the default `hex` format types them. */
 const OF_MARIA = '04A1B2C3D4E5F6';
 const NEW_ONE = '04DEADBEEF0001';

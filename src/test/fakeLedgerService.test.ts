@@ -102,7 +102,6 @@ describe('createFakeLedgerService: purchases', () => {
     const luca = await customers.service.create({
       operationId: OP_4,
       name: 'Luca Bianchi',
-      phone: '',
       email: '',
       privacyConsent: true,
       notes: '',

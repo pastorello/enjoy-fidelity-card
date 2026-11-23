@@ -215,11 +215,10 @@ export const supabaseCardsService: CardsService = {
     return expected(toCard(await call('deactivate_card', { p_card_id: cardId })));
   },
 
-  async createCustomerWithCard({ operationId, name, phone, email, privacyConsent, notes, uid }) {
+  async createCustomerWithCard({ operationId, name, email, privacyConsent, notes, uid }) {
     const data = await call('create_customer_with_card', {
       p_operation_id: operationId,
       p_name: name,
-      p_phone: phone,
       p_email: email,
       p_privacy_consent: privacyConsent,
       p_notes: notes,

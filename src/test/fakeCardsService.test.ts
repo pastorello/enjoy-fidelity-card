@@ -27,7 +27,6 @@ function newCustomer(
   return {
     operationId: OP_1,
     name: 'Maria Rossi',
-    phone: '',
     email: '',
     privacyConsent: true,
     notes: '',
@@ -226,12 +225,12 @@ describe('createFakeCardsService: createCustomerWithCard', () => {
     const customers = createFakeCustomerService();
     const cards = createFakeCardsService({ customers });
     const created = await cards.service.createCustomerWithCard(
-      newCustomer({ phone: '333 1234521', email: ' Maria.Rossi@Example.com' }),
+      newCustomer({ email: ' Maria.Rossi@Example.com' }),
     );
 
+    expect(created).not.toHaveProperty('phone');
     expect(created).toMatchObject({
       name: 'Maria Rossi',
-      phone: '+393331234521',
       email: 'maria.rossi@example.com',
       balance: 0,
     });

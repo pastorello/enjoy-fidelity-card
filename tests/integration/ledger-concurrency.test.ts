@@ -66,7 +66,6 @@ async function customerWith100Points(label: string): Promise<{ id: string; purch
     customers.create({
       operationId: randomUUID(),
       name: `Ledger ${label} ${SUFFIX}`,
-      phone: '',
       email: '',
       privacyConsent: true,
       notes: '',

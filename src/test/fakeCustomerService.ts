@@ -1,6 +1,5 @@
 import { vi } from 'vitest';
 import { normalizeEmail } from '../features/customers/email';
-import { normalizePhone } from '../features/customers/phone';
 import { CUSTOMER_LIST_PAGE_SIZE, CustomerError } from '../features/customers/types';
 import type {
   CreateCustomerInput,
@@ -62,7 +61,6 @@ export function fakeCustomer(
   return {
     id: fakeId(900_000_000 + nextFixture),
     name: 'Cliente Prova',
-    phone: null,
     email: null,
     notes: null,
     anonymizedAt: null,
@@ -94,8 +92,8 @@ function copy(customer: CustomerSummary): CustomerSummary {
 
 /** The summary of a fixture, without the list-only fields. */
 function summaryOf(fixture: FakeCustomerFixture): CustomerSummary {
-  const { id, name, phone, email = null, notes, anonymizedAt, balance, lastServedAt } = fixture;
-  return { id, name, phone, email, notes, anonymizedAt, balance, lastServedAt };
+  const { id, name, email = null, notes, anonymizedAt, balance, lastServedAt } = fixture;
+  return { id, name, email, notes, anonymizedAt, balance, lastServedAt };
 }
 
 /** The fake clock of creation times: `2026-11-01T08:00:00` plus `tick` seconds, with microseconds. */
@@ -145,22 +143,16 @@ function nameMatches(name: string, words: string[]): boolean {
  * The checks shared by create and update that come before the name's uniqueness, in the server's
  * order; returns the cleaned values. The email is only normalized here: its checks come after.
  */
-function validate(
-  input: { name: string; phone: string; email: string; notes: string },
-  consent = true,
-) {
+function validate(input: { name: string; email: string; notes: string }, consent = true) {
   const name = cleanName(input.name);
   if (name === '') throw new CustomerError('name_required');
   if (Array.from(name).length > NAME_MAX) throw new CustomerError('name_too_long');
-  const typedPhone = blankToNull(input.phone);
-  const phone = typedPhone === null ? null : normalizePhone(typedPhone);
-  if (typedPhone !== null && phone === null) throw new CustomerError('phone_invalid');
   if (!consent) throw new CustomerError('consent_required');
   const notes = blankToNull(input.notes);
   if (notes !== null && Array.from(notes).length > NOTES_MAX) {
     throw new CustomerError('notes_too_long');
   }
-  return { name, phone, email: normalizeEmail(input.email), notes };
+  return { name, email: normalizeEmail(input.email), notes };
 }
 
 function perMethod<T>(make: () => T): Record<Method, T> {
@@ -242,7 +234,7 @@ export function createFakeCustomerService({
    * the customer: `fakeCardsService` runs the card checks in between, all or nothing.
    */
   function prepareCreate(input: CreateCustomerInput): () => CustomerSummary {
-    const { name, phone, email: typedEmail, notes } = validate(input, input.privacyConsent);
+    const { name, email: typedEmail, notes } = validate(input, input.privacyConsent);
     const taken = takenBy(name, null);
     if (taken !== null) throw new CustomerError('customer_name_taken', taken);
     const email = checkEmail(typedEmail, null);
@@ -251,7 +243,6 @@ export function createFakeCustomerService({
       const customer: CustomerSummary = {
         id: fakeId(created),
         name,
-        phone,
         email,
         notes,
         anonymizedAt: null,
@@ -352,11 +343,11 @@ export function createFakeCustomerService({
         const customer = stored.get(input.id);
         if (!customer) throw new CustomerError('customer_not_found');
         if (customer.anonymizedAt !== null) throw new CustomerError('customer_anonymized');
-        const { name, phone, email: typedEmail, notes } = validate(input);
+        const { name, email: typedEmail, notes } = validate(input);
         const taken = takenBy(name, customer.id);
         if (taken !== null) throw new CustomerError('customer_name_taken', taken);
         const email = checkEmail(typedEmail, customer.id);
-        Object.assign(customer, { name, phone, email, notes });
+        Object.assign(customer, { name, email, notes });
         return copy(customer);
       }),
     ),
@@ -368,7 +359,6 @@ export function createFakeCustomerService({
         if (customer.anonymizedAt === null) {
           Object.assign(customer, {
             name: `Cliente cancellato ${id.slice(0, 8)}`,
-            phone: null,
             email: null,
             notes: null,
             anonymizedAt: '2026-11-17T12:00:00.000Z',

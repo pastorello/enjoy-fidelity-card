@@ -195,12 +195,14 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo, card in the history state
     expect(fixture.cards.service.createCustomerWithCard.mock.calls[0]?.[0]).toMatchObject({
       uid: UID,
       name: 'Maria Rossi',
-      phone: '',
       // As typed: the server normalizes it.
       email: 'Giulia@Example.com',
       privacyConsent: true,
       notes: '',
     });
+    expect(fixture.cards.service.createCustomerWithCard.mock.calls[0]?.[0]).not.toHaveProperty(
+      'phone',
+    );
     expect(fixture.cards.cards()).toMatchObject([
       { uid: UID, customerId: saved?.id, active: true },
     ]);

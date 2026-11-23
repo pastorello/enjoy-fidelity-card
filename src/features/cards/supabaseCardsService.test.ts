@@ -76,7 +76,6 @@ const writtenCard: CardSummary = {
 const customerRow = {
   id: CUSTOMER_ID,
   name: 'Maria Rossi',
-  phone: null,
   notes: null,
   anonymized_at: null,
   balance: 0,
@@ -86,7 +85,6 @@ const customerRow = {
 const customer: CustomerSummary = {
   id: CUSTOMER_ID,
   name: 'Maria Rossi',
-  phone: null,
   notes: null,
   anonymizedAt: null,
   balance: 0,
@@ -189,7 +187,6 @@ const calls = [
       supabaseCardsService.createCustomerWithCard({
         operationId: OPERATION_ID,
         name: 'Maria Rossi',
-        phone: '',
         email: '',
         privacyConsent: true,
         notes: '',
@@ -323,7 +320,6 @@ describe('arguments', () => {
         supabaseCardsService.createCustomerWithCard({
           operationId: OPERATION_ID,
           name: 'Maria Rossi',
-          phone: '333 000 0001',
           email: 'Maria.Rossi@Example.com',
           privacyConsent: true,
           notes: 'Tavolo 4',
@@ -333,7 +329,6 @@ describe('arguments', () => {
       {
         p_operation_id: OPERATION_ID,
         p_name: 'Maria Rossi',
-        p_phone: '333 000 0001',
         p_email: 'Maria.Rossi@Example.com',
         p_privacy_consent: true,
         p_notes: 'Tavolo 4',
@@ -478,7 +473,6 @@ describe('createCustomerWithCard', () => {
   const input = {
     operationId: OPERATION_ID,
     name: 'maria rossi',
-    phone: '',
     email: '',
     privacyConsent: true,
     notes: '',
@@ -497,6 +491,13 @@ describe('createCustomerWithCard', () => {
       expect(error).toMatchObject({ kind: code });
     },
   );
+
+  it('sends no phone and drops the one of the transitional customer_summary', async () => {
+    answerWith({ data: { ...customerRow, phone: null }, error: null, status: 200 });
+    const created = await supabaseCardsService.createCustomerWithCard(input);
+    expect(created).not.toHaveProperty('phone');
+    expect(db.rpc.mock.calls[0]?.[1]).not.toHaveProperty('p_phone');
+  });
 
   it('customer_email_taken carries the customer that has the email', async () => {
     answerWith(raised('customer_email_taken', OWNER_ID));

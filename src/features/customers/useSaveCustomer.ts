@@ -43,8 +43,6 @@ export function useSaveCustomer(via: SaveCustomerVia | null = null): SaveCustome
       return create({
         operationId: operationId.current,
         name: values.name,
-        // No phone field any more (SPEC-customers-v2, point 1); `phone` leaves the input with task 22.
-        phone: '',
         email: values.email,
         privacyConsent: values.privacyConsent,
         notes: values.notes,

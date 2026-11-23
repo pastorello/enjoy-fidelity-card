@@ -94,8 +94,6 @@ describe('EditCustomerPage: Modifica cliente', () => {
     expect(customers.service.update).toHaveBeenCalledWith({
       id: MARIA.id,
       name: 'Maria Rossi',
-      // No phone field any more: nothing to send until `phone` leaves the input (task 22).
-      phone: '',
       // As typed: the server normalizes it.
       email: 'Maria.Rossi@Example.it',
       notes: 'Preferisce il caffè d’orzo',
