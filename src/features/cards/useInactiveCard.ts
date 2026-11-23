@@ -14,8 +14,11 @@ export type InactiveCardState =
   | { status: 'not-found' }
   | { status: 'error'; error: unknown };
 
-/** The state, and `retry` to load again at once (after an error). */
-export type InactiveCardLoad = InactiveCardState & { retry: () => void };
+/**
+ * The state, `retry` to load again at once (after an error, showing the loading state), and
+ * `reload` to load again in the background: the card on screen stays until the new answer.
+ */
+export type InactiveCardLoad = InactiveCardState & { retry: () => void; reload: () => void };
 
 /**
  * Loads the card of `/card/:cardId` (`app.get_card`, SPEC-customers-v2 point 4). An answer for a
@@ -29,8 +32,15 @@ export function useInactiveCard(cardId: string): InactiveCardLoad {
   const report = useLatest(reportNotEnabled);
   const valid = UUID.test(cardId);
   // Keyed by card and attempt, so a new card or "Riprova" shows the loading state at once.
-  const [loaded, setLoaded] = useState<{ key: string; state: InactiveCardState } | null>(null);
+  // `refresh` is the background reload it answers: kept apart from the key, so the card stays.
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    refresh: number;
+    state: InactiveCardState;
+  } | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // A background reload (`active_card_changed`): not in the key, so the card stays meanwhile.
+  const [refresh, setRefresh] = useState(0);
   const key = `${cardId}#${attempt}`;
 
   useEffect(() => {
@@ -41,6 +51,7 @@ export function useInactiveCard(cardId: string): InactiveCardLoad {
         if (!current) return;
         setLoaded({
           key,
+          refresh,
           state: card === null ? { status: 'not-found' } : { status: 'done', card },
         });
       },
@@ -49,18 +60,19 @@ export function useInactiveCard(cardId: string): InactiveCardLoad {
         if (error instanceof CardsError && error.kind === 'not_operator') {
           void report.current();
         }
-        setLoaded({ key, state: { status: 'error', error } });
+        setLoaded({ key, refresh, state: { status: 'error', error } });
       },
     );
     return () => {
       current = false;
     };
-  }, [service, cardId, key, valid, report]);
+  }, [service, cardId, key, valid, report, refresh]);
 
   const retry = useCallback(() => setAttempt((count) => count + 1), []);
+  const reload = useCallback(() => setRefresh((count) => count + 1), []);
 
   let state: InactiveCardState;
   if (!valid) state = { status: 'not-found' };
   else state = loaded?.key === key ? loaded.state : { status: 'loading' };
-  return { ...state, retry };
+  return { ...state, retry, reload };
 }

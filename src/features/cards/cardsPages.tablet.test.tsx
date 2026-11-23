@@ -131,6 +131,10 @@ describe('«Card non attiva» at 1280×800 (SPEC-customers-v2, point 4)', () => 
     expect(
       within(column('inactive-card')).getByRole('link', { name: /Era di Maria Rossi/ }),
     ).toBeInTheDocument();
+    // Riattiva stays on the till (criterion 12), in the column.
+    expect(
+      within(column('inactive-card')).getByRole('button', { name: 'Riattiva la card' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('contentinfo')).toBeNull();
   });
 });

@@ -76,3 +76,23 @@
   flex-direction: column;
   gap: calc(var(--space-3) + var(--space-2));
 }
+
+/* A refusal of Riattiva (`forbidden`, `card_released`, `customer_anonymized`): it takes the place of
+   the button, which would be refused again. */
+.refused {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  color: var(--color-ink);
+}
+
+.refusedIcon {
+  flex-shrink: 0;
+  color: var(--color-danger);
+}
+
+/* A part of a dialog title with a glyph Enjoy Display lacks (displayGlyphs.test.ts). */
+.plain {
+  font-family: var(--type-body-family);
+}

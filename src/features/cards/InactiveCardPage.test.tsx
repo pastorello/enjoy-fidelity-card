@@ -1,7 +1,8 @@
-import { screen, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ServerFaultError } from '../../lib/serverFault';
+import type { CardWriteResult, CardWriteStep, WriteUrlOptions } from '../card-input/webNfcWriter';
 import { fakeOperator } from '../../test/fakeAuthService';
 import { createTestCardReader } from '../../test/fakeCardReader';
 import { createFakeCardsService, fakeCard } from '../../test/fakeCardsService';
@@ -55,9 +56,21 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
-async function setup({ role = 'admin' }: { role?: 'admin' | 'operator' } = {}) {
+/** One `writeUrl` call, ended by the test with `finish`. */
+type WriteCall = {
+  url: string;
+  options: WriteUrlOptions;
+  step: (step: CardWriteStep) => void;
+  finish: (result: CardWriteResult) => Promise<void>;
+};
+
+async function setup({
+  role = 'admin',
+  writable = true,
+}: { role?: 'admin' | 'operator'; writable?: boolean } = {}) {
   const customers = createFakeCustomerService({ customers: [MARIA, GIULIA, ERASED] });
   const cards = createFakeCardsService({
     customers,
@@ -67,7 +80,26 @@ async function setup({ role = 'admin' }: { role?: 'admin' | 'operator' } = {}) {
   await cards.service.releaseCard('00000000-0000-4000-8000-0000000000aa', GIULIA_RELEASED.id);
   cards.calls.length = 0;
   const auth = signedInFake({ operator: { ...fakeOperator, role } });
-  return { customers, cards, auth };
+  const reader = createTestCardReader({ writable });
+  // The link writes are driven by the tests: each `writeUrl` waits for `finish` (or its signal).
+  const writes: WriteCall[] = [];
+  vi.spyOn(reader.reader, 'writeUrl').mockImplementation(
+    (url, options) =>
+      new Promise<CardWriteResult>((resolve) => {
+        writes.push({
+          url,
+          options,
+          step: (step) => act(() => options.onStep?.(step)),
+          finish: (result) =>
+            act(async () => {
+              resolve(result);
+              await Promise.resolve();
+            }),
+        });
+        options.signal?.addEventListener('abort', () => resolve({ ok: false, reason: 'aborted' }));
+      }),
+  );
+  return { customers, cards, auth, reader, writes };
 }
 
 type Fixture = Awaited<ReturnType<typeof setup>>;
@@ -79,13 +111,48 @@ function renderPage(fixture: Fixture, cardId: string) {
     createFakeSettingsService(),
     fixture.customers,
     createFakeRewardsService(),
-    createTestCardReader(),
+    fixture.reader,
     fixture.cards,
   );
 }
 
 function main(): HTMLElement {
   return screen.getByRole('main');
+}
+
+const REACTIVATE = 'Riattiva la card';
+const SKIP = 'Salta, lo scrivo più tardi';
+const LINK = /^https?:\/\/[^/]+\/s\/[A-Za-z0-9_-]{22}$/;
+
+function reactivations(fixture: Fixture) {
+  return fixture.cards.calls
+    .filter((call) => call.method === 'reactivateCard')
+    .map((call) => call.args);
+}
+
+/** The write in progress (the last `writeUrl` call), once it has started. */
+async function currentWrite(fixture: Fixture): Promise<WriteCall> {
+  await waitFor(() => expect(fixture.writes.length).toBeGreaterThan(0));
+  const write = fixture.writes.at(-1);
+  if (!write) throw new Error('no write');
+  return write;
+}
+
+/** The one-time confirmation of the customer page, written a moment after the page opens. */
+async function expectConfirmation(text: string) {
+  await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(text));
+}
+
+/** «Card …E5F6 riattivata per Maria», the status over the write of the link. */
+async function expectReactivated(text: string) {
+  const reactivated = await screen.findByText(
+    (_content, element) => element?.tagName === 'OUTPUT' && element.textContent === text,
+  );
+  expect(reactivated).toHaveRole('status');
+}
+
+function cardOf(fixture: Fixture, id: string) {
+  return fixture.cards.cards().find((card) => card.id === id);
 }
 
 describe('«Card non attiva» (/card/:cardId)', () => {
@@ -163,6 +230,7 @@ describe('«Card non attiva» (/card/:cardId)', () => {
       ).toBeInTheDocument();
       expect(within(main()).queryByRole('link')).toBeNull();
       expect(screen.queryByText(/Riattiva/)).toBeNull();
+      expect(screen.queryByRole('button', { name: REACTIVATE })).toBeNull();
       expect(screen.queryByText(/La card torna a/)).toBeNull();
       expect(screen.queryByText(/cancellato-7f3a/)).toBeNull();
     });
@@ -243,6 +311,218 @@ describe('«Card non attiva» (/card/:cardId)', () => {
       expect(fixture.cards.service.getCard).not.toHaveBeenCalled();
       await userEvent.click(within(alert).getByRole('button', { name: 'Torna all’inizio' }));
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    });
+  });
+});
+
+describe('Riattiva (SPEC-customers-v2 point 4, criterion 8)', () => {
+  it('without another active card: always a confirmation, and no call before «Riattiva»', async () => {
+    const fixture = await setup();
+    renderPage(fixture, GIULIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Riattivare la card …0001?' });
+    expect(dialog).toHaveAccessibleDescription(
+      'Disattivata il 15 nov. Riattiva solo se la card è tornata a Giulia: chi la usa potrà spendere i suoi punti.',
+    );
+    // «Lascia com'è» changes nothing.
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(reactivations(fixture)).toEqual([]);
+
+    await userEvent.click(screen.getByRole('button', { name: REACTIVATE }));
+    expect(reactivations(fixture)).toEqual([]);
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' }),
+    );
+    expect(reactivations(fixture)).toEqual([[GIULIA_LOST.id, null]]);
+    await expectReactivated('Card …0001 riattivata per Giulia');
+    expect(cardOf(fixture, GIULIA_LOST.id)?.active).toBe(true);
+  });
+
+  it('with another active card: «Scambiare le card di Maria?» and the swap names that card', async () => {
+    const fixture = await setup();
+    renderPage(fixture, MARIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Scambiare le card di Maria?' });
+    expect(dialog).toHaveAccessibleDescription(
+      'La card …5566 (disattivata il 12 nov) torna attiva. Riattiva solo se la card è tornata a Maria: chi la usa potrà spendere i suoi punti. La card …E5F6, ora attiva, si disattiva e il suo link non mostrerà più i punti. I punti restano a Maria.',
+    );
+    expect(reactivations(fixture)).toEqual([]);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Scambia le card' }));
+
+    expect(reactivations(fixture)).toEqual([[MARIA_LOST.id, MARIA_ACTIVE.id]]);
+    await expectReactivated('Card …5566 riattivata per Maria');
+    // One active card: the other one was swapped out.
+    expect(cardOf(fixture, MARIA_ACTIVE.id)?.active).toBe(false);
+    expect(cardOf(fixture, MARIA_LOST.id)?.active).toBe(true);
+  });
+
+  it('active_card_changed: the page loads again and asks again, with the right card', async () => {
+    const fixture = await setup();
+    renderPage(fixture, GIULIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+    // Meanwhile another operator gives Giulia a new card.
+    const { card: other } = await fixture.cards.service.associate(GIULIA.id, '04CAFE00000077');
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' }),
+    );
+
+    // Asked again: a new dialog, with the card Giulia has now.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('dialog', { name: 'Scambiare le card di Giulia?' }),
+      ).toHaveAccessibleDescription(/La card …0077, ora attiva, si disattiva/),
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(fixture.cards.service.getCard).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/al posto della card …0077/)).toBeInTheDocument();
+    expect(cardOf(fixture, other.id)?.active).toBe(true);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Scambia le card' }));
+    expect(reactivations(fixture)).toEqual([
+      [GIULIA_LOST.id, null],
+      [GIULIA_LOST.id, other.id],
+    ]);
+    await expectReactivated('Card …0001 riattivata per Giulia');
+    expect(cardOf(fixture, other.id)?.active).toBe(false);
+  });
+
+  it('forbidden: «Card non attiva: chiedi a un amministratore.», and no Riattiva any more', async () => {
+    const fixture = await setup();
+    fixture.cards.failNext('reactivateCard', 'forbidden');
+    renderPage(fixture, GIULIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Card non attiva: chiedi a un amministratore.',
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('button', { name: REACTIVATE })).toBeNull();
+    expect(cardOf(fixture, GIULIA_LOST.id)?.active).toBe(false);
+  });
+
+  it.each([
+    ['card_released', 'Questa card è già stata riformattata.'],
+    ['customer_anonymized', 'Questo cliente non può avere una card.'],
+  ] as const)('%s: the text of the spec', async (kind, text) => {
+    const fixture = await setup();
+    fixture.cards.failNext('reactivateCard', kind);
+    renderPage(fixture, GIULIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' }),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(text);
+    expect(screen.queryByRole('button', { name: REACTIVATE })).toBeNull();
+  });
+
+  it('no answer: the dialog stays with «Riprova», which sends the same request (safe)', async () => {
+    const fixture = await setup();
+    // Applied on the server, the answer lost: sending it again changes nothing.
+    fixture.cards.failNext('reactivateCard', 'lost');
+    renderPage(fixture, MARIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Scambia le card' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Card non riattivata: controlla la connessione.',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Riprova' }));
+    expect(reactivations(fixture)).toEqual([
+      [MARIA_LOST.id, MARIA_ACTIVE.id],
+      [MARIA_LOST.id, MARIA_ACTIVE.id],
+    ]);
+    await expectReactivated('Card …5566 riattivata per Maria');
+  });
+
+  it('a server fault is said as such, with «Riprova»', async () => {
+    const fixture = await setup();
+    fixture.cards.failNext('reactivateCard', new ServerFaultError('unavailable'));
+    renderPage(fixture, GIULIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+    const dialog = screen.getByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Riattiva' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Card non riattivata. Servizio momentaneamente non disponibile: riprova tra poco.',
+    );
+    expect(within(dialog).getByRole('button', { name: 'Riprova' })).toBeInTheDocument();
+  });
+
+  it('a double tap on the confirmation sends one request', async () => {
+    const fixture = await setup();
+    const { release } = fixture.cards.holdNext('reactivateCard');
+    renderPage(fixture, GIULIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+    const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' });
+    await userEvent.click(confirm);
+    await userEvent.click(confirm);
+    release();
+    await expectReactivated('Card …0001 riattivata per Giulia');
+    expect(reactivations(fixture)).toHaveLength(1);
+  });
+
+  describe('the link, written after the reactivation', () => {
+    it('is written on the card (a token, never the uid); then the customer page says «riattivata»', async () => {
+      const fixture = await setup();
+      const { router } = renderPage(fixture, GIULIA_LOST.id);
+      await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+      await userEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' }),
+      );
+
+      const status = await screen.findByRole('status');
+      expect(status).toHaveTextContent('Card …0001 riattivata per Giulia');
+      const write = await currentWrite(fixture);
+      expect(screen.getByRole('region', { name: 'Scrittura del link' })).toBeInTheDocument();
+      expect(write.options.expectedUid).toBe(GIULIA_LOST.uid);
+      expect(write.url).toMatch(LINK);
+      expect(write.url.toUpperCase()).not.toContain(GIULIA_LOST.uid);
+
+      await write.finish({ ok: true });
+      await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${GIULIA.id}`));
+      expect(router.state.historyAction).toBe('REPLACE');
+      await expectConfirmation('Card …0001 riattivata');
+      expect(screen.getByRole('status')).not.toHaveTextContent('Link non scritto');
+      expect(cardOf(fixture, GIULIA_LOST.id)?.linkState).toBe('written');
+    });
+
+    it('«Salta, lo scrivo più tardi»: the customer page with «Link non scritto.»', async () => {
+      const fixture = await setup();
+      const { router } = renderPage(fixture, GIULIA_LOST.id);
+      await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+      await userEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' }),
+      );
+      const write = await currentWrite(fixture);
+      await userEvent.click(screen.getByRole('button', { name: SKIP }));
+      expect(write.options.signal?.aborted).toBe(true);
+      await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${GIULIA.id}`));
+      await expectConfirmation('Card …0001 riattivata. Link non scritto.');
+      // The reactivation stays.
+      expect(cardOf(fixture, GIULIA_LOST.id)).toMatchObject({
+        active: true,
+        linkState: 'not-written',
+      });
+    });
+
+    it('a device that does not write: the customer page at once, «Link non scritto.»', async () => {
+      const fixture = await setup({ writable: false });
+      const { router } = renderPage(fixture, GIULIA_LOST.id);
+      await userEvent.click(await screen.findByRole('button', { name: REACTIVATE }));
+      await userEvent.click(
+        within(screen.getByRole('dialog')).getByRole('button', { name: 'Riattiva' }),
+      );
+      await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${GIULIA.id}`));
+      expect(router.state.historyAction).toBe('REPLACE');
+      await expectConfirmation('Card …0001 riattivata. Link non scritto.');
+      expect(fixture.cards.service.issueLink).not.toHaveBeenCalled();
+      expect(fixture.writes).toHaveLength(0);
+      expect(cardOf(fixture, GIULIA_LOST.id)?.active).toBe(true);
     });
   });
 });
