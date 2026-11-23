@@ -1,4 +1,5 @@
-import { expect, type Page } from '@playwright/test';
+import { execFileSync } from 'node:child_process';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
 /** Fake accounts created by supabase/seed.sql (local stack only). */
 export const seedAccounts = {
@@ -49,4 +50,35 @@ export async function signInDevice(page: Page, email: string = seedDevices.till.
   await page.getByRole('button', { name: 'Accedi' }).click();
   await expect(page).toHaveURL(/\/cassa$/);
   await expect(page.getByRole('heading', { name: 'Chi è alla cassa?' })).toBeVisible();
+}
+
+/** Same origin as playwright.config.ts (LOCAL_SUPABASE_URL). */
+export const LOCAL_SUPABASE_URL = 'http://localhost:54321';
+
+/**
+ * The publishable key and an access token of a seed account, from the local Auth: for the calls a
+ * test makes outside the page, as that account.
+ */
+export async function signedInApi(
+  request: APIRequestContext,
+  email: string,
+): Promise<{ key: string; token: string }> {
+  const status = execFileSync('npx', ['supabase', 'status', '-o', 'env'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  const key = /^PUBLISHABLE_KEY="?([^"\n]+)"?$/m.exec(status)?.[1];
+  if (!key) throw new Error('`supabase status` printed no PUBLISHABLE_KEY.');
+  const auth = await request.post(`${LOCAL_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    headers: { apikey: key },
+    data: { email, password: SEED_PASSWORD },
+  });
+  expect(auth.ok()).toBe(true);
+  const session: unknown = await auth.json();
+  const token =
+    typeof session === 'object' && session !== null && 'access_token' in session
+      ? session.access_token
+      : null;
+  if (typeof token !== 'string') throw new Error('Auth gave no access token.');
+  return { key, token };
 }

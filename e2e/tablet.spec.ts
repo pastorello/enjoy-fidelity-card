@@ -1,6 +1,12 @@
-import type { APIRequestContext, Page } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
-import { SEED_PASSWORD, SEED_PINS, seedAccounts, seedDevices, signInDevice } from './auth';
+import type { Page } from '@playwright/test';
+import {
+  SEED_PINS,
+  seedAccounts,
+  seedDevices,
+  signInDevice,
+  signedInApi,
+  LOCAL_SUPABASE_URL,
+} from './auth';
 import { runSql } from './db';
 import { expect, test } from './fixtures';
 import { asWebNfc, freshUid, uniqueName } from './nfc';
@@ -23,9 +29,6 @@ import {
  * The USB format in force is the initial one (`hex`).
  */
 
-/** Same origin as playwright.config.ts (LOCAL_SUPABASE_URL). */
-const LOCAL_SUPABASE_URL = 'http://localhost:54321';
-
 /** Types an amount on the app's keypad, digit by digit, as on a POS. */
 async function typeAmount(page: Page, digits: string) {
   const keypad = page.getByRole('group', { name: 'Tastierino numerico' });
@@ -43,31 +46,6 @@ async function expectKeypadOff(page: Page) {
   const keys = page.getByRole('group', { name: 'Tastierino PIN' }).getByRole('button');
   await expect(keys).toHaveCount(11);
   await Promise.all((await keys.all()).map((key) => expect(key).toBeDisabled()));
-}
-
-/** The publishable key and an access token of a seed account, from the local Auth. */
-async function signedInApi(
-  request: APIRequestContext,
-  email: string,
-): Promise<{ key: string; token: string }> {
-  const status = execFileSync('npx', ['supabase', 'status', '-o', 'env'], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'ignore'],
-  });
-  const key = /^PUBLISHABLE_KEY="?([^"\n]+)"?$/m.exec(status)?.[1];
-  if (!key) throw new Error('`supabase status` printed no PUBLISHABLE_KEY.');
-  const auth = await request.post(`${LOCAL_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    headers: { apikey: key },
-    data: { email, password: SEED_PASSWORD },
-  });
-  expect(auth.ok()).toBe(true);
-  const session: unknown = await auth.json();
-  const token =
-    typeof session === 'object' && session !== null && 'access_token' in session
-      ? session.access_token
-      : null;
-  if (typeof token !== 'string') throw new Error('Auth gave no access token.');
-  return { key, token };
 }
 
 test.describe('the till tablet, with its own device account', () => {

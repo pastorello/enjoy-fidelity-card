@@ -191,3 +191,29 @@ export async function tapUntilWritten(page: Page, uid: string, customerPath: str
     await expect(page).toHaveURL(customerPath, { timeout: 1000 });
   }).toPass({ timeout: 10_000 });
 }
+
+/**
+ * Puts `uid` back on the phone whenever the panel `region` asks for it («Avvicina la card …»), until
+ * `done` passes: the fake writer writes (or erases) at once only a card tapped less than 1.5 s
+ * before (IN_FIELD_MS), otherwise it waits for the card, as the operator would put it back.
+ * `done` should fail fast (a 1 s timeout). Returns when the card was last tapped (null: not here).
+ */
+export async function tapWhileAsked(
+  page: Page,
+  uid: string,
+  region: 'Scrittura del link' | 'Riformattazione della card',
+  done: () => Promise<void>,
+): Promise<number | null> {
+  const again = page
+    .getByRole('region', { name: region })
+    .getByText(`Avvicina la card …${uid.slice(-4)}`);
+  let lastTap: number | null = null;
+  await expect(async () => {
+    if (await again.isVisible()) {
+      lastTap = Date.now();
+      await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+    }
+    await done();
+  }).toPass({ timeout: 10_000 });
+  return lastTap;
+}
