@@ -66,6 +66,7 @@ describe('operator', () => {
       operationId,
       name,
       phone: '333 000 0009',
+      email: '',
       privacyConsent: true,
       notes: '  ',
     });
@@ -85,6 +86,7 @@ describe('operator', () => {
       operationId,
       name,
       phone: '333 000 0009',
+      email: '',
       privacyConsent: true,
       notes: '',
     });
@@ -109,6 +111,7 @@ describe('operator', () => {
         operationId: randomUUID(),
         name: `NICOLO  integrazione ${SUFFIX}`,
         phone: '',
+        email: '',
         privacyConsent: true,
         notes: '',
       }),
@@ -116,7 +119,14 @@ describe('operator', () => {
   });
 
   it('validation refusals come back as their codes', async () => {
-    const base = { operationId: randomUUID(), name, phone: '', privacyConsent: true, notes: '' };
+    const base = {
+      operationId: randomUUID(),
+      name,
+      phone: '',
+      email: '',
+      privacyConsent: true,
+      notes: '',
+    };
     await expect(
       service.create({ ...base, name: `Senza consenso ${SUFFIX}`, privacyConsent: false }),
     ).rejects.toMatchObject({ kind: 'consent_required' });
@@ -129,10 +139,16 @@ describe('operator', () => {
   });
 
   it('updates the phone to blank, which removes it', async () => {
-    const updated = await service.update({ id: createdId, name, phone: '', notes: 'Tavolo 4' });
+    const updated = await service.update({
+      id: createdId,
+      name,
+      phone: '',
+      email: '',
+      notes: 'Tavolo 4',
+    });
     expect(updated).toMatchObject({ id: createdId, phone: null, notes: 'Tavolo 4' });
     await expect(
-      service.update({ id: randomUUID(), name, phone: '', notes: '' }),
+      service.update({ id: randomUUID(), name, phone: '', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_not_found' });
   });
 
@@ -160,6 +176,90 @@ describe('operator', () => {
   });
 });
 
+describe('email (customers-v2)', () => {
+  const email = `maria.${SUFFIX}@example.com`;
+  const base = { phone: '', privacyConsent: true, notes: '' };
+
+  beforeAll(() => {
+    current.client = operatorClient;
+  });
+
+  it('create stores it normalized; get returns it; the same email is taken with its id', async () => {
+    const created = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Prima ${SUFFIX}`,
+      email: `  ${email.toUpperCase()} `,
+    });
+    toErase.push(created.id);
+    expect(created.email).toBe(email);
+    await expect(service.get(created.id)).resolves.toMatchObject({ email });
+
+    await expect(
+      service.create({
+        ...base,
+        operationId: randomUUID(),
+        name: `Email Seconda ${SUFFIX}`,
+        email,
+      }),
+    ).rejects.toMatchObject({ kind: 'customer_email_taken', existingCustomerId: created.id });
+    await expect(
+      service.create({
+        ...base,
+        operationId: randomUUID(),
+        name: `Email Seconda ${SUFFIX}`,
+        email: 'maria@rossi',
+      }),
+    ).rejects.toMatchObject({ kind: 'email_invalid', existingCustomerId: null });
+  });
+
+  it('update keeps its own email, a blank email removes it, and frees it for another', async () => {
+    const owner = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Terza ${SUFFIX}`,
+      email: `terza.${SUFFIX}@example.com`,
+    });
+    toErase.push(owner.id);
+    const update = { ...base, id: owner.id, name: owner.name };
+
+    await expect(
+      service.update({ ...update, email: `Terza.${SUFFIX}@Example.com` }),
+    ).resolves.toMatchObject({ email: `terza.${SUFFIX}@example.com` });
+    await expect(service.update({ ...update, email: '' })).resolves.toMatchObject({
+      email: null,
+    });
+    const other = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Quarta ${SUFFIX}`,
+      email: `terza.${SUFFIX}@example.com`,
+    });
+    toErase.push(other.id);
+    expect(other.email).toBe(`terza.${SUFFIX}@example.com`);
+  });
+
+  it('the anonymization clears the email and frees it', async () => {
+    const erased = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Cancellata ${SUFFIX}`,
+      email: `cancellata.${SUFFIX}@example.com`,
+    });
+    current.client = adminClient;
+    await expect(service.anonymize(erased.id)).resolves.toMatchObject({ email: null });
+    current.client = operatorClient;
+    const reused = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Riusata ${SUFFIX}`,
+      email: `cancellata.${SUFFIX}@example.com`,
+    });
+    toErase.push(reused.id);
+    expect(reused.email).toBe(`cancellata.${SUFFIX}@example.com`);
+  });
+});
+
 describe('admin', () => {
   const name = `Cliente Da Cancellare ${SUFFIX}`;
 
@@ -172,6 +272,7 @@ describe('admin', () => {
       operationId: randomUUID(),
       name,
       phone: '333 000 0008',
+      email: '',
       privacyConsent: true,
       notes: 'Nota di prova',
     });
@@ -194,7 +295,7 @@ describe('admin', () => {
     await expect(service.get(created.id)).resolves.toEqual(erased);
     // An anonymized customer cannot be edited.
     await expect(
-      service.update({ id: created.id, name, phone: '', notes: '' }),
+      service.update({ id: created.id, name, phone: '', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_anonymized' });
   });
 });
@@ -250,6 +351,7 @@ describe('concurrent saves', () => {
       operationId: randomUUID(),
       name: held.name,
       phone: '',
+      email: '',
       privacyConsent: true,
       notes: '',
     });
@@ -268,6 +370,7 @@ describe('concurrent saves', () => {
       operationId: held.operationId,
       name: `Gara Invio Doppio ${SUFFIX}`,
       phone: '',
+      email: '',
       privacyConsent: true,
       notes: '',
     });
@@ -281,6 +384,7 @@ describe('concurrent saves', () => {
       operationId: randomUUID(),
       name: `Gara Rinomina ${SUFFIX}`,
       phone: '',
+      email: '',
       privacyConsent: true,
       notes: '',
     });
@@ -289,7 +393,7 @@ describe('concurrent saves', () => {
     const { done } = await holdInsert(held);
     toErase.push(held.id);
     await expect(
-      service.update({ id: renamed.id, name: held.name, phone: '', notes: '' }),
+      service.update({ id: renamed.id, name: held.name, phone: '', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_name_taken', existingCustomerId: held.id });
     await done;
     await expect(service.get(renamed.id)).resolves.toMatchObject({
@@ -333,6 +437,7 @@ describe('without an active profile', () => {
         operationId: randomUUID(),
         name: `Senza profilo ${SUFFIX}`,
         phone: '',
+        email: '',
         privacyConsent: true,
         notes: '',
       }),

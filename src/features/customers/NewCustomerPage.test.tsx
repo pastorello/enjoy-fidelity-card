@@ -84,6 +84,7 @@ describe('NewCustomerPage', () => {
     expect(input).toMatchObject({
       name: 'Maria Rossi',
       phone: '333 123 4521',
+      email: '',
       privacyConsent: true,
       notes: '',
     });

@@ -27,6 +27,7 @@ const row = {
   anonymized_at: null,
   balance: 0,
   last_served_at: null,
+  email: 'maria.rossi@example.com',
 };
 /** A row of `app.list_customers`, timestamps with microseconds as PostgREST sends them. */
 const listRow = {
@@ -52,6 +53,7 @@ const customer: CustomerSummary = {
   anonymizedAt: null,
   balance: 0,
   lastServedAt: null,
+  email: 'maria.rossi@example.com',
 };
 
 /** An error raised by the app's functions, as PostgREST returns it. */
@@ -111,6 +113,7 @@ const calls = [
         operationId: OPERATION_ID,
         name: 'Maria Rossi',
         phone: '333 000 0001',
+        email: ' Maria.Rossi@Example.com ',
         privacyConsent: true,
         notes: '',
       }),
@@ -120,6 +123,7 @@ const calls = [
         p_operation_id: OPERATION_ID,
         p_name: 'Maria Rossi',
         p_phone: '333 000 0001',
+        p_email: ' Maria.Rossi@Example.com ',
         p_privacy_consent: true,
         p_notes: '',
       },
@@ -130,10 +134,16 @@ const calls = [
   {
     name: 'update',
     run: () =>
-      supabaseCustomerService.update({ id: ID, name: 'Maria Rossi', phone: '', notes: 'Tavolo 4' }),
+      supabaseCustomerService.update({
+        id: ID,
+        name: 'Maria Rossi',
+        phone: '',
+        email: '',
+        notes: 'Tavolo 4',
+      }),
     rpc: [
       'update_customer',
-      { p_customer_id: ID, p_name: 'Maria Rossi', p_phone: '', p_notes: 'Tavolo 4' },
+      { p_customer_id: ID, p_name: 'Maria Rossi', p_phone: '', p_email: '', p_notes: 'Tavolo 4' },
     ],
     data: row,
     result: customer,
@@ -142,8 +152,8 @@ const calls = [
     name: 'anonymize',
     run: () => supabaseCustomerService.anonymize(ID),
     rpc: ['anonymize_customer', { p_customer_id: ID }],
-    data: { ...row, name: 'Cliente cancellato 6f1c2a5e', phone: null },
-    result: { ...customer, name: 'Cliente cancellato 6f1c2a5e', phone: null },
+    data: { ...row, name: 'Cliente cancellato 6f1c2a5e', phone: null, email: null },
+    result: { ...customer, name: 'Cliente cancellato 6f1c2a5e', phone: null, email: null },
   },
 ] as const;
 
@@ -215,6 +225,12 @@ describe.each(calls)('$name', ({ run, rpc, data, result }) => {
     expect((await customerError(run())).kind).toBe('unknown');
   });
 
+  it.each([42, undefined])('an email that is %s is unknown', async (email) => {
+    const bad = { ...row, email };
+    db.rpc.mockResolvedValue({ data: Array.isArray(data) ? [bad] : bad, error: null, status: 200 });
+    expect((await customerError(run())).kind).toBe('unknown');
+  });
+
   it.each(CUSTOMER_ERROR_CODES)('keeps the email out of a raised %s', async (code) => {
     db.rpc.mockResolvedValue(raised(code, 'maria.rossi@example.com'));
     const error = await customerError(run());
@@ -241,6 +257,7 @@ describe('customer_name_taken', () => {
         operationId: OPERATION_ID,
         name: 'maria rossi',
         phone: '',
+        email: '',
         privacyConsent: true,
         notes: '',
       }),
@@ -252,7 +269,13 @@ describe('customer_name_taken', () => {
   it('a detail that is not a uuid gives no id', async () => {
     db.rpc.mockResolvedValue(raised('customer_name_taken', 'not-an-id'));
     const error = await customerError(
-      supabaseCustomerService.update({ id: ID, name: 'Maria Rossi', phone: '', notes: '' }),
+      supabaseCustomerService.update({
+        id: ID,
+        name: 'Maria Rossi',
+        phone: '',
+        email: '',
+        notes: '',
+      }),
     );
     expect(error.kind).toBe('customer_name_taken');
     expect(error.existingCustomerId).toBeNull();
@@ -270,7 +293,13 @@ describe('customer_email_taken', () => {
   it('carries the id of the customer that has the email from the detail', async () => {
     db.rpc.mockResolvedValue(raised('customer_email_taken', OTHER_ID));
     const error = await customerError(
-      supabaseCustomerService.update({ id: ID, name: 'Maria Rossi', phone: '', notes: '' }),
+      supabaseCustomerService.update({
+        id: ID,
+        name: 'Maria Rossi',
+        phone: '',
+        email: '',
+        notes: '',
+      }),
     );
     expect(error.kind).toBe('customer_email_taken');
     expect(error.existingCustomerId).toBe(OTHER_ID);
@@ -305,6 +334,7 @@ describe('reads', () => {
           ...row,
           name: 'Cliente cancellato 6f1c2a5e',
           phone: null,
+          email: null,
           notes: null,
           anonymized_at: '2026-11-17T10:00:00+00:00',
           balance: 12,
@@ -318,6 +348,7 @@ describe('reads', () => {
       ...customer,
       name: 'Cliente cancellato 6f1c2a5e',
       phone: null,
+      email: null,
       anonymizedAt: '2026-11-17T10:00:00+00:00',
       balance: 12,
       lastServedAt: '2026-11-18T09:58:00+00:00',

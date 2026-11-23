@@ -15,6 +15,7 @@ const NETWORK_TEXT = 'Modifiche non salvate: controlla la connessione e riprova.
 const MARIA = fakeCustomer({
   name: 'Maria Rossi',
   phone: '+393331234521',
+  email: 'maria.rossi@example.com',
   notes: 'Preferisce il caffè d’orzo',
 });
 const LUCA = fakeCustomer({ name: 'Luca Bianchi', phone: '+447911123456', notes: null });
@@ -97,8 +98,11 @@ describe('EditCustomerPage: Modifica cliente', () => {
       id: MARIA.id,
       name: 'Maria Rossi',
       phone: '333 765 4321',
+      // Shown by the form from task 19 of customers-v2: until then the stored email goes back as is.
+      email: 'maria.rossi@example.com',
       notes: 'Preferisce il caffè d’orzo',
     });
+    expect(stored(customers, MARIA.id)?.email).toBe('maria.rossi@example.com');
     expect(await screen.findByText('Tel. 333 ••• 4321')).toBeInTheDocument();
   });
 

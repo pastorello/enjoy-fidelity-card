@@ -103,6 +103,7 @@ describe('createFakeLedgerService: purchases', () => {
       operationId: OP_4,
       name: 'Luca Bianchi',
       phone: '',
+      email: '',
       privacyConsent: true,
       notes: '',
     });

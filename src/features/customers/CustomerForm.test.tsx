@@ -12,6 +12,7 @@ const CONSENT = /Ha letto l’informativa privacy/;
 const valid: CustomerFormValues = {
   name: 'Maria Rossi',
   phone: '',
+  email: '',
   notes: '',
   privacyConsent: true,
 };
@@ -212,6 +213,7 @@ describe('CustomerForm', () => {
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'Maria Rossi',
       phone: '333 123 4521',
+      email: '',
       notes: 'Preferisce il caffè macchiato',
       privacyConsent: true,
     });

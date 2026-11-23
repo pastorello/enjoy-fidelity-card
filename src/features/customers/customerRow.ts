@@ -11,12 +11,13 @@ function isNullableString(value: unknown): value is string | null {
 export function toCustomerSummary(data: unknown): CustomerSummary | null {
   if (typeof data !== 'object' || data === null) return null;
   const row: Record<string, unknown> = { ...data };
-  const { id, name, phone, notes, balance } = row;
+  const { id, name, phone, email, notes, balance } = row;
   const { anonymized_at: anonymizedAt, last_served_at: lastServedAt } = row;
   if (
     typeof id !== 'string' ||
     typeof name !== 'string' ||
     !isNullableString(phone) ||
+    !isNullableString(email) ||
     !isNullableString(notes) ||
     !isNullableString(anonymizedAt) ||
     typeof balance !== 'number' ||
@@ -25,5 +26,5 @@ export function toCustomerSummary(data: unknown): CustomerSummary | null {
   ) {
     return null;
   }
-  return { id, name, phone, notes, anonymizedAt, balance, lastServedAt };
+  return { id, name, phone, email, notes, anonymizedAt, balance, lastServedAt };
 }

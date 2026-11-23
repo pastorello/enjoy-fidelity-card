@@ -81,6 +81,7 @@ const customerRow = {
   anonymized_at: null,
   balance: 0,
   last_served_at: null,
+  email: 'maria.rossi@example.com',
 };
 const customer: CustomerSummary = {
   id: CUSTOMER_ID,
@@ -90,6 +91,7 @@ const customer: CustomerSummary = {
   anonymizedAt: null,
   balance: 0,
   lastServedAt: null,
+  email: 'maria.rossi@example.com',
 };
 
 /** An error raised by the app's functions, as PostgREST returns it. */
@@ -188,6 +190,7 @@ const calls = [
         operationId: OPERATION_ID,
         name: 'Maria Rossi',
         phone: '',
+        email: '',
         privacyConsent: true,
         notes: '',
         uid: UID,
@@ -321,6 +324,7 @@ describe('arguments', () => {
           operationId: OPERATION_ID,
           name: 'Maria Rossi',
           phone: '333 000 0001',
+          email: 'Maria.Rossi@Example.com',
           privacyConsent: true,
           notes: 'Tavolo 4',
           uid: UID,
@@ -330,6 +334,7 @@ describe('arguments', () => {
         p_operation_id: OPERATION_ID,
         p_name: 'Maria Rossi',
         p_phone: '333 000 0001',
+        p_email: 'Maria.Rossi@Example.com',
         p_privacy_consent: true,
         p_notes: 'Tavolo 4',
         p_uid: UID,
@@ -474,6 +479,7 @@ describe('createCustomerWithCard', () => {
     operationId: OPERATION_ID,
     name: 'maria rossi',
     phone: '',
+    email: '',
     privacyConsent: true,
     notes: '',
     uid: UID,

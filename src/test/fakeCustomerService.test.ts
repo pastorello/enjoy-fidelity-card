@@ -12,6 +12,7 @@ function newCustomer(overrides: Partial<CreateCustomerInput> = {}): CreateCustom
     operationId: OP_1,
     name: 'Maria Rossi',
     phone: '',
+    email: '',
     privacyConsent: true,
     notes: '',
     ...overrides,
@@ -59,11 +60,11 @@ describe('createFakeCustomerService', () => {
 
     const other = await service.create(newCustomer({ operationId: OP_2, name: 'Luca Bianchi' }));
     await expect(
-      service.update({ id: other.id, name: 'NICOLO d’angelo', phone: '', notes: '' }),
+      service.update({ id: other.id, name: 'NICOLO d’angelo', phone: '', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_name_taken', existingCustomerId: existing.id });
     // Renaming a customer to another spelling of its own name is fine.
     await expect(
-      service.update({ id: existing.id, name: 'Nicolo D’Angelo', phone: '', notes: '' }),
+      service.update({ id: existing.id, name: 'Nicolo D’Angelo', phone: '', email: '', notes: '' }),
     ).resolves.toMatchObject({ name: 'Nicolo D’Angelo' });
   });
 
@@ -98,19 +99,24 @@ describe('createFakeCustomerService', () => {
     const { service } = createFakeCustomerService({ customers: [kept, erased] });
 
     await expect(
-      service.update({ id: kept.id, name: 'Anna Verdi', phone: ' ', notes: '' }),
+      service.update({ id: kept.id, name: 'Anna Verdi', phone: ' ', email: '', notes: '' }),
     ).resolves.toMatchObject({ phone: null, notes: null });
     await expect(
-      service.update({ id: erased.id, name: 'Nuovo', phone: '', notes: '' }),
+      service.update({ id: erased.id, name: 'Nuovo', phone: '', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_anonymized' });
     await expect(
-      service.update({ id: OP_2, name: 'Nuovo', phone: '', notes: '' }),
+      service.update({ id: OP_2, name: 'Nuovo', phone: '', email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_not_found' });
     await expect(service.get(OP_2)).resolves.toBeNull();
   });
 
   it('anonymize: admins only, clears the data, idempotent, gone from the list', async () => {
-    const customer = fakeCustomer({ name: 'Paolo Neri', phone: '+393331234521', notes: 'Note' });
+    const customer = fakeCustomer({
+      name: 'Paolo Neri',
+      phone: '+393331234521',
+      email: 'paolo.neri@example.com',
+      notes: 'Note',
+    });
     const operatorFake = createFakeCustomerService({ customers: [customer], role: 'operator' });
     await expect(operatorFake.service.anonymize(customer.id)).rejects.toMatchObject({
       kind: 'forbidden',
@@ -122,12 +128,109 @@ describe('createFakeCustomerService', () => {
       'Paolo Neri',
     ]);
     const erased = await service.anonymize(customer.id);
-    expect(erased).toMatchObject({ phone: null, notes: null });
+    expect(erased).toMatchObject({ phone: null, email: null, notes: null });
     expect(erased.name).toBe(`Cliente cancellato ${customer.id.slice(0, 8)}`);
     expect(erased.anonymizedAt).not.toBeNull();
     await expect(service.anonymize(customer.id)).resolves.toEqual(erased);
     await expect(service.list({ query: '', after: null }).then(names)).resolves.toEqual([]);
     await expect(service.get(customer.id)).resolves.toEqual(erased);
+  });
+
+  it('stores the email normalized, returns it everywhere and finds the customer by it', async () => {
+    const { service } = createFakeCustomerService();
+    const created = await service.create(newCustomer({ email: '\u00a0 Maria.Rossi@Example.COM ' }));
+
+    expect(created.email).toBe('maria.rossi@example.com');
+    await expect(service.get(created.id)).resolves.toMatchObject({
+      email: 'maria.rossi@example.com',
+    });
+    await expect(service.list({ query: 'rossi@exa', after: null }).then(names)).resolves.toEqual([
+      'Maria Rossi',
+    ]);
+    const without = await service.create(
+      newCustomer({ operationId: OP_2, name: 'Luca Bianchi', email: '   ' }),
+    );
+    expect(without.email).toBeNull();
+  });
+
+  it('refuses an invalid email after every other check, like the server', async () => {
+    const existing = fakeCustomer({ name: 'Anna Verdi' });
+    const { service, customers } = createFakeCustomerService({ customers: [existing] });
+    const kind = async (input: Partial<CreateCustomerInput>) => {
+      const error = await rejection(service.create(newCustomer(input)));
+      return error instanceof CustomerError ? error.kind : error;
+    };
+
+    const invalid = ['maria', 'a@b.c', 'maria@rossi', 'ma ria@example.com', 'a@@example.com'];
+    await expect(Promise.all(invalid.map((email) => kind({ email })))).resolves.toEqual(
+      invalid.map(() => 'email_invalid'),
+    );
+    expect(await kind({ email: `${'m'.repeat(243)}@example.com` })).toBe('email_invalid');
+    expect(await kind({ email: 'maria', privacyConsent: false })).toBe('consent_required');
+    expect(await kind({ email: 'maria', name: 'anna verdi' })).toBe('customer_name_taken');
+    expect(customers()).toHaveLength(1);
+    await expect(
+      service.update({ id: existing.id, name: 'Anna Verdi', phone: '', email: 'x@y', notes: '' }),
+    ).rejects.toMatchObject({ kind: 'email_invalid', existingCustomerId: null });
+  });
+
+  it('refuses an email already used with the id of the other customer, case aside', async () => {
+    const maria = fakeCustomer({ name: 'Maria Rossi', email: 'maria.rossi@example.com' });
+    const anna = fakeCustomer({ name: 'Anna Verdi', email: null });
+    const { service, customers } = createFakeCustomerService({ customers: [maria, anna] });
+
+    const error = await rejection(
+      service.create(newCustomer({ name: 'Luca Bianchi', email: 'MARIA.ROSSI@example.com' })),
+    );
+    expect(error).toBeInstanceOf(CustomerError);
+    expect(error).toMatchObject({ kind: 'customer_email_taken', existingCustomerId: maria.id });
+    expect(customers()).toHaveLength(2);
+    await expect(
+      service.update({
+        id: anna.id,
+        name: 'Anna Verdi',
+        phone: '',
+        email: ' maria.rossi@example.com',
+        notes: '',
+      }),
+    ).rejects.toMatchObject({ kind: 'customer_email_taken', existingCustomerId: maria.id });
+    // A name and an email both taken: only the name is reported (first check).
+    await expect(
+      service.create(newCustomer({ name: 'anna verdi', email: 'maria.rossi@example.com' })),
+    ).rejects.toMatchObject({ kind: 'customer_name_taken', existingCustomerId: anna.id });
+    // The customer's own email is not a conflict; a blank email removes it.
+    await expect(
+      service.update({
+        id: maria.id,
+        name: 'Maria Rossi',
+        phone: '',
+        email: 'Maria.Rossi@example.com',
+        notes: '',
+      }),
+    ).resolves.toMatchObject({ email: 'maria.rossi@example.com' });
+    await expect(
+      service.update({ id: maria.id, name: 'Maria Rossi', phone: '', email: ' ', notes: '' }),
+    ).resolves.toMatchObject({ email: null });
+    await expect(
+      service.update({
+        id: anna.id,
+        name: 'Anna Verdi',
+        phone: '',
+        email: 'maria.rossi@example.com',
+        notes: '',
+      }),
+    ).resolves.toMatchObject({ email: 'maria.rossi@example.com' });
+  });
+
+  it('anonymize clears the email and frees it for another customer', async () => {
+    const maria = fakeCustomer({ name: 'Maria Rossi', email: 'maria.rossi@example.com' });
+    const { service } = createFakeCustomerService({ customers: [maria] });
+
+    await expect(service.anonymize(maria.id)).resolves.toMatchObject({ email: null });
+    await expect(service.get(maria.id)).resolves.toMatchObject({ email: null });
+    await expect(
+      service.create(newCustomer({ name: 'Luca Bianchi', email: 'maria.rossi@example.com' })),
+    ).resolves.toMatchObject({ email: 'maria.rossi@example.com' });
   });
 
   it('network down: every call rejects with network and changes nothing', async () => {

@@ -7,6 +7,8 @@ export type CustomerSummary = {
   name: string;
   /** E.164 (`+393331234521`), or null. */
   phone: string | null;
+  /** Stored form (trimmed, lowercase, unique), or null; null for an anonymized customer. */
+  email: string | null;
   notes: string | null;
   /** When the data was erased on request (GDPR), or null. */
   anonymizedAt: string | null;
@@ -42,6 +44,8 @@ export type CreateCustomerInput = {
   name: string;
   /** As typed: the server normalizes it; blank means none. */
   phone: string;
+  /** As typed: the server normalizes it (`normalizeEmail`); blank means none. */
+  email: string;
   privacyConsent: boolean;
   /** Blank means none. */
   notes: string;
@@ -52,6 +56,8 @@ export type UpdateCustomerInput = {
   name: string;
   /** Blank removes the phone. */
   phone: string;
+  /** As typed; blank removes the email. */
+  email: string;
   notes: string;
 };
 

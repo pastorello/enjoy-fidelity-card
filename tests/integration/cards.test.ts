@@ -35,6 +35,7 @@ async function newCustomer(label: string): Promise<string> {
     operationId: randomUUID(),
     name: `Card ${label} ${SUFFIX}`,
     phone: '',
+    email: '',
     privacyConsent: true,
     notes: '',
   });

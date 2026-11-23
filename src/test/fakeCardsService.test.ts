@@ -28,6 +28,7 @@ function newCustomer(
     operationId: OP_1,
     name: 'Maria Rossi',
     phone: '',
+    email: '',
     privacyConsent: true,
     notes: '',
     uid: UID_1,
@@ -225,10 +226,15 @@ describe('createFakeCardsService: createCustomerWithCard', () => {
     const customers = createFakeCustomerService();
     const cards = createFakeCardsService({ customers });
     const created = await cards.service.createCustomerWithCard(
-      newCustomer({ phone: '333 1234521' }),
+      newCustomer({ phone: '333 1234521', email: ' Maria.Rossi@Example.com' }),
     );
 
-    expect(created).toMatchObject({ name: 'Maria Rossi', phone: '+393331234521', balance: 0 });
+    expect(created).toMatchObject({
+      name: 'Maria Rossi',
+      phone: '+393331234521',
+      email: 'maria.rossi@example.com',
+      balance: 0,
+    });
     await expect(customers.service.get(created.id)).resolves.toEqual(created);
     await expect(cards.service.lookup(UID_1)).resolves.toMatchObject({
       status: 'active',
@@ -273,6 +279,42 @@ describe('createFakeCardsService: createCustomerWithCard', () => {
     await expect(
       cards.service.createCustomerWithCard(newCustomer({ name: 'Luca Bianchi', uid: UID_2 })),
     ).resolves.toMatchObject({ name: 'Luca Bianchi' });
+  });
+});
+
+describe('createFakeCardsService: createCustomerWithCard with an email', () => {
+  it('email_invalid or customer_email_taken (with the other id) leave neither customer nor card', async () => {
+    const maria = fakeCustomer({ name: 'Maria Rossi', email: 'maria.rossi@example.com' });
+    const customers = createFakeCustomerService({ customers: [maria] });
+    const cards = createFakeCardsService({ customers });
+
+    await expect(
+      cards.service.createCustomerWithCard(newCustomer({ name: 'Luca Bianchi', email: 'luca@' })),
+    ).rejects.toMatchObject({ kind: 'email_invalid', existingCustomerId: null });
+    const taken = await rejection(
+      cards.service.createCustomerWithCard(
+        newCustomer({ name: 'Luca Bianchi', email: 'MARIA.rossi@example.com' }),
+      ),
+    );
+    expect(taken).toBeInstanceOf(CustomerError);
+    expect(taken).toMatchObject({ kind: 'customer_email_taken', existingCustomerId: maria.id });
+
+    expect(customers.customers()).toHaveLength(1);
+    expect(cards.cards()).toHaveLength(0);
+    await expect(cards.service.lookup(UID_1)).resolves.toEqual({ status: 'unknown' });
+  });
+
+  it('an email freed by the anonymization can be given to a new customer with a card', async () => {
+    const maria = fakeCustomer({ name: 'Maria Rossi', email: 'maria.rossi@example.com' });
+    const customers = createFakeCustomerService({ customers: [maria] });
+    const cards = createFakeCardsService({ customers });
+    await customers.service.anonymize(maria.id);
+
+    await expect(
+      cards.service.createCustomerWithCard(
+        newCustomer({ name: 'Luca Bianchi', email: 'maria.rossi@example.com' }),
+      ),
+    ).resolves.toMatchObject({ name: 'Luca Bianchi', email: 'maria.rossi@example.com' });
   });
 });
 

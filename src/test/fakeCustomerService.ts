@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { normalizeEmail } from '../features/customers/email';
 import { normalizePhone } from '../features/customers/phone';
 import { CUSTOMER_LIST_PAGE_SIZE, CustomerError } from '../features/customers/types';
 import type {
@@ -23,18 +24,19 @@ export type FakeFailure = CustomerErrorKind | 'lost' | Error;
 export type FakeCustomerCall = { method: Method; args: unknown[] };
 
 /**
- * A stored customer plus what only the list reads: when it was created (default: a fake clock,
- * one second after the previous customer, so later fixtures are newer), its last purchase or
- * redemption (default none) and its email (default none). ISO strings, as PostgREST sends them.
+ * A stored customer (its email, in the stored form, defaults to none) plus what only the list
+ * reads: when it was created (default: a fake clock, one second after the previous customer, so
+ * later fixtures are newer) and its last purchase or redemption (default none). ISO strings, as
+ * PostgREST sends them.
  */
-export type FakeCustomerFixture = CustomerSummary & {
+export type FakeCustomerFixture = Omit<CustomerSummary, 'email'> & {
+  email?: string | null;
   createdAt?: string;
   lastActivityAt?: string | null;
-  email?: string | null;
 };
 
 /** What the list reads besides the summary. */
-type ListFields = { createdAt: string; lastActivityAt: string | null; email: string | null };
+type ListFields = { createdAt: string; lastActivityAt: string | null };
 
 type FakeOptions = {
   customers?: FakeCustomerFixture[];
@@ -53,12 +55,15 @@ function fakeId(counter: number): string {
 }
 
 /** A customer as the server returns it, with a fresh id; for the `customers` option. */
-export function fakeCustomer(overrides: Partial<FakeCustomerFixture> = {}): FakeCustomerFixture {
+export function fakeCustomer(
+  overrides: Partial<FakeCustomerFixture> = {},
+): FakeCustomerFixture & CustomerSummary {
   nextFixture += 1;
   return {
     id: fakeId(900_000_000 + nextFixture),
     name: 'Cliente Prova',
     phone: null,
+    email: null,
     notes: null,
     anonymizedAt: null,
     balance: 0,
@@ -89,8 +94,8 @@ function copy(customer: CustomerSummary): CustomerSummary {
 
 /** The summary of a fixture, without the list-only fields. */
 function summaryOf(fixture: FakeCustomerFixture): CustomerSummary {
-  const { id, name, phone, notes, anonymizedAt, balance, lastServedAt } = fixture;
-  return { id, name, phone, notes, anonymizedAt, balance, lastServedAt };
+  const { id, name, phone, email = null, notes, anonymizedAt, balance, lastServedAt } = fixture;
+  return { id, name, phone, email, notes, anonymizedAt, balance, lastServedAt };
 }
 
 /** The fake clock of creation times: `2026-11-01T08:00:00` plus `tick` seconds, with microseconds. */
@@ -136,8 +141,14 @@ function nameMatches(name: string, words: string[]): boolean {
   return words.every((word) => key.includes(word));
 }
 
-/** The checks shared by create and update, in the server's order; returns the cleaned values. */
-function validate(input: { name: string; phone: string; notes: string }, consent = true) {
+/**
+ * The checks shared by create and update that come before the name's uniqueness, in the server's
+ * order; returns the cleaned values. The email is only normalized here: its checks come after.
+ */
+function validate(
+  input: { name: string; phone: string; email: string; notes: string },
+  consent = true,
+) {
   const name = cleanName(input.name);
   if (name === '') throw new CustomerError('name_required');
   if (Array.from(name).length > NAME_MAX) throw new CustomerError('name_too_long');
@@ -149,7 +160,7 @@ function validate(input: { name: string; phone: string; notes: string }, consent
   if (notes !== null && Array.from(notes).length > NOTES_MAX) {
     throw new CustomerError('notes_too_long');
   }
-  return { name, phone, notes };
+  return { name, phone, email: normalizeEmail(input.email), notes };
 }
 
 function perMethod<T>(make: () => T): Record<Method, T> {
@@ -164,7 +175,8 @@ function perMethod<T>(make: () => T): Record<Method, T> {
 
 /**
  * In-memory CustomerService for component tests, following the server's rules: the name is
- * unique on the same key as `customer_name_key`, `create` is idempotent on `operationId`, `list`
+ * unique on the same key as `customer_name_key`, the email is stored as `normalizeEmail` gives it
+ * and is unique (the anonymization frees it), `create` is idempotent on `operationId`, `list`
  * pages like `app.list_customers` (order, filter by name words or part of the email, cursor, 20 rows,
  * never anonymized customers). Every method is a
  * `vi.fn` and every call is also logged in `calls`. `failNext` programs a failure (also an
@@ -185,7 +197,6 @@ export function createFakeCustomerService({
         {
           createdAt: customer.createdAt ?? createdStamp(ticks),
           lastActivityAt: customer.lastActivityAt ?? null,
-          email: customer.email ?? null,
         },
       ];
     }),
@@ -205,6 +216,21 @@ export function createFakeCustomerService({
     return null;
   }
 
+  /**
+   * The checks after the name's uniqueness, as `private.check_email` and
+   * `private.raise_email_taken`: the format, then the customer (not `except`) that has it.
+   */
+  function checkEmail(email: string | null, except: string | null): string | null {
+    if (email === 'invalid') throw new CustomerError('email_invalid');
+    if (email === null) return null;
+    for (const customer of stored.values()) {
+      if (customer.id !== except && customer.email === email) {
+        throw new CustomerError('customer_email_taken', customer.id);
+      }
+    }
+    return email;
+  }
+
   /** The customer a create with this `operationId` made, or null. */
   function createdFor(operationId: string): CustomerSummary | null {
     const existing = stored.get(createdBy.get(operationId) ?? '');
@@ -216,15 +242,17 @@ export function createFakeCustomerService({
    * the customer: `fakeCardsService` runs the card checks in between, all or nothing.
    */
   function prepareCreate(input: CreateCustomerInput): () => CustomerSummary {
-    const { name, phone, notes } = validate(input, input.privacyConsent);
+    const { name, phone, email: typedEmail, notes } = validate(input, input.privacyConsent);
     const taken = takenBy(name, null);
     if (taken !== null) throw new CustomerError('customer_name_taken', taken);
+    const email = checkEmail(typedEmail, null);
     return () => {
       created += 1;
       const customer: CustomerSummary = {
         id: fakeId(created),
         name,
         phone,
+        email,
         notes,
         anonymizedAt: null,
         balance: 0,
@@ -232,11 +260,7 @@ export function createFakeCustomerService({
       };
       stored.set(customer.id, customer);
       ticks += 1;
-      listFields.set(customer.id, {
-        createdAt: createdStamp(ticks),
-        lastActivityAt: null,
-        email: null,
-      });
+      listFields.set(customer.id, { createdAt: createdStamp(ticks), lastActivityAt: null });
       createdBy.set(input.operationId, customer.id);
       return copy(customer);
     };
@@ -286,10 +310,10 @@ export function createFakeCustomerService({
       .filter((customer) => customer.anonymizedAt === null)
       .map((customer) => ({ customer, fields: fieldsOf(customer.id) }))
       .filter(
-        ({ customer, fields }) =>
+        ({ customer }) =>
           !filtered ||
           nameMatches(customer.name, words) ||
-          (fields.email?.includes(email) ?? false),
+          (customer.email?.includes(email) ?? false),
       )
       .map((entry) => ({ ...entry, key: listKey(entry.customer.id, entry.fields) }))
       .filter(({ key }) => bound === null || compareDesc(key, bound) > 0)
@@ -328,10 +352,11 @@ export function createFakeCustomerService({
         const customer = stored.get(input.id);
         if (!customer) throw new CustomerError('customer_not_found');
         if (customer.anonymizedAt !== null) throw new CustomerError('customer_anonymized');
-        const { name, phone, notes } = validate(input);
+        const { name, phone, email: typedEmail, notes } = validate(input);
         const taken = takenBy(name, customer.id);
         if (taken !== null) throw new CustomerError('customer_name_taken', taken);
-        Object.assign(customer, { name, phone, notes });
+        const email = checkEmail(typedEmail, customer.id);
+        Object.assign(customer, { name, phone, email, notes });
         return copy(customer);
       }),
     ),
@@ -344,10 +369,10 @@ export function createFakeCustomerService({
           Object.assign(customer, {
             name: `Cliente cancellato ${id.slice(0, 8)}`,
             phone: null,
+            email: null,
             notes: null,
             anonymizedAt: '2026-11-17T12:00:00.000Z',
           });
-          fieldsOf(id).email = null;
         }
         return copy(customer);
       }),

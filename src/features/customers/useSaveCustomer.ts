@@ -44,6 +44,7 @@ export function useSaveCustomer(via: SaveCustomerVia | null = null): SaveCustome
         operationId: operationId.current,
         name: values.name,
         phone: values.phone,
+        email: values.email,
         privacyConsent: values.privacyConsent,
         notes: values.notes,
       });

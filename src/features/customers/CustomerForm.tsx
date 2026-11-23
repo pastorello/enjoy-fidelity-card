@@ -11,6 +11,8 @@ import { PrivacyNoticeDialog } from './PrivacyNoticeDialog';
 export type CustomerFormValues = {
   name: string;
   phone: string;
+  /** As typed (blank: none). No field shows it until task 19: Modifica sends back the stored one. */
+  email: string;
   notes: string;
   privacyConsent: boolean;
 };
@@ -22,7 +24,13 @@ const NAME_MAX = 80;
 const NOTES_MAX = 500;
 const FIELD_ORDER: CustomerField[] = ['name', 'phone', 'email', 'consent', 'notes'];
 
-const EMPTY: CustomerFormValues = { name: '', phone: '', notes: '', privacyConsent: false };
+const EMPTY: CustomerFormValues = {
+  name: '',
+  phone: '',
+  email: '',
+  notes: '',
+  privacyConsent: false,
+};
 
 /** `private.clean_name`: inner whitespace runs (non-breaking spaces too) collapsed to one, trimmed. */
 function cleanName(name: string): string {

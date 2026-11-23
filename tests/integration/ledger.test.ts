@@ -53,6 +53,7 @@ async function newCustomer(label: string): Promise<string> {
       operationId: randomUUID(),
       name: `Ledger codici ${label} ${SUFFIX}`,
       phone: '',
+      email: '',
       privacyConsent: true,
       notes: '',
     }),

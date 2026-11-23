@@ -12,6 +12,7 @@ import { useCustomerSubmit } from './useCustomerSubmit';
 const VALUES: CustomerFormValues = {
   name: 'Giulia Bianchi',
   phone: '',
+  email: '',
   notes: '',
   privacyConsent: true,
 };

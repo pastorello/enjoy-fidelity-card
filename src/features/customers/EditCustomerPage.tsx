@@ -51,6 +51,7 @@ function EditForm({
         initialValues={{
           name: customer.name,
           phone: customer.phone === null ? '' : formatPhoneForEdit(customer.phone),
+          email: customer.email ?? '',
           notes: customer.notes ?? '',
         }}
         onSubmit={save}
