@@ -245,8 +245,10 @@ secure_password_change = false
 max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
-# Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# Number of seconds before the email OTP expires (defaults to 1 hour). 24 hours: the invite link of
+# the Operators screen (SPEC-operators Open Questions 7, decided 2026-11-23); it is also the life of
+# the recovery link of "Password dimenticata". Hosted projects: Auth "Email OTP Expiration" = 86400.
+otp_expiry = 86400
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]

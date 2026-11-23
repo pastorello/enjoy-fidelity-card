@@ -282,7 +282,7 @@ describe('operator-invites served locally: the real invite email (Mailpit)', () 
     expect(text).toContain(
       `${admin.name} ti ha invitato come amministratore dell’Enjoy Card, la fidelity card dell’Enjoy Bar.`,
     );
-    expect(text).toContain('il link vale un’ora e si usa una volta sola.');
+    expect(text).toContain('il link vale 24 ore e si usa una volta sola.');
     expect(message.html).not.toMatch(/<img\b/i);
 
     const link = new URL(linkHref(message.html, 'Scegli la password'));
@@ -412,6 +412,45 @@ async function invited(
 function statusOf(id: string): string {
   return runSql(`select status from private.operator_rows(:'id'::uuid);`, { id });
 }
+
+/** Ages the invite of `email` as if it had been sent `hours` ago. */
+function sentHoursAgo(email: string, hours: number) {
+  runSql(
+    `update auth.users
+     set confirmation_sent_at = now() - make_interval(hours => :'hours'::int),
+         invited_at = now() - make_interval(hours => :'hours'::int)
+     where lower(email) = lower(:'email');`,
+    { hours: String(hours), email },
+  );
+}
+
+// SPEC-operators Open Questions 7 (decided 2026-11-23): the invite link lasts 24 hours
+// (otp_expiry 86400, shared with the recovery link). Auth measures its age from confirmation_sent_at.
+describe('operator-invites served locally: the invite link lasts 24 hours', () => {
+  it('an invite opened 23 hours after it was sent still works', async () => {
+    const body = inviteBody('23-ore');
+    const { tokenHash } = await invited(body);
+    sentHoursAgo(body.email, 23);
+    const { data, error } = await memoryClient(local.url, local.publishableKey).auth.verifyOtp({
+      type: 'invite',
+      token_hash: tokenHash,
+    });
+    expect(error).toBeNull();
+    expect(data.user?.email).toBe(body.email);
+  });
+
+  it('an invite opened 25 hours after it was sent answers otp_expired', async () => {
+    const body = inviteBody('25-ore');
+    const { tokenHash } = await invited(body);
+    sentHoursAgo(body.email, 25);
+    const { data, error } = await memoryClient(local.url, local.publishableKey).auth.verifyOtp({
+      type: 'invite',
+      token_hash: tokenHash,
+    });
+    expect(error?.code).toBe('otp_expired');
+    expect(data.user).toBeNull();
+  });
+});
 
 describe('operator-invites served locally: resend and cancel for real (Mailpit)', () => {
   it('a resend: a new invite email, the old token answers otp_expired, the new one works', async () => {
