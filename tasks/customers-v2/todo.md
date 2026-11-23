@@ -378,8 +378,8 @@ nome o email»; `e2e/tablet-pin.spec.ts` rinomina il parametro in `operatorPhone
 percorso admin con email (crea con `'  Rossi@Example.COM '`, trova scrivendo «rossi@exa» e «maria rossi»,
 doppione rifiutato con «Apri la scheda», `rossi@` rifiutato, cancella i dati, l'email si riusa).
 **Accettazione:**
-- [ ] E2E (criteri 2, 3, 4) verde a 390×844
-- [ ] `grep` di `phone`/`telefono` in `src/`, `e2e/`: solo il senso di dispositivo
+- [x] E2E (criteri 2, 3, 4) verde a 390×844
+- [x] `grep` di `phone`/`telefono` in `src/`, `e2e/`: solo il senso di dispositivo
 **Verifica:** `npm test && npm run e2e`
 **Dipendenze:** 22 · **File:** src/features/customers/phone.ts (+test, eliminati),
 src/features/customers/errorCodes.ts (+test), src/app/dev/UiGallery.tsx, e2e/tablet-pin.spec.ts,
