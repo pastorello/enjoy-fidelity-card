@@ -127,7 +127,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 2: Colonna `email` (vincolo, indice unico) e `app.list_customers` a chiave
 - [x] Task 3: Piano di `list_customers` con 1 000 clienti e 20 000 movimenti (`explain` in pgTAP)
 - [x] Task 4: Card riformattate: colonne `released_*`, indice parziale `cards_uid_key`, ricerche per uid, `release_card`
-- [ ] Task 5: `get_card`, `reactivate_card` e riattivazione da Associa card solo per amministratori
+- [x] Task 5: `get_card`, `reactivate_card` e riattivazione da Associa card solo per amministratori
 - [ ] Task 6: `private.card_customer_for_token`, `card_points` riscritta, `public.card_rewards`
 - [ ] Task 7: Integrazione su HTTP e concorrenza delle RPC nuove
 

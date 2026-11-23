@@ -88,11 +88,11 @@ p_expected_active_card_id)` (`forbidden`, `card_not_found`, `card_released`, `cu
 `private.associate_card_to`: nel ramo "card disattivata dello stesso cliente" `forbidden` se non admin. I pgTAP
 esistenti che riattivano da Associa card usano l'admin.
 **Accettazione:**
-- [ ] pgTAP: matrice operatore / admin / cassiere admin / cassiere operatore per `reactivate_card` e per la
+- [x] pgTAP: matrice operatore / admin / cassiere admin / cassiere operatore per `reactivate_card` e per la
       riattivazione da `associate_card` (criterio 11)
-- [ ] pgTAP: scambio con `p_expected_active_card_id` giusto (l'altra si disattiva, una sola attiva, punti
+- [x] pgTAP: scambio con `p_expected_active_card_id` giusto (l'altra si disattiva, una sola attiva, punti
       invariati); sbagliato o `null` contro una card attiva → `active_card_changed`; riattivata senza link
-- [ ] pgTAP: `get_card` restituisce l'altra card attiva e il saldo; nessun messaggio o `detail` contiene uid
+- [x] pgTAP: `get_card` restituisce l'altra card attiva e il saldo; nessun messaggio o `detail` contiene uid
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 4 · **File:** supabase/migrations/*_cards_v2_release.sql, supabase/tests/cards_v2.test.sql,
 supabase/tests/cards.test.sql, supabase/tests/tablet_kiosk_access.test.sql · **Dimensione:** M
