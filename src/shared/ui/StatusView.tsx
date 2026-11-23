@@ -5,14 +5,16 @@ import styles from './StatusView.module.css';
 type StatusViewProps =
   | { kind: 'loading'; label?: string }
   | { kind: 'empty'; title: string; description?: string; icon?: IconName }
-  | {
+  | ({
       kind: 'error';
       title: string;
       description?: string;
       icon?: IconName;
-      onRetry: () => void;
-      retryLabel?: string;
-    };
+    } & (
+      | { onRetry: () => void; retryLabel?: string }
+      // No retry: the screen offers its own way out (a link home, in the footer).
+      | { onRetry?: undefined; retryLabel?: undefined }
+    ));
 
 /** Loading, empty and error states of a screen or a section. */
 export function StatusView(props: StatusViewProps) {
@@ -42,9 +44,11 @@ export function StatusView(props: StatusViewProps) {
         <h2 className={styles.title}>{props.title}</h2>
       </div>
       {props.description && <p className={styles.errorText}>{props.description}</p>}
-      <Button className={styles.retry} onClick={props.onRetry} block>
-        {props.retryLabel ?? 'Riprova'}
-      </Button>
+      {props.onRetry && (
+        <Button className={styles.retry} onClick={props.onRetry} block>
+          {props.retryLabel ?? 'Riprova'}
+        </Button>
+      )}
     </section>
   );
 }

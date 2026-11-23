@@ -450,9 +450,15 @@ test.describe('an operator', () => {
 
     // The page opened by hand: refused without asking the server for the card.
     await page.goto(`/card/${lostId}`);
+    const refusal = page.getByRole('alert');
     await expect(
-      page.getByText('Solo un amministratore può riattivare o riformattare una card.'),
+      refusal.getByText('Solo un amministratore può riattivare o riformattare una card.'),
     ).toBeVisible();
+    // The title wraps: its alert icon keeps its 24 px; the way home is a link, as on the other states.
+    const alertIcon = await refusal.locator('svg').first().boundingBox();
+    expect(alertIcon?.width).toBe(24);
+    await expect(refusal.getByRole('button')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Torna all’inizio' })).toHaveAttribute('href', '/');
     await expect(page.getByRole('button', { name: 'Riattiva la card' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Riformatta la card' })).toHaveCount(0);
     calls.stop();

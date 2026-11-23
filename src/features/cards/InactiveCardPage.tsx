@@ -572,17 +572,11 @@ function AdminView({ cardId }: { cardId: string }) {
 export function InactiveCardPage() {
   const { cardId = '' } = useParams();
   const { role } = useCurrentOperator();
-  const navigate = useNavigate();
 
   if (role !== 'admin') {
     return (
-      <Page>
-        <StatusView
-          kind="error"
-          title={OPERATOR_ONLY}
-          retryLabel="Torna all’inizio"
-          onRetry={() => void navigate('/')}
-        />
+      <Page action={homeLink}>
+        <StatusView kind="error" title={OPERATOR_ONLY} />
       </Page>
     );
   }

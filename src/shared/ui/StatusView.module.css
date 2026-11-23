@@ -59,6 +59,11 @@
   color: var(--color-danger-text);
 }
 
+/* A title wrapped on several lines must not squeeze its icon. */
+.errorHeading svg {
+  flex-shrink: 0;
+}
+
 .errorText {
   font-size: var(--type-body-size);
   line-height: var(--type-body-line-height);

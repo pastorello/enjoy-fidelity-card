@@ -329,7 +329,11 @@ describe('«Card non attiva» (/card/:cardId)', () => {
       expect(within(alert).getByRole('heading', { name: OPERATOR_ONLY })).toBeInTheDocument();
       expect(screen.queryByText(/Maria/)).toBeNull();
       expect(fixture.cards.service.getCard).not.toHaveBeenCalled();
-      await userEvent.click(within(alert).getByRole('button', { name: 'Torna all’inizio' }));
+      // The way home is the same link as on the other states, not a button inside the alert.
+      expect(within(alert).queryByRole('button')).toBeNull();
+      const home = screen.getByRole('link', { name: 'Torna all’inizio' });
+      expect(home).toHaveAttribute('href', '/');
+      await userEvent.click(home);
       await vi.waitFor(() => expect(router.state.location.pathname).toBe('/'));
     });
   });

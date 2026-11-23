@@ -36,6 +36,12 @@ describe('StatusView', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
+  it('error: without onRetry there is no button (the way out is elsewhere)', () => {
+    render(<StatusView kind="error" title="Solo per gli amministratori" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Solo per gli amministratori');
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
   it('error: the retry label can be specific', () => {
     render(<StatusView kind="error" title="Errore" onRetry={() => {}} retryLabel="Riprova +12" />);
     expect(screen.getByRole('button', { name: 'Riprova +12' })).toBeInTheDocument();
