@@ -329,9 +329,9 @@ src/features/customers/useUpdateCustomer.ts, src/features/customers/EditCustomer
 selezionabile, `overflow-wrap: anywhere`, nessun `mailto:`; `CustomerPage` senza «Tel. …»/«Senza telefono»;
 `AnonymizeSection`: «Nome, email e note si cancellano per sempre…» e testo della sezione DATI DEL CLIENTE.
 **Accettazione:**
-- [ ] Componenti: email o «Senza email»; nel DOM della scheda nessun link `mailto:` (criterio 4); anonimizzato
+- [x] Componenti: email o «Senza email»; nel DOM della scheda nessun link `mailto:` (criterio 4); anonimizzato
       invariato
-- [ ] Tablet (`CustomerPage.tablet.test.tsx`) verde; Impeccable pulito; confronto con Scheda cliente
+- [x] Tablet (`CustomerPage.tablet.test.tsx`) verde; Impeccable pulito; confronto con Scheda cliente
 **Verifica:** `npm test -- customers cards`
 **Dipendenze:** 18 · **File:** src/features/cards/CardSummary.tsx (+css, +test),
 src/features/customers/CustomerPage.tsx (+css, +test), src/features/customers/CustomerPage.tablet.test.tsx,
