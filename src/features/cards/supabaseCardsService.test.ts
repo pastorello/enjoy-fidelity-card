@@ -492,11 +492,22 @@ describe('createCustomerWithCard', () => {
     },
   );
 
-  it('sends no phone and drops the one of the transitional customer_summary', async () => {
-    answerWith({ data: { ...customerRow, phone: null }, error: null, status: 200 });
+  it('sends only its arguments and drops the attributes of customer_summary it does not know', async () => {
+    answerWith({ data: { ...customerRow, future_column: null }, error: null, status: 200 });
     const created = await supabaseCardsService.createCustomerWithCard(input);
-    expect(created).not.toHaveProperty('phone');
-    expect(db.rpc.mock.calls[0]?.[1]).not.toHaveProperty('p_phone');
+    expect(Object.keys(created).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'anonymizedAt',
+      'balance',
+      'email',
+      'id',
+      'lastServedAt',
+      'name',
+      'notes',
+    ]);
+    // Strict: no phone argument, not even left undefined (SPEC-customers-v2, point 1).
+    expect(
+      Object.keys(db.rpc.mock.calls[0]?.[1] ?? {}).toSorted((a, b) => a.localeCompare(b)),
+    ).toEqual(['p_email', 'p_name', 'p_notes', 'p_operation_id', 'p_privacy_consent', 'p_uid']);
   });
 
   it('customer_email_taken carries the customer that has the email', async () => {

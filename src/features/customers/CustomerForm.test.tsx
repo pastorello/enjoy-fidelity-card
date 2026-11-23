@@ -144,7 +144,7 @@ describe('CustomerForm', () => {
     expect(email).toHaveAttribute('placeholder', 'nome@esempio.it');
     expect(screen.getByText(HELP)).toBeInTheDocument();
     // The email takes the place of the phone: no phone field and no phone text.
-    expect(screen.queryByRole('textbox', { name: /Telefono/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('textbox')).toHaveLength(3);
     expect(document.body).not.toHaveTextContent(/telefono/i);
     expect(screen.getByRole('group', { name: 'PRIVACY' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: CONSENT })).not.toBeChecked();

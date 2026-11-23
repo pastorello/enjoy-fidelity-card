@@ -23,6 +23,13 @@ function raisedCodes(pattern: RegExp): string[] {
   return [...new Set(codes)].toSorted((a, b) => a.localeCompare(b));
 }
 
+/**
+ * Codes the app no longer translates although a migration still raises them: the customer phone
+ * (SPEC-customers-v2, point 1). The app sends no phone, so the server cannot raise it; the code
+ * leaves the migrations with task 25 and this list with task 26 (latest definition of each function).
+ */
+const RETIRED_CUSTOMER_CODES: ReadonlySet<string> = new Set(['phone_invalid']);
+
 const sorted = (codes: readonly string[]) => codes.toSorted((a, b) => a.localeCompare(b));
 
 describe('customer error codes', () => {
@@ -38,7 +45,7 @@ describe('customer error codes', () => {
       ),
     );
     const raised = raisedCodes(/_customers(_v2_[a-z0-9_]+)?\.sql$/).filter(
-      (code) => !cardOnly.has(code),
+      (code) => !cardOnly.has(code) && !RETIRED_CUSTOMER_CODES.has(code),
     );
     expect(raised).toEqual(expect.arrayContaining(['email_invalid', 'customer_email_taken']));
     expect(sorted(CUSTOMER_ERROR_CODES)).toEqual(raised);

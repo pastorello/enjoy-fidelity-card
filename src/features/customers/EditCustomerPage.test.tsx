@@ -61,7 +61,8 @@ describe('EditCustomerPage: Modifica cliente', () => {
     ).toHaveAttribute('href', `/clienti/${MARIA.id}`);
     // The stored email as it is (already lowercase).
     expect(screen.getByRole('textbox', { name: EMAIL })).toHaveValue('maria.rossi@example.com');
-    expect(screen.queryByRole('textbox', { name: /Telefono/ })).not.toBeInTheDocument();
+    // Name, email and notes, and no other field: no phone (SPEC-customers-v2, point 1).
+    expect(screen.getAllByRole('textbox')).toHaveLength(3);
     expect(screen.getByRole('textbox', { name: NOTES })).toHaveValue('Preferisce il caffè d’orzo');
     expect(screen.getByRole('button', { name: SAVE })).toBeInTheDocument();
   });

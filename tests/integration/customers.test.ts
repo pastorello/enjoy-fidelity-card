@@ -69,7 +69,16 @@ describe('operator', () => {
       privacyConsent: true,
       notes: '  ',
     });
-    expect(created).not.toHaveProperty('phone');
+    // Only the summary's fields: no phone (SPEC-customers-v2, point 1).
+    expect(Object.keys(created).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'anonymizedAt',
+      'balance',
+      'email',
+      'id',
+      'lastServedAt',
+      'name',
+      'notes',
+    ]);
     expect(created).toMatchObject({
       name,
       email: `nicolo.${SUFFIX}@example.com`,

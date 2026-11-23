@@ -120,6 +120,87 @@ test.describe('administrator', () => {
   });
 });
 
+test.describe('administrator, the email', () => {
+  // The email already used is refused by the server with a 400, shown under the email field.
+  test.use({ expectedRefusals: [/\/rest\/v1\/rpc\/create_customer$/] });
+
+  test('normalized, found by part of it, unique, freed by the erase (criteria 2, 3, 4)', async ({
+    page,
+  }) => {
+    // Unique to the run, so the suite passes again without `db:reset` and next to other tests.
+    const suffix = uniqueSuffix();
+    const name = `Maria Rossi ${suffix}`;
+    const other = `Mario Bianchi ${suffix}`;
+    const email = `rossi.${suffix}@example.com`;
+    await signIn(page, seedAccounts.admin.email);
+
+    // Criterion 2: typed with spaces and capitals, stored trimmed and lowercase.
+    await createCustomer(page, name, `  Rossi.${suffix}@Example.COM `);
+    const customerUrl = page.url();
+    await expect(page.getByRole('main').getByText(email, { exact: false })).toBeVisible();
+    await expect(page.locator('[href^="mailto:" i]')).toHaveCount(0);
+
+    // Criterion 4: found by part of the email, and by the words of the name.
+    await page.goto('/');
+    await search(page, `rossi.${suffix}@exa`);
+    await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
+    await expect(resultRow(page, name)).toBeVisible();
+    await expect(resultRow(page, name)).not.toContainText('@');
+    expect(new URL(page.url()).search).toBe('');
+    await search(page, `maria rossi ${suffix}`);
+    await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
+    await resultRow(page, name).click();
+    await expect(page).toHaveURL(customerUrl);
+
+    // Criterion 2: the same email in other capitals is refused, with «Apri la scheda» of the first.
+    await page.goto('/clienti/nuovo');
+    await page.getByLabel('Nome e cognome').fill(other);
+    await page.getByLabel('Email (facoltativa)').fill(`ROSSI.${suffix}@example.com`);
+    await page.getByText('Ha letto l’informativa privacy').click();
+    await page.getByRole('button', { name: 'Salva cliente' }).click();
+    await expect(page.getByText('Esiste già un cliente con questa email.')).toBeVisible();
+    await expect(page).toHaveURL('/clienti/nuovo');
+    const openExisting = page.getByRole('link', { name: 'Apri la scheda' });
+    await expect(openExisting).toHaveAttribute('href', new URL(customerUrl).pathname);
+
+    // An email without a domain is refused; without an email the customer is saved, like the
+    // customers of the seed with no email (two customers without one live together).
+    await page.getByLabel('Email (facoltativa)').fill('rossi@');
+    await page.getByRole('button', { name: 'Salva cliente' }).click();
+    await expect(page.getByText('Email non valida: controlla come è scritta.')).toBeVisible();
+    await expect(page).toHaveURL('/clienti/nuovo');
+    await page.getByLabel('Email (facoltativa)').fill('');
+    await page.getByRole('button', { name: 'Salva cliente' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: other })).toBeVisible();
+    await expect(page.getByText('Senza email')).toBeVisible();
+    const otherUrl = page.url();
+
+    // «Apri la scheda» led to the first customer; criterion 3: its data are erased.
+    await page.goto(customerUrl);
+    await page.getByRole('link', { name: 'Modifica cliente' }).click();
+    await page.getByRole('button', { name: 'Cancella i dati del cliente' }).click();
+    await page
+      .getByRole('dialog', { name: `Cancellare i dati di ${name}?` })
+      .getByRole('button', { name: 'Cancella i dati' })
+      .click();
+    await expect(page.getByText('Dati del cliente cancellati.')).toBeVisible();
+    await search(page, `rossi.${suffix}@exa`);
+    await expect(page.getByRole('heading', { name: 'Nessun cliente trovato' })).toBeVisible();
+
+    // At once another customer can save the same email.
+    await page.goto(otherUrl);
+    await page.getByRole('link', { name: 'Modifica cliente' }).click();
+    await page.getByLabel('Email (facoltativa)').fill(`  Rossi.${suffix}@Example.COM `);
+    await page.getByRole('button', { name: 'Salva modifiche' }).click();
+    await expect(page).toHaveURL(otherUrl);
+    await expect(page.getByRole('main').getByText(email, { exact: false })).toBeVisible();
+    await page.goto('/');
+    await search(page, `rossi.${suffix}@exa`);
+    await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
+    await expect(resultRow(page, other)).toBeVisible();
+  });
+});
+
 test('an operator creates a customer with only the name and the consent, and cannot erase data', async ({
   page,
 }) => {

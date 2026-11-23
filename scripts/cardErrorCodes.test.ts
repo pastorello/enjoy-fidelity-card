@@ -11,6 +11,12 @@ import { CARD_ERROR_CODES } from '../src/features/cards/supabaseCardsService';
 
 const MIGRATIONS = 'supabase/migrations';
 
+/**
+ * The customer phone's code (SPEC-customers-v2, point 1): still raised by the migrations, never by a
+ * call of the app, which sends no phone. It leaves the migrations with task 25, this list with task 26.
+ */
+const RETIRED_CUSTOMER_CODES: ReadonlySet<string> = new Set(['phone_invalid']);
+
 /** The message-codes the migrations ending in `suffix` raise with errcode P0001, sorted. */
 function raisedCodes(suffix: string): string[] {
   const files = readdirSync(MIGRATIONS).filter((name) => name.endsWith(suffix));
@@ -35,7 +41,9 @@ describe('card error codes', () => {
 
   it('translates every code app.create_customer can raise inside create_customer_with_card', () => {
     const translated = new Set<string>([...CARD_ERROR_CODES, ...CUSTOMER_ERROR_CODES]);
-    const untranslated = raisedCodes('_customers.sql').filter((code) => !translated.has(code));
+    const untranslated = raisedCodes('_customers.sql').filter(
+      (code) => !translated.has(code) && !RETIRED_CUSTOMER_CODES.has(code),
+    );
     expect(untranslated).toEqual([]);
   });
 });

@@ -11,7 +11,6 @@ describe('customer error codes', () => {
   it.each([
     ['name_required', 'Scrivi nome e cognome.'],
     ['name_too_long', 'Al massimo 80 caratteri.'],
-    ['phone_invalid', 'Numero non valido: scrivi solo le cifre, con o senza prefisso.'],
     ['consent_required', 'Serve il consenso privacy per registrare il cliente.'],
     ['notes_too_long', 'Al massimo 500 caratteri.'],
     ['customer_name_taken', 'Esiste già un cliente con questo nome.'],
@@ -34,7 +33,6 @@ describe('customer error codes', () => {
     ['customer_name_taken', 'name'],
     ['email_invalid', 'email'],
     ['customer_email_taken', 'email'],
-    ['phone_invalid', 'phone'],
     ['consent_required', 'consent'],
     ['notes_too_long', 'notes'],
     ['forbidden', null],
@@ -50,6 +48,22 @@ describe('customer error codes', () => {
     expect(pointing.toSorted((a, b) => a.localeCompare(b))).toEqual([
       'customer_email_taken',
       'customer_name_taken',
+    ]);
+  });
+
+  it('lists exactly these codes: none for the customer phone (SPEC-customers-v2, point 1)', () => {
+    expect(CUSTOMER_ERROR_CODES.toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'consent_required',
+      'customer_anonymized',
+      'customer_email_taken',
+      'customer_name_taken',
+      'customer_not_found',
+      'email_invalid',
+      'forbidden',
+      'name_required',
+      'name_too_long',
+      'not_operator',
+      'notes_too_long',
     ]);
   });
 

@@ -17,7 +17,7 @@ export type CustomerFormValues = {
 };
 
 /** The fields of the form, in their order (the server's `phone` is no longer one of them). */
-type FormField = Exclude<CustomerField, 'phone'>;
+type FormField = CustomerField;
 
 /** One message per wrong field, in the order of the form. */
 export type CustomerFormErrors = Partial<Record<FormField, string>>;
@@ -153,10 +153,9 @@ export function CustomerForm({
     notes: notesRef,
   };
 
-  // A new refusal of the server moves the focus to its field, like the checks of the app. The
-  // form sends no phone, so the server's `phone_invalid` cannot come back (it goes with task 24).
+  // A new refusal of the server moves the focus to its field, like the checks of the app.
   useEffect(() => {
-    if (!refusal || refusal.field === 'phone') return;
+    if (!refusal) return;
     const target = { name: nameRef, email: emailRef, consent: consentRef, notes: notesRef }[
       refusal.field
     ];
@@ -166,9 +165,7 @@ export function CustomerForm({
   // The app's own checks win; when they pass, the server's refusal of the last save is shown.
   const ownErrors = Object.keys(errors).length > 0;
   const shown: CustomerFormErrors =
-    !ownErrors && refusal?.kind === 'field' && refusal.field !== 'phone'
-      ? { [refusal.field]: refusal.text }
-      : errors;
+    !ownErrors && refusal?.kind === 'field' ? { [refusal.field]: refusal.text } : errors;
   const taken = !ownErrors && refusal?.kind === 'taken' ? refusal : null;
   const nameTaken = taken?.field === 'name' ? taken : null;
   const emailTaken = taken?.field === 'email' ? taken : null;

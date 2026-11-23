@@ -83,10 +83,10 @@ describe('CustomerPage: Scheda cliente', () => {
     expect(balanceBox()).toHaveTextContent('punti');
   });
 
-  it('no phone line any more: neither "Tel." nor "Senza telefono"', async () => {
+  it('no phone line any more under the name (SPEC-customers-v2, point 1)', async () => {
     renderCustomer(`/clienti/${MARIA.id}`);
     await screen.findByText(/· maria\.rossi@example\.com$/);
-    expect(screen.queryByText(/Tel\.|telefono/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tel\.|telefono/i)).not.toBeInTheDocument();
   });
 
   it('shows the loading state until the customer arrives', async () => {

@@ -85,7 +85,14 @@ describe('NewCustomerPage', () => {
       privacyConsent: true,
       notes: '',
     });
-    expect(input).not.toHaveProperty('phone');
+    // The form's fields and nothing else: no phone (SPEC-customers-v2, point 1).
+    expect(Object.keys(input ?? {}).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'email',
+      'name',
+      'notes',
+      'operationId',
+      'privacyConsent',
+    ]);
     expect(input?.operationId).toMatch(/^[0-9a-f-]{36}$/);
   });
 

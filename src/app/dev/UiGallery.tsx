@@ -28,7 +28,7 @@ const NFC_STATES: NfcStatus[] = [
 export function UiGallery() {
   const [search, setSearch] = useState('Rossi');
   const [name, setName] = useState('Maria Rossi');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [ratio, setRatio] = useState('1,00');
   const [threshold, setThreshold] = useState('15o');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -47,10 +47,10 @@ export function UiGallery() {
           CAMPI
         </h2>
         <SearchField
-          label="Cerca per nome o telefono"
+          label="Cerca per nome o email"
           value={search}
           onChange={setSearch}
-          placeholder="Es. Rossi o 4521"
+          placeholder="Es. Rossi o rossi@"
         />
         <TextField
           label="Nome e cognome"
@@ -59,11 +59,15 @@ export function UiGallery() {
           error="Esiste già Maria Rossi · Apri la scheda"
         />
         <TextField
-          label="Telefono"
-          type="tel"
-          value={phone}
-          onChange={setPhone}
-          hint="Facoltativo"
+          label="Email (facoltativa)"
+          type="email"
+          placeholder="nome@esempio.it"
+          value={email}
+          onChange={setEmail}
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          inputMode="email"
         />
         <TextField
           label="1 punto ogni"
@@ -86,19 +90,19 @@ export function UiGallery() {
 
       <section className={styles.section} aria-labelledby="g-list">
         <h2 id="g-list" className={styles.group}>
-          SERVITI OGGI
+          CLIENTI
         </h2>
         <ul className={styles.list}>
           <ListRow
             to="/dev/ui"
             title="Antonio Esposito"
-            subtitle="••• 0388 · 10:15"
+            subtitle="Oggi, 10:15"
             trailing={<PointsBadge points={45} />}
           />
           <ListRow
             to="/dev/ui"
             title="Lucia De Meo"
-            subtitle="Senza telefono · 09:58"
+            subtitle="Ieri, 18:30"
             trailing={<PointsBadge points={310} />}
           />
           <ListRow
@@ -136,7 +140,7 @@ export function UiGallery() {
         <StatusView
           kind="empty"
           title="Nessun cliente trovato"
-          description="Controlla come è scritto, o cerca con le ultime 4 cifre del telefono."
+          description="Controlla come è scritto, o cerca con l’email."
         />
         <StatusView
           kind="error"

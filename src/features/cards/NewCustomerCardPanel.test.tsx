@@ -200,9 +200,12 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo, card in the history state
       privacyConsent: true,
       notes: '',
     });
-    expect(fixture.cards.service.createCustomerWithCard.mock.calls[0]?.[0]).not.toHaveProperty(
-      'phone',
-    );
+    // The form's fields and the uid, nothing else: no phone (SPEC-customers-v2, point 1).
+    expect(
+      Object.keys(fixture.cards.service.createCustomerWithCard.mock.calls[0]?.[0] ?? {}).toSorted(
+        (a, b) => a.localeCompare(b),
+      ),
+    ).toEqual(['email', 'name', 'notes', 'operationId', 'privacyConsent', 'uid']);
     expect(fixture.cards.cards()).toMatchObject([
       { uid: UID, customerId: saved?.id, active: true },
     ]);

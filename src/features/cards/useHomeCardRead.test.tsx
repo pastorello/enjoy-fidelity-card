@@ -119,7 +119,7 @@ describe('useHomeCardRead: a card read on the home', () => {
     const alert = await within(cardPanel()).findByRole('alert');
     expect(alert).toHaveTextContent('Card disattivata');
     expect(alert).toHaveTextContent(
-      'Questa card non è più attiva: era di Maria Rossi. Cerca il cliente per nome o telefono.',
+      'Questa card non è più attiva: era di Maria Rossi. Cerca il cliente per nome o email.',
     );
     const open = within(cardPanel()).getByRole('link', { name: 'Apri la scheda di Maria' });
     expect(open).toHaveAttribute('href', `/clienti/${MARIA.id}`);

@@ -9,7 +9,6 @@ export const CUSTOMER_ERROR_CODES = [
   'forbidden',
   'name_required',
   'name_too_long',
-  'phone_invalid',
   'consent_required',
   'notes_too_long',
   'customer_name_taken',
@@ -22,7 +21,7 @@ export const CUSTOMER_ERROR_CODES = [
 export type CustomerErrorCode = (typeof CUSTOMER_ERROR_CODES)[number];
 
 /** The form field a code is shown under; null when it belongs to the whole page. */
-export type CustomerField = 'name' | 'phone' | 'email' | 'consent' | 'notes';
+export type CustomerField = 'name' | 'email' | 'consent' | 'notes';
 
 const ERRORS: Record<CustomerErrorCode, { text: string; field: CustomerField | null }> = {
   // identity's sign-in message: the app signs out and shows it on /accedi.
@@ -30,10 +29,6 @@ const ERRORS: Record<CustomerErrorCode, { text: string; field: CustomerField | n
   forbidden: { text: 'Solo un amministratore può cancellare i dati di un cliente.', field: null },
   name_required: { text: 'Scrivi nome e cognome.', field: 'name' },
   name_too_long: { text: 'Al massimo 80 caratteri.', field: 'name' },
-  phone_invalid: {
-    text: 'Numero non valido: scrivi solo le cifre, con o senza prefisso.',
-    field: 'phone',
-  },
   consent_required: {
     text: 'Serve il consenso privacy per registrare il cliente.',
     field: 'consent',

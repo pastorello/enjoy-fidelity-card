@@ -248,10 +248,11 @@ describe.each(calls)('$name', ({ run, rpc, data, result }) => {
     expect(error.message).not.toMatch(/Maria|example/i);
   });
 
-  it('sends no phone argument (SPEC-customers-v2, point 1)', async () => {
+  it('sends exactly its arguments, none for a phone (SPEC-customers-v2, point 1)', async () => {
     db.rpc.mockResolvedValue({ data, error: null, status: 200 });
     await run();
-    for (const [, args] of db.rpc.mock.calls) expect(args).not.toHaveProperty('p_phone');
+    // Strict: an extra argument left undefined would fail too.
+    expect(db.rpc.mock.calls).toStrictEqual([rpc]);
   });
 });
 
@@ -356,11 +357,10 @@ describe('reads', () => {
     });
   });
 
-  it('drops the phone the transitional customer_summary still carries (gone with task 25)', async () => {
-    db.rpc.mockResolvedValue({ data: [{ ...row, phone: null }], error: null, status: 200 });
+  it('drops the attributes of customer_summary it does not know', async () => {
+    db.rpc.mockResolvedValue({ data: [{ ...row, future_column: null }], error: null, status: 200 });
     const read = await supabaseCustomerService.get(ID);
-    expect(read).toEqual(customer);
-    expect(read).not.toHaveProperty('phone');
+    expect(read).toStrictEqual(customer);
   });
 
   it('a get answer that is not an array is unknown', async () => {

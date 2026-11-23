@@ -228,7 +228,16 @@ describe('createFakeCardsService: createCustomerWithCard', () => {
       newCustomer({ email: ' Maria.Rossi@Example.com' }),
     );
 
-    expect(created).not.toHaveProperty('phone');
+    // Only the summary's fields: no phone (SPEC-customers-v2, point 1).
+    expect(Object.keys(created).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'anonymizedAt',
+      'balance',
+      'email',
+      'id',
+      'lastServedAt',
+      'name',
+      'notes',
+    ]);
     expect(created).toMatchObject({
       name: 'Maria Rossi',
       email: 'maria.rossi@example.com',

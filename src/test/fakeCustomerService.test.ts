@@ -27,14 +27,17 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
   );
 }
 
+/** Every field of a customer summary, sorted: nothing else (no phone, SPEC-customers-v2 point 1). */
+const SUMMARY_FIELDS = ['anonymizedAt', 'balance', 'email', 'id', 'lastServedAt', 'name', 'notes'];
+
 describe('createFakeCustomerService', () => {
-  it('creates a customer that get and list then find, normalizing the name, without a phone', async () => {
+  it('creates a customer that get and list then find, normalizing the name, with only its fields', async () => {
     const { service } = createFakeCustomerService();
     const created = await service.create(
       newCustomer({ name: '  Maria   Rossi ', notes: '  Al banco ' }),
     );
 
-    expect(created).not.toHaveProperty('phone');
+    expect(Object.keys(created).toSorted((a, b) => a.localeCompare(b))).toEqual(SUMMARY_FIELDS);
     expect(created).toMatchObject({
       name: 'Maria Rossi',
       notes: 'Al banco',
@@ -126,7 +129,7 @@ describe('createFakeCustomerService', () => {
     ]);
     const erased = await service.anonymize(customer.id);
     expect(erased).toMatchObject({ email: null, notes: null });
-    expect(erased).not.toHaveProperty('phone');
+    expect(Object.keys(erased).toSorted((a, b) => a.localeCompare(b))).toEqual(SUMMARY_FIELDS);
     expect(erased.name).toBe(`Cliente cancellato ${customer.id.slice(0, 8)}`);
     expect(erased.anonymizedAt).not.toBeNull();
     await expect(service.anonymize(customer.id)).resolves.toEqual(erased);

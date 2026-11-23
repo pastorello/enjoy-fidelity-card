@@ -24,7 +24,7 @@ export function homeCardNotice(read: HomeCardRead): CardReadNotice | null {
     const name = firstName(read.customerName);
     return {
       title: 'Card disattivata',
-      text: `Questa card non è più attiva: era di ${read.customerName}. Cerca il cliente per nome o telefono.`,
+      text: `Questa card non è più attiva: era di ${read.customerName}. Cerca il cliente per nome o email.`,
       action: (
         <ButtonLink to={`/clienti/${read.customerId}`} variant="secondary" block>
           {/* One flex item: the button's gap must not widen the space before the name. */}
