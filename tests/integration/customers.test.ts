@@ -344,17 +344,22 @@ describe('concurrent saves', () => {
    * Inserts a customer in a transaction kept open for HOLD_SECONDS and resolves once the row is
    * inserted (the session is sleeping); `done` settles when it has committed.
    */
-  async function holdInsert(row: { id: string; name: string; operationId: string }) {
+  async function holdInsert(row: {
+    id: string;
+    name: string;
+    operationId: string;
+    email?: string;
+  }) {
     const marker = `race-${randomUUID()}`;
     const done = runSqlInBackground(
       `begin;
-       insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
-       values (:'id'::uuid, :'name', now(),
+       insert into app.customers (id, name, email, privacy_consent_at, created_by, create_operation_id)
+       values (:'id'::uuid, :'name', nullif(:'email', ''), now(),
                (select id from app.operators order by created_at limit 1),
                :'op'::uuid);
        select pg_sleep(${HOLD_SECONDS}) /* ${marker} */;
        commit;`,
-      { id: row.id, name: row.name, op: row.operationId },
+      { id: row.id, name: row.name, op: row.operationId, email: row.email ?? '' },
     );
     await vi.waitFor(
       () => {
@@ -456,6 +461,79 @@ describe('concurrent saves', () => {
     await expect(service.get(renamed.id)).resolves.toMatchObject({
       name: `Gara Rinomina ${SUFFIX}`,
     });
+  });
+
+  it('update: an email committed meanwhile is customer_email_taken with its id', async () => {
+    // Two customers without an email take, at the same moment, the email of a customer still being
+    // inserted: both pass the pre-check, wait on customers_email_key, then meet the unique_violation.
+    // One edit goes through the service, the other over plain HTTP to read the raw answer.
+    const [first, second] = await Promise.all(
+      ['Uno', 'Due'].map((word) =>
+        service.create({
+          operationId: randomUUID(),
+          name: `Gara Email Modifica ${word} ${SUFFIX}`,
+          email: '',
+          privacyConsent: true,
+          notes: '',
+        }),
+      ),
+    );
+    if (!first || !second) throw new Error('The customers to edit were not created');
+    toErase.push(first.id, second.id);
+    const email = `gara.upd.${SUFFIX}@example.com`;
+    const typed = `  GARA.UPD.${SUFFIX}@Example.com`;
+    const held = {
+      id: randomUUID(),
+      name: `Gara Email Presa ${SUFFIX}`,
+      operationId: randomUUID(),
+      email,
+    };
+    const { data } = await operatorClient.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error('No session for the operator');
+    const { done } = await holdInsert(held);
+    toErase.push(held.id);
+
+    const [viaService, raw] = await Promise.allSettled([
+      service.update({ id: first.id, name: first.name, email: typed, notes: '' }),
+      fetch(`${local.url}/rest/v1/rpc/update_customer`, {
+        method: 'POST',
+        headers: {
+          apikey: local.publishableKey,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Content-Profile': 'app',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          p_customer_id: second.id,
+          p_name: second.name,
+          p_email: typed,
+          p_notes: null,
+        }),
+      }).then(async (response) => ({ status: response.status, body: await response.text() })),
+    ]);
+    await done;
+
+    expect(viaService).toMatchObject({
+      status: 'rejected',
+      reason: { kind: 'customer_email_taken', existingCustomerId: held.id },
+    });
+    if (raw.status !== 'fulfilled') throw new Error('The raw update got no answer');
+    expect(raw.value.status).toBe(400);
+    expect(JSON.parse(raw.value.body)).toMatchObject({
+      code: 'P0001',
+      message: 'customer_email_taken',
+      details: held.id,
+    });
+    expect(raw.value.body.toLowerCase()).not.toContain(email);
+    // Neither edit was saved: both keep no email.
+    expect(
+      runSql(
+        `select count(*) from app.customers where id in (:'a'::uuid, :'b'::uuid) and email is null;`,
+        { a: first.id, b: second.id },
+      ),
+    ).toBe('2');
   });
 });
 
