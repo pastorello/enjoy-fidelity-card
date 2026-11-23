@@ -79,7 +79,7 @@ async function expectTouchTargets(page: Page, names: (string | RegExp)[]) {
   });
 }
 
-test('from the card to «Spesa registrata» in less than 10 s; after 10 s back to the home, with the customer in CLIENTI (criterion 3)', async ({
+test('from the card to «Spesa registrata» in less than 10 s; after 10 s back to the home, with the customer on top of CLIENTI (criterion 3)', async ({
   page,
   request,
 }) => {
@@ -125,8 +125,21 @@ test('from the card to «Spesa registrata» in less than 10 s; after 10 s back t
   const row = served.getByRole('link', { name: new RegExp(customer.name) });
   await expect(row).toBeVisible();
   await expect(row).toContainText(/Oggi, \d{2}:\d{2}/);
-  await expect(row).toContainText('12');
+  await expect(row).toContainText('12 punti');
   expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(48);
+  // On top of CLIENTI (SPEC-customers-v2 point 6). The other tests, in parallel on the same
+  // database, may serve a customer after this one: only those can stand above it, served today
+  // at the same minute or later.
+  const time = /Oggi, (\d{2}:\d{2})/.exec(await row.innerText())?.[1] ?? '';
+  const texts = await served.getByRole('link').allInnerTexts();
+  const position = texts.findIndex((text) => text.includes(customer.name));
+  expect(position, 'the customer in the first page of CLIENTI').toBeGreaterThanOrEqual(0);
+  for (const above of texts.slice(0, position)) {
+    const aboveTime = /Oggi, (\d{2}:\d{2})/.exec(above)?.[1] ?? '';
+    expect(aboveTime !== '' && aboveTime >= time, `served after ${customer.name}: ${above}`).toBe(
+      true,
+    );
+  }
 
   // One purchase of 12,50 € and 12 points, with the ratio in force saved on it.
   const movements = await movementsOf(request, customer.id);
