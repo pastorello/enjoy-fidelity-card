@@ -2,7 +2,8 @@ import type { Operator as OperatorBrief, Role } from '../identity/types';
 
 // Types of the Operators screen (SPEC-operators, "Code Style"). Every rule (who is an admin, the
 // last admin, oneself, devices) is checked on the server: these types only carry its answers. No
-// type here keeps a token, a password or a PIN.
+// type here keeps a token, a password or a PIN: the cashier's PIN of an admin action on the till
+// tablet is only an argument of the call that sends it (Open Questions 11).
 
 export type { OperatorBrief };
 
@@ -38,15 +39,24 @@ export type ListOperatorsResult =
   { status: 'ok'; operators: Operator[] } | { status: CommonFailure };
 
 /**
+ * The cashier's PIN of an admin action on the till tablet refused by the server, with the counter
+ * and the lock of /cassa: the attempts left before the lock, or the seconds the lock still lasts.
+ */
+export type PinRefusal =
+  { status: 'wrong-pin'; attemptsLeft: number } | { status: 'pin-locked'; lockSecondsLeft: number };
+
+/**
  * What a role change or a (de)activation ended with: 'last-admin' (EO001), 'self' (EO002),
- * 'no-account' (EO003, a removed profile), 'not-found' (P0002), 'admin-from-device' (EO005).
+ * 'no-account' (EO003, a removed profile), 'not-found' (P0002), 'admin-from-device' (EO005: on a
+ * device the PIN was missing), or the PIN refused.
  */
 export type OperatorChangeResult =
   | { status: 'ok'; operator: Operator }
   | {
       status:
         'last-admin' | 'self' | 'no-account' | 'not-found' | 'admin-from-device' | CommonFailure;
-    };
+    }
+  | PinRefusal;
 
 export type RoleResult = OperatorChangeResult;
 export type ActiveResult = OperatorChangeResult;
@@ -63,7 +73,8 @@ export type InviteResult =
         | 'admin-from-device'
         | CommonFailure;
     }
-  | { status: 'email-taken'; deactivated: boolean };
+  | { status: 'email-taken'; deactivated: boolean }
+  | PinRefusal;
 
 /** 'not-invited': the person accepted meanwhile, or is not active (EO004, 409 `not_invited`). */
 export type ResendResult =
@@ -88,10 +99,18 @@ export type InviteInput = {
 export type OperatorsService = {
   /** The people of the bar, in the server's order (alphabetical, deactivated and removed last). */
   list(): Promise<ListOperatorsResult>;
-  setRole(operatorId: string, role: Role): Promise<RoleResult>;
-  setActive(operatorId: string, active: boolean): Promise<ActiveResult>;
-  /** Sends the invite email; the same `operationId` twice sends one email at most. */
-  invite(input: InviteInput): Promise<InviteResult>;
+  /**
+   * `pin`: on the till tablet, the cashier's PIN typed again to name an admin (Open Questions 11);
+   * checked by the server with every change it comes with. Never given on the phone.
+   */
+  setRole(operatorId: string, role: Role, pin?: string): Promise<RoleResult>;
+  /** `pin`: as `setRole`, to reactivate a deactivated admin from the till tablet. */
+  setActive(operatorId: string, active: boolean, pin?: string): Promise<ActiveResult>;
+  /**
+   * Sends the invite email; the same `operationId` twice sends one email at most. `pin`: as
+   * `setRole`, to invite an admin from the till tablet; never kept with the operation.
+   */
+  invite(input: InviteInput, pin?: string): Promise<InviteResult>;
   /** Sends a new link to someone `invited`; the previous link stops working. */
   resendInvite(operatorId: string): Promise<ResendResult>;
   /** Deletes the account of someone `invited`: the link already sent stops working. */

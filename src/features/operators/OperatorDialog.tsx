@@ -5,12 +5,11 @@ import { Icon } from '../../shared/ui/Icon';
 import { NOT_IN_DISPLAY } from '../cards/customerName';
 import { useDevice } from '../identity/AuthProvider';
 import type { Role } from '../identity/types';
-import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
+import { AdminPinStep } from './AdminPinStep';
 import styles from './OperatorDialog.module.css';
 import { STATUS_LABEL } from './OperatorRow';
 import {
-  ADMIN_FROM_PHONE,
-  ADMIN_REACTIVATE_FROM_PHONE,
+  ADMIN_PIN_MISSING,
   GENERIC_ERROR,
   LAST_ADMIN_ERROR,
   RATE_LIMITED_ERROR,
@@ -19,9 +18,10 @@ import {
 } from './operatorTexts';
 import { RoleFieldset } from './RoleFieldset';
 import { useOperatorsService } from './OperatorsServiceProvider';
-import type { CancelInviteResult, Operator, ResendResult, RoleResult } from './types';
+import type { CancelInviteResult, Operator, PinRefusal, ResendResult, RoleResult } from './types';
 
-type RoleFailure = Exclude<RoleResult['status'], 'ok' | 'forbidden'>;
+/** The PIN refusals stay in the PIN step; every other failure goes back to the confirmation. */
+type RoleFailure = Exclude<RoleResult['status'], 'ok' | 'forbidden' | PinRefusal['status']>;
 type ResendFailure = Exclude<ResendResult['status'], 'resent' | 'forbidden'>;
 type CancelFailure = Exclude<CancelInviteResult['status'], 'cancelled' | 'forbidden'>;
 
@@ -29,7 +29,7 @@ type CancelFailure = Exclude<CancelInviteResult['status'], 'cancelled' | 'forbid
 const ROLE_ERROR: Record<RoleFailure, (name: string) => string> = {
   'last-admin': () => LAST_ADMIN_ERROR,
   self: () => SELF_ERROR,
-  'admin-from-device': () => ADMIN_FROM_PHONE,
+  'admin-from-device': () => ADMIN_PIN_MISSING,
   'no-account': () => GENERIC_ERROR,
   'not-found': () => GENERIC_ERROR,
   network: () => GENERIC_ERROR,
@@ -73,7 +73,8 @@ const CONFIRM = {
   },
 } as const;
 
-type Step = 'manage' | keyof typeof CONFIRM;
+/** `pin`: on the till tablet, "Rendi amministratore" asks the cashier's PIN (Open Questions 11). */
+type Step = 'manage' | keyof typeof CONFIRM | 'pin';
 type Action = 'role' | 'resend' | 'cancel';
 
 export type OperatorDialogProps = {
@@ -96,7 +97,9 @@ function describeOperator(operator: Operator): string {
  * The dialog "{nome}" of the Operators screen (SPEC-operators point 2, "Gestione della persona";
  * not in the wireframe): the email and the state; for active and invited people the "Ruolo" with
  * "Salva ruolo" and its second confirmation; for invited people "Reinvia invito" and "Annulla
- * invito" (second confirmation). One request at a time; errors stay in the dialog, which can try
+ * invito" (second confirmation). On a device (the till tablet) naming an admin asks, after the
+ * second confirmation, the cashier's PIN in the same dialog (Open Questions 11): the PIN goes with
+ * the change and is never kept. One request at a time; errors stay in the dialog, which can try
  * again. Mount it with a `key` per person: its choices start again each time it opens.
  */
 export function OperatorDialog({
@@ -107,8 +110,8 @@ export function OperatorDialog({
   onClose,
 }: OperatorDialogProps) {
   const service = useOperatorsService();
-  const tablet = useTabletLayout();
-  const onDevice = useDevice() !== null;
+  const device = useDevice();
+  const onDevice = device !== null;
   const [step, setStep] = useState<Step>('manage');
   const [role, setRole] = useState<Role>(operator.role);
   const [busy, setBusy] = useState<Action | null>(null);
@@ -128,8 +131,6 @@ export function OperatorDialog({
 
   const manageable = operator.status === 'active' || operator.status === 'invited';
   const invited = operator.status === 'invited';
-  // SPEC-operators point 2 and Open Questions 11: no admin is named from the till tablet.
-  const adminDisabled = (tablet || onDevice) && operator.role === 'operator';
 
   useEffect(() => {
     // The shell sets the first focus; this moves it between the steps.
@@ -137,8 +138,8 @@ export function OperatorDialog({
       if (returnTo.current === null) return;
       (returnTo.current === 'cancel' ? cancelRef : saveRef).current?.focus();
       returnTo.current = null;
-    } else if (step === 'cancel') {
-      // A dangerous action starts on the safe choice.
+    } else if (step === 'cancel' || step === 'pin') {
+      // A dangerous action starts on the safe choice; the PIN step too (the keys are for touch).
       closeRef.current?.focus();
     } else {
       confirmRef.current?.focus();
@@ -171,6 +172,15 @@ export function OperatorDialog({
     }
     sending.current = false;
     setBusy(null);
+    settle(result, success, errors, message);
+  }
+
+  function settle(
+    result: { status: string },
+    success: string,
+    errors: Record<string, (name: string) => string>,
+    message: string,
+  ) {
     if (result.status === success) {
       onDone(operator, message);
     } else if (result.status === 'forbidden') {
@@ -179,6 +189,29 @@ export function OperatorDialog({
       setError((errors[result.status] ?? (() => GENERIC_ERROR))(name));
       if (STALE.has(result.status)) onStale();
     }
+  }
+
+  /**
+   * The PIN step of "Rendi amministratore": a refused PIN stays there (PIN errato, the lock); any
+   * other answer is settled as without the PIN, its error back in the confirmation.
+   */
+  async function promoteWithPin(pin: string): Promise<PinRefusal | null> {
+    if (sending.current) return null;
+    sending.current = true;
+    setBusy('role');
+    setError(null);
+    let result: RoleResult;
+    try {
+      result = await service.setRole(operator.id, 'admin', pin);
+    } catch {
+      result = { status: 'unknown' };
+    }
+    sending.current = false;
+    setBusy(null);
+    if (result.status === 'wrong-pin' || result.status === 'pin-locked') return result;
+    if (result.status !== 'ok' && result.status !== 'forbidden') setStep('promote');
+    settle(result, 'ok', ROLE_ERROR, `${name} è ora amministratore.`);
+    return null;
   }
 
   function close() {
@@ -195,7 +228,16 @@ export function OperatorDialog({
   );
 
   let content;
-  if (step !== 'manage') {
+  if (step === 'pin') {
+    content = (
+      <AdminPinStep
+        question={`Per rendere ${name} amministratore dal tablet serve il tuo PIN.`}
+        cashierName={device?.cashier?.name ?? ''}
+        lockSeconds={device?.lockSecondsLeft ?? 0}
+        onPin={promoteWithPin}
+      />
+    );
+  } else if (step !== 'manage') {
     const texts = CONFIRM[step];
     content = (
       <>
@@ -208,7 +250,9 @@ export function OperatorDialog({
           busy={busy !== null}
           block
           onClick={() => {
-            if (step === 'cancel') {
+            if (step === 'promote' && onDevice) {
+              goTo('pin', returnTo.current);
+            } else if (step === 'cancel') {
               void run(
                 'cancel',
                 () => service.cancelInvite(operator.id),
@@ -234,13 +278,7 @@ export function OperatorDialog({
   } else if (manageable) {
     content = (
       <>
-        <RoleFieldset
-          name={radioName}
-          value={role}
-          onChange={setRole}
-          adminDisabled={adminDisabled}
-          note={adminDisabled ? ADMIN_FROM_PHONE : undefined}
-        />
+        <RoleFieldset name={radioName} value={role} onChange={setRole} />
         <Button
           ref={saveRef}
           block
@@ -288,18 +326,6 @@ export function OperatorDialog({
             </Button>
           </div>
         )}
-      </>
-    );
-  } else if (
-    operator.status === 'deactivated' &&
-    operator.role === 'admin' &&
-    (tablet || onDevice)
-  ) {
-    // Point 7: from the till a deactivated admin is not reactivated; the row has no "Riattiva".
-    content = (
-      <>
-        <p className={styles.note}>{ADMIN_REACTIVATE_FROM_PHONE}</p>
-        {alert}
       </>
     );
   } else {

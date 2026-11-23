@@ -10,14 +10,12 @@ export const LAST_ADMIN_ERROR =
 /** EO002: never expected, no action is offered on the own row. */
 export const SELF_ERROR = 'Non puoi cambiare il tuo account da qui.';
 
-/** EO005 and the note under Ruolo on the tablet. */
-export const ADMIN_FROM_PHONE = 'Un amministratore si nomina dal telefono.';
-
-/** EO005 of a reactivation, and the note of a deactivated admin on the tablet (point 7). */
-export const ADMIN_REACTIVATE_FROM_PHONE = 'Un amministratore si riattiva dal telefono.';
-
-/** The note under Ruolo of "Invita operatore" on the tablet (SPEC-operators point 3). */
-export const ADMIN_INVITE_FROM_PHONE = 'Un amministratore si invita dal telefono.';
+/**
+ * EO005 / 403 `admin_from_device`: on the till tablet an admin was invited, named or reactivated
+ * without the cashier's PIN (Open Questions 11). Never expected: the app always asks it there.
+ */
+export const ADMIN_PIN_MISSING =
+  'Dal tablet un amministratore si conferma con il tuo PIN: riprova.';
 
 /** EO004 / 409 `not_invited`. */
 export function notInvitedError(name: string): string {

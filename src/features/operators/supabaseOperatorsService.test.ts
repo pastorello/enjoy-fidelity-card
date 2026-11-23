@@ -233,6 +233,67 @@ describe('supabaseOperatorsService.setRole and setActive', () => {
   });
 });
 
+describe('supabaseOperatorsService.setRole and setActive with the cashier PIN (tablet)', () => {
+  it('sends the PIN to app.set_operator_role_with_pin and maps the profile of its answer', async () => {
+    answer(ok({ status: 'ok', operator: { ...ROW, role: 'admin' } }));
+    await expect(service.setRole(ID, 'admin', '2468')).resolves.toEqual({
+      status: 'ok',
+      operator: { ...OPERATOR, role: 'admin' },
+    });
+    expect(db.rpc).toHaveBeenCalledWith('set_operator_role_with_pin', {
+      p_operator_id: ID,
+      p_role: 'admin',
+      p_pin: '2468',
+    });
+  });
+
+  it('sends the PIN to app.set_operator_active_with_pin', async () => {
+    answer(ok({ status: 'ok', operator: ROW }));
+    await expect(service.setActive(ID, true, '2468')).resolves.toEqual({
+      status: 'ok',
+      operator: OPERATOR,
+    });
+    expect(db.rpc).toHaveBeenCalledWith('set_operator_active_with_pin', {
+      p_operator_id: ID,
+      p_active: true,
+      p_pin: '2468',
+    });
+  });
+
+  it('maps a wrong PIN and the lock of the till', async () => {
+    answer(ok({ status: 'wrong_pin', attempts_left: 3 }));
+    await expect(service.setRole(ID, 'admin', '0000')).resolves.toEqual({
+      status: 'wrong-pin',
+      attemptsLeft: 3,
+    });
+    answer(ok({ status: 'locked', lock_seconds_left: 241 }));
+    await expect(service.setActive(ID, true, '0000')).resolves.toEqual({
+      status: 'pin-locked',
+      lockSecondsLeft: 241,
+    });
+  });
+
+  it.each([
+    ['an unknown status', { status: 'maybe' }],
+    ['wrong_pin without a count', { status: 'wrong_pin' }],
+    ['locked with a negative count', { status: 'locked', lock_seconds_left: -1 }],
+    ['ok without a profile', { status: 'ok' }],
+    ['a list of rows', [ROW]],
+  ])('answers unknown on %s', async (_label, data) => {
+    answer(ok(data));
+    await expect(service.setRole(ID, 'admin', '2468')).resolves.toEqual({ status: 'unknown' });
+  });
+
+  it('maps the refusals of the RPC as without the PIN', async () => {
+    answer(pgError('EO005', 400));
+    await expect(service.setRole(ID, 'admin', '2468')).resolves.toEqual({
+      status: 'admin-from-device',
+    });
+    answer(pgError('42501', 403));
+    await expect(service.setActive(ID, true, '2468')).resolves.toEqual({ status: 'forbidden' });
+  });
+});
+
 describe('supabaseOperatorsService.invite', () => {
   const INPUT = {
     operationId: OPERATION,
@@ -292,6 +353,40 @@ describe('supabaseOperatorsService.invite', () => {
   ])('maps HTTP %i %j', async (status, body, expected) => {
     db.invoke.mockResolvedValue(httpError(status, body));
     await expect(service.invite(INPUT)).resolves.toEqual(expected);
+  });
+
+  it('adds the cashier PIN of the tablet to the body only when there is one', async () => {
+    db.invoke.mockResolvedValue(
+      invoked({ status: 'invited', operator: { id: ID, name: 'Invito Prova', role: 'admin' } }),
+    );
+    await service.invite({ ...INPUT, role: 'admin' }, '2468');
+    expect(db.invoke).toHaveBeenCalledWith('operator-invites', {
+      body: {
+        action: 'invite',
+        operation_id: OPERATION,
+        name: 'Invito Prova',
+        email: 'invito@example.com',
+        role: 'admin',
+        pin: '2468',
+      },
+      signal: anySignal,
+    });
+  });
+
+  it.each([
+    [
+      { error: 'wrong_pin', attempts_left: 2 },
+      { status: 'wrong-pin', attemptsLeft: 2 },
+    ],
+    [
+      { error: 'pin_locked', lock_seconds_left: 300 },
+      { status: 'pin-locked', lockSecondsLeft: 300 },
+    ],
+    [{ error: 'wrong_pin' }, { status: 'unknown' }],
+    [{ error: 'pin_locked', lock_seconds_left: 'soon' }, { status: 'unknown' }],
+  ])('maps 403 %j for the PIN of the tablet', async (body, expected) => {
+    db.invoke.mockResolvedValue(httpError(403, body));
+    await expect(service.invite({ ...INPUT, role: 'admin' }, '0000')).resolves.toEqual(expected);
   });
 
   it('answers network when the request never reached the function', async () => {

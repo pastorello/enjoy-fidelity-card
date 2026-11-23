@@ -21,7 +21,7 @@ const LAST_ADMIN_TEXT =
 const NOT_INVITED_TEXT = 'Marco Prova ha già accettato l’invito o non è attivo: ricarica l’elenco.';
 const RATE_LIMITED_TEXT =
   'Troppe email inviate in poco tempo: l’invito non è partito. Riprova tra qualche minuto.';
-const FROM_PHONE_TEXT = 'Un amministratore si nomina dal telefono.';
+const PIN_MISSING_TEXT = 'Dal tablet un amministratore si conferma con il tuo PIN: riprova.';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -69,6 +69,18 @@ function renderPage(fake: ReturnType<typeof createFakeOperatorsService>, auth = 
     fake,
   );
   return { auth };
+}
+
+/** Taps the PIN on the keypad of the PIN step, one digit after the other. */
+async function typePin(dialog: HTMLElement, pin: string) {
+  const keypad = within(dialog).getByRole('group', { name: 'Tastierino PIN' });
+  await pin
+    .split('')
+    .reduce<Promise<void>>(
+      (previous, digit) =>
+        previous.then(() => userEvent.click(within(keypad).getByRole('button', { name: digit }))),
+      Promise.resolve(),
+    );
 }
 
 async function findList() {
@@ -282,7 +294,7 @@ describe('OperatorDialog: the role', () => {
 
   it.each([
     ['self', 'Non puoi cambiare il tuo account da qui.'],
-    ['admin-from-device', FROM_PHONE_TEXT],
+    ['admin-from-device', PIN_MISSING_TEXT],
     ['network', GENERIC_TEXT],
     ['unknown', GENERIC_TEXT],
   ] as const)('%s: the text in the dialog, nothing reloaded', async (failure, text) => {
@@ -355,23 +367,53 @@ describe('OperatorDialog: the role', () => {
     expect(within(dialog).getByRole('radio', { name: 'Operatore' })).toBeChecked();
   });
 
-  it('tablet layout: "Amministratore" disabled for an operator, with the note', async () => {
+  it('tablet layout of a phone account: an admin is named without any PIN', async () => {
     stubLayout(true);
-    const { fake } = setup();
+    const { fake, idOf } = setup();
     renderPage(fake);
-    let dialog = await openPerson('Luca Prova');
-    const admin = within(dialog).getByRole('radio', { name: 'Amministratore' });
-    expect(admin).toBeDisabled();
-    expect(roleGroup(dialog)).toHaveAccessibleDescription(FROM_PHONE_TEXT);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Chiudi' }));
-    // An admin can still be demoted from the tablet.
-    dialog = await openPerson('Andrea Prova');
-    expect(within(dialog).getByRole('radio', { name: 'Operatore' })).toBeEnabled();
-    expect(within(dialog).getByRole('radio', { name: 'Amministratore' })).toBeEnabled();
-    expect(within(dialog).queryByText(FROM_PHONE_TEXT)).toBeNull();
+    const dialog = await openPerson('Luca Prova');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Amministratore' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salva ruolo' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rendi amministratore' }));
+    await waitFor(() => expect(messages()).toHaveTextContent('Luca Prova è ora amministratore.'));
+    expect(fake.service.setRole).toHaveBeenCalledExactlyOnceWith(idOf('Luca Prova'), 'admin');
   });
 
-  it('a device with an admin cashier: "Amministratore" disabled even without the tablet layout', async () => {
+  it('a device with an admin cashier: "Rendi amministratore" asks the PIN, even without the tablet layout', async () => {
+    const operators = team();
+    const giulia = operators[0];
+    const { fake, idOf } = setup(operators, { onDevice: true });
+    renderPage(
+      fake,
+      signedInFake({
+        device: fakeDevice,
+        cashier: { id: giulia?.id ?? '', name: 'Giulia Prova', role: 'admin' },
+      }),
+    );
+    const dialog = await openPerson('Luca Prova');
+    expect(within(dialog).getByRole('radio', { name: 'Amministratore' })).toBeEnabled();
+    expect(roleGroup(dialog)).not.toHaveAccessibleDescription();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Amministratore' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salva ruolo' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rendi amministratore' }));
+    expect(
+      within(dialog).getByText(
+        'Per rendere Luca Prova amministratore dal tablet serve il tuo PIN.',
+      ),
+    ).toBeVisible();
+    expect(within(dialog).getByRole('heading', { name: 'PIN di Giulia Prova' })).toBeVisible();
+    expect(fake.service.setRole).not.toHaveBeenCalled();
+    await typePin(dialog, '1234');
+    await waitFor(() => expect(messages()).toHaveTextContent('Luca Prova è ora amministratore.'));
+    expect(fake.service.setRole).toHaveBeenCalledExactlyOnceWith(
+      idOf('Luca Prova'),
+      'admin',
+      '1234',
+    );
+    expect(JSON.stringify(fake.calls)).not.toContain('1234');
+  });
+
+  it('on a device a wrong PIN stays in the PIN step; "Lascia com’è" goes back to the person', async () => {
     const operators = team();
     const giulia = operators[0];
     const { fake } = setup(operators, { onDevice: true });
@@ -383,8 +425,38 @@ describe('OperatorDialog: the role', () => {
       }),
     );
     const dialog = await openPerson('Luca Prova');
-    expect(within(dialog).getByRole('radio', { name: 'Amministratore' })).toBeDisabled();
-    expect(within(dialog).getByText(FROM_PHONE_TEXT)).toBeVisible();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Amministratore' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salva ruolo' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rendi amministratore' }));
+    await typePin(dialog, '9999');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'PIN errato. Tentativi rimasti: 4',
+    );
+    expect(fake.operators().find((o) => o.name === 'Luca Prova')?.role).toBe('operator');
+    expect(messages()).toBeEmptyDOMElement();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    expect(within(dialog).getByRole('button', { name: 'Salva ruolo' })).toHaveFocus();
+  });
+
+  it('on a device another failure after the PIN goes back to the confirmation with its text', async () => {
+    const operators = team();
+    const giulia = operators[0];
+    const { fake } = setup(operators, { onDevice: true });
+    renderPage(
+      fake,
+      signedInFake({
+        device: fakeDevice,
+        cashier: { id: giulia?.id ?? '', name: 'Giulia Prova', role: 'admin' },
+      }),
+    );
+    const dialog = await openPerson('Luca Prova');
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Amministratore' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Salva ruolo' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Rendi amministratore' }));
+    fake.failNext('setRole', 'network');
+    await typePin(dialog, '1234');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(GENERIC_TEXT);
+    expect(within(dialog).getByRole('button', { name: 'Rendi amministratore' })).toBeVisible();
   });
 
   it('phone layout: "Amministratore" enabled, no note', async () => {
@@ -392,7 +464,7 @@ describe('OperatorDialog: the role', () => {
     renderPage(fake);
     const dialog = await openPerson('Luca Prova');
     expect(within(dialog).getByRole('radio', { name: 'Amministratore' })).toBeEnabled();
-    expect(within(dialog).queryByText(FROM_PHONE_TEXT)).toBeNull();
+    expect(roleGroup(dialog)).not.toHaveAccessibleDescription();
   });
 });
 

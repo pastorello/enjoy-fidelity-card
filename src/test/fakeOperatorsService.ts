@@ -9,6 +9,7 @@ import type {
   OperatorChangeResult,
   OperatorStatus,
   OperatorsService,
+  PinRefusal,
   ResendResult,
 } from '../features/operators/types';
 
@@ -28,8 +29,11 @@ type FailureOf<M extends Method> = Exclude<
  */
 export type FakeOperatorsFailure<M extends Method = Method> = FailureOf<M> | 'lost' | Error;
 
-/** One logged call: the method and the arguments it received (fake emails only). */
-export type FakeOperatorsCall = { method: Method; args: unknown[] };
+/**
+ * One logged call: the method and the arguments it received (fake emails only). The cashier's PIN
+ * is never logged: `withPin` only says that one came with the call.
+ */
+export type FakeOperatorsCall = { method: Method; args: unknown[]; withPin?: true };
 
 /** An email Auth would have sent: an invite, or a recovery link once the email is confirmed. */
 export type FakeOperatorsEmail = {
@@ -57,7 +61,10 @@ export type FakeOperator = {
 type Caller = {
   /** `acting_operator_id()`: the account on the phone, the cashier on a device (null: none). */
   actingId?: string | null;
-  /** A tablet: `current_device_id()` is not null (no admin is named from there). */
+  /**
+   * A tablet: `current_device_id()` is not null. An admin is invited, named or reactivated from
+   * there only with the cashier's PIN (Open Questions 11).
+   */
   onDevice?: boolean;
 };
 
@@ -66,7 +73,13 @@ type FakeOptions = Caller & {
   operators?: FakeOperator[];
   /** Emails of device accounts (`email_is_device`). */
   deviceEmails?: string[];
+  /** The PIN of the cashier on a device (fake): `1234` when missing. */
+  cashierPin?: string;
 };
+
+/** The wrong PINs in a row that lock the till, and for how long (`unlock_cashier`). */
+const PIN_ATTEMPTS = 5;
+const PIN_LOCK_SECONDS = 300;
 
 const NAME_MAX = 60;
 const EMAIL_MAX = 254;
@@ -143,6 +156,13 @@ const CHANGE = [
   'admin-from-device',
 ] as const;
 
+/** A programmed PIN refusal: 4 attempts left, or a lock of 5 minutes. */
+function pinRefused(status: AnyFailure): PinRefusal | null {
+  if (status === 'wrong-pin') return { status, attemptsLeft: PIN_ATTEMPTS - 1 };
+  if (status === 'pin-locked') return { status, lockSecondsLeft: PIN_LOCK_SECONDS };
+  return null;
+}
+
 /** `status` when `allowed` has it, `unknown` otherwise (never happens: failures are typed by method). */
 function pick<S extends string>(allowed: readonly S[], status: string, fallback: S): S {
   return allowed.find((candidate) => candidate === status) ?? fallback;
@@ -151,10 +171,11 @@ function pick<S extends string>(allowed: readonly S[], status: string, fallback:
 /** How each method answers a failure status (a refusal of the server, or a programmed one). */
 const REFUSED: { [M in Method]: (status: AnyFailure) => ResultOf<M> } = {
   list: (status) => ({ status: pick(COMMON, status, 'unknown') }),
-  setRole: (status) => ({ status: pick(CHANGE, status, 'unknown') }),
-  setActive: (status) => ({ status: pick(CHANGE, status, 'unknown') }),
+  setRole: (status) => pinRefused(status) ?? { status: pick(CHANGE, status, 'unknown') },
+  setActive: (status) => pinRefused(status) ?? { status: pick(CHANGE, status, 'unknown') },
   invite: (status) =>
-    status === 'email-taken'
+    pinRefused(status) ??
+    (status === 'email-taken'
       ? { status, deactivated: false }
       : {
           status: pick(
@@ -169,7 +190,7 @@ const REFUSED: { [M in Method]: (status: AnyFailure) => ResultOf<M> } = {
             status,
             'unknown',
           ),
-        },
+        }),
   resendInvite: (status) => ({
     status: pick([...COMMON, 'not-invited', 'self', 'rate-limited'] as const, status, 'unknown'),
   }),
@@ -192,8 +213,9 @@ type Reservation = {
  * operator-invites function: statuses computed as `list_operators` (`invited` until the email is
  * confirmed and a password is set), the same order, `is_admin()` for the caller (an active admin,
  * or an admin cashier on a device), the checks of `lock_operator_target` in order (forbidden,
- * not-found, self, no-account), `admin-from-device` for a role or an invite of an admin from a
- * device, the last-admin rule (another active admin with an accepted invite), invites idempotent
+ * not-found, self, no-account), on a device the cashier's PIN for inviting, naming or reactivating
+ * an admin (`admin-from-device` without it; `wrong-pin` and, at the 5th in a row, `pin-locked` of
+ * 300 s, until `endPinLock`; never logged), the last-admin rule (another active admin with an accepted invite), invites idempotent
  * on `operationId` (the same id with other fields is `unknown`, like 22023), taken name, taken
  * email (`deactivated`), device email, relink of a removed profile with the same name, resend and
  * cancel only for `invited` (`not-invited` also for an unknown id, as the function), cancel
@@ -208,6 +230,7 @@ export function createFakeOperatorsService({
   actingId,
   onDevice = false,
   deviceEmails = [],
+  cashierPin = '1234',
 }: FakeOptions = {}) {
   const seed = initial ?? [
     fakeOperator({ name: 'Giulia Prova', role: 'admin' }),
@@ -222,6 +245,9 @@ export function createFakeOperatorsService({
     onDevice,
   };
   let networkDown = false;
+  // The counter and the lock of the device, shared by every PIN check (`check_cashier_pin`).
+  let wrongPins = 0;
+  let lockSeconds = 0;
   const failures = perMethod<FakeOperatorsFailure[]>(() => []);
   const holds = perMethod<Promise<void>[]>(() => []);
   const calls: FakeOperatorsCall[] = [];
@@ -277,7 +303,30 @@ export function createFakeOperatorsService({
     return operator;
   }
 
-  function invite(input: InviteInput): InviteResult {
+  /**
+   * `private.check_cashier_pin`: null when the cashier's PIN is right (the counter starts again),
+   * otherwise the refusal, counted. A phone session never sends a PIN (22023: unknown); a device
+   * without one is `admin-from-device` (EO005).
+   */
+  function checkPin(pin: string | undefined): PinRefusal | null {
+    if (!caller.onDevice) throw new Refusal('unknown');
+    if (pin === undefined) throw new Refusal('admin-from-device');
+    if (!/^[0-9]{4}$/.test(pin)) throw new Refusal('unknown');
+    if (lockSeconds > 0) return { status: 'pin-locked', lockSecondsLeft: lockSeconds };
+    if (pin === cashierPin) {
+      wrongPins = 0;
+      return null;
+    }
+    wrongPins += 1;
+    if (wrongPins >= PIN_ATTEMPTS) {
+      wrongPins = 0;
+      lockSeconds = PIN_LOCK_SECONDS;
+      return { status: 'pin-locked', lockSecondsLeft: lockSeconds };
+    }
+    return { status: 'wrong-pin', attemptsLeft: PIN_ATTEMPTS - wrongPins };
+  }
+
+  function invite(input: InviteInput, pin: string | undefined): InviteResult {
     const acting = requireAdmin();
     const name = cleanName(input.name);
     const email = input.email.trim().toLowerCase();
@@ -285,7 +334,10 @@ export function createFakeOperatorsService({
     if (nameLength < 1 || nameLength > NAME_MAX || email.length > EMAIL_MAX || !EMAIL.test(email)) {
       throw new Refusal('unknown');
     }
-    if (input.role === 'admin' && caller.onDevice) throw new Refusal('admin-from-device');
+    if (pin !== undefined || (input.role === 'admin' && caller.onDevice)) {
+      const refused = checkPin(pin);
+      if (refused) return refused;
+    }
 
     const reserved = reservations.get(input.operationId);
     if (reserved) {
@@ -359,8 +411,9 @@ export function createFakeOperatorsService({
     method: M,
     args: unknown[],
     compute: () => ResultOf<M>,
+    withPin = false,
   ): Promise<ResultOf<M>> {
-    calls.push({ method, args });
+    calls.push({ method, args, ...(withPin ? { withPin: true as const } : {}) });
     const failure = failures[method].shift();
     const hold = holds[method].shift();
     const down = networkDown;
@@ -382,9 +435,14 @@ export function createFakeOperatorsService({
     return hold ? hold.then(answer) : answer();
   }
 
-  function setRole(operatorId: string, role: Role): OperatorChangeResult {
+  function setRole(operatorId: string, role: Role, pin: string | undefined): OperatorChangeResult {
     const operator = target(operatorId);
-    if (role === 'admin' && caller.onDevice) throw new Refusal('admin-from-device');
+    if (pin !== undefined) {
+      const refused = checkPin(pin);
+      if (refused) return refused;
+    } else if (role === 'admin' && caller.onDevice) {
+      throw new Refusal('admin-from-device');
+    }
     if (operator.role !== role) {
       if (role === 'operator') assertOtherAdmin(operator);
       operator.role = role;
@@ -392,10 +450,23 @@ export function createFakeOperatorsService({
     return { status: 'ok', operator: row(operator) };
   }
 
-  function setActive(operatorId: string, active: boolean): OperatorChangeResult {
+  function setActive(
+    operatorId: string,
+    active: boolean,
+    pin: string | undefined,
+  ): OperatorChangeResult {
     const operator = target(operatorId);
+    if (pin !== undefined) {
+      const refused = checkPin(pin);
+      if (refused) return refused;
+    }
     if (active) {
-      if (operator.deactivated && operator.role === 'admin' && caller.onDevice) {
+      if (
+        pin === undefined &&
+        operator.deactivated &&
+        operator.role === 'admin' &&
+        caller.onDevice
+      ) {
         throw new Refusal('admin-from-device');
       }
       operator.deactivated = false;
@@ -413,14 +484,19 @@ export function createFakeOperatorsService({
         return { status: 'ok', operators: [...stored.values()].toSorted(compare).map(row) };
       }),
     ),
-    setRole: vi.fn<OperatorsService['setRole']>((operatorId, role) =>
-      run('setRole', [operatorId, role], () => setRole(operatorId, role)),
+    setRole: vi.fn<OperatorsService['setRole']>((operatorId, role, pin) =>
+      run('setRole', [operatorId, role], () => setRole(operatorId, role, pin), pin !== undefined),
     ),
-    setActive: vi.fn<OperatorsService['setActive']>((operatorId, active) =>
-      run('setActive', [operatorId, active], () => setActive(operatorId, active)),
+    setActive: vi.fn<OperatorsService['setActive']>((operatorId, active, pin) =>
+      run(
+        'setActive',
+        [operatorId, active],
+        () => setActive(operatorId, active, pin),
+        pin !== undefined,
+      ),
     ),
-    invite: vi.fn<OperatorsService['invite']>((input) =>
-      run('invite', [input], () => invite(input)),
+    invite: vi.fn<OperatorsService['invite']>((input, pin) =>
+      run('invite', [input], () => invite(input, pin), pin !== undefined),
     ),
     resendInvite: vi.fn<OperatorsService['resendInvite']>((operatorId) =>
       run('resendInvite', [operatorId], (): ResendResult => {
@@ -485,6 +561,10 @@ export function createFakeOperatorsService({
         }),
       );
       return { release };
+    },
+    /** The device's lock of wrong PINs is over (5 minutes later). */
+    endPinLock() {
+      lockSeconds = 0;
     },
     /** While down, every call resolves `network` and changes nothing. */
     setNetworkDown(down: boolean) {

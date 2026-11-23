@@ -356,7 +356,7 @@ describe('InviteForm: the errors of point 6', () => {
     expect(fake.emails).toEqual([]);
   });
 
-  it('admin_from_device: under Ruolo', async () => {
+  it('admin_from_device (the PIN missing on a device): under Ruolo', async () => {
     const { fake } = renderPage();
     const form = await findForm();
     await fill(form, 'Marco Prova', 'marco@esempio.it');
@@ -364,7 +364,9 @@ describe('InviteForm: the errors of point 6', () => {
     fake.failNext('invite', 'admin-from-device');
     await userEvent.click(form.send);
     await waitFor(() =>
-      expect(form.role).toHaveAccessibleDescription('Un amministratore si nomina dal telefono.'),
+      expect(form.role).toHaveAccessibleDescription(
+        'Dal tablet un amministratore si conferma con il tuo PIN: riprova.',
+      ),
     );
     // Announced, and not under the button.
     const alert = within(form.role).getByRole('alert');

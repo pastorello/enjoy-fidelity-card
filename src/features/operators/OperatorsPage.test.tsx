@@ -381,8 +381,8 @@ describe('OperatorsPage: Disattiva e Riattiva', () => {
     ['self', 'Non puoi cambiare il tuo account da qui.'],
     ['unknown', GENERIC_TEXT],
     ['network', GENERIC_TEXT],
-    // EO005 of set_operator_active: a deactivated admin reactivated from a device (point 7).
-    ['admin-from-device', 'Un amministratore si riattiva dal telefono.'],
+    // EO005 of set_operator_active: a deactivated admin reactivated from a device without the PIN.
+    ['admin-from-device', 'Dal tablet un amministratore si conferma con il tuo PIN: riprova.'],
   ] as const)('%s: the text stays in the dialog, nothing is reloaded', async (failure, text) => {
     const fake = createFakeOperatorsService({ operators: wireframeTeam() });
     fake.failNext('setActive', failure);

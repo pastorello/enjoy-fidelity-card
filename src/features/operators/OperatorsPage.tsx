@@ -6,21 +6,17 @@ import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
 import { StatusView } from '../../shared/ui/StatusView';
 import { NOT_IN_DISPLAY } from '../cards/customerName';
 import { loadErrorText } from '../customers/loadErrorText';
-import { useAuth, useCurrentOperator } from '../identity/AuthProvider';
+import { useAuth, useCurrentOperator, useDevice } from '../identity/AuthProvider';
 import { TabletColumns } from '../tablet-kiosk/TabletColumns';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
+import { AdminPinDialog } from './AdminPinDialog';
 import { InviteForm } from './InviteForm';
 import { OperatorDialog } from './OperatorDialog';
 import { OperatorRow, type RowAction, type RowFocus } from './OperatorRow';
-import {
-  ADMIN_REACTIVATE_FROM_PHONE,
-  GENERIC_ERROR,
-  LAST_ADMIN_ERROR,
-  SELF_ERROR,
-} from './operatorTexts';
+import { ADMIN_PIN_MISSING, GENERIC_ERROR, LAST_ADMIN_ERROR, SELF_ERROR } from './operatorTexts';
 import styles from './OperatorsPage.module.css';
 import { useOperatorsService } from './OperatorsServiceProvider';
-import type { ActiveResult, Operator } from './types';
+import type { ActiveResult, Operator, PinRefusal } from './types';
 
 const TITLE = 'Operatori';
 const BACK_TO = '/impostazioni';
@@ -100,7 +96,7 @@ function useOperatorsList() {
   return { state, reload, forbid };
 }
 
-type ChangeFailure = Exclude<ActiveResult['status'], 'ok' | 'forbidden'>;
+type ChangeFailure = Exclude<ActiveResult['status'], 'ok' | 'forbidden' | PinRefusal['status']>;
 
 /**
  * SPEC-operators point 6: errors stay in the dialog. `upstream` and anything else (no answer, a
@@ -109,8 +105,8 @@ type ChangeFailure = Exclude<ActiveResult['status'], 'ok' | 'forbidden'>;
 const CHANGE_ERROR: Record<ChangeFailure, string> = {
   'last-admin': LAST_ADMIN_ERROR,
   self: SELF_ERROR,
-  // EO005: a deactivated admin reactivated from a device (no "Riattiva" is offered there).
-  'admin-from-device': ADMIN_REACTIVATE_FROM_PHONE,
+  // EO005: a deactivated admin reactivated from a device without the PIN (never asked so).
+  'admin-from-device': ADMIN_PIN_MISSING,
   'no-account': GENERIC_ERROR,
   'not-found': GENERIC_ERROR,
   network: GENERIC_ERROR,
@@ -145,6 +141,9 @@ type Pending = { operator: Operator; action: RowAction };
  * "Disattiva" / "Riattiva" with their `ConfirmDialog`: one request at a time (a double tap sends
  * one), errors in the dialog, which stays open to try again (the change is idempotent). Done: the
  * dialog closes, the outcome goes to the live region and the list is asked again from the server.
+ * On a device, reactivating a deactivated admin asks the cashier's PIN once confirmed (`asking`,
+ * "Conferma con il PIN", Open Questions 11): a refused PIN stays there; any other failure goes back
+ * to the confirmation with its text.
  */
 function useActiveChange({
   onDone,
@@ -156,22 +155,33 @@ function useActiveChange({
   onForbidden: () => void;
 }) {
   const service = useOperatorsService();
+  const onDevice = useDevice() !== null;
   const [pending, setPending] = useState<Pending | null>(null);
+  const [asking, setAsking] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   // Set synchronously, so a second tap in the same frame is ignored before `busy` renders.
   const sending = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function send({ operator, action }: Pending) {
+  async function send({ operator, action }: Pending, pin?: string): Promise<PinRefusal | null> {
     let result: ActiveResult;
     try {
-      result = await service.setActive(operator.id, action === 'reactivate');
+      const active = action === 'reactivate';
+      result = await (pin === undefined
+        ? service.setActive(operator.id, active)
+        : service.setActive(operator.id, active, pin));
     } catch {
       // A server fault (`ServerFaultError`): "altro" in the table of point 6.
       result = { status: 'unknown' };
     }
     sending.current = false;
     setBusy(false);
+    if (result.status === 'wrong-pin' || result.status === 'pin-locked') return result;
+    if (pin !== undefined) {
+      setAsking(null);
+      // Back to the confirmation, where the error is told and a new tap asks the PIN again.
+      if (result.status !== 'ok' && result.status !== 'forbidden') setPending({ operator, action });
+    }
     if (result.status === 'ok') {
       setPending(null);
       onDone(operator, CONFIRM[action].done(operator.name));
@@ -182,10 +192,12 @@ function useActiveChange({
       setError(CHANGE_ERROR[result.status]);
       if (STALE.has(result.status)) onStale();
     }
+    return null;
   }
 
   return {
     pending,
+    asking,
     busy,
     error,
     open: (operator: Operator, action: RowAction) => {
@@ -194,6 +206,12 @@ function useActiveChange({
     },
     confirm: () => {
       if (sending.current || pending === null) return;
+      if (onDevice && pending.action === 'reactivate' && pending.operator.role === 'admin') {
+        setError(null);
+        setPending(null);
+        setAsking(pending);
+        return;
+      }
       sending.current = true;
       setBusy(true);
       setError(null);
@@ -203,6 +221,16 @@ function useActiveChange({
       if (sending.current) return;
       setPending(null);
       setError(null);
+    },
+    /** The PIN of "Conferma con il PIN": sent with the reactivation it confirms. */
+    sendPin: (pin: string): Promise<PinRefusal | null> => {
+      if (sending.current || asking === null) return Promise.resolve(null);
+      sending.current = true;
+      setBusy(true);
+      return send(asking, pin);
+    },
+    closePin: () => {
+      if (!sending.current) setAsking(null);
     },
   };
 }
@@ -332,6 +360,12 @@ function Operators() {
         error={change.error}
         onConfirm={change.confirm}
         onCancel={change.cancel}
+      />
+      <AdminPinDialog
+        open={change.asking !== null}
+        question={`Per riattivare ${change.asking?.operator.name ?? ''}, amministratore, dal tablet serve il tuo PIN.`}
+        onPin={change.sendPin}
+        onClose={change.closePin}
       />
       {shownPerson && (
         <OperatorDialog

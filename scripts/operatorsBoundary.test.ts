@@ -14,7 +14,14 @@ const SRC = 'src';
 const MODULE = 'src/features/operators/';
 const SERVICE = 'src/features/operators/supabaseOperatorsService.ts';
 const MAIN = 'src/main.tsx';
-const RPCS = ['list_operators', 'set_operator_role', 'set_operator_active'];
+const RPCS = [
+  'list_operators',
+  'set_operator_role',
+  'set_operator_active',
+  // With the cashier's PIN, on the till tablet (Open Questions 11).
+  'set_operator_role_with_pin',
+  'set_operator_active_with_pin',
+];
 const FUNCTION = 'operator-invites';
 /** Called by the function only (the caller's token or the secret key), never by the app. */
 const FUNCTION_RPCS = [

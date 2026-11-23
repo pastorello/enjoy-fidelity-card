@@ -112,7 +112,7 @@ describe('setRole', () => {
     expect(await fake.service.setRole(FABIO.id, 'admin')).toEqual({ status: 'no-account' });
   });
 
-  it('never names an admin from a device, even with an admin cashier', async () => {
+  it('never names an admin from a device without the PIN, even with an admin cashier', async () => {
     const fake = setUp({ onDevice: true });
     expect(await fake.service.setRole(CARLA.id, 'admin')).toEqual({ status: 'admin-from-device' });
     expect(await fake.service.setRole(BRUNO.id, 'operator')).toMatchObject({ status: 'ok' });
@@ -153,7 +153,7 @@ describe('setActive', () => {
     });
   });
 
-  it('never reactivates a deactivated admin from a device; a deactivated operator yes', async () => {
+  it('never reactivates a deactivated admin from a device without the PIN; a deactivated operator yes', async () => {
     const fake = setUp();
     await fake.service.setActive(BRUNO.id, false);
     await fake.service.setActive(CARLA.id, false);
@@ -280,7 +280,7 @@ describe('invite', () => {
     expect(fake.emails).toEqual([]);
   });
 
-  it('never invites an admin from a device; an operator yes, with an admin cashier', async () => {
+  it('never invites an admin from a device without the PIN; an operator yes, with an admin cashier', async () => {
     const fake = setUp({ onDevice: true });
     expect(await fake.service.invite(invite({ role: 'admin' }))).toEqual({
       status: 'admin-from-device',
@@ -305,6 +305,92 @@ describe('invite', () => {
       deactivated: false,
     });
     expect(fake.emails).toEqual([]);
+  });
+});
+
+describe('the cashier PIN of an admin action on a device', () => {
+  it('names, reactivates and invites an admin with the right PIN', async () => {
+    const fake = setUp({ onDevice: true, cashierPin: '2468' });
+    expect(await fake.service.setRole(CARLA.id, 'admin', '2468')).toMatchObject({
+      status: 'ok',
+      operator: { role: 'admin' },
+    });
+    await fake.service.setActive(BRUNO.id, false);
+    expect(await fake.service.setActive(BRUNO.id, true, '2468')).toMatchObject({
+      operator: { status: 'active' },
+    });
+    expect(await fake.service.invite(invite({ role: 'admin' }), '2468')).toMatchObject({
+      status: 'invited',
+    });
+  });
+
+  it('counts wrong PINs across the actions and locks the till at the 5th, until endPinLock', async () => {
+    const fake = setUp({ onDevice: true });
+    expect(await fake.service.setRole(CARLA.id, 'admin', '0000')).toEqual({
+      status: 'wrong-pin',
+      attemptsLeft: 4,
+    });
+    expect(await fake.service.invite(invite({ role: 'admin' }), '0000')).toEqual({
+      status: 'wrong-pin',
+      attemptsLeft: 3,
+    });
+    await fake.service.setRole(CARLA.id, 'admin', '0000');
+    await fake.service.setRole(CARLA.id, 'admin', '0000');
+    expect(await fake.service.setRole(CARLA.id, 'admin', '0000')).toEqual({
+      status: 'pin-locked',
+      lockSecondsLeft: 300,
+    });
+    expect(await fake.service.setRole(CARLA.id, 'admin', '1234')).toEqual({
+      status: 'pin-locked',
+      lockSecondsLeft: 300,
+    });
+    expect(fake.operators().find((o) => o.id === CARLA.id)?.role).toBe('operator');
+    expect(fake.emails).toEqual([]);
+    fake.endPinLock();
+    expect(await fake.service.setRole(CARLA.id, 'admin', '1234')).toMatchObject({ status: 'ok' });
+  });
+
+  it('a right PIN starts the counter again', async () => {
+    const fake = setUp({ onDevice: true });
+    await fake.service.setRole(CARLA.id, 'admin', '0000');
+    await fake.service.setRole(CARLA.id, 'admin', '1234');
+    expect(await fake.service.setRole(CARLA.id, 'operator', '0000')).toEqual({
+      status: 'wrong-pin',
+      attemptsLeft: 4,
+    });
+  });
+
+  it('a PIN from the phone is refused as unknown (22023), after the rights', async () => {
+    const fake = setUp();
+    expect(await fake.service.setRole(CARLA.id, 'admin', '1234')).toEqual({ status: 'unknown' });
+    expect(await fake.service.invite(invite({ role: 'admin' }), '1234')).toEqual({
+      status: 'unknown',
+    });
+    fake.setCaller({ actingId: CARLA.id });
+    expect(await fake.service.setRole(DARIO.id, 'admin', '1234')).toEqual({ status: 'forbidden' });
+  });
+
+  it('never logs the PIN, only that one came with the call', async () => {
+    const fake = setUp({ onDevice: true, cashierPin: '8642' });
+    await fake.service.setRole(CARLA.id, 'admin', '8642');
+    await fake.service.invite(invite({ role: 'admin' }), '8642');
+    await fake.service.setRole(CARLA.id, 'operator');
+    expect(JSON.stringify(fake.calls)).not.toContain('8642');
+    expect(fake.calls.map((call) => call.withPin ?? false)).toEqual([true, true, false]);
+  });
+
+  it('programmed PIN refusals', async () => {
+    const fake = setUp({ onDevice: true });
+    fake.failNext('setRole', 'wrong-pin');
+    fake.failNext('invite', 'pin-locked');
+    expect(await fake.service.setRole(CARLA.id, 'admin', '1234')).toEqual({
+      status: 'wrong-pin',
+      attemptsLeft: 4,
+    });
+    expect(await fake.service.invite(invite({ role: 'admin' }), '1234')).toEqual({
+      status: 'pin-locked',
+      lockSecondsLeft: 300,
+    });
   });
 });
 

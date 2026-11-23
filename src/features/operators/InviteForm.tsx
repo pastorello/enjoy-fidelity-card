@@ -6,10 +6,10 @@ import { TextField } from '../../shared/ui/TextField';
 import { useDevice } from '../identity/AuthProvider';
 import type { Role } from '../identity/types';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
+import { AdminPinDialog } from './AdminPinDialog';
 import styles from './InviteForm.module.css';
 import {
-  ADMIN_FROM_PHONE,
-  ADMIN_INVITE_FROM_PHONE,
+  ADMIN_PIN_MISSING,
   EMAIL_DEACTIVATED_ERROR,
   EMAIL_IS_DEVICE_ERROR,
   EMAIL_TAKEN_ERROR,
@@ -21,7 +21,7 @@ import {
 } from './operatorTexts';
 import { useOperatorsService } from './OperatorsServiceProvider';
 import { RoleFieldset } from './RoleFieldset';
-import type { InviteResult, OperatorBrief } from './types';
+import type { InviteResult, OperatorBrief, PinRefusal } from './types';
 import { validateInvite, type InviteFormValues } from './validateInvite';
 
 /** The note under "Invia invito" (SPEC-operators point 3); the tablet names the till PIN too. */
@@ -79,21 +79,23 @@ export type InviteFormProps = {
  * goes to the page. Sent: the form empties (the role back to "Operatore").
  *
  * On the tablet layout the page puts it in the `<aside aria-label="Invita operatore">` column, so
- * it is a plain block there (no second landmark of the same name), and "Amministratore" cannot be
- * chosen (Open Questions 11): the same rule as the person dialog, also for a device without the
- * tablet layout. The server refuses an admin from a device anyway (`admin_from_device`).
+ * it is a plain block there (no second landmark of the same name). On a device (the till tablet,
+ * whatever the screen size) inviting an admin asks the cashier's PIN after "Invia invito", in
+ * "Conferma con il PIN" (Open Questions 11): the PIN goes with that request only, never into the
+ * kept operation, and a wrong PIN stays in the PIN step. The phone never asks it.
  */
 export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps) {
   const service = useOperatorsService();
   const tablet = useTabletLayout();
   const onDevice = useDevice() !== null;
-  const adminDisabled = tablet || onDevice;
   const [values, setValues] = useState<InviteFormValues>(EMPTY);
   // Read by the submit handler: the values the screen shows, even right after a commit.
   const latestValues = useLatest(values);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [failure, setFailure] = useState<ButtonFailure | null>(null);
   const [busy, setBusy] = useState(false);
+  // The admin invite waiting for the cashier's PIN (on a device), or null.
+  const [asking, setAsking] = useState<InviteFormValues | null>(null);
   // Set synchronously, so a second tap in the same frame is ignored before `busy` renders.
   const sending = useRef(false);
   const [firstId] = useState(() => crypto.randomUUID());
@@ -135,21 +137,41 @@ export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps
       return;
     }
     const { invite } = checked;
-    const operationId = operationFor(invite);
     setErrors({});
     setFailure(null);
+    if (invite.role === 'admin' && onDevice) {
+      setAsking(invite);
+      return;
+    }
+    await send(invite);
+  }
+
+  /**
+   * Sends the invite (with the cashier's PIN on a device for an admin). A refused PIN is answered
+   * to the PIN step, which stays open; any other answer closes it and is told in the form.
+   */
+  async function send(invite: InviteFormValues, pin?: string): Promise<PinRefusal | null> {
+    if (sending.current) return null;
+    const operationId = operationFor(invite);
     sending.current = true;
     setBusy(true);
     let result: InviteResult;
     try {
-      result = await service.invite({ operationId, ...invite });
+      const input = { operationId, ...invite };
+      result = await (pin === undefined ? service.invite(input) : service.invite(input, pin));
     } catch {
       // A server fault (`ServerFaultError`): "altro" in the table of point 6.
       result = { status: 'unknown' };
     }
     sending.current = false;
     setBusy(false);
+    if (result.status === 'wrong-pin' || result.status === 'pin-locked') return result;
+    setAsking(null);
+    settle(result);
+    return null;
+  }
 
+  function settle(result: Exclude<InviteResult, PinRefusal>) {
     switch (result.status) {
       case 'invited':
         operation.current = { id: crypto.randomUUID(), sentWith: null };
@@ -172,7 +194,7 @@ export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps
         emailRef.current?.focus();
         return;
       case 'admin-from-device':
-        setErrors({ role: ADMIN_FROM_PHONE });
+        setErrors({ role: ADMIN_PIN_MISSING });
         return;
       default:
         // No answer: the same operation_id goes with the next tap, unless the values change.
@@ -215,8 +237,6 @@ export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps
             name={roleName}
             value={values.role}
             onChange={changeRole}
-            adminDisabled={adminDisabled}
-            note={adminDisabled ? ADMIN_INVITE_FROM_PHONE : undefined}
             error={errors.role}
           />
           <Button type="submit" block busy={busy} aria-describedby={noteId}>
@@ -233,6 +253,14 @@ export function InviteForm({ disabled, onInvited, onForbidden }: InviteFormProps
           </p>
         </fieldset>
       </form>
+      <AdminPinDialog
+        open={asking !== null}
+        question={`Per invitare ${asking?.name ?? ''} come amministratore dal tablet serve il tuo PIN.`}
+        onPin={(pin) => (asking === null ? Promise.resolve(null) : send(asking, pin))}
+        onClose={() => {
+          if (!sending.current) setAsking(null);
+        }}
+      />
     </Box>
   );
 }

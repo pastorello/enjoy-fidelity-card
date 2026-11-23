@@ -16,11 +16,14 @@ import type {
   OperatorChangeResult,
   OperatorStatus,
   OperatorsService,
+  PinRefusal,
   ResendResult,
 } from './types';
 
 // The only module that calls the operators RPCs (app.list_operators, app.set_operator_role,
-// app.set_operator_active) and the operator-invites Edge Function (scripts/operatorsBoundary.test.ts).
+// app.set_operator_active and, with the cashier's PIN on the till tablet, their _with_pin versions)
+// and the operator-invites Edge Function (scripts/operatorsBoundary.test.ts). The PIN goes into the
+// request and nowhere else.
 // The secret key never comes near the app: the function holds it, and checks the caller through
 // the RPCs. Results are built from codes alone, never from the server's text, and nothing here logs:
 // an email goes into the request body and nowhere else.
@@ -109,10 +112,14 @@ type Settled = { data: unknown } | { failure: RpcRefusal | 'network' };
  * Calls one operators RPC. No answer (a thrown fetch, status 0, the timeout) settles as `network`;
  * a server fault rejects, read before any code (a missing grant is a 42501 too).
  */
-async function call(
-  fn: 'list_operators' | 'set_operator_role' | 'set_operator_active',
-  args?: Record<string, unknown>,
-): Promise<Settled> {
+type Rpc =
+  | 'list_operators'
+  | 'set_operator_role'
+  | 'set_operator_active'
+  | 'set_operator_role_with_pin'
+  | 'set_operator_active_with_pin';
+
+async function call(fn: Rpc, args?: Record<string, unknown>): Promise<Settled> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<null>((resolve) => {
@@ -161,6 +168,50 @@ async function change(
   const rows: unknown[] = settled.data;
   const operator = toOperator(rows[0]);
   return operator ? { status: 'ok', operator } : { status: 'unknown' };
+}
+
+/** A whole count of the server (attempts, seconds), or null when it is anything else. */
+function count(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/** A refused PIN: `wrong_pin` / `locked` of the RPCs, `wrong_pin` / `pin_locked` of the function. */
+function pinRefusal(
+  status: unknown,
+  fields: Record<string, unknown>,
+): PinRefusal | { status: 'unknown' } {
+  if (status === 'wrong_pin') {
+    const attemptsLeft = count(fields.attempts_left);
+    return attemptsLeft === null ? { status: 'unknown' } : { status: 'wrong-pin', attemptsLeft };
+  }
+  const lockSecondsLeft = count(fields.lock_seconds_left);
+  return lockSecondsLeft === null
+    ? { status: 'unknown' }
+    : { status: 'pin-locked', lockSecondsLeft };
+}
+
+/**
+ * The same change with the cashier's PIN (the _with_pin RPCs, jsonb): `ok` with the profile, or
+ * the PIN refused (`wrong_pin`, `locked`), which the server keeps counted.
+ */
+async function changeWithPin(
+  fn: 'set_operator_role_with_pin' | 'set_operator_active_with_pin',
+  args: Record<string, unknown>,
+): Promise<OperatorChangeResult> {
+  const settled = await call(fn, args);
+  if ('failure' in settled) {
+    return { status: settled.failure === 'not-invited' ? 'unknown' : settled.failure };
+  }
+  const answer = record(settled.data);
+  if (!answer) return { status: 'unknown' };
+  if (answer.status === 'ok') {
+    const operator = toOperator(answer.operator);
+    return operator ? { status: 'ok', operator } : { status: 'unknown' };
+  }
+  if (answer.status === 'wrong_pin' || answer.status === 'locked') {
+    return pinRefusal(answer.status, answer);
+  }
+  return { status: 'unknown' };
 }
 
 /** An answer of operator-invites: its body on a 2xx, its error code otherwise. */
@@ -242,21 +293,28 @@ export const supabaseOperatorsService: OperatorsService = {
     return { status: 'ok', operators: operators.filter((operator) => operator !== null) };
   },
 
-  setRole(operatorId, role) {
-    return change('set_operator_role', { p_operator_id: operatorId, p_role: role });
+  setRole(operatorId, role, pin) {
+    const args = { p_operator_id: operatorId, p_role: role };
+    return pin === undefined
+      ? change('set_operator_role', args)
+      : changeWithPin('set_operator_role_with_pin', { ...args, p_pin: pin });
   },
 
-  setActive(operatorId, active) {
-    return change('set_operator_active', { p_operator_id: operatorId, p_active: active });
+  setActive(operatorId, active, pin) {
+    const args = { p_operator_id: operatorId, p_active: active };
+    return pin === undefined
+      ? change('set_operator_active', args)
+      : changeWithPin('set_operator_active_with_pin', { ...args, p_pin: pin });
   },
 
-  async invite({ operationId, name, email, role }): Promise<InviteResult> {
+  async invite({ operationId, name, email, role }, pin): Promise<InviteResult> {
     const answer = await invoke({
       action: 'invite',
       operation_id: operationId,
       name,
       email,
       role,
+      ...(pin === undefined ? {} : { pin }),
     });
     if (answer.ok) {
       const operator = answer.body.status === 'invited' ? toBrief(answer.body.operator) : null;
@@ -275,6 +333,9 @@ export const supabaseOperatorsService: OperatorsService = {
         return { status: 'admin-from-device' };
       case 'rate_limited':
         return { status: 'rate-limited' };
+      case 'wrong_pin':
+      case 'pin_locked':
+        return pinRefusal(answer.code, answer.body);
       default:
         return { status: common(answer.code) };
     }
