@@ -540,8 +540,8 @@ scambio → link scritto (`__enjoyFakeCardWrites`) → spesa (< 10 s dalla card)
 con `url: null` → riletta → Nuovo cliente con la card; card di un cliente cancellato → solo Riformatta;
 operatore → avviso.
 **Accettazione:**
-- [ ] E2E dei criteri 8, 9, 10, 11 e 13 verdi a 390×844
-- [ ] Nessuna chiamata in più nel percorso card attiva → Registra spesa
+- [x] E2E dei criteri 8, 9, 10, 11 e 13 verdi a 390×844
+- [x] Nessuna chiamata in più nel percorso card attiva → Registra spesa
 **Verifica:** `npm run e2e`
 **Dipendenze:** 32, 33 · **File:** e2e/cards-v2.spec.ts, e2e/nfc.ts · **Dimensione:** M
 
