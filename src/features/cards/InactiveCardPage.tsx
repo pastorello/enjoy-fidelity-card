@@ -1,4 +1,5 @@
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { ServerFaultError } from '../../lib/serverFault';
 import { useNavigate, useParams } from 'react-router';
 import { AppShell } from '../../app/AppShell';
 import { Button, ButtonLink } from '../../shared/ui/Button';
@@ -14,10 +15,25 @@ import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import { CardLinkScreen, Reactivated } from './CardLinkScreen';
 import { NOT_IN_DISPLAY } from './customerName';
 import { formatCardDay, formatCardLabel, shortName } from './formatCard';
+import writerStyles from './CardLinkWriter.module.css';
 import styles from './InactiveCardPage.module.css';
-import type { CardDetail, CardSummary } from './types';
+import {
+  CARD_FORBIDDEN_TEXT,
+  CardActiveError,
+  CardForbiddenError,
+  NetworkError,
+  type CardDetail,
+  type CardSummary,
+} from './types';
 import { useInactiveCard, type InactiveCardLoad } from './useInactiveCard';
 import { reactivatedNotice, useReactivateCard, type ReactivateCard } from './useReactivateCard';
+import {
+  isReleaseRetryable,
+  reformattedNotice,
+  useReformatCard,
+  type ReformatCard,
+  type ReformatFailure,
+} from './useReformatCard';
 
 const TITLE = 'Card non attiva';
 const OPERATOR_ONLY = 'Solo un amministratore può riattivare o riformattare una card.';
@@ -97,6 +113,155 @@ function reactivateQuestion(card: CardDetail, name: string) {
   };
 }
 
+/** The confirmation of Riformatta (SPEC-customers-v2, point 4, «Riformatta» 1). */
+function reformatQuestion(card: CardDetail) {
+  const label = formatCardLabel(card.uid);
+  return {
+    title: (
+      <>
+        Riformattare la card <Plain>{label}</Plain>?
+      </>
+    ),
+    description:
+      card.customerName === null
+        ? 'La card si svuota e torna come nuova. Non si può tornare indietro.'
+        : `La card si svuota e non sarà più di ${card.customerName}, per sempre. Punti e movimenti restano a ${shortName(card.customerName)}. Non si può tornare indietro.`,
+  };
+}
+
+const DEVICE_NOTE =
+  'Per riformattare la card serve un telefono Android con l’NFC attivo: apri Enjoy Card sul telefono e avvicina la card.';
+
+/** Whether the reformatting has taken the place of the choices (the erase, its release, an outcome). */
+function reformatting(reformat: ReformatCard): boolean {
+  return (
+    reformat.status === 'erasing' ||
+    reformat.status === 'releasing' ||
+    reformat.status === 'released' ||
+    reformat.status === 'failed'
+  );
+}
+
+const DETACHED = 'Card non riformattata: si è staccata troppo presto.';
+
+/** What each outcome of `eraseCard` without an empty card says, given the card label. */
+const ERASE_FAILURES: Record<
+  Extract<ReformatFailure, { kind: 'erase' }>['reason'],
+  (label: string) => string
+> = {
+  timeout: () => DETACHED,
+  io: () => DETACHED,
+  'wrong-card': (label) => `Questa non è la card ${label}: avvicina quella giusta.`,
+  'verify-failed': () => 'La card non risulta vuota. Riprova.',
+  'not-allowed': () =>
+    'Il telefono non permette di scrivere la card: controlla il permesso NFC di Chrome.',
+  unreadable: (label) => `La card non si legge. È la card ${label}? Puoi riformattarla comunque.`,
+  // Another write still running.
+  busy: () => 'Card non riformattata: riprova.',
+};
+
+/** What an outcome without a free card says (SPEC-customers-v2, point 4, «Riformatta» 5 to 7). */
+function reformatFailureText(failure: ReformatFailure, card: CardDetail): string {
+  const label = formatCardLabel(card.uid);
+  if (failure.kind === 'release') {
+    const { error } = failure;
+    if (error instanceof CardActiveError) {
+      const reactivated = 'La card è stata riattivata nel frattempo e non è stata liberata.';
+      return card.customerName === null
+        ? reactivated
+        : `${reactivated} Il suo link è stato cancellato: riscrivilo dalla scheda di ${shortName(card.customerName)}.`;
+    }
+    if (error instanceof CardForbiddenError) return CARD_FORBIDDEN_TEXT;
+    if (error instanceof NetworkError) {
+      return 'Card svuotata ma non liberata: controlla la connessione.';
+    }
+    if (error instanceof ServerFaultError) {
+      return `Card svuotata ma non liberata. ${loadErrorText(error)}`;
+    }
+    return isReleaseRetryable(error)
+      ? 'Card svuotata ma non liberata: riprova.'
+      : 'Card svuotata ma non liberata.';
+  }
+  // Only once write() had started can the other card have been emptied.
+  if (
+    failure.reason === 'wrong-card' &&
+    failure.mayHaveWritten === true &&
+    failure.otherUid !== undefined
+  ) {
+    return `Questa non è la card ${label}. La card ${formatCardLabel(failure.otherUid)} potrebbe essere stata svuotata: se aveva il link ai punti, riscrivilo dalla scheda del suo cliente.`;
+  }
+  return ERASE_FAILURES[failure.reason](label);
+}
+
+/**
+ * The erase of the card, live (`aria-live="polite"`), then its outcome in an alert: the boards of the
+ * link write, with the texts of Riformatta. Its buttons are in `reformatActions`.
+ */
+function ReformatPanel({ reformat, card }: { reformat: ReformatCard; card: CardDetail }) {
+  const texts = useRef<HTMLDivElement>(null);
+  const { status } = reformat;
+  const shown = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (shown.current === status) return;
+    shown.current = status;
+    // The button tapped («Riformatta», «Riprova»…) unmounted: the focus fell to the page, so it goes
+    // to the text of the new state.
+    const focused = document.activeElement;
+    if (focused === null || focused === document.body) texts.current?.focus();
+  }, [status]);
+
+  if (reformat.status === 'failed') {
+    return (
+      <section role="alert" className={writerStyles.failure}>
+        <Icon name="circle-alert" size={48} className={writerStyles.failureIcon} />
+        <div ref={texts} tabIndex={-1}>
+          <p className={writerStyles.failureText}>{reformatFailureText(reformat.failure, card)}</p>
+        </div>
+      </section>
+    );
+  }
+  let body;
+  if (reformat.status === 'erasing' && reformat.step === 'waiting-card') {
+    body = (
+      <p className={writerStyles.title}>
+        {/* Enjoy Display has no "…": the label is set in the body font. */}
+        Avvicina la card <span className={writerStyles.label}>{formatCardLabel(card.uid)}</span>
+      </p>
+    );
+  } else if (reformat.status === 'erasing' && reformat.step === 'writing') {
+    body = (
+      <>
+        <p className={writerStyles.title}>Tieni la card appoggiata</p>
+        <p className={writerStyles.progress}>
+          <Icon name="loader-circle" size={16} className={writerStyles.spinner} />
+          Svuoto la card…
+        </p>
+      </>
+    );
+  } else {
+    // The verification, and the release that follows it at once.
+    body = <p className={writerStyles.title}>Controllo: allontana la card e riavvicinala</p>;
+  }
+  return (
+    <section aria-label="Riformattazione della card" className={writerStyles.panel}>
+      <Icon name="nfc" size={64} className={writerStyles.icon} />
+      <div ref={texts} tabIndex={-1} aria-live="polite" className={writerStyles.texts}>
+        {body}
+      </div>
+    </section>
+  );
+}
+
+/** «Per riformattare la card serve un telefono Android…», in place of «Riformatta la card». */
+function DeviceNote() {
+  return (
+    <p className={styles.deviceNote}>
+      <Icon name="nfc-off" size={24} className={styles.deviceNoteIcon} />
+      <span>{DEVICE_NOTE}</span>
+    </p>
+  );
+}
+
 /**
  * After the reactivation, on the same screen: «Card …E5F6 riattivata per Maria» and the write of
  * the new link (the old one died with the deactivation), with the outcomes and «Salta» of Associa
@@ -138,10 +303,19 @@ function WriteLink({ detail, card }: { detail: CardDetail; card: CardSummary }) 
  * points 4 and 5), with the confirmation of Riattiva. The card of an erased customer names no one
  * and offers no Riattiva.
  */
-function InactiveCard({ card, reactivation }: { card: CardDetail; reactivation: ReactivateCard }) {
+function InactiveCard({
+  card,
+  reactivation,
+  reformat,
+}: {
+  card: CardDetail;
+  reactivation: ReactivateCard;
+  reformat: ReformatCard;
+}) {
   const name = card.customerName === null ? null : shortName(card.customerName);
   const canReactivate = name !== null && reactivation.status !== 'refused';
   const question = name === null ? null : reactivateQuestion(card, name);
+  const erase = reformatQuestion(card);
   return (
     <>
       <CardRow card={card} />
@@ -162,20 +336,25 @@ function InactiveCard({ card, reactivation }: { card: CardDetail; reactivation: 
           <span>{reactivation.text}</span>
         </p>
       )}
-      <div className={styles.choices}>
-        {canReactivate && (
+      {reformatting(reformat) ? (
+        <ReformatPanel reformat={reformat} card={card} />
+      ) : (
+        <div className={styles.choices}>
+          {canReactivate && (
+            <p className={styles.choice}>
+              {card.otherActiveCard === null
+                ? `La card torna a ${name} e apre di nuovo la sua spesa.`
+                : `La card torna a ${name} al posto della card ${formatCardLabel(card.otherActiveCard.uid)}, che si disattiva. I punti restano a ${name}.`}
+            </p>
+          )}
           <p className={styles.choice}>
-            {card.otherActiveCard === null
-              ? `La card torna a ${name} e apre di nuovo la sua spesa.`
-              : `La card torna a ${name} al posto della card ${formatCardLabel(card.otherActiveCard.uid)}, che si disattiva. I punti restano a ${name}.`}
+            {name === null
+              ? 'La card si svuota e torna come nuova: potrà essere data a un cliente nuovo.'
+              : `La card si svuota e non sarà più di ${name}, per sempre: potrà essere data a un cliente nuovo. Punti e movimenti restano a ${name}.`}
           </p>
-        )}
-        <p className={styles.choice}>
-          {name === null
-            ? 'La card si svuota e torna come nuova: potrà essere data a un cliente nuovo.'
-            : `La card si svuota e non sarà più di ${name}, per sempre: potrà essere data a un cliente nuovo. Punti e movimenti restano a ${name}.`}
-        </p>
-      </div>
+          {!canReformat(reformat) && <DeviceNote />}
+        </div>
+      )}
       {question !== null && reactivation.status === 'confirming' && (
         <ConfirmDialog
           // Asked again after `active_card_changed`: a new dialog, with the right card.
@@ -190,17 +369,97 @@ function InactiveCard({ card, reactivation }: { card: CardDetail; reactivation: 
           onCancel={reactivation.cancel}
         />
       )}
+      {reformat.status === 'confirming' && (
+        <ConfirmDialog
+          open
+          tone="danger"
+          title={erase.title}
+          description={erase.description}
+          confirmLabel="Riformatta"
+          onConfirm={reformat.confirm}
+          onCancel={reformat.cancel}
+        />
+      )}
     </>
   );
 }
 
-/** «Riattiva la card», for a card with a customer to give it back to (not refused for good). */
-function reactivateAction(card: CardDetail, reactivation: ReactivateCard): ReactNode {
-  if (card.customerName === null || reactivation.status === 'refused') return undefined;
-  return (
-    <Button block onClick={reactivation.ask}>
-      Riattiva la card
+/** Whether «Riformatta la card» is offered: a phone that writes, not stopped writing mid-way. */
+function canReformat(reformat: ReformatCard): boolean {
+  return reformat.canWrite && reformat.status !== 'cannot-write';
+}
+
+/** The way out after a release refused for good: the customer's page, or the home. */
+function leaveAfterRefusal(card: CardDetail, failure: ReformatFailure): ReactNode {
+  if (
+    failure.kind === 'release' &&
+    failure.error instanceof CardActiveError &&
+    card.customerName !== null
+  ) {
+    return (
+      <ButtonLink to={`/clienti/${card.customerId}`} block>
+        Apri la scheda di {shortName(card.customerName)}
+      </ButtonLink>
+    );
+  }
+  return homeLink;
+}
+
+/** The buttons of the reformatting: «Annulla» while erasing; after an outcome, what can be done. */
+function reformatActions(card: CardDetail, reformat: ReformatCard): ReactNode {
+  const stop = (
+    <Button key="cancel" variant="secondary" block onClick={reformat.cancel}>
+      Annulla
     </Button>
+  );
+  if (reformat.status === 'erasing') return stop;
+  if (reformat.status !== 'failed') return undefined;
+  const { failure } = reformat;
+  if (failure.kind === 'release' && !isReleaseRetryable(failure.error)) {
+    return leaveAfterRefusal(card, failure);
+  }
+  return (
+    <>
+      {failure.kind === 'erase' && failure.reason === 'unreadable' ? (
+        <Button block onClick={reformat.eraseAnyway}>
+          Riformatta comunque
+        </Button>
+      ) : (
+        <Button block onClick={reformat.retry}>
+          Riprova
+        </Button>
+      )}
+      {stop}
+    </>
+  );
+}
+
+/**
+ * «Riattiva la card», for a card with a customer to give it back to (not refused for good), and
+ * «Riformatta la card» on a phone that writes; while reformatting, the buttons of the erase.
+ */
+function cardActions(
+  card: CardDetail,
+  reactivation: ReactivateCard,
+  reformat: ReformatCard,
+): ReactNode {
+  if (reformatting(reformat)) return reformatActions(card, reformat);
+  const reactivate = card.customerName !== null && reactivation.status !== 'refused';
+  const reformatButton = canReformat(reformat);
+  if (!reactivate && !reformatButton) return undefined;
+  return (
+    <>
+      {reactivate && (
+        <Button block onClick={reactivation.ask}>
+          Riattiva la card
+        </Button>
+      )}
+      {reformatButton && (
+        <Button variant="danger-secondary" block onClick={reformat.ask}>
+          Riformatta la card
+        </Button>
+      )}
+    </>
   );
 }
 
@@ -211,6 +470,7 @@ function reactivateAction(card: CardDetail, reactivation: ReactivateCard): React
 function adminContent(
   load: InactiveCardLoad,
   reactivation: ReactivateCard,
+  reformat: ReformatCard,
 ): { content: ReactNode; action?: ReactNode } {
   switch (load.status) {
     case 'loading':
@@ -269,8 +529,8 @@ function adminContent(
     };
   }
   return {
-    content: <InactiveCard card={card} reactivation={reactivation} />,
-    action: reactivateAction(card, reactivation),
+    content: <InactiveCard card={card} reactivation={reactivation} reformat={reformat} />,
+    action: cardActions(card, reactivation, reformat),
   };
 }
 
@@ -288,10 +548,18 @@ function AdminView({ cardId }: { cardId: string }) {
   const load = useInactiveCard(cardId);
   const card = inactiveCard(load);
   const reactivation = useReactivateCard(card, load.reload);
+  const navigate = useNavigate();
+  const uid = card?.uid ?? null;
+  // Free: the home, in place of this page, says so once.
+  const onReleased = useCallback(() => {
+    if (uid === null) return;
+    void navigate('/', { replace: true, state: homeNoticeState(reformattedNotice(uid)) });
+  }, [navigate, uid]);
+  const reformat = useReformatCard(card, onReleased);
   if (reactivation.status === 'reactivated' && card !== null) {
     return <WriteLink detail={card} card={reactivation.card} />;
   }
-  const { content, action } = adminContent(load, reactivation);
+  const { content, action } = adminContent(load, reactivation, reformat);
   return <Page action={action}>{content}</Page>;
 }
 
@@ -299,7 +567,7 @@ function AdminView({ cardId }: { cardId: string }) {
  * «Card non attiva» (`/card/:cardId`, SPEC-customers-v2 points 4 and 5): where an administrator
  * lands after reading a deactivated card on the home, by the id of its row (never the uid). An
  * operator who opens the URL by hand is turned away without a request: the server would refuse
- * the actions anyway. Riformatta comes with task 32.
+ * the actions anyway.
  */
 export function InactiveCardPage() {
   const { cardId = '' } = useParams();

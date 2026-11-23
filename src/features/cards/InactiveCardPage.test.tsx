@@ -67,6 +67,9 @@ type WriteCall = {
   finish: (result: CardWriteResult) => Promise<void>;
 };
 
+/** One `eraseCard` call, ended by the test with `finish`. */
+type EraseCall = Omit<WriteCall, 'url'>;
+
 async function setup({
   role = 'admin',
   writable = true,
@@ -99,7 +102,24 @@ async function setup({
         options.signal?.addEventListener('abort', () => resolve({ ok: false, reason: 'aborted' }));
       }),
   );
-  return { customers, cards, auth, reader, writes };
+  // The erases of Riformatta, driven the same way.
+  const erases: EraseCall[] = [];
+  vi.spyOn(reader.reader, 'eraseCard').mockImplementation(
+    (options) =>
+      new Promise<CardWriteResult>((resolve) => {
+        erases.push({
+          options,
+          step: (step) => act(() => options.onStep?.(step)),
+          finish: (result) =>
+            act(async () => {
+              resolve(result);
+              await Promise.resolve();
+            }),
+        });
+        options.signal?.addEventListener('abort', () => resolve({ ok: false, reason: 'aborted' }));
+      }),
+  );
+  return { customers, cards, auth, reader, writes, erases };
 }
 
 type Fixture = Awaited<ReturnType<typeof setup>>;
@@ -524,5 +544,271 @@ describe('Riattiva (SPEC-customers-v2 point 4, criterion 8)', () => {
       expect(fixture.writes).toHaveLength(0);
       expect(cardOf(fixture, GIULIA_LOST.id)?.active).toBe(true);
     });
+  });
+});
+
+const REFORMAT = 'Riformatta la card';
+const DEVICE_NOTE =
+  'Per riformattare la card serve un telefono Android con l’NFC attivo: apri Enjoy Card sul telefono e avvicina la card.';
+
+function releases(fixture: Fixture) {
+  return fixture.cards.calls
+    .filter((call) => call.method === 'releaseCard')
+    .map((call) => call.args);
+}
+
+/** The erase in progress (the last `eraseCard` call), once it has started. */
+async function currentErase(fixture: Fixture): Promise<EraseCall> {
+  await waitFor(() => expect(fixture.erases.length).toBeGreaterThan(0));
+  const erase = fixture.erases.at(-1);
+  if (!erase) throw new Error('no erase');
+  return erase;
+}
+
+function panel(): HTMLElement {
+  return screen.getByRole('region', { name: 'Riformattazione della card' });
+}
+
+/** «Riformatta la card», then «Riformatta» in the confirmation: the erase starts. */
+async function startReformat(fixture: Fixture, cardId = MARIA_LOST.id) {
+  const rendered = renderPage(fixture, cardId);
+  await userEvent.click(await screen.findByRole('button', { name: REFORMAT }));
+  await userEvent.click(
+    within(screen.getByRole('dialog')).getByRole('button', { name: 'Riformatta' }),
+  );
+  return { ...rendered, erase: await currentErase(fixture) };
+}
+
+describe('Riformatta (SPEC-customers-v2 points 4 and 5, criteria 9 and 10)', () => {
+  it('asks first, in the danger tone, and nothing is written before «Riformatta»', async () => {
+    const fixture = await setup();
+    renderPage(fixture, MARIA_LOST.id);
+    await userEvent.click(await screen.findByRole('button', { name: REFORMAT }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByRole('heading')).toHaveTextContent('Riformattare la card …5566?');
+    expect(dialog).toHaveTextContent(
+      'La card si svuota e non sarà più di Maria Rossi, per sempre. Punti e movimenti restano a Maria. Non si può tornare indietro.',
+    );
+    // The danger tone starts on the way out, not on the irreversible action.
+    expect(within(dialog).getByRole('button', { name: 'Lascia com’è' })).toHaveFocus();
+    expect(fixture.erases).toHaveLength(0);
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Lascia com’è' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(fixture.erases).toHaveLength(0);
+    expect(releases(fixture)).toEqual([]);
+  });
+
+  it('the card of an erased customer: its own confirmation, and the same outcome', async () => {
+    const fixture = await setup();
+    const { router } = renderPage(fixture, OF_ERASED.id);
+    await userEvent.click(await screen.findByRole('button', { name: REFORMAT }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent(
+      'La card si svuota e torna come nuova. Non si può tornare indietro.',
+    );
+    expect(dialog).not.toHaveTextContent(/cancellato-7f3a/);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Riformatta' }));
+    const erase = await currentErase(fixture);
+    expect(erase.options.expectedUid).toBe(OF_ERASED.uid);
+    await erase.finish({ ok: true });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(await screen.findByText('Card …BBCC riformattata: ora è libera.')).toBeInTheDocument();
+    expect(releases(fixture)).toEqual([[expect.any(String), OF_ERASED.id]]);
+  });
+
+  it('shows the steps live, and releases the card only after the verification', async () => {
+    const fixture = await setup();
+    const { router, erase } = await startReformat(fixture);
+
+    expect(erase.options.expectedUid).toBe(MARIA_LOST.uid);
+    expect(erase.options.allowUnreadable).toBeFalsy();
+    const live = within(panel())
+      .getByText(/Avvicina la card/)
+      .closest('[aria-live]');
+    expect(live).toHaveAttribute('aria-live', 'polite');
+
+    erase.step('waiting-card');
+    expect(panel()).toHaveTextContent('Avvicina la card …5566');
+    erase.step('writing');
+    expect(panel()).toHaveTextContent('Tieni la card appoggiata');
+    expect(panel()).toHaveTextContent('Svuoto la card…');
+    erase.step('verifying');
+    expect(panel()).toHaveTextContent('Controllo: allontana la card e riavvicinala');
+    expect(screen.getByRole('button', { name: 'Annulla' })).toBeInTheDocument();
+    // Criterion 9: the server unbinds the card only once it reads back empty.
+    expect(releases(fixture)).toEqual([]);
+
+    await erase.finish({ ok: true });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(await screen.findByText('Card …5566 riformattata: ora è libera.')).toBeInTheDocument();
+
+    expect(releases(fixture)).toEqual([
+      [
+        expect.stringMatching(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+        ),
+        MARIA_LOST.id,
+      ],
+    ]);
+    // The uid is free again: the same card read on the home is unknown.
+    await expect(fixture.cards.service.lookup(MARIA_LOST.uid)).resolves.toMatchObject({
+      status: 'unknown',
+    });
+  });
+
+  it('«Annulla» stops the erase through its signal: back to the card, nothing sent', async () => {
+    const fixture = await setup();
+    const { erase } = await startReformat(fixture);
+    await userEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+    expect(erase.options.signal?.aborted).toBe(true);
+    expect(screen.queryByRole('region', { name: 'Riformattazione della card' })).toBeNull();
+    expect(await screen.findByRole('button', { name: REFORMAT })).toBeInTheDocument();
+    expect(releases(fixture)).toEqual([]);
+  });
+
+  it.each([
+    [{ ok: false, reason: 'timeout' }, 'Card non riformattata: si è staccata troppo presto.'],
+    [{ ok: false, reason: 'io' }, 'Card non riformattata: si è staccata troppo presto.'],
+    [
+      { ok: false, reason: 'wrong-card', otherUid: '04AABBCCDDABCD', mayHaveWritten: false },
+      'Questa non è la card …5566: avvicina quella giusta.',
+    ],
+    [
+      { ok: false, reason: 'wrong-card', otherUid: '04AABBCCDDABCD', mayHaveWritten: true },
+      'Questa non è la card …5566. La card …ABCD potrebbe essere stata svuotata: se aveva il link ai punti, riscrivilo dalla scheda del suo cliente.',
+    ],
+    [{ ok: false, reason: 'verify-failed' }, 'La card non risulta vuota. Riprova.'],
+    [
+      { ok: false, reason: 'not-allowed' },
+      'Il telefono non permette di scrivere la card: controlla il permesso NFC di Chrome.',
+    ],
+  ] as const)('%o: its text, «Riprova» erases again, nothing is released', async (result, text) => {
+    const fixture = await setup();
+    const { erase } = await startReformat(fixture);
+    await erase.finish(result);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(text);
+    expect(screen.getByRole('button', { name: 'Annulla' })).toBeInTheDocument();
+    expect(releases(fixture)).toEqual([]);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    expect(fixture.erases).toHaveLength(2);
+    expect(fixture.erases[1]?.options.allowUnreadable).toBeFalsy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('unreadable: «Riformatta comunque» erases a card whose content does not read', async () => {
+    const fixture = await setup();
+    const { erase } = await startReformat(fixture);
+    await erase.finish({ ok: false, reason: 'unreadable' });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'La card non si legge. È la card …5566? Puoi riformattarla comunque.',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Riformatta comunque' }));
+    const again = await currentErase(fixture);
+    expect(fixture.erases).toHaveLength(2);
+    expect(again.options.allowUnreadable).toBe(true);
+    expect(again.options.expectedUid).toBe(MARIA_LOST.uid);
+  });
+
+  it('emptied but not released: «Riprova» sends the same operation_id, without the card', async () => {
+    const fixture = await setup();
+    // Applied on the server, the answer lost: the same operation_id changes nothing.
+    fixture.cards.failNext('releaseCard', 'lost');
+    const { router, erase } = await startReformat(fixture);
+    await erase.finish({ ok: true });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Card svuotata ma non liberata: controlla la connessione.',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+
+    const sent = releases(fixture);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual(sent[0]);
+    // No new write: the card is already empty.
+    expect(fixture.erases).toHaveLength(1);
+  });
+
+  it('a server fault after the write is said as such, with «Riprova» on the same operation_id', async () => {
+    const fixture = await setup();
+    fixture.cards.failNext('releaseCard', new ServerFaultError('unavailable'));
+    const { erase } = await startReformat(fixture);
+    await erase.finish({ ok: true });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Card svuotata ma non liberata. Servizio momentaneamente non disponibile: riprova tra poco.',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Riprova' }));
+    await waitFor(() => expect(releases(fixture)).toHaveLength(2));
+    const sent = releases(fixture);
+    expect(sent[1]).toEqual(sent[0]);
+  });
+
+  it('a new «Riformatta» after giving up keeps the operation_id the server may have applied', async () => {
+    const fixture = await setup();
+    fixture.cards.failNext('releaseCard', 'network');
+    const { erase } = await startReformat(fixture);
+    await erase.finish({ ok: true });
+    await screen.findByRole('alert');
+    await userEvent.click(screen.getByRole('button', { name: 'Annulla' }));
+
+    await userEvent.click(await screen.findByRole('button', { name: REFORMAT }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Riformatta' }),
+    );
+    const again = await currentErase(fixture);
+    await again.finish({ ok: true });
+    await waitFor(() => expect(releases(fixture)).toHaveLength(2));
+    const sent = releases(fixture);
+    expect(sent[1]).toEqual(sent[0]);
+  });
+
+  it('card_active: reactivated meanwhile, not released, and its link must be written again', async () => {
+    const fixture = await setup();
+    fixture.cards.failNext('releaseCard', 'card_active');
+    const { erase } = await startReformat(fixture);
+    await erase.finish({ ok: true });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'La card è stata riattivata nel frattempo e non è stata liberata. Il suo link è stato cancellato: riscrivilo dalla scheda di Maria.',
+    );
+    expect(screen.queryByRole('button', { name: 'Riprova' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Apri la scheda di Maria' })).toHaveAttribute(
+      'href',
+      `/clienti/${MARIA.id}`,
+    );
+  });
+
+  it('forbidden: «Card non attiva: chiedi a un amministratore.», no «Riprova»', async () => {
+    const fixture = await setup();
+    fixture.cards.failNext('releaseCard', 'forbidden');
+    const { erase } = await startReformat(fixture);
+    await erase.finish({ ok: true });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Card non attiva: chiedi a un amministratore.',
+    );
+    expect(screen.queryByRole('button', { name: 'Riprova' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Torna all’inizio' })).toHaveAttribute('href', '/');
+  });
+
+  it('a phone that stops writing mid-way gets the note in place of the button', async () => {
+    const fixture = await setup();
+    const { erase } = await startReformat(fixture);
+    await erase.finish({ ok: false, reason: 'cannot-write' });
+    expect(await screen.findByText(DEVICE_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: REFORMAT })).toBeNull();
+    expect(screen.getByRole('button', { name: REACTIVATE })).toBeInTheDocument();
+    expect(releases(fixture)).toEqual([]);
+  });
+
+  it('a device that does not write: the note in place of «Riformatta la card», Riattiva stays', async () => {
+    const fixture = await setup({ writable: false });
+    renderPage(fixture, MARIA_LOST.id);
+    expect(await screen.findByText(DEVICE_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: REFORMAT })).toBeNull();
+    expect(screen.getByRole('button', { name: REACTIVATE })).toBeInTheDocument();
   });
 });
