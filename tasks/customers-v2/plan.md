@@ -156,7 +156,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 19: Nuovo e Modifica cliente: campo email, errori, «Apri la scheda»; via il campo telefono
 - [x] Task 20: Scheda: email o «Senza email», niente `mailto:`; testi della cancellazione dati
 - [x] Task 21: Export CSV clienti: colonna «Email» con `guardFormula`
-- [ ] Task 22: Servizi e dominio senza telefono
+- [x] Task 22: Servizi e dominio senza telefono
 - [ ] Task 23: Test di integrazione senza telefono
 - [ ] Task 24: Telefono fuori da galleria, codici ed E2E; percorso E2E dell'email
 - [ ] Task 25: Migrazione 2 nella forma finale; seed con email

@@ -353,8 +353,8 @@ src/features/export/supabaseExportService.ts (+test), src/test/fakeExportService
 **Descrizione:** via `phone` da `Customer`, dagli input e da `customerRow.ts`; i servizi non mandano più
 `p_phone` (le firme transitorie lo hanno con `default`); finti senza telefono.
 **Accettazione:**
-- [ ] Unit: nessuna chiamata RPC contiene `p_phone`; nessuna riga parsata ha `phone`
-- [ ] `npm run typecheck` verde senza il campo
+- [x] Unit: nessuna chiamata RPC contiene `p_phone`; nessuna riga parsata ha `phone`
+- [x] `npm run typecheck` verde senza il campo
 **Verifica:** `npm run typecheck && npm test`
 **Dipendenze:** 19, 20, 21 · **File:** src/features/customers/types.ts, src/features/customers/customerRow.ts,
 src/features/customers/supabaseCustomerService.ts (+test), src/features/cards/supabaseCardsService.ts (+test),
