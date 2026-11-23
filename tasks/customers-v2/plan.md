@@ -165,7 +165,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint D: criteri 1–4 provati; `grep` del telefono pulito (salvo il senso di dispositivo); Impeccable pulito; confronto con Nuovo cliente, Nome già usato, Modifica cliente, Scheda cliente
 
 ### Fase 5: Premi nella pagina pubblica
-- [ ] Task 27: `fetchCardRewards` e sezione PREMI di `/s/:token`
+- [x] Task 27: `fetchCardRewards` e sezione PREMI di `/s/:token`
 
 ### Fase 6: Card non attiva: Riattiva e Riformatta
 - [ ] Task 28: Servizio delle card: `getCard`, `reactivateCard`, `releaseCard`, codici nuovi e `forbidden`

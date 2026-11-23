@@ -428,9 +428,9 @@ aria-labelledby="rewards-title">` con `h2` «PREMI», `<ul>` di righe ≥ 56 px 
 punti» / «1 punto», cifre `it-IT`; frase nuova «Questa pagina mostra i punti della card e i premi del bar,
 senza dati personali.»; senza premi nessuna sezione; «Card non attiva» invariata.
 **Accettazione:**
-- [ ] Componenti: testo intero della pagina («nothing else») con PREMI; singolare; catalogo vuoto; «Card non
+- [x] Componenti: testo intero della pagina («nothing else») con PREMI; singolare; catalogo vuoto; «Card non
       attiva» senza premi; errore di una delle due chiamate → «Riprova»
-- [ ] E2E `card-points`: premi attivi del seed in ordine, nessuna richiesta oltre alle due RPC; leggibile a
+- [x] E2E `card-points`: premi attivi del seed in ordine, nessuna richiesta oltre alle due RPC; leggibile a
       320 px; Impeccable pulito (criterio 7)
 **Verifica:** `npm test -- public && npm run e2e`
 **Dipendenze:** 6 · **File:** src/features/cards/public/cardPointsService.ts (+test),
