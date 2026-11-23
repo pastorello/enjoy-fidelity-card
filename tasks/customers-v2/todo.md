@@ -288,8 +288,8 @@ supabase/tests/customers.test.sql, supabase/tests/export.test.sql, supabase/test
 pgTAP; `email_invalid` e `customer_email_taken` in `errorCodes.ts` e nella traduzione di
 `supabaseCustomerService` (errori tipizzati, `detail` → id dell'altro cliente).
 **Accettazione:**
-- [ ] Unit: stessi vettori di pgTAP (spazi Unicode, maiuscole, vuota → `null`, limiti 6/254, formato)
-- [ ] Unit: ogni codice nuovo → errore tipizzato; nessuna email nei messaggi d'errore
+- [x] Unit: stessi vettori di pgTAP (spazi Unicode, maiuscole, vuota → `null`, limiti 6/254, formato)
+- [x] Unit: ogni codice nuovo → errore tipizzato; nessuna email nei messaggi d'errore
 **Verifica:** `npm test -- customers`
 **Dipendenze:** 16 · **File:** src/features/customers/email.ts (+test), src/features/customers/errorCodes.ts
 (+test), src/features/customers/supabaseCustomerService.ts (+test) · **Dimensione:** S
