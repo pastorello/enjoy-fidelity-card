@@ -159,7 +159,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 22: Servizi e dominio senza telefono
 - [x] Task 23: Test di integrazione senza telefono
 - [x] Task 24: Telefono fuori da galleria, codici ed E2E; percorso E2E dell'email
-- [ ] Task 25: Migrazione 2 nella forma finale; seed con email
+- [x] Task 25: Migrazione 2 nella forma finale; seed con email
 - [ ] Task 26: Controlli di confine e dei codici d'errore
 
 ### Checkpoint D: criteri 1–4 provati; `grep` del telefono pulito (salvo il senso di dispositivo); Impeccable pulito; confronto con Nuovo cliente, Nome già usato, Modifica cliente, Scheda cliente

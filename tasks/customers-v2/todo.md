@@ -393,9 +393,9 @@ column phone`, `drop function private.normalize_phone`, `app.search_customers`,
 `app.customers_served_today`; `seed.sql` con email `@example.com` (alcuni clienti senza) e nessun telefono;
 pgTAP sul telefono sostituiti.
 **Accettazione:**
-- [ ] pgTAP (criterio 1): colonna `phone` assente, le tre funzioni assenti; firme finali; tutti i pgTAP verdi
-- [ ] App, integrazione ed E2E verdi **senza** modifiche al frontend
-- [ ] Nessun `+39…` nel seed
+- [x] pgTAP (criterio 1): colonna `phone` assente, le tre funzioni assenti; firme finali; tutti i pgTAP verdi
+- [x] App, integrazione ed E2E verdi **senza** modifiche al frontend
+- [x] Nessun `+39…` nel seed
 **Verifica:** `npm run db:reset && npm run db:test && npm run test:integration && npm run e2e`
 **Dipendenze:** 23, 24 · **File:** supabase/migrations/*_customers_v2_email.sql, supabase/seed.sql,
 supabase/tests/customers.test.sql, supabase/tests/customers_v2.test.sql, supabase/tests/ledger_reads.test.sql
