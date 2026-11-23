@@ -15,13 +15,13 @@ import { stubLayout } from '../../test/stubLayout';
 
 const MARIA = fakeCustomer({
   name: 'Maria Rossi',
-  phone: '+393330004521',
+  email: 'maria.rossi@example.com',
   notes: 'Preferisce il caffè d’orzo',
   balance: 120,
 });
 const ERASED = fakeCustomer({
   name: 'cancellato-7f3a',
-  phone: null,
+  email: null,
   notes: null,
   anonymizedAt: '2026-11-17T09:00:00.000Z',
   balance: 40,
@@ -71,7 +71,8 @@ describe('CustomerPage at 1280×800 (wireframe "Tablet: scheda cliente")', () =>
     expect(document.querySelector('[data-tablet="true"]')).not.toBeNull();
 
     const left = column('customer');
-    expect(await within(left).findByText(/· Tel\. 333 ••• 4521$/)).toBeInTheDocument();
+    expect(await within(left).findByText(/· maria\.rossi@example\.com$/)).toBeInTheDocument();
+    expect(document.querySelector('[href^="mailto:" i]')).toBeNull();
     expect(within(left).getByText('Preferisce il caffè d’orzo')).toBeInTheDocument();
     expect(within(left).getByRole('region', { name: 'SALDO' })).toHaveTextContent('120');
     expect(within(left).getByRole('link', { name: 'Registra spesa' })).toHaveAttribute(

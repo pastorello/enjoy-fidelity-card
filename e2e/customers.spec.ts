@@ -56,6 +56,9 @@ test.describe('administrator', () => {
     const email = `nicolo.${suffix}@example.com`;
     await createCustomer(page, name, `  Nicolo.${suffix}@Example.COM `);
     await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
+    // Scheda cliente: the email in full, never a link to write to the customer.
+    await expect(page.getByRole('main').getByText(email)).toBeVisible();
+    await expect(page.locator('[href^="mailto:" i]')).toHaveCount(0);
     const customerUrl = page.url();
 
     // Found without the accent in CLIENTI, which never shows the email (SPEC-customers-v2 point
@@ -124,7 +127,7 @@ test('an operator creates a customer with only the name and the consent, and can
   await signIn(page, seedAccounts.operator.email);
 
   await createCustomer(page, name);
-  await expect(page.getByText('Senza telefono')).toBeVisible();
+  await expect(page.getByText('Senza email')).toBeVisible();
   await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
 
   await page.getByRole('link', { name: 'Modifica cliente' }).click();
@@ -159,7 +162,7 @@ test('Scheda cliente: a short name is not repeated under the header', async ({ p
   const name = `Breve ${uniqueSuffix()}`;
   await signIn(page);
   await createCustomer(page, name);
-  await expect(page.getByText('Senza telefono')).toBeVisible();
+  await expect(page.getByText('Senza email')).toBeVisible();
   await expect(page.getByRole('main').getByText(name, { exact: true })).toHaveCount(0);
 });
 

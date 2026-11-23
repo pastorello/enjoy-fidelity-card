@@ -8,14 +8,14 @@ import { renderApp, signedInFake } from '../../test/renderApp';
 
 const MARIA = fakeCustomer({
   name: 'Maria Rossi',
-  phone: '+393331234521',
+  email: 'maria.rossi@example.com',
   notes: 'Preferisce il caffè d’orzo',
   balance: 1250,
 });
-const ROSA = fakeCustomer({ name: 'Rosa Bianchi', phone: null, notes: null, balance: 0 });
+const ROSA = fakeCustomer({ name: 'Rosa Bianchi', email: null, notes: null, balance: 0 });
 const ERASED = fakeCustomer({
   name: 'Cliente cancellato abcdef12',
-  phone: null,
+  email: null,
   notes: null,
   anonymizedAt: '2026-11-17T12:00:00.000Z',
   balance: 120,
@@ -24,7 +24,12 @@ const ERASED = fakeCustomer({
 /** 80 characters, the longest name allowed: two header lines show only its start. */
 const LONG_NAME =
   'Maria Giovanna Esposito De Laurentiis Serapo Formia Lungomare Caboto Ventitre 12';
-const LONG = fakeCustomer({ name: LONG_NAME, phone: '+393331234521', notes: null, balance: 0 });
+const LONG = fakeCustomer({
+  name: LONG_NAME,
+  email: 'maria.giovanna.esposito.delaurentiis.serapo.formia@example.com',
+  notes: null,
+  balance: 0,
+});
 
 function customersFake() {
   return createFakeCustomerService({ customers: [MARIA, ROSA, ERASED, LONG] });
@@ -45,7 +50,7 @@ function balanceBox() {
 }
 
 describe('CustomerPage: Scheda cliente', () => {
-  it('shows the name as title, "Indietro" to the home, "Modifica cliente", phone, notes and SALDO', async () => {
+  it('shows the name as title, "Indietro" to the home, "Modifica cliente", email, notes and SALDO', async () => {
     renderCustomer(`/clienti/${MARIA.id}`);
     expect(
       await screen.findByRole('heading', { level: 1, name: 'Maria Rossi' }),
@@ -56,25 +61,32 @@ describe('CustomerPage: Scheda cliente', () => {
       'href',
       `/clienti/${MARIA.id}/modifica`,
     );
-    // After the card part of `cards` (CardSummary): "Senza card · Tel. 333 ••• 4521".
-    const phone = await screen.findByText(/· Tel\. 333 ••• 4521$/);
-    expect(screen.queryByText(/3331234521/)).not.toBeInTheDocument();
-    // The phone only finds the customer: it is never a link to call or text them.
-    expect(phone.closest('a')).toBeNull();
-    expect(within(phone).queryByRole('link')).not.toBeInTheDocument();
-    expect(document.querySelector('[href^="tel:"], [href^="sms:"]')).toBeNull();
+    // After the card part of `cards` (CardSummary): "Senza card · maria.rossi@example.com", in full.
+    const email = await screen.findByText(/· maria\.rossi@example\.com$/);
+    // The email only finds the customer: never a link to write to them (success criterion 4).
+    expect(email.closest('a')).toBeNull();
+    expect(within(email).queryByRole('link')).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[href^="mailto:" i], [href^="tel:"], [href^="sms:"]'),
+    ).toBeNull();
     expect(screen.getByText('Preferisce il caffè d’orzo')).toBeInTheDocument();
     expect(balanceBox()).toHaveTextContent('SALDO');
     expect(balanceBox()).toHaveTextContent('1.250');
     expect(balanceBox()).toHaveTextContent('punti');
   });
 
-  it('a customer without phone or notes: "Senza telefono", no notes line', async () => {
+  it('a customer without email or notes: "Senza email", no notes line', async () => {
     renderCustomer(`/clienti/${ROSA.id}`);
-    expect(await screen.findByText(/· Senza telefono$/)).toBeInTheDocument();
-    expect(screen.queryByText(/^Tel\./)).not.toBeInTheDocument();
+    expect(await screen.findByText(/· Senza email$/)).toBeInTheDocument();
+    expect(screen.queryByText(/@/)).not.toBeInTheDocument();
     expect(balanceBox()).toHaveTextContent('0');
     expect(balanceBox()).toHaveTextContent('punti');
+  });
+
+  it('no phone line any more: neither "Tel." nor "Senza telefono"', async () => {
+    renderCustomer(`/clienti/${MARIA.id}`);
+    await screen.findByText(/· maria\.rossi@example\.com$/);
+    expect(screen.queryByText(/Tel\.|telefono/)).not.toBeInTheDocument();
   });
 
   it('shows the loading state until the customer arrives', async () => {
@@ -181,9 +193,9 @@ describe('CustomerPage: Scheda cliente', () => {
     expect(screen.getByText('Dati cancellati il 17 nov 2026')).toBeInTheDocument();
     expect(balanceBox()).toHaveTextContent('120');
     expect(screen.queryByRole('link', { name: 'Modifica cliente' })).not.toBeInTheDocument();
-    // The technical name is never shown, nor the phone line.
+    // The technical name is never shown, nor the email line.
     expect(screen.queryByText(/abcdef12/)).not.toBeInTheDocument();
-    expect(screen.queryByText('Senza telefono')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Senza email/)).not.toBeInTheDocument();
   });
 
   it('"Indietro" goes back to the search it came from, kept in the history state', async () => {
@@ -223,7 +235,7 @@ describe('CustomerPage: a long name', () => {
     vi.restoreAllMocks();
   });
 
-  it('an 80-character name cut by the header is shown in full above the phone', async () => {
+  it('an 80-character name cut by the header is shown in full above the email', async () => {
     expect(LONG_NAME).toHaveLength(80);
     // jsdom has no layout: anything longer than two header lines (about 26 capitals) overflows.
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(50);
@@ -236,7 +248,9 @@ describe('CustomerPage: a long name', () => {
     await screen.findByRole('heading', { level: 1, name: LONG_NAME });
     const main = screen.getByRole('main');
     expect(main.firstElementChild).toHaveTextContent(LONG_NAME);
-    expect(main.firstElementChild?.nextElementSibling).toHaveTextContent('Tel. 333 ••• 4521');
+    expect(main.firstElementChild?.nextElementSibling).toHaveTextContent(
+      'maria.giovanna.esposito.delaurentiis.serapo.formia@example.com',
+    );
   });
 });
 

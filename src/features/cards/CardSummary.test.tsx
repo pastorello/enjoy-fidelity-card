@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { createTestCardReader } from '../../test/fakeCardReader';
 import { createFakeCardsService, fakeCard } from '../../test/fakeCardsService';
@@ -7,11 +7,11 @@ import { createFakeRewardsService } from '../../test/fakeRewardsService';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
-const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393331234521' });
-const ROSA = fakeCustomer({ name: 'Rosa Bianchi', phone: null });
+const MARIA = fakeCustomer({ name: 'Maria Rossi', email: 'maria.rossi@example.com' });
+const ROSA = fakeCustomer({ name: 'Rosa Bianchi', email: null });
 const ERASED = fakeCustomer({
   name: 'Cliente cancellato abcdef12',
-  phone: null,
+  email: null,
   anonymizedAt: '2026-11-17T12:00:00.000Z',
 });
 
@@ -53,42 +53,50 @@ async function summaryLine(text: string | RegExp) {
 }
 
 describe('CardSummary: the card part of the line under the name (SPEC-cards, point 6)', () => {
-  it('an active card: "Card attiva …E5F6 · Tel. 333 ••• 4521", the full uid nowhere', async () => {
+  it('an active card: "Card attiva …E5F6 · maria.rossi@example.com", the full uid nowhere', async () => {
     renderCustomer(setup(), `/clienti/${MARIA.id}`);
-    const line = await summaryLine('Card attiva …E5F6 · Tel. 333 ••• 4521');
+    const line = await summaryLine('Card attiva …E5F6 · maria.rossi@example.com');
     expect(line.querySelector('svg')).not.toBeNull();
     expect(screen.queryByText(new RegExp(UID))).not.toBeInTheDocument();
   });
 
-  it('no active card: "Senza card · Senza telefono"', async () => {
+  it('the email in full, as plain text of the line, never a mailto: link', async () => {
+    renderCustomer(setup(), `/clienti/${MARIA.id}`);
+    const line = await summaryLine('Card attiva …E5F6 · maria.rossi@example.com');
+    expect(line.closest('a')).toBeNull();
+    expect(within(line).queryByRole('link')).not.toBeInTheDocument();
+    expect(document.querySelector('[href^="mailto:" i]')).toBeNull();
+  });
+
+  it('no active card: "Senza card · Senza email"', async () => {
     renderCustomer(setup(), `/clienti/${ROSA.id}`);
-    await summaryLine('Senza card · Senza telefono');
+    await summaryLine('Senza card · Senza email');
     expect(screen.queryByText(/Card attiva/)).not.toBeInTheDocument();
   });
 
-  it('styled as "Senza telefono": the same muted secondary text', async () => {
+  it('styled as "Senza email": the same muted secondary text', async () => {
     renderCustomer(setup(), `/clienti/${ROSA.id}`);
-    const line = await summaryLine('Senza card · Senza telefono');
+    const line = await summaryLine('Senza card · Senza email');
     expect(line.className).toMatch(/summary/);
   });
 
-  it('while the card loads: only the phone part, never a guess', async () => {
+  it('while the card loads: only the email part, never a guess', async () => {
     const fixture = setup();
     const held = fixture.cards.holdNext('getActiveCard');
     renderCustomer(fixture, `/clienti/${MARIA.id}`);
-    await summaryLine('Tel. 333 ••• 4521');
+    await summaryLine('maria.rossi@example.com');
     expect(screen.queryByText(/Senza card/)).not.toBeInTheDocument();
     await act(async () => {
       held.release();
     });
-    await summaryLine('Card attiva …E5F6 · Tel. 333 ••• 4521');
+    await summaryLine('Card attiva …E5F6 · maria.rossi@example.com');
   });
 
   it('a card that cannot be loaded: "Card non caricata", not "Senza card"', async () => {
     const fixture = setup();
     fixture.cards.failNext('getActiveCard', 'network');
     renderCustomer(fixture, `/clienti/${MARIA.id}`);
-    await summaryLine('Card non caricata · Tel. 333 ••• 4521');
+    await summaryLine('Card non caricata · maria.rossi@example.com');
     expect(screen.queryByText(/Senza card/)).not.toBeInTheDocument();
   });
 
@@ -110,7 +118,7 @@ describe('CardSummary: the card part of the line under the name (SPEC-cards, poi
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('Card …A1B2 associata.'),
     );
-    await summaryLine('Card attiva …E5F6 · Tel. 333 ••• 4521');
+    await summaryLine('Card attiva …E5F6 · maria.rossi@example.com');
 
     // Away and back to the same page: no message any more.
     await act(async () => {
@@ -119,14 +127,14 @@ describe('CardSummary: the card part of the line under the name (SPEC-cards, poi
     await act(async () => {
       await router.navigate(`/clienti/${MARIA.id}`);
     });
-    await summaryLine('Card attiva …E5F6 · Tel. 333 ••• 4521');
+    await summaryLine('Card attiva …E5F6 · maria.rossi@example.com');
     expect(screen.queryByText('Card …A1B2 associata.')).not.toBeInTheDocument();
     // Neither when the history entry it came with is visited again.
     await act(async () => {
       await router.navigate(-2);
     });
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
-    await summaryLine('Card attiva …E5F6 · Tel. 333 ••• 4521');
+    await summaryLine('Card attiva …E5F6 · maria.rossi@example.com');
     expect(screen.queryByText('Card …A1B2 associata.')).not.toBeInTheDocument();
   });
 });
