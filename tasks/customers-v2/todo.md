@@ -527,8 +527,8 @@ nessun «Riformatta» (nota del telefono Android); `e2e/tablet-layout.spec.ts` m
 card disattivata dal lettore USB (`page.keyboard`) con un cassiere admin di un dispositivo del seed riservato →
 Riattiva → scheda con «Link non scritto».
 **Accettazione:**
-- [ ] Test tablet del componente e E2E (criterio 12); nessuno scorrimento orizzontale; target ≥ 48 px
-- [ ] Impeccable pulito
+- [x] Test tablet del componente e E2E (criterio 12); nessuno scorrimento orizzontale; target ≥ 48 px
+- [x] Impeccable pulito
 **Verifica:** `npm test && npm run e2e`
 **Dipendenze:** 31, 32 · **File:** src/features/cards/InactiveCardPage.module.css,
 src/features/cards/cardsPages.tablet.test.tsx, e2e/tablet-layout.spec.ts, e2e/tablet.spec.ts, supabase/seed.sql

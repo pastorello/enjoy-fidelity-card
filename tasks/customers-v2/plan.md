@@ -174,7 +174,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 31: Riattiva (conferma, scambio, `active_card_changed`, scrittura del link)
 - [x] Task 32: Riformatta (conferma, passi, esiti, `release_card` con lo stesso `operation_id`)
 - [x] Task 33: Associa card: riattivazione rifiutata all'operatore con il testo giusto
-- [ ] Task 34: Tablet: «Card non attiva» a 1280×800, nota al posto di Riformatta, E2E dal lettore USB
+- [x] Task 34: Tablet: «Card non attiva» a 1280×800, nota al posto di Riformatta, E2E dal lettore USB
 - [ ] Task 35: E2E telefono: riattiva con scambio, riformatta, operatore
 
 ### Checkpoint E: criteri 7–13 provati; revisione `security-and-hardening` del client; Impeccable pulito; E2E telefono e tablet verdi
