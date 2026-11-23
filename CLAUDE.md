@@ -17,7 +17,8 @@ lavorare in silenzio: conferma prima di aver capito.
 **Enjoy Card** è la fidelity card a punti dell'**Enjoy Bar**. Il cliente accumula punti in base a
 quanto spende; il titolare decide quali premi offrire e scala i punti. La card NFC è uno strumento di
 marketing e una scorciatoia per riconoscere il cliente alla cassa: tutto funziona anche senza card,
-cercando il cliente per nome o telefono.
+cercando il cliente per nome o email (il telefono non si raccoglie più: decisione del 2026-11-23,
+`docs/specs/SPEC-customers-v2.md`).
 
 **Fonti di verità** (in caso di dubbio valgono queste, non questo file):
 - Specifiche: https://claude.ai/artifact/59XU2sRGx1EoUtxS8mxN6S
@@ -32,8 +33,11 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
 - **Tablet della cassa** (BESTTAB A20, 10,1″, 1280×800 punti in orizzontale, senza NFC): fase successiva,
   **solo se si compra un lettore NFC USB**.
 - Flusso a senso unico alla cassa: il cliente consegna la card all'operatore e lì non vede nulla. Il proprio
-  **saldo** lo vede da solo avvicinando la card al suo telefono (pagina pubblica dal link sulla card).
-- L'app **non contatta i clienti**: niente messaggi, offerte o campagne. Il telefono del cliente è facoltativo.
+  **saldo**, e sotto l'elenco dei **premi attivi** (nome e punti), lo vede da solo avvicinando la card al suo
+  telefono (pagina pubblica dal link sulla card).
+- L'app **non contatta i clienti**: niente messaggi, offerte o campagne. Il telefono del cliente non si
+  raccoglie; l'**email** è facoltativa e unica, serve a ritrovare il cliente e non si usa per scrivergli (una
+  futura newsletter richiederebbe un consenso marketing separato).
 - Clienti nell'ordine delle centinaia; più operatori in contemporanea su un archivio condiviso online.
 - Obiettivo di usabilità: **dalla card alla conferma della spesa in meno di 10 secondi**.
 
@@ -60,9 +64,14 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
   se i suoi punti sono già stati spesi.
 - Ogni operazione porta un **identificativo generato dall'app** (idempotenza): doppio tocco o reinvio dopo
   un errore di rete non registrano due volte.
-- **Nome del cliente unico** (per gli omonimi si aggiunge un dettaglio). Clienti anche senza card e senza telefono.
+- **Nome del cliente unico** (per gli omonimi si aggiunge un dettaglio). **Email facoltativa e unica**
+  (minuscole, senza distinguere maiuscole; un cliente con dati cancellati la libera). Clienti anche senza card
+  e senza email.
 - Un cliente ha **al massimo una card attiva**; card persa → la vecchia si disattiva, i punti restano.
 - Una card sconosciuta letta dalla schermata principale apre Nuovo cliente con la card già associata.
+- Card disattivata riletta alla cassa: solo un **amministratore** la **riattiva** (scambio con l'eventuale
+  altra card attiva, dopo conferma) o la **riformatta** (card riscritta vuota, poi dissociata per sempre: la
+  riga resta per lo storico, l'uid torna libero). Card di un cliente con dati cancellati: solo riformattare.
 
 ## Ruoli
 - **Amministratore** (titolari): tutto, più operatori, catalogo premi, rapporto euro/punto, soglia di
@@ -85,8 +94,10 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
 
 ## Privacy (GDPR)
 - Consenso privacy obbligatorio alla registrazione; testi da far verificare al consulente del bar.
-- Cancellazione su richiesta: nome e telefono anonimizzati, movimenti conservati senza dati personali.
-- RLS: solo utenti autenticati leggono e scrivono.
+- Cancellazione su richiesta: nome, email e note anonimizzati, movimenti conservati senza dati personali.
+- RLS: solo utenti autenticati leggono e scrivono. Unica eccezione per i non autenticati: le funzioni della
+  pagina pubblica `/s/:token` (`public.card_points` e, con `customers-v2`, `public.card_rewards`), che con un
+  token valido restituiscono solo i punti e i premi attivi.
 - Il repo è **pubblico**: niente dati reali di clienti, nemmeno nei fixture di test; nessun segreto nel repo.
 
 ## Fasi

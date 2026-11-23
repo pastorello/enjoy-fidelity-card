@@ -16,9 +16,10 @@ revisione incrociata: `docs/specs/`.
 | `ledger` | Movimenti: spesa con tastierino e punti, riscatto (catalogo o libero), saldo, annullo entro 10 s, correzioni, idempotenza, saldo ≥ 0 | customers, settings, rewards | [SPEC-ledger.md](docs/specs/SPEC-ledger.md) |
 | `export` | Esportazione CSV di clienti e movimenti | customers, ledger | [SPEC-export.md](docs/specs/SPEC-export.md) |
 | `tablet-kiosk` | Account di dispositivo, cambio operatore con PIN (blocco dopo 5 errori), lettore USB, schermate tablet 1280×800 | identity, card-input, flussi sopra | [SPEC-tablet-kiosk.md](docs/specs/SPEC-tablet-kiosk.md) |
+| `customers-v2` | Delta del 2026-11-23: telefono rimosso, email facoltativa e unica (ricerca, scheda, export), elenco clienti in home a scorrimento infinito per ultima attività (al posto di SERVITI OGGI), premi attivi nella pagina pubblica dei punti, card disattivata o di cliente cancellato: Riattiva / Riformatta (solo amministratori) | customers, cards, card-input, ledger, rewards, export, tablet-kiosk | [SPEC-customers-v2.md](docs/specs/SPEC-customers-v2.md) (delta, proposta) |
 
 **Ordine di costruzione**: platform → identity → settings, customers, rewards → card-input → cards → ledger
-→ export → *checkpoint di lancio (50 card)* → tablet-kiosk.
+→ export → *checkpoint di lancio (50 card)* → tablet-kiosk → customers-v2 (delta del 2026-11-23).
 
 **Checkpoint di lancio** (non è un modulo): testo privacy approvato dal consulente, amministratori creati in
 produzione, card stampate e provate su telefono.

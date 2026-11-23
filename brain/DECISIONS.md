@@ -10,6 +10,60 @@
 
 ## Registro (più recenti in alto)
 
+### 2026-11-23 — Clienti V2: email al posto del telefono, premi nella pagina dei punti, card riattivabili o riformattabili, elenco clienti in home
+
+- **Decisione**: sei cambiamenti chiesti dal titolare, con le risposte alle domande di chiarimento dello
+  stesso giorno. Specifica: `docs/specs/SPEC-customers-v2.md` (modulo `customers-v2`).
+  1. **Niente più telefono**: il bar ha deciso di non raccoglierlo. Il campo sparisce da moduli, scheda,
+     ricerca, export CSV, dati di prova e documenti; la colonna e i numeri già salvati si cancellano dal
+     database (migrazione).
+  2. **Email facoltativa** al suo posto, un solo campo: si salva normalizzata (spazi tolti, minuscole), in
+     formato valido, **unica** (due clienti non possono avere la stessa email, senza distinguere maiuscole;
+     un cliente con dati cancellati la libera); si cerca dalla home **nello stesso campo del nome**; compare
+     nella scheda, in Modifica cliente e nell'export CSV dei clienti; si cancella con "Cancella i dati del
+     cliente". Per ora l'app **non manda email** ai clienti.
+  3. **Premi nella pagina pubblica dei punti** (`/s/<token>`): sotto i punti, l'elenco dei premi **attivi**
+     (nome e punti), e nient'altro.
+  4. **Card disattivata riavvicinata alla cassa**: un amministratore può **riattivarla** (torna al suo
+     cliente; se il cliente ha già un'altra card attiva le card si **scambiano** dopo una conferma che lo
+     dice: quella riavvicinata torna attiva, l'altra si disattiva, i punti restano sul cliente) oppure
+     **riformattarla**: la card torna vuota e si **dissocia per sempre** dal cliente, così diventa di nuovo
+     disponibile per un cliente nuovo. Oggi l'app dice "disattivata" e non permette nulla.
+  5. **Card di un cliente con dati cancellati**: un amministratore può solo **riformattarla**, riportandola
+     allo stato vergine.
+  6. **Home**: sotto il campo di ricerca, l'**elenco dei clienti** con scorrimento infinito, **20 per
+     pagina**, in ordine di **ultima attività** (prima i clienti con la spesa o il riscatto più recente).
+  - Riattivare o riformattare è **solo per gli amministratori**; agli operatori l'app dice «Card non attiva:
+    chiedi a un amministratore».
+  - Una futura **newsletter** richiederebbe un **consenso marketing separato** e facoltativo, distinto dal
+    consenso privacy della registrazione: non è in questo lavoro e non si raccoglie ora.
+  - L'**informativa privacy** va fatta ricontrollare dal consulente del bar: ora parla di email (facoltativa,
+    non usata per contattare il cliente) e non più di telefono.
+- **Perché**: richiesta del titolare del 2026-11-23. Il telefono non serve più; l'email è il recapito
+  facoltativo che il bar preferisce, utile per ritrovare il cliente e per una newsletter futura. Vedere i
+  premi spinge a usare i punti. Una card ritrovata o di un cliente cancellato oggi è un pezzo di plastica
+  inutilizzabile: riattivarla o riformattarla la recupera. L'elenco in home evita di scrivere per ritrovare i
+  clienti abituali.
+- **Alternative scartate (Rejected alternatives)**:
+  - Tenere il telefono accanto all'email: il bar ha deciso di non raccoglierlo.
+  - Email non unica: il titolare la vuole unica (identifica il cliente come il nome).
+  - Riattivare e riformattare per tutti gli operatori: il titolare le riserva agli amministratori.
+  - Riattivare rifiutando se il cliente ha già un'altra card attiva: il titolare vuole lo scambio, con conferma.
+  - Mostrare premi o altro anche sulla pagina «Card non attiva»: nient'altro oltre ai premi attivi sotto i
+    punti di una card valida.
+  - Raccogliere già ora il consenso alla newsletter: la funzione non esiste; il consenso si chiederà quando
+    e se verrà fatta.
+- **Ambito**: `customers`, `cards`, `card-input` (scrittura di una card vuota), `ledger` (ultima attività),
+  `export`, `tablet-kiosk` (stesse schermate a 1280×800), pagina pubblica `/s/:token`. Sostituisce: il
+  "telefono facoltativo" di `customers` e di `CLAUDE.md`; il non-obiettivo di `brain/PROJECT.md` «nessuna area
+  per il cliente oltre al saldo: niente … premi» (ora la pagina pubblica mostra anche i premi attivi; resta
+  senza nome, account e movimenti); la voce del 2026-11-17 «la pagina pubblica mostra solo i punti» (ora punti
+  e premi attivi); la regola di `cards` «un uid non passa mai a un altro cliente» (dopo una riformattazione la
+  card può essere associata a un cliente nuovo; la riga vecchia resta per lo storico); la sezione SERVITI OGGI
+  della home (sostituita dall'elenco dei clienti).
+- **Contesto**: messaggio del titolare del 2026-11-23 e sue risposte alle domande su email, scambio delle
+  card, ruoli e ordine dell'elenco. Testo originale nelle fonti della sessione, riassunto qui.
+
 ### 2026-11-18 — Indirizzo scritto sulle card: enjoy-fidelity-card.vercel.app
 
 - **Decisione**: i link scritti sulle Enjoy Card usano l'origine `https://enjoy-fidelity-card.vercel.app`
