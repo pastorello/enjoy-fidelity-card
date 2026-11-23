@@ -180,8 +180,8 @@ com'è, `serverFaultFor` per primo, codici `invalid_cursor`/`invalid_limit` come
 con lo stesso ordine, filtro e cursore del server; `fakeLedgerService.applyMovement` aggiorna
 `lastActivityAt`.
 **Accettazione:**
-- [ ] Unit: parser (stringhe ISO con microsecondi intatte, righe senza `notes`, forma sbagliata → errore)
-- [ ] Unit: il servizio Supabase manda i parametri della spec e restituisce `hasMore` = 20 righe; il finto
+- [x] Unit: parser (stringhe ISO con microsecondi intatte, righe senza `notes`, forma sbagliata → errore)
+- [x] Unit: il servizio Supabase manda i parametri della spec e restituisce `hasMore` = 20 righe; il finto
       rispetta ordine, filtro (nome a parole, parte dell'email) e cursore; una spesa nel ledger finto porta il
       cliente in cima
 **Verifica:** `npm test -- customers`

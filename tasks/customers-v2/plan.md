@@ -140,7 +140,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 ### Checkpoint B: quality bar completa verde; `npm run build && npm run check:bundle` verde
 
 ### Fase 3: Home con l'elenco CLIENTI
-- [ ] Task 10: Contratto `list` del servizio clienti (tipi, parser, Supabase, finto, ledger finto)
+- [x] Task 10: Contratto `list` del servizio clienti (tipi, parser, Supabase, finto, ledger finto)
 - [ ] Task 11: `activityLabel` e `useCustomerList` (pagine, sentinella, ricerca, aggiornamento)
 - [ ] Task 12: Campo di ricerca della home negli E2E tramite un solo helper
 - [ ] Task 13: Home: sezione CLIENTI, ricerca nello stato della cronologia, «nome o email», tablet a due colonne
