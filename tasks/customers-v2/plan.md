@@ -168,7 +168,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 - [x] Task 27: `fetchCardRewards` e sezione PREMI di `/s/:token`
 
 ### Fase 6: Card non attiva: Riattiva e Riformatta
-- [ ] Task 28: Servizio delle card: `getCard`, `reactivateCard`, `releaseCard`, codici nuovi e `forbidden`
+- [x] Task 28: Servizio delle card: `getCard`, `reactivateCard`, `releaseCard`, codici nuovi e `forbidden`
 - [ ] Task 29: Lettura in home di una card disattivata (admin → `/card/:cardId`, operatore → avviso) e rotta
 - [ ] Task 30: Schermata «Card non attiva»: dati e stati
 - [ ] Task 31: Riattiva (conferma, scambio, `active_card_changed`, scrittura del link)

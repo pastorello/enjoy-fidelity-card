@@ -444,9 +444,9 @@ src/features/cards/public/CardPointsPage.tsx (+css, +test), e2e/card-points.spec
 in `CARD_ERROR_CODES` con traduzione propria («Card non attiva: chiedi a un amministratore.»);
 `fakeCardsService` con le stesse regole (ruolo, scambio, idempotenza, rilascio che libera l'uid).
 **Accettazione:**
-- [ ] Unit: forme e parametri delle tre RPC; ogni codice nuovo → errore tipizzato; `forbidden` non è più il
+- [x] Unit: forme e parametri delle tre RPC; ogni codice nuovo → errore tipizzato; `forbidden` non è più il
       `CustomerError` della cancellazione dati
-- [ ] Finto: `release` con lo stesso `operation_id` non cambia nulla; uid rilasciato sconosciuto a `lookup`
+- [x] Finto: `release` con lo stesso `operation_id` non cambia nulla; uid rilasciato sconosciuto a `lookup`
 **Verifica:** `npm test -- cards`
 **Dipendenze:** 5 · **File:** src/features/cards/types.ts, src/features/cards/supabaseCardsService.ts (+test),
 src/test/fakeCardsService.ts (+test) · **Dimensione:** M
