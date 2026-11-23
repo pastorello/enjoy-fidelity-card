@@ -4,17 +4,18 @@
 -- Scan). This is the blocking, deterministic check; no timing assertion here (shared CI
 -- runners would make it random): the time is measured by hand (RUNBOOK).
 --
--- EXPLAIN cannot look inside a plpgsql function, so the file copies the query of its body
--- (the same text, its variables as parameters) and explains it planned with the parameter
--- values, as the function runs it (plan_cache_mode = force_custom_plan). The same three calls are
--- then made through app.list_customers and must return the same rows, so the copy cannot
--- drift from the function unnoticed.
+-- EXPLAIN cannot look inside a plpgsql function, so the file takes the `return query`
+-- statement out of the deployed body of app.list_customers (pg_proc.prosrc, its variables
+-- turned into parameters) and explains it planned with the parameter values, as the function
+-- runs it (plan_cache_mode = force_custom_plan). Any edit to the function's query changes what
+-- is explained. The same three calls are then made through app.list_customers and must return
+-- the same rows, a check of the extraction itself.
 --
 -- Everything happens in one transaction that is rolled back: nothing stays in the
 -- database. Fake data only: invented names, @example.com emails.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(9);
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-a900-000000000001', 'plan.admin@example.com');
@@ -61,24 +62,35 @@ join plan_active a on a.n = m % 900;
 analyze app.customers;
 analyze app.movements;
 
--- The query of the list_customers body, its variables as parameters: $1 = v_patterns,
--- $2 = v_email_pattern, $3 = p_after_activity_at, $4 = p_after_created_at, $5 = p_after_id,
--- $6 = p_limit.
-create function pg_temp.home_query() returns text language sql immutable as $f$ select $q$
-  select f.id, f.name, private.customer_balance(f.id), f.last_activity_at, f.created_at
-  from (
-    select c.id, c.name, c.last_activity_at, c.created_at, c.has_activity, c.sort_at
-    from app.customers c
-    where c.anonymized_at is null
-      and ($1 is null or c.name_key like all ($1) or c.email like $2)
-      and ($5 is null
-           or (c.has_activity, c.sort_at, c.id)
-              < ($3 is not null, coalesce($3, $4), $5))
-    order by c.has_activity desc, c.sort_at desc, c.id desc
-    limit $6
-  ) f
-  order by f.has_activity desc, f.sort_at desc, f.id desc
-$q$::text $f$;
+-- The query of the deployed list_customers body: the text of its `return query` statement,
+-- whitespace collapsed, its variables as parameters: $1 = v_patterns, $2 = v_email_pattern,
+-- $3 = p_after_activity_at, $4 = p_after_created_at, $5 = p_after_id, $6 = p_limit.
+create function pg_temp.home_query() returns text language sql stable as $f$
+  select regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(regexp_replace(
+    regexp_replace(
+      substring(p.prosrc from '(?:\mreturn query\M)(.*?);\s*end;\s*$'),
+      '\s+', ' ', 'g'),
+    '\mv_patterns\M', '$1', 'g'),
+    '\mv_email_pattern\M', '$2', 'g'),
+    '\mp_after_activity_at\M', '$3', 'g'),
+    '\mp_after_created_at\M', '$4', 'g'),
+    '\mp_after_id\M', '$5', 'g'),
+    '\mp_limit\M', '$6', 'g')
+  from pg_proc p
+  where p.oid = 'app.list_customers(text,timestamptz,timestamptz,uuid,int)'::regprocedure
+$f$;
+
+select ok(
+  pg_temp.home_query() ~ '^ select .* from app\.customers c .* limit \$6 \) f order by .*$'
+    and pg_temp.home_query() !~ '\m(v|p)_[a-z_]+\M',
+  'the query is taken from the body of list_customers, every variable a parameter'
+);
+select is(
+  (select count(*)::int from pg_proc
+   where pronamespace = 'app'::regnamespace and proname = 'list_customers'),
+  1,
+  'one list_customers only: the one whose body is explained'
+);
 
 -- The text-to-pattern step of the body: one pattern per word for the name key and one
 -- for the whole text in the email, from 2 characters; \, % and _ literal.
