@@ -408,8 +408,8 @@ supabase/tests/customers.test.sql, supabase/tests/customers_v2.test.sql, supabas
 `mailto:`); `customerErrorCodes.test.ts` e `cardErrorCodes.test.ts` leggono `_customers*.sql`/`_cards*.sql` e
 usano la definizione più recente di ogni funzione ancora presente; `ledgerErrorCodes.test.ts` aggiornato.
 **Accettazione:**
-- [ ] Test di confine verde (criterio 1) e rosso se si reintroduce uno dei modelli (provato in TDD)
-- [ ] `email_invalid` e `customer_email_taken` obbligatori, `phone_invalid` assente
+- [x] Test di confine verde (criterio 1) e rosso se si reintroduce uno dei modelli (provato in TDD)
+- [x] `email_invalid` e `customer_email_taken` obbligatori, `phone_invalid` assente
 **Verifica:** `npm test -- scripts`
 **Dipendenze:** 25 · **File:** scripts/customersBoundary.test.ts, scripts/customerErrorCodes.test.ts,
 scripts/cardErrorCodes.test.ts, scripts/ledgerErrorCodes.test.ts · **Dimensione:** M
