@@ -830,8 +830,8 @@ export function normalizeEmail(input: string): string | null | 'invalid' {
 1. **Spese e riscatti annullati nell'ultima attività?** Default: sì, contano (il cliente è venuto al bar, come in
    SERVITI OGGI); le correzioni no.
 2. **SERVITI OGGI si toglie?** Il titolare ha chiesto l'elenco dei clienti sotto la ricerca, non la rimozione di
-   SERVITI OGGI. Default da confermare: la sezione CLIENTI la sostituisce; i clienti di oggi stanno in cima con
-   «Oggi, 10:15». Nessuna sezione separata.
+   SERVITI OGGI. **Deciso dal titolare (2026-11-23)**: un solo elenco CLIENTI che la sostituisce; i clienti di
+   oggi stanno in cima con «Oggi, 10:15». Nessuna sezione separata.
 3. **Riattivazione da Associa card per gli operatori** (oggi permessa per la card disattivata dello stesso
    cliente). Default, conseguenza della regola del titolare «riattivare una card disattivata: solo
    amministratori» (da confermare che valga anche da lì): solo amministratori; l'operatore vede
@@ -870,5 +870,5 @@ export function normalizeEmail(input: string): string | null | 'invalid' {
 17. **Cancellare i telefoni già salvati** (irreversibile). Il titolare ha detto «rimuoviamo il numero di
     telefono, abbiamo deciso di non collezionarli»: è deciso che il campo sparisce e che non se ne raccolgono più;
     non è stato detto esplicitamente di cancellare quelli già in archivio. Default proposto: cancellarli
-    (`update … set phone = null`, `drop column`, `vacuum full`). **Domanda da fare al titolare, con risposta
-    prima del merge della migrazione 2**: «Cancelliamo anche i numeri già salvati? Non si potranno recuperare.»
+    (`update … set phone = null`, `drop column`, `vacuum full`). **Deciso dal titolare (2026-11-23)**: «Sì,
+    cancellali»: i numeri già salvati si cancellano con la migrazione 2.

@@ -14,12 +14,10 @@
 
 - **Decisione**: sei cambiamenti chiesti dal titolare, con le risposte alle domande di chiarimento dello
   stesso giorno. Specifica: `docs/specs/SPEC-customers-v2.md` (modulo `customers-v2`). Qui solo ciò che il
-  titolare ha detto; le scelte proposte dalla spec (SERVITI OGGI tolta, email senza distinguere maiuscole, riga
-  della card riformattata conservata, «Card non attiva» senza premi, cancellazione dei telefoni già salvati)
-  sono nelle sue Open Questions, da confermare.
-  1. **Niente più telefono**: il bar ha deciso di non raccoglierlo; il campo si rimuove dall'app. Se cancellare
-     anche i numeri già salvati (irreversibile) è da chiedere al titolare prima del rilascio (Open Question 17
-     della spec).
+  titolare ha detto; le altre scelte proposte dalla spec (email senza distinguere maiuscole, riga della card
+  riformattata conservata, «Card non attiva» senza premi) sono nelle sue Open Questions.
+  1. **Niente più telefono**: il bar ha deciso di non raccoglierlo; il campo si rimuove dall'app e i **numeri
+     già salvati si cancellano** (irreversibile; confermato dal titolare il 2026-11-23, Open Question 17).
   2. **Email facoltativa** al suo posto: si salva, si cerca dalla home **nello stesso campo del nome**, compare
      nella scheda e nell'export CSV; è **unica** (due clienti non possono averla uguale); si cancella con la
      cancellazione dei dati del cliente. Per ora l'app **non manda email** ai clienti; in futuro potrebbe
@@ -34,7 +32,8 @@
   5. **Card di un cliente con dati cancellati**: un amministratore può solo **riformattarla**, riportandola
      allo stato vergine.
   6. **Home**: sotto il campo di ricerca, l'**elenco dei clienti** con scorrimento infinito, **20 per
-     pagina**, in ordine di **ultima attività** (prima i clienti con la spesa o il riscatto più recente).
+     pagina**, in ordine di **ultima attività** (prima i clienti con la spesa o il riscatto più recente). È
+     **un solo elenco CLIENTI** che sostituisce «SERVITI OGGI» (confermato dal titolare, Open Question 2).
   - Riattivare o riformattare è **solo per gli amministratori**; agli operatori l'app dice «Card non attiva:
     chiedi a un amministratore».
   - Una futura **newsletter** richiederebbe un **consenso marketing separato** e facoltativo, distinto dal
