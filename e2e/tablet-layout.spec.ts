@@ -249,8 +249,10 @@ test('the cashier chip fits a narrow window of the till tablet (390 px wide)', a
   await page.getByRole('searchbox').fill('Bianchi');
   await page.getByRole('link', { name: /Giulia Bianchi/ }).click();
   await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}$/);
-  await expectHeaderFits(page.getByRole('link', { name: /Modifica/ }));
+  // Measured once the customer has loaded: the header re-renders when it arrives, and a chip
+  // measured before that can be detached between `toBeVisible` and `boundingBox`.
   await expect(page.getByRole('heading', { level: 1, name: 'Giulia Bianchi' })).toBeVisible();
+  await expectHeaderFits(page.getByRole('link', { name: /Modifica/ }));
 
   resetDevice(till.name);
 });
