@@ -98,20 +98,6 @@ const calls = [
     result: { customers: [listed], hasMore: false },
   },
   {
-    name: 'search',
-    run: () => supabaseCustomerService.search('rossi'),
-    rpc: ['search_customers', { p_query: 'rossi' }],
-    data: [row],
-    result: [customer],
-  },
-  {
-    name: 'servedToday',
-    run: () => supabaseCustomerService.servedToday(),
-    rpc: ['customers_served_today'],
-    data: [row],
-    result: [customer],
-  },
-  {
     name: 'get',
     run: () => supabaseCustomerService.get(ID),
     rpc: ['get_customer', { p_customer_id: ID }],
@@ -203,7 +189,7 @@ describe.each(calls)('$name', ({ run, rpc, data, result }) => {
   it.each([
     ['PGRST202', 404, 'Could not find the function', 'misconfigured'],
     ['PGRST106', 406, 'Invalid schema: app', 'misconfigured'],
-    ['42501', 401, 'permission denied for function search_customers', 'misconfigured'],
+    ['42501', 401, 'permission denied for function list_customers', 'misconfigured'],
     ['PGRST002', 503, 'Could not query the database for the schema cache', 'unavailable'],
     ['', 503, 'Service Unavailable', 'unavailable'],
   ])('%s (HTTP %i) is a ServerFaultError', async (code, status, message, kind) => {
@@ -279,12 +265,6 @@ describe('reads', () => {
     await expect(supabaseCustomerService.get(ID)).resolves.toBeNull();
   });
 
-  it('search keeps the 21st row, which tells the page there are more', async () => {
-    const rows = Array.from({ length: 21 }, (_, index) => ({ ...row, id: `${index}` }));
-    db.rpc.mockResolvedValue({ data: rows, error: null, status: 200 });
-    await expect(supabaseCustomerService.search('rossi')).resolves.toHaveLength(21);
-  });
-
   it('maps an anonymized customer with its date and a served time', async () => {
     db.rpc.mockResolvedValue({
       data: [
@@ -311,9 +291,9 @@ describe('reads', () => {
     });
   });
 
-  it('a list answer that is not an array is unknown', async () => {
+  it('a get answer that is not an array is unknown', async () => {
     db.rpc.mockResolvedValue({ data: row, error: null, status: 200 });
-    expect((await customerError(supabaseCustomerService.search('rossi'))).kind).toBe('unknown');
+    expect((await customerError(supabaseCustomerService.get(ID))).kind).toBe('unknown');
   });
 });
 

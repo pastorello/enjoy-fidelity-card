@@ -8,7 +8,7 @@ import { createFakeSettingsService, defaultSettings } from '../../test/fakeSetti
 import { renderApp, signedInFake } from '../../test/renderApp';
 
 const TURN_ENDED = 'Turno scaduto: inserisci di nuovo il PIN';
-const SEARCH_LABEL = 'Oppure cerca per nome o telefono';
+const SEARCH_LABEL = 'Oppure cerca per nome o email';
 const cashier = { id: 'op-2', name: 'Marco Prova', role: 'operator' as const };
 
 afterEach(() => {
@@ -116,7 +116,7 @@ describe('RequireCashier', () => {
     const field = await screen.findByRole('searchbox', { name: SEARCH_LABEL });
 
     fake.expireTurn();
-    customers.failNext('search', 'not_operator');
+    customers.failNext('list', 'not_operator');
     fireEvent.change(field, { target: { value: 'rossi' } });
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/cassa'));
@@ -131,7 +131,7 @@ describe('RequireCashier', () => {
     const field = await screen.findByRole('searchbox', { name: SEARCH_LABEL });
 
     fake.removeProfile();
-    customers.failNext('search', 'not_operator');
+    customers.failNext('list', 'not_operator');
     fireEvent.change(field, { target: { value: 'rossi' } });
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));

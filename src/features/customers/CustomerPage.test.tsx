@@ -186,26 +186,35 @@ describe('CustomerPage: Scheda cliente', () => {
     expect(screen.queryByText('Senza telefono')).not.toBeInTheDocument();
   });
 
-  it('"Indietro" goes back to the search it came from (?q=)', async () => {
-    const { router } = renderCustomer('/?q=rossi');
+  it('"Indietro" goes back to the search it came from, kept in the history state', async () => {
+    const { router } = renderCustomer('/');
+    await userEvent.type(
+      await screen.findByRole('searchbox', { name: 'Oppure cerca per nome o email' }),
+      'rossi',
+    );
+    await waitFor(() => expect(router.state.location.state).toEqual({ q: 'rossi' }));
     await userEvent.click(await screen.findByRole('link', { name: /Maria Rossi/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
     const back = await screen.findByRole('link', { name: 'Indietro' });
-    expect(back).toHaveAttribute('href', '/?q=rossi');
+    expect(back).toHaveAttribute('href', '/');
     await userEvent.click(back);
-    await waitFor(() => expect(router.state.location.search).toBe('?q=rossi'));
-    expect(await screen.findByRole('searchbox', { name: 'Cerca per nome o telefono' })).toHaveValue(
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(router.state.location.search).toBe('');
+    expect(router.state.location.state).toEqual({ q: 'rossi' });
+    expect(await screen.findByRole('searchbox', { name: 'Cerca per nome o email' })).toHaveValue(
       'rossi',
     );
   });
 
-  it('opened from SERVITI OGGI or a direct link: "Indietro" goes to the plain home', async () => {
-    const customers = customersFake();
-    customers.setServedToday([MARIA.id]);
-    const { router } = renderCustomer('/', customers);
+  it('opened from the plain list or a direct link: "Indietro" goes to the plain home', async () => {
+    const { router } = renderCustomer('/');
     await userEvent.click(await screen.findByRole('link', { name: /Maria Rossi/ }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${MARIA.id}`));
-    expect(await screen.findByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/');
+    const back = await screen.findByRole('link', { name: 'Indietro' });
+    expect(back).toHaveAttribute('href', '/');
+    await userEvent.click(back);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(router.state.location.state).toBeNull();
   });
 });
 
@@ -245,6 +254,6 @@ describe('CustomerPage: a one-time message of the navigation state', () => {
       ),
     );
     expect(router.state.location.state).toEqual({ backSearch: 'rossi' });
-    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/?q=rossi');
+    expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/');
   });
 });

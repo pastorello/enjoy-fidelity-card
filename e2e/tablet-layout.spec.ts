@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { SEED_PINS, seedAccounts, seedDevices, signInDevice } from './auth';
-import { expect, test } from './fixtures';
+import { expect, homeCustomers, test } from './fixtures';
 import { uniqueName } from './nfc';
 import { operatorButton, resetDevice, tapPin } from './tablet';
 
@@ -121,6 +121,15 @@ test('every screen of the tablet wireframes at 1280×800 (criterion 7)', async (
     const reader = page.locator('[data-tablet="true"] > :first-child');
     await expect(reader.getByRole('region', { name: 'Lettura card' })).toBeVisible();
     await expectColumn(reader, 440, 'left');
+    // CLIENTI in two columns on the right (SPEC-customers-v2 point 6): the first two rows side by side.
+    const rows = homeCustomers(page).getByRole('link');
+    await expect(rows.nth(1)).toBeVisible();
+    const first = await rows.nth(0).boundingBox();
+    const second = await rows.nth(1).boundingBox();
+    if (!first || !second) throw new Error('The CLIENTI rows have no box');
+    expect(Math.abs(first.y - second.y)).toBeLessThanOrEqual(TOLERANCE);
+    expect(second.x).toBeGreaterThanOrEqual(first.x + first.width);
+    expect(first.x).toBeGreaterThanOrEqual(440);
     await expectTabletScreen(page, page.getByRole('link', { name: 'Nuovo cliente' }));
   });
 

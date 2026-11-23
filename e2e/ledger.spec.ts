@@ -79,7 +79,7 @@ async function expectTouchTargets(page: Page, names: (string | RegExp)[]) {
   });
 }
 
-test('from the card to «Spesa registrata» in less than 10 s; after 10 s back to the home, with the customer in Serviti oggi (criterion 3)', async ({
+test('from the card to «Spesa registrata» in less than 10 s; after 10 s back to the home, with the customer in CLIENTI (criterion 3)', async ({
   page,
   request,
 }) => {
@@ -121,9 +121,10 @@ test('from the card to «Spesa registrata» in less than 10 s; after 10 s back t
   // After 10 s the confirmation goes back to reading cards, by itself.
   await expect(page).toHaveURL('/', { timeout: 13_000 });
   await expect(panel).toContainText('Avvicina la card');
-  const served = page.getByRole('region', { name: 'SERVITI OGGI' });
+  const served = page.getByRole('region', { name: 'CLIENTI' });
   const row = served.getByRole('link', { name: new RegExp(customer.name) });
   await expect(row).toBeVisible();
+  await expect(row).toContainText(/Oggi, \d{2}:\d{2}/);
   await expect(row).toContainText('12');
   expect((await row.boundingBox())?.height).toBeGreaterThanOrEqual(48);
 

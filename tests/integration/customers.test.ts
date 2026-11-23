@@ -92,11 +92,10 @@ describe('operator', () => {
     expect(rowsWithOperation(operationId)).toBe('1');
   });
 
-  it('finds it by name without accents and by the phone digits', async () => {
-    const byName = await service.search(`nicolo integrazione ${SUFFIX}`);
-    expect(byName.map((customer) => customer.id)).toEqual([createdId]);
-    const byPhone = await service.search('0000009');
-    expect(byPhone.map((customer) => customer.id)).toContain(createdId);
+  it('lists it filtered by name without accents', async () => {
+    const page = await service.list({ query: `nicolo integrazione ${SUFFIX}`, after: null });
+    expect(page.customers.map((customer) => customer.id)).toEqual([createdId]);
+    expect(page.hasMore).toBe(false);
   });
 
   it('reads it back with get, and null for an id that does not exist', async () => {
@@ -142,20 +141,22 @@ describe('operator', () => {
     await expect(service.get(createdId)).resolves.toMatchObject({ name, anonymizedAt: null });
   });
 
-  it('servedToday lists the customer after a purchase today, with the real balance', async () => {
-    // Other customers may have been served today on this stack (e2e runs): only ours is checked.
-    await expect(service.servedToday()).resolves.not.toContainEqual(
-      expect.objectContaining({ id: createdId }),
-    );
+  it('list gives the last activity after a purchase today, with the real balance', async () => {
+    // Other customers may be served on this stack (e2e runs): only ours is checked, by its name.
+    const ours = async () =>
+      (await service.list({ query: name, after: null })).customers.find(
+        (customer) => customer.id === createdId,
+      );
+    await expect(ours()).resolves.toMatchObject({ lastActivityAt: null });
     await ledger.recordPurchase({
       operationId: randomUUID(),
       customerId: createdId,
       amountCents: 1250,
     });
 
-    const ours = (await service.servedToday()).find((customer) => customer.id === createdId);
-    expect(ours).toMatchObject({ id: createdId, balance: 12, anonymizedAt: null });
-    expect(ours?.lastServedAt).not.toBeNull();
+    const served = await ours();
+    expect(served).toMatchObject({ id: createdId, balance: 12 });
+    expect(served?.lastActivityAt).not.toBeNull();
   });
 });
 
@@ -186,7 +187,10 @@ describe('admin', () => {
 
     // Repeating it changes nothing.
     await expect(service.anonymize(created.id)).resolves.toEqual(erased);
-    await expect(service.search(`da cancellare ${SUFFIX}`)).resolves.toEqual([]);
+    await expect(service.list({ query: `da cancellare ${SUFFIX}`, after: null })).resolves.toEqual({
+      customers: [],
+      hasMore: false,
+    });
     await expect(service.get(created.id)).resolves.toEqual(erased);
     // An anonymized customer cannot be edited.
     await expect(
@@ -321,8 +325,8 @@ describe('without an active profile', () => {
     expect(error).toBeNull();
     current.client = client;
     const notOperator = { kind: 'not_operator' };
-    await expect(service.search('rossi')).rejects.toMatchObject(notOperator);
-    await expect(service.servedToday()).rejects.toMatchObject(notOperator);
+    await expect(service.list({ query: 'rossi', after: null })).rejects.toMatchObject(notOperator);
+    await expect(service.list({ query: '', after: null })).rejects.toMatchObject(notOperator);
     await expect(service.get(randomUUID())).rejects.toMatchObject(notOperator);
     await expect(
       service.create({
@@ -338,6 +342,8 @@ describe('without an active profile', () => {
   it('a server that cannot be reached is network', async () => {
     // Port 9 (discard) on the loopback: nothing listens there, the fetch fails at once.
     current.client = memoryClient('http://127.0.0.1:9', local.publishableKey);
-    await expect(service.search('rossi')).rejects.toMatchObject({ kind: 'network' });
+    await expect(service.list({ query: 'rossi', after: null })).rejects.toMatchObject({
+      kind: 'network',
+    });
   });
 });

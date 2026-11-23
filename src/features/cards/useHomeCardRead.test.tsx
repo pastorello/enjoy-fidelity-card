@@ -205,12 +205,18 @@ describe('useHomeCardRead: a card read on the home', () => {
 
   it('while a search is shown, the notice still appears in the card panel', async () => {
     const fixture = setup();
-    await renderHome(fixture, '/?q=rossi');
-    await screen.findByRole('list', { name: 'Risultati della ricerca' });
+    await renderHome(fixture);
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: /cerca per nome o email$/i }),
+      'rossi',
+    );
+    const clients = screen.getByRole('region', { name: 'CLIENTI' });
+    await within(cardPanel()).findByText(/Lettura attiva/);
+    await waitFor(() => expect(within(clients).getAllByRole('link')).toHaveLength(1));
     tap(fixture, LOST.read);
 
     expect(await within(cardPanel()).findByRole('alert')).toHaveTextContent('Card disattivata');
-    expect(screen.getByRole('list', { name: 'Risultati della ricerca' })).toBeInTheDocument();
+    expect(within(clients).getAllByRole('link')).toHaveLength(1);
   });
 
   it('not_operator: back to /accedi', async () => {

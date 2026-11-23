@@ -5,7 +5,7 @@ import { CustomerServiceProvider, useCustomerService } from './CustomerServicePr
 
 function Probe() {
   const service = useCustomerService();
-  return <p>{typeof service.search}</p>;
+  return <p>{typeof service.list}</p>;
 }
 
 describe('CustomerServiceProvider', () => {

@@ -56,10 +56,15 @@ export { expect };
  */
 export function homeSearch(page: Page, label: 'any' | 'full' | 'compact' = 'any'): Locator {
   if (label === 'full') {
-    return page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono', exact: true });
+    return page.getByRole('searchbox', { name: 'Oppure cerca per nome o email', exact: true });
   }
   if (label === 'compact') {
-    return page.getByRole('searchbox', { name: 'Cerca per nome o telefono', exact: true });
+    return page.getByRole('searchbox', { name: 'Cerca per nome o email', exact: true });
   }
-  return page.getByRole('searchbox', { name: /cerca per nome o telefono$/i });
+  return page.getByRole('searchbox', { name: /cerca per nome o email$/i });
+}
+
+/** The CLIENTI section of the home (SPEC-customers-v2 point 6): the list, filtered by the search. */
+export function homeCustomers(page: Page): Locator {
+  return page.getByRole('region', { name: 'CLIENTI' });
 }

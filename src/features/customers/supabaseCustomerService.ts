@@ -79,14 +79,6 @@ export const supabaseCustomerService: CustomerService = {
     return { customers, hasMore: customers.length === CUSTOMER_LIST_PAGE_SIZE };
   },
 
-  search(query) {
-    return many('search_customers', { p_query: query });
-  },
-
-  servedToday() {
-    return many('customers_served_today');
-  },
-
   async get(id) {
     const [customer = null] = await many('get_customer', { p_customer_id: id });
     return customer;

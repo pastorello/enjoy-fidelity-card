@@ -12,7 +12,7 @@ import {
 } from '../ledger/CustomerLedgerSection';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import styles from './CustomerPage.module.css';
-import { customerBackTo } from './customerBack';
+import { customerBackHomeState } from './customerBack';
 import { loadErrorText } from './loadErrorText';
 import { NavigationNotice } from './NavigationNotice';
 import { formatPhoneForCard } from './phone';
@@ -102,7 +102,8 @@ function TabletCustomerDetails({ customer }: { customer: CustomerSummary }) {
 export function CustomerPage() {
   const { id = '' } = useParams();
   const location = useLocation();
-  const backTo = customerBackTo(location.state);
+  // Always the home; the search it came from travels in the history state, never in the URL.
+  const backState = customerBackHomeState(location.state);
   const load = useCustomer(id);
   // 1280×800: SALDO and the actions on the left, ULTIMI MOVIMENTI on the right.
   const tablet = useTabletLayout();
@@ -121,7 +122,8 @@ export function CustomerPage() {
     return (
       <AppShell
         title={erased ? 'Cliente cancellato' : customer.name}
-        backTo={backTo}
+        backTo="/"
+        backState={backState}
         headingRef={heading}
         repeatCutTitle={!erased}
         headerAction={
@@ -143,7 +145,8 @@ export function CustomerPage() {
     return (
       <AppShell
         title={PLACEHOLDER_TITLE}
-        backTo={backTo}
+        backTo="/"
+        backState={backState}
         headingRef={heading}
         actions={
           <ButtonLink to="/" block>
@@ -162,7 +165,7 @@ export function CustomerPage() {
   }
 
   return (
-    <AppShell title={PLACEHOLDER_TITLE} backTo={backTo} headingRef={heading}>
+    <AppShell title={PLACEHOLDER_TITLE} backTo="/" backState={backState} headingRef={heading}>
       {load.status === 'loading' ? (
         <StatusView kind="loading" />
       ) : (

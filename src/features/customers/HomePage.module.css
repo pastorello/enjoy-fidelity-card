@@ -4,14 +4,6 @@
   list-style: none;
 }
 
-/* Below the 20 rows: tells the operator to narrow the search. */
-.more {
-  margin: var(--space-2) 0 0;
-  font-size: var(--type-body-sm-size);
-  line-height: var(--type-body-sm-line-height);
-  color: var(--color-ink-muted);
-}
-
 /* "Nuovo cliente «<testo>»": a long name wraps inside the button instead of overflowing. */
 .newCustomerLabel {
   min-width: 0;
@@ -24,19 +16,20 @@
   font-family: var(--type-body-family);
 }
 
-/* The search's loading, error, empty state or results: one block, spaced as the page. */
+/* CLIENTI: the title, then the list's loading, error, empty state or rows. */
+.customers {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The list's loading, error, empty state or rows: one block, spaced as the page. */
 .outcome {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.served {
-  display: flex;
-  flex-direction: column;
-}
-
-/* "SERVITI OGGI": spaced condensed caps in muted ink, as the settings sections. */
+/* "CLIENTI": spaced condensed caps in muted ink, as the settings sections. */
 .sectionTitle {
   margin: 0 0 var(--space-1);
   font-family: var(--type-spaced-caps-condensed-family);
@@ -47,8 +40,47 @@
   color: var(--color-ink-muted);
 }
 
+/* Under the rows: "Mostra altri clienti", "Carico altri clienti…" or the next page's error. */
+.moreArea {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.moreArea:focus {
+  outline: none;
+}
+
+/* Starts the next page when it comes within 400 px of the window (HomePage.tsx). */
+.sentinel {
+  height: 1px;
+}
+
+/* "Carico altri clienti…": a row as tall as the button it replaces. */
+.moreStatus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-ink-muted);
+}
+
+.spinner {
+  flex-shrink: 0;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* Compact error row: the text and "Riprova" side by side, stacked when there is no room. */
-.servedError {
+.moreError {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -56,7 +88,7 @@
   gap: var(--space-2);
 }
 
-.servedErrorText {
+.moreErrorText {
   display: flex;
   flex: 1 1 12rem;
   align-items: flex-start;
@@ -67,13 +99,13 @@
   color: var(--color-danger-text);
 }
 
-.servedErrorText svg {
+.moreErrorText svg {
   flex-shrink: 0;
   margin-top: 2px;
 }
 
 /* Wireframe "Tablet: cerca cliente" (SPEC-tablet-kiosk, point 10): edge to edge under the header,
-   the reader column (440 px) on the left, the search and SERVITI OGGI on the right. */
+   the reader column (440 px) on the left, the search and CLIENTI on the right. */
 .tabletLayout {
   flex: 1;
   display: flex;
@@ -131,8 +163,8 @@
   flex-shrink: 0;
 }
 
-/* SERVITI OGGI in two columns, as in the wireframe. */
-.tabletContent .served .list {
+/* CLIENTI in two columns, as SERVITI OGGI in the wireframe; "Mostra altri clienti" under the grid. */
+.list[data-columns='2'] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: var(--space-4);

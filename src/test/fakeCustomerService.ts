@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { classifyQuery, normalizePhone } from '../features/customers/phone';
+import { normalizePhone } from '../features/customers/phone';
 import { CUSTOMER_LIST_PAGE_SIZE, CustomerError } from '../features/customers/types';
 import type {
   CreateCustomerInput,
@@ -44,9 +44,7 @@ type FakeOptions = {
 
 const NAME_MAX = 80;
 const NOTES_MAX = 500;
-const SEARCH_MAX_ROWS = 21;
 const SEARCH_MAX_TEXT = 80;
-const SERVED_TODAY_MAX = 50;
 let nextFixture = 0;
 
 /** A UUID-shaped id from a counter, so pages that check the id shape accept it. */
@@ -138,14 +136,6 @@ function nameMatches(name: string, words: string[]): boolean {
   return words.every((word) => key.includes(word));
 }
 
-function byNameKey(a: CustomerSummary, b: CustomerSummary): number {
-  const ka = nameKey(a.name);
-  const kb = nameKey(b.name);
-  if (ka !== kb) return ka < kb ? -1 : 1;
-  if (a.id === b.id) return 0;
-  return a.id < b.id ? -1 : 1;
-}
-
 /** The checks shared by create and update, in the server's order; returns the cleaned values. */
 function validate(input: { name: string; phone: string; notes: string }, consent = true) {
   const name = cleanName(input.name);
@@ -165,8 +155,6 @@ function validate(input: { name: string; phone: string; notes: string }, consent
 function perMethod<T>(make: () => T): Record<Method, T> {
   return {
     list: make(),
-    search: make(),
-    servedToday: make(),
     get: make(),
     create: make(),
     update: make(),
@@ -177,8 +165,8 @@ function perMethod<T>(make: () => T): Record<Method, T> {
 /**
  * In-memory CustomerService for component tests, following the server's rules: the name is
  * unique on the same key as `customer_name_key`, `create` is idempotent on `operationId`, `list`
- * pages like `app.list_customers` (order, filter by name words or part of the email, cursor, 20 rows),
- * search by name words or phone digits (21 rows at most, never anonymized customers). Every method is a
+ * pages like `app.list_customers` (order, filter by name words or part of the email, cursor, 20 rows,
+ * never anonymized customers). Every method is a
  * `vi.fn` and every call is also logged in `calls`. `failNext` programs a failure (also an
  * answer lost after the call was applied), `holdNext` delays an answer until released (responses
  * out of order), `setNetworkDown` makes every call fail with `network`.
@@ -203,7 +191,6 @@ export function createFakeCustomerService({
     }),
   );
   const createdBy = new Map<string, string>();
-  let servedTodayIds: string[] = [];
   let created = 0;
   let networkDown = false;
   const failures = perMethod<FakeFailure[]>(() => []);
@@ -273,25 +260,6 @@ export function createFakeCustomerService({
     return hold ? hold.then(answer) : answer();
   }
 
-  function search(query: string): CustomerSummary[] {
-    const text = cleanName(query.slice(0, SEARCH_MAX_TEXT));
-    const kind = classifyQuery(text);
-    if (kind === 'none') return [];
-    const visible = [...stored.values()].filter((customer) => customer.anonymizedAt === null);
-    let found: CustomerSummary[];
-    if (kind === 'phone') {
-      let digits = text.replace(/[\s+.-]/g, '');
-      if (digits.startsWith('00')) digits = digits.slice(2);
-      found = visible.filter((customer) => customer.phone?.includes(digits));
-    } else {
-      const words = text.split(' ').map(nameKey);
-      found = visible.filter((customer) =>
-        words.every((word) => nameKey(customer.name).includes(word)),
-      );
-    }
-    return found.toSorted(byNameKey).slice(0, SEARCH_MAX_ROWS).map(copy);
-  }
-
   function fieldsOf(id: string): ListFields {
     const fields = listFields.get(id);
     if (!fields) throw new Error('fakeCustomerService: a customer without list fields');
@@ -342,19 +310,6 @@ export function createFakeCustomerService({
         const customers = list(input.query, input.after);
         return { customers, hasMore: customers.length === CUSTOMER_LIST_PAGE_SIZE };
       }),
-    ),
-    search: vi.fn<CustomerService['search']>((query) =>
-      run('search', [query], () => search(query)),
-    ),
-    servedToday: vi.fn<CustomerService['servedToday']>(() =>
-      run('servedToday', [], () =>
-        servedTodayIds
-          .flatMap((id) => {
-            const customer = stored.get(id);
-            return customer && customer.anonymizedAt === null ? [copy(customer)] : [];
-          })
-          .slice(0, SERVED_TODAY_MAX),
-      ),
     ),
     get: vi.fn<CustomerService['get']>((id) =>
       run('get', [id], () => {
@@ -424,12 +379,7 @@ export function createFakeCustomerService({
         if (fields.lastActivityAt === null || micros(servedAt) > micros(fields.lastActivityAt)) {
           fields.lastActivityAt = servedAt;
         }
-        servedTodayIds = [customerId, ...servedTodayIds.filter((id) => id !== customerId)];
       }
-    },
-    /** The customers served today, most recent first (until `ledger`, the server's list is empty). */
-    setServedToday(ids: string[]) {
-      servedTodayIds = [...ids];
     },
     /** Programs the next call of `method` (queued: one failure per call, in order). */
     failNext(method: Method, failure: FakeFailure) {

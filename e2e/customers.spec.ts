@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { seedAccounts, signIn } from './auth';
-import { expect, homeSearch, test } from './fixtures';
+import { expect, homeCustomers, homeSearch, test } from './fixtures';
 
 /**
  * Customers end to end (SPEC-customers). Names carry a suffix unique to the run, so the suite also
@@ -38,9 +38,9 @@ async function search(page: Page, text: string) {
 }
 
 function resultRow(page: Page, name: string) {
-  return page
-    .getByRole('list', { name: 'Risultati della ricerca' })
-    .getByRole('link', { name: new RegExp(`^${escapeRegExp(name)}\\b`) });
+  return homeCustomers(page).getByRole('link', {
+    name: new RegExp(`^${escapeRegExp(name)}\\b`),
+  });
 }
 
 test.describe('administrator', () => {
@@ -57,12 +57,16 @@ test.describe('administrator', () => {
     await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
     const customerUrl = page.url();
 
-    // Found without the accent, and with the last 4 digits of the phone. The search names this
-    // run's customer in full: customers left by other runs never push it past the 20 rows shown.
+    // Found without the accent in CLIENTI, which never shows the phone (SPEC-customers-v2 point
+    // 6). The search names this run's customer in full: customers left by other runs never push
+    // it past the first page.
     await page.goto('/');
     await search(page, `nicolo prova e2e ${suffix}`);
-    await expect(resultRow(page, name)).toContainText('••• 4521');
-    await search(page, '4521');
+    await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
+    await expect(resultRow(page, name)).toContainText('Nessun movimento');
+    await expect(resultRow(page, name)).not.toContainText('4521');
+    // The text stays out of the URL.
+    expect(new URL(page.url()).search).toBe('');
     await resultRow(page, name).click();
     await expect(page).toHaveURL(customerUrl);
     await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
@@ -93,16 +97,9 @@ test.describe('administrator', () => {
     await expect(page).toHaveURL('/');
     await expect(page.getByText('Dati del cliente cancellati.')).toBeVisible();
 
-    // Not found any more, by name or by phone; the page keeps the balance without personal data.
+    // Not found any more by name; the page keeps the balance without personal data.
     await search(page, name);
     await expect(page.getByRole('heading', { name: 'Nessun cliente trovato' })).toBeVisible();
-    // A fresh search (from the URL), so the outcome waited for is not the previous one.
-    await page.goto('/?q=4321');
-    await expect(
-      page
-        .getByRole('list', { name: 'Risultati della ricerca' })
-        .or(page.getByRole('heading', { name: 'Nessun cliente trovato' })),
-    ).toBeVisible();
     await expect(resultRow(page, name)).toHaveCount(0);
     await page.goto(customerUrl);
     await expect(page.getByRole('heading', { level: 1, name: 'Cliente cancellato' })).toBeVisible();

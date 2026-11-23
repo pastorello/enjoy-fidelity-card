@@ -28,7 +28,7 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
 }
 
 describe('createFakeCustomerService', () => {
-  it('creates a customer that get and search then find, normalizing name and phone', async () => {
+  it('creates a customer that get and list then find, normalizing name and phone', async () => {
     const { service } = createFakeCustomerService();
     const created = await service.create(
       newCustomer({ name: '  Maria   Rossi ', phone: '333 123 4521', notes: '  Al banco ' }),
@@ -44,8 +44,9 @@ describe('createFakeCustomerService', () => {
     });
     expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
     await expect(service.get(created.id)).resolves.toEqual(created);
-    await expect(service.search('rossi maria')).resolves.toEqual([created]);
-    await expect(service.search('4521')).resolves.toEqual([created]);
+    await expect(service.list({ query: 'rossi maria', after: null }).then(names)).resolves.toEqual([
+      'Maria Rossi',
+    ]);
   });
 
   it('refuses an equivalent name (case, accents, apostrophes, spaces) with the existing id', async () => {
@@ -108,25 +109,7 @@ describe('createFakeCustomerService', () => {
     await expect(service.get(OP_2)).resolves.toBeNull();
   });
 
-  it('search: by name words or phone digits, alphabetical, 21 rows at most, never anonymized', async () => {
-    const many = Array.from({ length: 25 }, (_, index) =>
-      fakeCustomer({ name: `Rossi ${String(25 - index).padStart(2, '0')}` }),
-    );
-    const erased = fakeCustomer({ name: 'Rossi Cancellato', anonymizedAt: '2026-11-17T09:00:00Z' });
-    const phoned = fakeCustomer({ name: 'Zeta', phone: '+393331234521' });
-    const { service } = createFakeCustomerService({ customers: [...many, erased, phoned] });
-
-    const rows = await service.search('rossi');
-    expect(rows).toHaveLength(21);
-    expect(rows[0]?.name).toBe('Rossi 01');
-    expect(rows.map((row) => row.name)).not.toContain('Rossi Cancellato');
-    await expect(service.search('0039 333')).resolves.toEqual([phoned]);
-    await expect(service.search('45')).resolves.toEqual([]);
-    await expect(service.search('r')).resolves.toEqual([]);
-    await expect(service.search('50%')).resolves.toEqual([]);
-  });
-
-  it('anonymize: admins only, clears the data, idempotent, gone from search and served today', async () => {
+  it('anonymize: admins only, clears the data, idempotent, gone from the list', async () => {
     const customer = fakeCustomer({ name: 'Paolo Neri', phone: '+393331234521', notes: 'Note' });
     const operatorFake = createFakeCustomerService({ customers: [customer], role: 'operator' });
     await expect(operatorFake.service.anonymize(customer.id)).rejects.toMatchObject({
@@ -135,15 +118,15 @@ describe('createFakeCustomerService', () => {
 
     const fake = createFakeCustomerService({ customers: [customer] });
     const { service } = fake;
-    fake.setServedToday([customer.id]);
-    await expect(service.servedToday()).resolves.toHaveLength(1);
+    await expect(service.list({ query: '', after: null }).then(names)).resolves.toEqual([
+      'Paolo Neri',
+    ]);
     const erased = await service.anonymize(customer.id);
     expect(erased).toMatchObject({ phone: null, notes: null });
     expect(erased.name).toBe(`Cliente cancellato ${customer.id.slice(0, 8)}`);
     expect(erased.anonymizedAt).not.toBeNull();
     await expect(service.anonymize(customer.id)).resolves.toEqual(erased);
-    await expect(service.search('paolo')).resolves.toEqual([]);
-    await expect(service.servedToday()).resolves.toEqual([]);
+    await expect(service.list({ query: '', after: null }).then(names)).resolves.toEqual([]);
     await expect(service.get(customer.id)).resolves.toEqual(erased);
   });
 
@@ -154,7 +137,9 @@ describe('createFakeCustomerService', () => {
     const error = await rejection(fake.service.create(newCustomer()));
     expect(error).toBeInstanceOf(CustomerError);
     expect(error).toMatchObject({ kind: 'network' });
-    await expect(fake.service.search('rossi')).rejects.toMatchObject({ kind: 'network' });
+    await expect(fake.service.list({ query: 'rossi', after: null })).rejects.toMatchObject({
+      kind: 'network',
+    });
     expect(fake.customers()).toEqual([]);
 
     fake.setNetworkDown(false);
@@ -176,24 +161,27 @@ describe('createFakeCustomerService', () => {
 
   it('plays programmed failures once, in order, for the given method only', async () => {
     const fake = createFakeCustomerService();
-    fake.failNext('search', 'not_operator');
-    fake.failNext('search', new ServerFaultError('unavailable'));
+    const list = () => fake.service.list({ query: 'rossi', after: null });
+    fake.failNext('list', 'not_operator');
+    fake.failNext('list', new ServerFaultError('unavailable'));
 
-    await expect(fake.service.servedToday()).resolves.toEqual([]);
-    await expect(fake.service.search('rossi')).rejects.toMatchObject({ kind: 'not_operator' });
-    const fault = await rejection(fake.service.search('rossi'));
+    await expect(fake.service.get(OP_1)).resolves.toBeNull();
+    await expect(list()).rejects.toMatchObject({ kind: 'not_operator' });
+    const fault = await rejection(list());
     expect(fault).toBeInstanceOf(ServerFaultError);
-    await expect(fake.service.search('rossi')).resolves.toEqual([]);
+    await expect(list()).resolves.toEqual({ customers: [], hasMore: false });
   });
 
   it('holds an answer until released, so tests can settle calls out of order', async () => {
     const maria = fakeCustomer({ name: 'Maria Rossi' });
     const fake = createFakeCustomerService({ customers: [maria] });
-    const gate = fake.holdNext('search');
+    const gate = fake.holdNext('list');
 
     const settled: string[] = [];
-    const slow = fake.service.search('ma').then(() => settled.push('slow'));
-    const fast = fake.service.search('maria').then(() => settled.push('fast'));
+    const slow = fake.service.list({ query: 'ma', after: null }).then(() => settled.push('slow'));
+    const fast = fake.service
+      .list({ query: 'maria', after: null })
+      .then(() => settled.push('fast'));
     await fast;
     expect(settled).toEqual(['fast']);
 
@@ -204,13 +192,13 @@ describe('createFakeCustomerService', () => {
 
   it('logs every call with its arguments, in order', async () => {
     const fake = createFakeCustomerService();
-    await fake.service.search('rossi');
+    await fake.service.list({ query: 'rossi', after: null });
     await fake.service.get(OP_1);
     await fake.service.create(newCustomer()).catch(() => undefined);
 
-    expect(fake.calls.map((call) => call.method)).toEqual(['search', 'get', 'create']);
-    expect(fake.calls[0]?.args).toEqual(['rossi']);
-    expect(fake.service.search).toHaveBeenCalledWith('rossi');
+    expect(fake.calls.map((call) => call.method)).toEqual(['list', 'get', 'create']);
+    expect(fake.calls[0]?.args).toEqual([{ query: 'rossi', after: null }]);
+    expect(fake.service.list).toHaveBeenCalledWith({ query: 'rossi', after: null });
   });
 
   it('returns copies, so a caller cannot change the stored customers', async () => {

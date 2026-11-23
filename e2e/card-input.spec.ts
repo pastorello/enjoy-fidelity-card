@@ -1,5 +1,5 @@
 import { signIn } from './auth';
-import { expect, homeSearch, test } from './fixtures';
+import { expect, homeCustomers, homeSearch, test } from './fixtures';
 import { fakeCardErasures, fakeCardWrites, stubWebNfc } from './nfc';
 
 /**
@@ -72,9 +72,7 @@ test.describe('the card panel on the home', () => {
     // A seed customer (supabase/seed.sql) is found by name.
     await homeSearch(page, 'full').fill('bianchi');
     await expect(
-      page.getByRole('list', { name: 'Risultati della ricerca' }).getByRole('link', {
-        name: /^Giulia Bianchi\b/,
-      }),
+      homeCustomers(page).getByRole('link', { name: /^Giulia Bianchi\b/ }),
     ).toBeVisible();
     // With reading off the compact line has nothing to say.
     await expect(page.getByRole('region', { name: 'Lettura card' })).toHaveCount(0);
@@ -90,7 +88,9 @@ test.describe('the card panel on the home', () => {
     await expect(panel).toContainText(OFF_TEXT);
     await expect(panel.getByRole('button')).toHaveCount(0);
     await homeSearch(page, 'full').fill('bianchi');
-    await expect(page.getByRole('list', { name: 'Risultati della ricerca' })).toBeVisible();
+    await expect(
+      homeCustomers(page).getByRole('link', { name: /^Giulia Bianchi\b/ }),
+    ).toBeVisible();
   });
 
   test('a search shrinks the panel to one line, and clearing it brings the panel back', async ({
@@ -115,6 +115,9 @@ test.describe('the USB reader on the home (keyboard wedge, format hex)', () => {
   }) => {
     await stubWebNfc(page);
     await signIn(page);
+    // CLIENTI first: its first page arriving in the middle of the burst can hold the main thread
+    // past the wedge's 50 ms gap on a busy runner, and the burst would read as typing.
+    await expect(homeCustomers(page).getByRole('link').first()).toBeVisible();
     const newCustomer = page.getByRole('link', { name: 'Nuovo cliente' });
     await newCustomer.focus();
     await page.keyboard.type('04A1B2C3D4E5F6', { delay: 0 });
@@ -139,6 +142,7 @@ test.describe('the USB reader on the home (keyboard wedge, format hex)', () => {
     await page.keyboard.type('04A1B2C3', { delay: 120 });
     await page.keyboard.press('Enter');
     await expect(homeSearch(page)).toHaveValue('04A1B2C3');
-    await expect(page).toHaveURL(/\/\?q=04A1B2C3$/);
+    // The text lives in the history state, never in the URL (SPEC-customers-v2 point 6).
+    await expect(page).toHaveURL(/\/$/);
   });
 });

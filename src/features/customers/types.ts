@@ -90,10 +90,6 @@ export type CustomerService = {
     customers: CustomerListRow[];
     hasMore: boolean;
   }>;
-  /** Up to 21 customers, by name: a 21st row means there are more. Never anonymized ones. */
-  search(query: string): Promise<CustomerSummary[]>;
-  /** Customers with a purchase or redemption today (empty until `ledger`). */
-  servedToday(): Promise<CustomerSummary[]>;
   /** The customer, anonymized ones included, or null when the id does not exist. */
   get(id: string): Promise<CustomerSummary | null>;
   /** Idempotent on `operationId`: a repeated send returns the customer already created. */
