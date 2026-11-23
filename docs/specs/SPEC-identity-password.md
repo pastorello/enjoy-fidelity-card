@@ -1,6 +1,6 @@
 # Spec: identity — Password dimenticata e Cambia password
 
-Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
+Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3). Aggiornata il 2026-11-23: il link vale **24 ore** (`otp_expiry` 86400, condiviso con l'invito; `SPEC-operators.md` Open Questions 7, `brain/DECISIONS.md`)
 Modulo: `identity` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity` V1 ([SPEC-identity.md](SPEC-identity.md)) ·
 Fonti: specifiche ("Ruoli e account"), wireframe Accesso, Password dimenticata, Invito: scegli la password,
 Impostazioni (operatore) · Decisione: `brain/DECISIONS.md`, 2026-11-17 "Email di Auth attive; Password
@@ -30,13 +30,13 @@ sul telefono, in meno di 2 minuti; la vecchia password non funziona più.
    - `AppShell` con titolo "Password dimenticata" e Indietro (→ `/accedi`; → `/impostazioni` se collegato);
    - testo "Scrivi l'email del tuo account: ti mandiamo un link per sceglierne una nuova.", campo Email
      (`autoComplete="email"`, placeholder `nome@esempio.it`), pulsante **"Invia il link"**, nota "Il link vale
-     un'ora. Se non arriva, controlla lo spam o chiedi a un amministratore.";
+     24 ore. Se non arriva, controlla lo spam o chiedi a un amministratore.";
    - validazione locale: vuota → "Inserisci l'email"; senza forma `x@y` → "Email non valida";
    - invio: `resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin + '/imposta-password' })`,
      pulsante `busy` (un doppio tocco non manda due richieste);
    - **stessa risposta che l'email esista o no**: per **ogni risposta HTTP** del server (200, 429, altri 4xx,
      500, 502/503/504) la pagina mostra la stessa conferma "Se l'email è di un account dell'Enjoy Card, ti
-     abbiamo mandato un link. Il link vale un'ora: se non arriva, controlla lo spam o chiedi a un
+     abbiamo mandato un link. Il link vale 24 ore: se non arriva, controlla lo spam o chiedi a un
      amministratore." con "Torna all'accesso" (o "Torna alle impostazioni"). Solo la richiesta che non riceve
      alcuna risposta HTTP (`fetch` fallita, `status` 0) mostra "Connessione assente: controlla la rete e
      riprova." e lascia il modulo compilato. Attenzione: `isAuthRetryableFetchError` è vero anche per
@@ -152,7 +152,7 @@ servizio direttamente.
 | Voce | Locale (`supabase/config.toml`) | Staging | Produzione |
 |---|---|---|---|
 | `minimum_password_length` | **8** (oggi 6: da correggere) | 8 | 8 |
-| Scadenza link (`otp_expiry`) | 3600 (già) | 3600 | 3600 |
+| Scadenza link (`otp_expiry`) | 86400 (dal 2026-11-23; prima 3600) | 86400 | 86400 |
 | `site_url` | `http://localhost:5173` (già) | `http://localhost:5173` | `https://enjoy-fidelity-card.vercel.app` |
 | `additional_redirect_urls` | `http://localhost:5173/imposta-password`, `http://localhost:4173/imposta-password` (togliere `https://127.0.0.1:3000`) | `http://localhost:5173/imposta-password`, `https://enjoy-fidelity-card-*-<team>.vercel.app/imposta-password` | `https://enjoy-fidelity-card.vercel.app/imposta-password` |
 | Template "Reset password" | `[auth.email.template.recovery]` → `supabase/templates/recovery.html` | incollato a mano | incollato a mano |
@@ -166,7 +166,7 @@ Questions 7). Se cambia l'hosting
 
 **Template** `supabase/templates/recovery.html` (oggetto "Enjoy Card: scegli una nuova password"), HTML
 semplice in italiano, senza immagini esterne: "Hai chiesto di scegliere una nuova password per l'Enjoy Card.
-Tocca il pulsante: il link vale un'ora e si usa una volta sola." · pulsante "Scegli la password"
+Tocca il pulsante: il link vale 24 ore e si usa una volta sola." · pulsante "Scegli la password"
 (`href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery"`) · "Se non l'hai chiesto tu, ignora
 questa email: la password resta quella di prima." Nessun dato oltre a quelli del template.
 
@@ -174,7 +174,7 @@ questa email: la password resta quella di prima." Nessun dato oltre a quelli del
 `supabase config push`, che porterebbe in remoto i valori locali):
 1. Authentication → URL Configuration: Site URL e Redirect URLs della tabella (`<team>` = slug del team Vercel).
 2. Authentication → Emails → Templates → Reset Password: oggetto e corpo di `supabase/templates/recovery.html`.
-3. Authentication → Providers → Email: lunghezza minima password 8; scadenza OTP email 3600 s.
+3. Authentication → Providers → Email: lunghezza minima password 8; scadenza OTP email 86400 s (24 ore, dal 2026-11-23).
 4. Prova reale: richiesta da un'anteprima (staging) e dalla produzione con un account dell'utente; l'email
    arriva da `info@enjoygaeta.it`, il link apre `/imposta-password` sullo stesso ambiente.
 
@@ -265,6 +265,9 @@ con `-x …,mailpit,…`: va tolto `mailpit` dall'elenco. `[auth.rate_limit] ema
 9. Schermate conformi ai wireframe a 390×844, target ≥ 48 px, detector Impeccable pulito.
 
 ## Out of Scope
+
+(Aggiornamento 2026-11-22: inviti, schermata Operatori, versione "invito" di `/imposta-password` e nota di
+Accesso sono ora in [SPEC-operators.md](SPEC-operators.md).)
 
 Inviti via email e schermata Operatori (decisione del 2026-11-17), quindi anche la versione "invito" del
 wireframe Imposta password ("Ciao, Marco", "Andrea ti ha invitato…", Email in sola lettura) e la frase sugli

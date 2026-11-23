@@ -1,6 +1,7 @@
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Button } from './Button';
 import styles from './ConfirmDialog.module.css';
+import { Dialog } from './Dialog';
 import { Icon } from './Icon';
 
 type ConfirmDialogProps = {
@@ -25,11 +26,9 @@ type ConfirmDialogProps = {
   onCancel: () => void;
 };
 
-export function ConfirmDialog({ open, ...props }: ConfirmDialogProps) {
-  return open ? <OpenDialog {...props} /> : null;
-}
-
-function OpenDialog({
+/** A question on the `Dialog` shell: the button that repeats the action, then the safe choice. */
+export function ConfirmDialog({
+  open,
   title,
   description,
   confirmLabel,
@@ -39,43 +38,19 @@ function OpenDialog({
   error = null,
   onConfirm,
   onCancel,
-}: Omit<ConfirmDialogProps, 'open'>) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
+}: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
-  const titleId = useId();
-  const descriptionId = useId();
-
-  useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const dialog = dialogRef.current;
-    dialog?.showModal();
-    // A dangerous action starts on the safe choice.
-    (tone === 'danger' ? cancelRef : confirmRef).current?.focus();
-    return () => {
-      if (dialog?.open) dialog.close();
-      opener?.focus();
-    };
-  }, [tone]);
 
   return (
-    <dialog
-      ref={dialogRef}
-      className={styles.dialog}
-      aria-labelledby={titleId}
-      aria-describedby={descriptionId}
-      onCancel={(event) => {
-        // Esc: let React close it, so state and focus stay in sync.
-        event.preventDefault();
-        onCancel();
-      }}
+    <Dialog
+      open={open}
+      title={title}
+      description={description}
+      closeLabel={cancelLabel}
+      // A dangerous action starts on the safe choice (the shell's close action).
+      initialFocusRef={tone === 'danger' ? undefined : confirmRef}
+      onClose={onCancel}
     >
-      <h2 id={titleId} className={styles.title}>
-        {title}
-      </h2>
-      <p id={descriptionId} className={styles.description}>
-        {description}
-      </p>
       {error !== null && error !== '' && (
         <p role="alert" className={styles.error}>
           <Icon name="circle-alert" size={24} className={styles.errorIcon} />
@@ -91,9 +66,6 @@ function OpenDialog({
       >
         {confirmLabel}
       </Button>
-      <Button ref={cancelRef} variant="secondary" block onClick={onCancel}>
-        {cancelLabel}
-      </Button>
-    </dialog>
+    </Dialog>
   );
 }

@@ -67,8 +67,43 @@ written in parallel fit together. If a source contradicts this file, the source 
 `/clienti/nuovo` (optional `?card=<UID>`) · `/clienti/:id` scheda · `/clienti/:id/modifica` ·
 `/clienti/:id/card` associa/sostituisci · `/clienti/:id/spesa` importo · `/clienti/:id/premi` ·
 `/clienti/:id/movimenti` · `/impostazioni` (sections added by modules) · `/impostazioni/premi`
-(catalogo, admin) · `/accedi` · `/password-dimenticata` · `/imposta-password`.
-Tablet screens: only in `tablet-kiosk` (responsive ≥ 1024 px layouts or dedicated routes, its choice).
+(catalogo, admin) · `/impostazioni/operatori` (admin, module `operators`) · `/accedi` ·
+`/password-dimenticata` · `/imposta-password`. `tablet-kiosk` adds `/cassa` and `/impostazioni/pin`.
+Tablet screens: only in `tablet-kiosk` (responsive ≥ 1024 px layouts or dedicated routes, its choice),
+except "Tablet: operatori", built by `operators` itself.
+
+## Operators (module operators, added 2026-11-22, [SPEC-operators.md](SPEC-operators.md))
+Built after the other modules; no existing table, RPC or route is renamed.
+- **Route**: `/impostazioni/operatori` (admins; an operator sees the `AdminsOnly` view), reached from the
+  first row of GESTIONE in `/impostazioni` ("Operatori"). Phone and tablet layouts (480 px "Invita
+  operatore" column). `/imposta-password` gains the invite version (`type=invite`).
+- **New columns of `app.operators`** (still read-only from the API, profiles never deleted):
+  `deactivated_at timestamptz null` (null = active), `deactivated_by → operators`, `invited_at timestamptz
+  null` (last invite sent from the app), `invited_by → operators`. The email stays in `auth.users`.
+  A deactivated profile is not an operator: `private.current_operator_id()`, `private.valid_cashier_id()`,
+  `app.get_session_identity()`, `app.list_cashiers()` and `app.unlock_cashier()` ignore it, so its token
+  reads 0 rows and every write is refused; `private.add_operator()` reactivates the profile it relinks.
+- **RPCs for the app** (`authenticated`, `is_admin()` inside, `42501` otherwise):
+  `app.list_operators()` → `id, name, role, status ('active'|'invited'|'deactivated'|'removed'), email,
+  has_pin, is_me`; `app.set_operator_role(p_operator_id, p_role)`; `app.set_operator_active(p_operator_id,
+  p_active)`; `app.operator_invite_begin`, `app.operator_resend_begin`, `app.operator_cancel_begin` (called
+  only by the Edge Function with the caller's token). The other steps (`app.operator_invite_finish`,
+  `_fail`, `_orphan`, `app.operator_resend_finish`, `app.operator_cancel_check`) are executable by
+  `service_role` only. Reservations in `private.operator_invites` (no API privilege).
+- **Edge Function** `supabase/functions/operator-invites` (the project's first, `verify_jwt = true`):
+  `POST` with `action` `invite` (`operation_id`, `name`, `email`, `role`, idempotent on `operation_id`),
+  `resend` or `cancel` (`operator_id`). Only Origins in `APP_ORIGINS` (+ `APP_PREVIEW_ORIGIN` on staging);
+  `redirectTo` = `<Origin>/imposta-password`. The secret key exists only in the Edge runtime: never in the
+  app, Vercel, logs or the repo. The app calls it only from `supabaseOperatorsService.ts`
+  (`functions.invoke('operator-invites')`).
+- **Error codes** of the module: `EO001` last active admin, `EO002` oneself, `EO003` profile without an
+  account, `EO004` not waiting for an invite, `EO005` an admin from a device (invite, promotion or
+  reactivation) without the cashier's PIN; plus the standard `42501`, `22023`, `P0002`. With the PIN (till
+  tablet only, decided 2026-11-23): `app.set_operator_role_with_pin(p_operator_id, p_role, p_pin)`,
+  `app.set_operator_active_with_pin(p_operator_id, p_active, p_pin)` (jsonb `{status: 'ok', operator}` |
+  `wrong_pin {attempts_left}` | `locked {lock_seconds_left}`, the counter and lock of `unlock_cashier`) and
+  the fifth argument `p_pin` of `app.operator_invite_begin` (the function body's `pin`; 403 `wrong_pin` /
+  `pin_locked`).
 
 ## Card input (module card-input)
 One app-wide reader service with adapters: Web NFC (Chrome Android), USB keyboard-wedge (tablet),

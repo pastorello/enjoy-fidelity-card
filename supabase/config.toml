@@ -245,8 +245,10 @@ secure_password_change = false
 max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
-# Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# Number of seconds before the email OTP expires (defaults to 1 hour). 24 hours: the invite link of
+# the Operators screen (SPEC-operators Open Questions 7, decided 2026-11-23); it is also the life of
+# the recovery link of "Password dimenticata". Hosted projects: Auth "Email OTP Expiration" = 86400.
+otp_expiry = 86400
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
@@ -264,10 +266,10 @@ otp_expiry = 3600
 subject = "Enjoy Card: scegli una nuova password"
 content_path = "./supabase/templates/recovery.html"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+# Invite of the Edge Function operator-invites (SPEC-operators point 8).
+[auth.email.template.invite]
+subject = "Enjoy Card: il tuo invito"
+content_path = "./supabase/templates/invite.html"
 
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
@@ -411,6 +413,11 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# operator-invites (SPEC-operators point 5): the gateway refuses a missing or malformed token. It
+# accepts the anon key too (a valid JWT), so the admin check stays in the RPCs, not here.
+[functions.operator-invites]
+verify_jwt = true
 
 [analytics]
 enabled = true

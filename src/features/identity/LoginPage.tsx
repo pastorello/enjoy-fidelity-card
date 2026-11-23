@@ -146,8 +146,8 @@ export function LoginPage() {
         </p>
       ) : (
         <p className={styles.note}>
-          Gli account li crea un amministratore: se non riesci ad accedere, rivolgiti a chi gestisce
-          l’app.
+          Gli account li crea un amministratore. Se hai ricevuto un invito, apri il link nell’email
+          per scegliere la password.
         </p>
       )}
     </main>

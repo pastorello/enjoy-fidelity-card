@@ -34,6 +34,17 @@
   padding: 0 calc(var(--space-3) - 1px);
 }
 
+/*
+ * Not available (also inside a disabled fieldset): the muted surface and text of a disabled Button,
+ * so a field that takes no focus never looks like one that does.
+ */
+.input:disabled {
+  background: var(--color-surface-raised);
+  border-color: var(--color-divider);
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
 .hint,
 .error {
   display: flex;

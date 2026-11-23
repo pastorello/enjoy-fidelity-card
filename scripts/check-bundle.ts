@@ -2,8 +2,11 @@
 // SPEC-card-input, success criterion 8: the E2E fake card reader (window.__enjoyFakeCard*, chunk
 // fakeCardAdapter) must never reach a published build. Fails if dist/ (JS chunks, service worker and its
 // precache manifest, HTML) still carries it, e.g. because the build ran with VITE_E2E=1.
+// SPEC-operators, success criterion 5: it also fails if any text file of dist/ holds a key that bypasses
+// Row Level Security (the secret key of operator-invites, or a service_role JWT).
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { findPrivilegedKeys, type PrivilegedKeyKind } from './privilegedKeys.ts';
 
 /** `__enjoyFakeCard` is also the prefix of `__enjoyFakeCardWrites` and `__enjoyFakeCardControl`. */
 const NEEDLES = ['__enjoyFakeCard', 'fakeCardAdapter'] as const;
@@ -12,6 +15,7 @@ const NEEDLES = ['__enjoyFakeCard', 'fakeCardAdapter'] as const;
 const TEXT_FILE = /\.(js|mjs|cjs|html|json|webmanifest|map)$/;
 
 export type Trace = { file: string; needle: (typeof NEEDLES)[number] };
+export type PrivilegedKeyTrace = { file: string; kind: PrivilegedKeyKind };
 
 function listFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -20,20 +24,33 @@ function listFiles(dir: string): string[] {
   });
 }
 
-/** Every file of `distDir` that names or contains the fake adapter, sorted by file then needle. */
-export function findFakeAdapterTraces(distDir: string): Trace[] {
+/** The files of a built `distDir` with their path relative to it, sorted. */
+function builtFiles(distDir: string): { path: string; file: string }[] {
   if (!existsSync(distDir) || !statSync(distDir).isDirectory()) {
     throw new Error(`${distDir}/ not found: run \`npm run build\` before \`npm run check:bundle\``);
   }
   return listFiles(distDir)
     .map((path) => ({ path, file: relative(distDir, path).split('\\').join('/') }))
-    .toSorted((a, b) => a.file.localeCompare(b.file))
-    .flatMap(({ path, file }) => {
-      const text = TEXT_FILE.test(file) ? readFileSync(path, 'utf8') : '';
-      return NEEDLES.filter((needle) => file.includes(needle) || text.includes(needle)).map(
-        (needle) => ({ file, needle }),
-      );
-    });
+    .toSorted((a, b) => a.file.localeCompare(b.file));
+}
+
+/** Every file of `distDir` that names or contains the fake adapter, sorted by file then needle. */
+export function findFakeAdapterTraces(distDir: string): Trace[] {
+  return builtFiles(distDir).flatMap(({ path, file }) => {
+    const text = TEXT_FILE.test(file) ? readFileSync(path, 'utf8') : '';
+    return NEEDLES.filter((needle) => file.includes(needle) || text.includes(needle)).map(
+      (needle) => ({ file, needle }),
+    );
+  });
+}
+
+/** Every text file of `distDir` (binary ones, such as fonts and images, skipped) holding a secret key. */
+export function findPrivilegedKeyTraces(distDir: string): PrivilegedKeyTrace[] {
+  return builtFiles(distDir).flatMap(({ path, file }) => {
+    const buffer = readFileSync(path);
+    if (buffer.includes(0)) return [];
+    return findPrivilegedKeys(buffer.toString('utf8')).map((kind) => ({ file, kind }));
+  });
 }
 
 if (import.meta.main) {
@@ -44,7 +61,13 @@ if (import.meta.main) {
       for (const { file, needle } of traces) console.error(`  dist/${file}: ${needle}`);
       process.exit(1);
     }
-    console.log('check:bundle: dist/ has no trace of the fake card reader');
+    const secrets = findPrivilegedKeyTraces('dist');
+    if (secrets.length > 0) {
+      console.error('check:bundle: dist/ holds a key that bypasses Row Level Security');
+      for (const { file, kind } of secrets) console.error(`  dist/${file}: ${kind}`);
+      process.exit(1);
+    }
+    console.log('check:bundle: dist/ has no trace of the fake card reader and no secret key');
   } catch (error) {
     console.error(`check:bundle: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);

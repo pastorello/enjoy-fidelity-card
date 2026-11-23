@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- Colors from design/tokens.json: paper, black ink, Enjoy green (email clients ignore CSS variables). -->
+<!-- Name, inviter and role come from user_metadata: text of this email only, never authorization. -->
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Enjoy Card: il tuo invito</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 24px 16px;
+      background: #faf5f1;
+      color: #000000;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 16px;
+      line-height: 1.5;
+    "
+  >
+    <p style="margin: 0 0 16px">Ciao {{ .Data.name }},</p>
+    <p style="margin: 0 0 16px">
+      {{ .Data.invited_by }} ti ha invitato come {{ .Data.role_label }} dell’Enjoy Card, la fidelity
+      card dell’Enjoy Bar. Tocca il pulsante per scegliere la password: il link vale 24 ore e si usa
+      una volta sola.
+    </p>
+    <p style="margin: 0 0 24px">
+      <a
+        href="{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=invite#nome={{ .Data.name }}&da={{ .Data.invited_by }}&ruolo={{ .Data.role_label }}"
+        style="
+          display: inline-block;
+          min-height: 48px;
+          padding: 14px 24px;
+          border-radius: 8px;
+          background: #00603a;
+          color: #ffffff;
+          font-weight: bold;
+          text-decoration: none;
+          box-sizing: border-box;
+        "
+        >Scegli la password</a
+      >
+    </p>
+    <p style="margin: 0">
+      Se il link è scaduto, chiedi a chi ti ha invitato di mandarne un altro. Se non lavori
+      all’Enjoy Bar, ignora questa email.
+    </p>
+  </body>
+</html>

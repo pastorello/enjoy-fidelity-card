@@ -320,6 +320,22 @@ describe('AuthProvider', () => {
       expect(state()).toHaveTextContent('in:Marco Prova');
     });
 
+    it('an invite link is verified as an invite, without signing out other devices', async () => {
+      const fake = createFakeAuthService({ recoveryUser: linkUser });
+      const auth = renderWith(fake);
+      await waitFor(() => expect(state()).toHaveTextContent('out:-'));
+      let outcome: string | undefined;
+      await act(async () => {
+        outcome = await auth().completeRecovery('token-abc', 'nuova-password', 'invite');
+      });
+      expect(outcome).toBe('ok');
+      expect(fake.service.verifyInvite).toHaveBeenCalledExactlyOnceWith('token-abc');
+      expect(fake.service.verifyRecovery).not.toHaveBeenCalled();
+      expect(fake.service.updatePassword).toHaveBeenCalledWith('nuova-password');
+      expect(fake.service.signOutOtherDevices).not.toHaveBeenCalled();
+      expect(state()).toHaveTextContent('in:Marco Prova');
+    });
+
     it('reports an invalid link without saving anything', async () => {
       const fake = createFakeAuthService({ verifyResults: ['invalid-link'] });
       const auth = renderWith(fake);

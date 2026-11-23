@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { isAuthApiError } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { linkHref, waitForMessageTo } from '../../e2e/mailpit';
-import { localSupabase, memoryClient } from './localSupabase';
+import { localSupabase, memoryClient, runSql } from './localSupabase';
 
 const local = localSupabase();
 const admin = memoryClient(local.url, local.secretKey);
@@ -43,7 +43,7 @@ describe('password recovery email (local stack + Mailpit)', () => {
     expect(message.subject).toBe('Enjoy Card: scegli una nuova password');
     const text = message.html.replace(/\s+/g, ' ');
     expect(text).toContain('Hai chiesto di scegliere una nuova password per l’Enjoy Card.');
-    expect(text).toContain('il link vale un’ora e si usa una volta sola.');
+    expect(text).toContain('il link vale 24 ore e si usa una volta sola.');
     expect(text).toContain('Se non l’hai chiesto tu, ignora questa email');
     expect(message.html).not.toMatch(/<img\b/i);
 
@@ -156,5 +156,54 @@ describe('saving a recovered password (local stack)', () => {
     const userA = await deviceA.auth.getUser();
     expect(userA.error).toBeNull();
     expect(userA.data.user?.email).toBe(otherEmail);
+  });
+});
+
+// SPEC-operators Open Questions 7 (decided 2026-11-23): otp_expiry is 86400 s, so a recovery link
+// works for 24 hours (the invite link shares it). Auth measures the age from recovery_sent_at.
+describe('the recovery link lasts 24 hours (local stack)', () => {
+  const agedEmail = `recupero-${randomUUID()}@example.com`;
+  let agedId: string | undefined;
+
+  beforeAll(async () => {
+    const { data, error } = await admin.auth.admin.createUser({
+      email: agedEmail,
+      password: randomPassword(16),
+      email_confirm: true,
+    });
+    if (error) throw error;
+    agedId = data.user.id;
+  });
+
+  afterAll(async () => {
+    if (agedId) await admin.auth.admin.deleteUser(agedId).catch(() => undefined);
+  });
+
+  /** A new recovery token, sent `hours` ago as Auth sees it. */
+  async function linkSentHoursAgo(hours: number): Promise<string> {
+    const link = await admin.auth.admin.generateLink({ type: 'recovery', email: agedEmail });
+    if (link.error) throw link.error;
+    runSql(
+      `update auth.users set recovery_sent_at = now() - make_interval(hours => :'hours'::int)
+       where id = :'id'::uuid;`,
+      { hours: String(hours), id: agedId ?? '' },
+    );
+    return link.data.properties.hashed_token;
+  }
+
+  it('a link sent 23 hours ago still opens a session', async () => {
+    const tokenHash = await linkSentHoursAgo(23);
+    const client = memoryClient(local.url, local.publishableKey);
+    const verified = await client.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash });
+    expect(verified.error).toBeNull();
+    expect(verified.data.session?.user.email).toBe(agedEmail);
+  });
+
+  it('a link sent 25 hours ago answers otp_expired', async () => {
+    const tokenHash = await linkSentHoursAgo(25);
+    const client = memoryClient(local.url, local.publishableKey);
+    const verified = await client.auth.verifyOtp({ type: 'recovery', token_hash: tokenHash });
+    expect(verified.error?.code).toBe('otp_expired');
+    expect(verified.data.session).toBeNull();
   });
 });

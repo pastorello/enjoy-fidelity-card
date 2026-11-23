@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { runSql } from './db';
 
 /**
@@ -72,4 +72,60 @@ export function resetDevice(device: string) {
      where name = :'name';`,
     { name: device },
   );
+}
+
+/** Pixels of rounding allowed on a measured width (layout E2E). */
+export const TOLERANCE = 1;
+
+/** The page never scrolls sideways. */
+export async function expectNoHorizontalScroll(page: Page) {
+  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
+    scrollWidth: document.documentElement.scrollWidth,
+    clientWidth: document.documentElement.clientWidth,
+  }));
+  expect(scrollWidth, 'document scroll width').toBeLessThanOrEqual(clientWidth);
+}
+
+/**
+ * Every visible control is at least 48 px tall. Links inside a sentence are exempt (WCAG 2.5.8,
+ * "inline"), and so are the native inputs a styled control hides (their label is the target).
+ */
+export async function expectTouchTargets(page: Page) {
+  const small = await page.evaluate(() => {
+    const controls = document.querySelectorAll<HTMLElement>(
+      'button, a[href], [role="radio"], [role="checkbox"], input, select, textarea',
+    );
+    return [...controls].flatMap((control) => {
+      // A native radio or checkbox is tapped through its label, which is the target.
+      const target =
+        control instanceof HTMLInputElement && ['radio', 'checkbox'].includes(control.type)
+          ? (control.closest('label') ?? control)
+          : control;
+      const box = target.getBoundingClientRect();
+      const style = getComputedStyle(control);
+      const hidden =
+        box.width === 0 ||
+        box.height === 0 ||
+        style.visibility === 'hidden' ||
+        style.opacity === '0' ||
+        control.closest('.visually-hidden') !== null;
+      const inline = control.tagName === 'A' && control.closest('p') !== null;
+      if (hidden || inline || box.height >= 48) return [];
+      const label =
+        control.getAttribute('aria-label') ??
+        (target.textContent?.trim() || control.getAttribute('name')) ??
+        '';
+      return [`${control.tagName.toLowerCase()} "${label}" ${Math.round(box.height)} px`];
+    });
+  });
+  expect(small, `controls under 48 px on ${page.url()}`).toEqual([]);
+}
+
+/** A column `width` px wide (±1), against the left or the right edge of the page. */
+export async function expectColumn(column: Locator, width: number, side: 'left' | 'right') {
+  const box = await column.boundingBox();
+  if (!box) throw new Error('The column has no box');
+  expect(Math.abs(box.width - width), `column width ${box.width}`).toBeLessThanOrEqual(TOLERANCE);
+  if (side === 'left') expect(box.x + box.width).toBeLessThanOrEqual(1280 / 2);
+  else expect(box.x).toBeGreaterThanOrEqual(1280 / 2);
 }

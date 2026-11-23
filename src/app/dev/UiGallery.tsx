@@ -5,6 +5,7 @@ import { CardReadPanelView } from '../../features/card-input/CardReadPanel';
 import type { NfcStatus } from '../../features/card-input/cardReader';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { ConfirmDialog } from '../../shared/ui/ConfirmDialog';
+import { Dialog } from '../../shared/ui/Dialog';
 import { ListRow } from '../../shared/ui/ListRow';
 import { PointsBadge } from '../../shared/ui/PointsBadge';
 import { SearchField } from '../../shared/ui/SearchField';
@@ -32,6 +33,7 @@ export function UiGallery() {
   const [ratio, setRatio] = useState('1,00');
   const [threshold, setThreshold] = useState('15o');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [shellOpen, setShellOpen] = useState(false);
 
   return (
     <AppShell
@@ -126,6 +128,9 @@ export function UiGallery() {
         <Button disabled block>
           Mancano 60 punti
         </Button>
+        <Button variant="secondary" block onClick={() => setShellOpen(true)}>
+          Apri il dialogo
+        </Button>
       </section>
 
       <section className={styles.section} aria-labelledby="g-states">
@@ -186,6 +191,10 @@ export function UiGallery() {
         onConfirm={() => setDialogOpen(false)}
         onCancel={() => setDialogOpen(false)}
       />
+
+      <Dialog open={shellOpen} title="Maria Rossi" onClose={() => setShellOpen(false)}>
+        <p className={styles.dialogText}>maria.rossi@example.com · Attivo</p>
+      </Dialog>
     </AppShell>
   );
 }

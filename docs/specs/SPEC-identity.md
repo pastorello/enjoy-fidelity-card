@@ -8,6 +8,10 @@ Accedi, Impostazioni, Impostazioni operatore (link in `brain/MAP.md` §5) · Dec
 > **Differenza dalle specifiche**: le specifiche prevedono inviti via email e gestione degli operatori
 > dall'app. Il bar non ha un dominio internet, quindi niente servizio email: in V1 gli account si creano a
 > mano dal pannello di Supabase. Decisione del 2026-11-17 in `brain/DECISIONS.md`.
+>
+> **Aggiornamento 2026-11-22**: inviti via email, schermata "Operatori", cambio di ruolo, disattivazione e
+> riattivazione dall'app sono ora in [SPEC-operators.md](SPEC-operators.md) (decisione del 2026-11-22).
+> `private.add_operator` resta per il primo amministratore e come riserva.
 
 ## Objective
 
@@ -182,7 +186,8 @@ resta rinviato:
 - "Cambia password" dalle Impostazioni.
 
 "Password dimenticata", scelta della password dal link e "Cambia password" sono specificati in
-[SPEC-identity-password.md](SPEC-identity-password.md); inviti e schermata "Operatori" restano rinviati.
+[SPEC-identity-password.md](SPEC-identity-password.md); inviti, schermata "Operatori" e cambio di ruolo dall'app
+sono specificati in [SPEC-operators.md](SPEC-operators.md).
 
 Fuori anche:
 - PIN, account di dispositivo e cambio operatore sul tablet: modulo `tablet-kiosk`.

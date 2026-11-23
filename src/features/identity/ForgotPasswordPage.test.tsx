@@ -5,7 +5,7 @@ import { createFakeAuthService } from '../../test/fakeAuthService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
 const CONFIRMATION =
-  'Se l’email è di un account dell’Enjoy Card, ti abbiamo mandato un link. Il link vale un’ora: se non arriva, controlla lo spam o chiedi a un amministratore.';
+  'Se l’email è di un account dell’Enjoy Card, ti abbiamo mandato un link. Il link vale 24 ore: se non arriva, controlla lo spam o chiedi a un amministratore.';
 const NETWORK = 'Connessione assente: controlla la rete e riprova.';
 
 /** A promise the test settles by hand (the app's TS lib predates Promise.withResolvers). */
@@ -46,7 +46,7 @@ describe('forgot password page', () => {
     expect(field).toHaveValue('');
     expect(
       screen.getByText(
-        'Il link vale un’ora. Se non arriva, controlla lo spam o chiedi a un amministratore.',
+        'Il link vale 24 ore. Se non arriva, controlla lo spam o chiedi a un amministratore.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/accedi');

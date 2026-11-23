@@ -10,6 +10,7 @@ import { loadErrorText } from '../customers/loadErrorText';
 import { useAuth } from '../identity/AuthProvider';
 import { useKioskService } from './KioskServiceProvider';
 import { PinPad } from './PinPad';
+import { lockText, usePinLock, wrongPinText } from './pinLock';
 import { turnEndedIn } from './RequireCashier';
 import { KioskError, type Cashier } from './types';
 import { useTabletLayout } from './useTabletLayout';
@@ -34,7 +35,7 @@ type Feedback =
 
 function feedbackText(feedback: Feedback): string {
   if (feedback.kind === 'wrong-pin') {
-    return `PIN errato. Tentativi rimasti: ${feedback.attemptsLeft}`;
+    return wrongPinText(feedback.attemptsLeft);
   }
   if (feedback.kind === 'no-pin') return NO_PIN_TEXT;
   if (feedback.kind === 'network') return NETWORK_TEXT;
@@ -51,37 +52,6 @@ function byName(a: Cashier, b: Cashier): number {
 
 function initialOf(name: string): string {
   return name.trim().charAt(0).toLocaleUpperCase('it-IT');
-}
-
-/** "4:05" from the seconds left. */
-function minutesSeconds(seconds: number): string {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
-}
-
-/**
- * The lock of the till, counted down from the seconds the server gave (`lockSecondsLeft` of the
- * identity, or of a refused unlock), never from the tablet's clock. A countdown that runs late
- * only keeps the keypad off longer: the server refuses any PIN until its own lock ends.
- */
-function useLock(serverSeconds: number) {
-  const [secondsLeft, setSecondsLeft] = useState(serverSeconds);
-  // A fresh reading of the identity says how long the lock still lasts (0: none).
-  const [readSeconds, setReadSeconds] = useState(serverSeconds);
-  if (readSeconds !== serverSeconds) {
-    setReadSeconds(serverSeconds);
-    setSecondsLeft(serverSeconds);
-  }
-  const locked = secondsLeft > 0;
-
-  useEffect(() => {
-    if (!locked) return undefined;
-    const timer = setInterval(() => {
-      setSecondsLeft((left) => Math.max(left - 1, 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [locked]);
-
-  return { secondsLeft, lockFor: setSecondsLeft };
 }
 
 /**
@@ -113,7 +83,7 @@ function CashierChooser({ turnEnded, lockSeconds }: { turnEnded: boolean; lockSe
   const [pin, setPin] = useState('');
   const [checking, setChecking] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const { secondsLeft, lockFor } = useLock(lockSeconds);
+  const { secondsLeft, lockFor } = usePinLock(lockSeconds);
   const locked = secondsLeft > 0;
 
   const load = useCallback(
@@ -285,7 +255,7 @@ function CashierChooser({ turnEnded, lockSeconds }: { turnEnded: boolean; lockSe
             />
             {locked ? (
               <p role="timer" className={styles.message}>
-                Troppi tentativi: riprova tra {minutesSeconds(secondsLeft)}
+                {lockText(secondsLeft)}
               </p>
             ) : (
               feedback && (

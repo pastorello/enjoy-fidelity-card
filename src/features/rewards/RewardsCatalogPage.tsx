@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { AppShell } from '../../app/AppShell';
-import { ButtonLink } from '../../shared/ui/Button';
+import { AdminsOnly } from '../../shared/ui/AdminsOnly';
 import { StatusView } from '../../shared/ui/StatusView';
 import { loadErrorText } from '../customers/loadErrorText';
 import { useCurrentOperator } from '../identity/AuthProvider';
@@ -14,31 +14,6 @@ import type { Reward } from './types';
 
 const TITLE = 'Catalogo premi';
 const BACK_TO = '/impostazioni';
-
-/**
- * The permission message for an operator who opens the catalogue URL by hand
- * (docs/specs/SPEC-rewards.md §4): no read and no write is sent, and no "Nuovo premio" box.
- */
-function AdminsOnly() {
-  return (
-    <AppShell
-      title={TITLE}
-      backTo={BACK_TO}
-      actions={
-        <ButtonLink to={BACK_TO} variant="secondary" block>
-          Torna alle impostazioni
-        </ButtonLink>
-      }
-    >
-      <StatusView
-        kind="empty"
-        icon="lock"
-        title="Solo per gli amministratori"
-        description="Il catalogo premi lo gestiscono gli amministratori."
-      />
-    </AppShell>
-  );
-}
 
 /**
  * The admin's catalogue: loading, error with "Riprova", empty, or the rewards in order; the
@@ -155,6 +130,11 @@ function Catalog() {
  */
 export function RewardsCatalogPage() {
   const operator = useCurrentOperator();
-  if (operator.role !== 'admin') return <AdminsOnly />;
+  if (operator.role !== 'admin') {
+    // SPEC-rewards §4: no read and no write is sent, and no "Nuovo premio" box.
+    return (
+      <AdminsOnly title={TITLE} description="Il catalogo premi lo gestiscono gli amministratori." />
+    );
+  }
   return <Catalog />;
 }

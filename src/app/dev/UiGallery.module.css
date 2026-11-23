@@ -29,3 +29,9 @@
   letter-spacing: var(--type-label-lg-letter-spacing);
   white-space: nowrap;
 }
+
+/* The content of the shell example: body text, like the description of ConfirmDialog. */
+.dialogText {
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+}

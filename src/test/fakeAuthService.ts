@@ -46,9 +46,10 @@ type FakeOptions = {
   email?: string;
   /** Results returned in order by each call; the last one repeats. Default: always success. */
   resetResults?: ResetRequestResult[];
+  /** Results of `verifyRecovery` and `verifyInvite`, in one sequence. */
   verifyResults?: VerifyRecoveryResult[];
   updatePasswordResults?: UpdatePasswordResult[];
-  /** The account of the recovery link: a successful `verifyRecovery` switches the session to it. */
+  /** The account of the link: a successful `verifyRecovery` or `verifyInvite` switches to it. */
   recoveryUser?: { userId: string; operator: Operator | null; email: string };
 };
 
@@ -139,6 +140,20 @@ export function createFakeAuthService({
     };
   }
 
+  /** Recovery and invite links share `verifyResults` and `recoveryUser` (the link's account). */
+  function verifyLink(): VerifyRecoveryResult {
+    const result = nextVerify();
+    if (result === 'ok') {
+      // Like verifyOtp: the link session replaces the saved one, without SIGNED_OUT.
+      currentUser = recoveryUser.userId;
+      profile = recoveryUser.operator;
+      deviceAccount = null;
+      currentAddress = recoveryUser.email;
+      notify(currentUser);
+    }
+    return result;
+  }
+
   const service = {
     currentUserId: vi.fn<AuthService['currentUserId']>(() => Promise.resolve(currentUser)),
     signIn: vi.fn<AuthService['signIn']>(() => {
@@ -165,18 +180,8 @@ export function createFakeAuthService({
     requestPasswordReset: vi.fn<AuthService['requestPasswordReset']>(() =>
       Promise.resolve(nextReset()),
     ),
-    verifyRecovery: vi.fn<AuthService['verifyRecovery']>(() => {
-      const result = nextVerify();
-      if (result === 'ok') {
-        // Like verifyOtp: the link session replaces the saved one, without SIGNED_OUT.
-        currentUser = recoveryUser.userId;
-        profile = recoveryUser.operator;
-        deviceAccount = null;
-        currentAddress = recoveryUser.email;
-        notify(currentUser);
-      }
-      return Promise.resolve(result);
-    }),
+    verifyRecovery: vi.fn<AuthService['verifyRecovery']>(() => Promise.resolve(verifyLink())),
+    verifyInvite: vi.fn<AuthService['verifyInvite']>(() => Promise.resolve(verifyLink())),
     updatePassword: vi.fn<AuthService['updatePassword']>(() => Promise.resolve(nextUpdate())),
     signOutOtherDevices: vi.fn<AuthService['signOutOtherDevices']>(() => Promise.resolve()),
   } satisfies AuthService;
