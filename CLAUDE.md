@@ -65,19 +65,20 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
 - Ogni operazione porta un **identificativo generato dall'app** (idempotenza): doppio tocco o reinvio dopo
   un errore di rete non registrano due volte.
 - **Nome del cliente unico** (per gli omonimi si aggiunge un dettaglio). **Email facoltativa e unica**
-  (minuscole, senza distinguere maiuscole; un cliente con dati cancellati la libera). Clienti anche senza card
-  e senza email.
+  (si cancella con la cancellazione dei dati del cliente). Clienti anche senza card e senza email.
 - Un cliente ha **al massimo una card attiva**; card persa → la vecchia si disattiva, i punti restano.
 - Una card sconosciuta letta dalla schermata principale apre Nuovo cliente con la card già associata.
 - Card disattivata riletta alla cassa: solo un **amministratore** la **riattiva** (scambio con l'eventuale
-  altra card attiva, dopo conferma) o la **riformatta** (card riscritta vuota, poi dissociata per sempre: la
-  riga resta per lo storico, l'uid torna libero). Card di un cliente con dati cancellati: solo riformattare.
+  altra card attiva, dopo conferma) o la **riformatta** (card vuota, dissociata per sempre dal cliente e di
+  nuovo disponibile). Card di un cliente con dati cancellati: solo riformattare.
 
 ## Ruoli
 - **Amministratore** (titolari): tutto, più operatori, catalogo premi, rapporto euro/punto, soglia di
-  conferma importo, export CSV, annullamento movimenti, cancellazione dati cliente.
+  conferma importo, export CSV, annullamento movimenti, cancellazione dati cliente, riattivazione e
+  riformattazione delle card disattivate.
 - **Operatore** (camerieri): cerca e crea clienti, consegna card, registra spese, riscatta premi, annulla
-  entro 10 secondi la propria spesa o il proprio riscatto appena registrati.
+  entro 10 secondi la propria spesa o il proprio riscatto appena registrati; non riattiva né riformatta card
+  disattivate (anche da Associa card): «Card non attiva: chiedi a un amministratore».
 - Account creati solo da un amministratore. **V1**: a mano dal pannello di Supabase + `private.add_operator`
   (`docs/setup-accounts.md` §4), niente inviti dall'app. Le email di Auth partono da `info@enjoygaeta.it`;
   "Password dimenticata" arriva con una spec aggiuntiva dopo la V1 (`brain/DECISIONS.md` 2026-11-17).

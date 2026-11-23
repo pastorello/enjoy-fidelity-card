@@ -13,15 +13,17 @@
 ### 2026-11-23 — Clienti V2: email al posto del telefono, premi nella pagina dei punti, card riattivabili o riformattabili, elenco clienti in home
 
 - **Decisione**: sei cambiamenti chiesti dal titolare, con le risposte alle domande di chiarimento dello
-  stesso giorno. Specifica: `docs/specs/SPEC-customers-v2.md` (modulo `customers-v2`).
-  1. **Niente più telefono**: il bar ha deciso di non raccoglierlo. Il campo sparisce da moduli, scheda,
-     ricerca, export CSV, dati di prova e documenti; la colonna e i numeri già salvati si cancellano dal
-     database (migrazione).
-  2. **Email facoltativa** al suo posto, un solo campo: si salva normalizzata (spazi tolti, minuscole), in
-     formato valido, **unica** (due clienti non possono avere la stessa email, senza distinguere maiuscole;
-     un cliente con dati cancellati la libera); si cerca dalla home **nello stesso campo del nome**; compare
-     nella scheda, in Modifica cliente e nell'export CSV dei clienti; si cancella con "Cancella i dati del
-     cliente". Per ora l'app **non manda email** ai clienti.
+  stesso giorno. Specifica: `docs/specs/SPEC-customers-v2.md` (modulo `customers-v2`). Qui solo ciò che il
+  titolare ha detto; le scelte proposte dalla spec (SERVITI OGGI tolta, email senza distinguere maiuscole, riga
+  della card riformattata conservata, «Card non attiva» senza premi, cancellazione dei telefoni già salvati)
+  sono nelle sue Open Questions, da confermare.
+  1. **Niente più telefono**: il bar ha deciso di non raccoglierlo; il campo si rimuove dall'app. Se cancellare
+     anche i numeri già salvati (irreversibile) è da chiedere al titolare prima del rilascio (Open Question 17
+     della spec).
+  2. **Email facoltativa** al suo posto: si salva, si cerca dalla home **nello stesso campo del nome**, compare
+     nella scheda e nell'export CSV; è **unica** (due clienti non possono averla uguale); si cancella con la
+     cancellazione dei dati del cliente. Per ora l'app **non manda email** ai clienti; in futuro potrebbe
+     arrivare una newsletter.
   3. **Premi nella pagina pubblica dei punti** (`/s/<token>`): sotto i punti, l'elenco dei premi **attivi**
      (nome e punti), e nient'altro.
   4. **Card disattivata riavvicinata alla cassa**: un amministratore può **riattivarla** (torna al suo
@@ -49,8 +51,6 @@
   - Email non unica: il titolare la vuole unica (identifica il cliente come il nome).
   - Riattivare e riformattare per tutti gli operatori: il titolare le riserva agli amministratori.
   - Riattivare rifiutando se il cliente ha già un'altra card attiva: il titolare vuole lo scambio, con conferma.
-  - Mostrare premi o altro anche sulla pagina «Card non attiva»: nient'altro oltre ai premi attivi sotto i
-    punti di una card valida.
   - Raccogliere già ora il consenso alla newsletter: la funzione non esiste; il consenso si chiederà quando
     e se verrà fatta.
 - **Ambito**: `customers`, `cards`, `card-input` (scrittura di una card vuota), `ledger` (ultima attività),
@@ -59,8 +59,7 @@
   per il cliente oltre al saldo: niente … premi» (ora la pagina pubblica mostra anche i premi attivi; resta
   senza nome, account e movimenti); la voce del 2026-11-17 «la pagina pubblica mostra solo i punti» (ora punti
   e premi attivi); la regola di `cards` «un uid non passa mai a un altro cliente» (dopo una riformattazione la
-  card può essere associata a un cliente nuovo; la riga vecchia resta per lo storico); la sezione SERVITI OGGI
-  della home (sostituita dall'elenco dei clienti).
+  card può essere associata a un cliente nuovo).
 - **Contesto**: messaggio del titolare del 2026-11-23 e sue risposte alle domande su email, scambio delle
   card, ruoli e ordine dell'elenco. Testo originale nelle fonti della sessione, riassunto qui.
 

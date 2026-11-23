@@ -38,7 +38,7 @@ clienti**: l'email non si usa per scrivere a nessuno (niente `mailto:`); una new
 consenso marketing separato, fuori da questa spec.
 
 **Utenti**: operatori e amministratori (alla cassa, telefono e tablet); il cliente (solo la pagina pubblica).
-**Successo**: nessun numero di telefono resta nel database né nell'app; un cliente si ritrova scrivendo parte
+**Successo**: nessun telefono nella colonna né nell'app né nei dati di prova (note controllate a mano); un cliente si ritrova scrivendo parte
 dell'email; il cliente vede i premi che può chiedere; un amministratore recupera in meno di un minuto una
 card ritrovata o di un cliente cancellato; la home mostra subito i clienti di oggi in cima senza scrivere
 nulla; l'obiettivo "dalla card alla conferma in meno di 10 secondi" non peggiora.
@@ -69,6 +69,13 @@ nulla; l'obiettivo "dalla card alla conferma in meno di 10 secondi" non peggiora
   TABLE`, "DROP COLUMN"). Per questo l'`update … set phone = null` viene prima (le versioni vecchie delle
   righe restano come tuple morte fino al `VACUUM`), e dopo il rilascio si esegue a mano `vacuum full
   app.customers;` (note di rilascio; `VACUUM` non può girare dentro la transazione di una migrazione).
+  **Da confermare col titolare prima del rilascio** (Open Question 17): il titolare ha deciso di non raccogliere
+  più il telefono e di toglierlo dall'app; cancellare **anche i numeri già salvati** è la conseguenza proposta
+  qui, ma è irreversibile e va confermata esplicitamente. Se il titolare preferisse conservarli, la migrazione 2
+  toglie la colonna dall'app (funzioni e tipo) ma il `drop column` slitta: decisione da prendere prima del merge.
+- **Numeri scritti a mano nelle note**: `app.customers.notes` (testo libero, fino a 500 caratteri) può
+  contenere telefoni scritti dagli operatori; la migrazione non li tocca (non si riscrive testo libero in
+  automatico). Le note di rilascio prevedono un controllo a mano prima del `vacuum full` (sotto).
 - **Tipo `app.customer_summary`**: `alter type app.customer_summary rename attribute phone to email` (stessa
   posizione e stesso tipo `text`: i costruttori posizionali `(id, name, email, notes, …)::app.customer_summary`
   restano validi; verificato sullo stack locale, Postgres 17). Tutte le funzioni che leggevano `c.phone`
@@ -90,10 +97,18 @@ nulla; l'obiettivo "dalla card alla conferma in meno di 10 secondi" non peggiora
   disattivata (punto 4), `CardReadPanel` stato `off` («Su iPhone le card non si leggono: cerca il cliente per
   nome o email.»), dialogo di anonimizzazione («Nome, email e note si cancellano per sempre…»), sezione DATI DEL
   CLIENTE («Nome ed email si cancellano, i movimenti restano senza dati personali. Solo amministratori.»).
-  Restano invece le parole "telefono" che indicano il **dispositivo** (Android, "dal proprio telefono",
-  "avvicina la card al suo telefono"…). Un controllo nel test di confine `scripts/customersBoundary.test.ts`
-  vieta `phone`/`Telefono`/`telefono del cliente` nel codice di `customers`, `cards`, `export` (elenco preciso
-  nel piano).
+  Restano invece le parole "telefono"/"phone" che indicano il **dispositivo** (Android, "dal proprio
+  telefono", "avvicina la card al suo telefono", `openPhone`, "the card on the phone"…).
+- **Controllo di confine** (`scripts/customersBoundary.test.ts`; **la stessa regola** vale per il Success
+  Criterion 1): nei file di `src/`, `e2e/`, `tests/`, `scripts/` e in `supabase/seed.sql`, **escluso il file
+  del test stesso**, sono vietati:
+  - gli identificatori del telefono del cliente come proprietà, campo, parametro o colonna: `phone:`, `.phone`,
+    `p_phone`, `'phone'`, `normalize_phone`, `maskPhone`, `phone_invalid`;
+  - i testi dell'interfaccia «Telefono», «Senza telefono», «Tel.»;
+  - letterali simili a E.164: `\+39\d{6,}`.
+  Le parole in senso di dispositivo non corrispondono a questi modelli (commenti, `openPhone`, `phone.on(…)`);
+  l'unico parametro che oggi coincide, `setPinFromPhone(phone: Page, …)` in `e2e/tablet-pin.spec.ts`, si
+  rinomina (`operatorPhone`).
 
 ### 2. Email facoltativa e unica
 
@@ -160,13 +175,15 @@ nulla; l'obiettivo "dalla card alla conferma in meno di 10 secondi" non peggiora
   dello schema `app`; legarlo al token non apre una porta nuova a chi non ha una card e lascia «Card non
   attiva» identica per ogni token non valido (stessa regola di `card_points`: la risposta non distingue mai i
   casi).
-- **Pagina «Card non attiva»: senza premi** (decisione): chi ha in mano una card disattivata non è (o non è
+- **Pagina «Card non attiva»: senza premi** (default da confermare, Open Question 8): chi ha in mano una card disattivata non è (o non è
   più) un cliente che può usarla; il titolare ha chiesto i premi "sotto i punti", e lì i punti non ci sono;
   mostrare il catalogo a qualunque link non valido toglierebbe la garanzia "nessuna differenza tra i casi".
 - **Disegno** (nessuna tavola nei wireframe: proposto qui con il design system "Enjoy Bar", da aggiungere
   alla tela come "Saldo-punti-premi"). Ordine della pagina "Saldo-punti": logo · riquadro verde «ENJOY YOUR
   POINTS» con il saldo · **sezione premi** · «Mostra la card alla cassa per usare i tuoi punti.» · «Questa pagina
-  mostra solo i punti della card, senza dati personali.» · piè di pagina.
+  mostra i punti della card e i premi del bar, senza dati personali.» (al posto di «Questa pagina mostra solo i
+  punti della card, senza dati personali.», che non descriverebbe più la pagina; da rivedere col titolare e
+  col consulente insieme all'informativa) · piè di pagina.
   - `<section aria-labelledby="rewards-title">` con titolo `h2` «PREMI» nello stile `spaced-caps-condensed`
     in `--color-ink-muted` (lo stesso dei titoli di sezione della home e delle Impostazioni);
   - elenco `<ul>` con una riga per premio, altezza minima 56 px (non è un'area da toccare: niente
@@ -181,7 +198,8 @@ nulla; l'obiettivo "dalla card alla conferma in meno di 10 secondi" non peggiora
   - catalogo senza premi attivi → la sezione non c'è (la pagina torna quella di oggi);
   - niente `lang="en"`: i nomi dei premi sono del bar.
 - **Testo della pagina**: il test che confronta l'intero testo della pagina (`CardPointsPage.test.tsx`,
-  "nothing else") si aggiorna con il titolo «PREMI» e le righe; continua a vietare qualunque altro dato.
+  "nothing else") si aggiorna con il titolo «PREMI», le righe e la frase nuova «Questa pagina mostra i punti
+  della card e i premi del bar, senza dati personali.»; continua a vietare qualunque altro dato.
 
 ### 4. Card disattivata riletta alla cassa: Riattiva o Riformatta
 
@@ -198,10 +216,17 @@ risponde come oggi; cambia solo cosa succede con una card **non attiva** (`activ
   - card di un cliente con dati cancellati: titolo «Card non attiva: chiedi a un amministratore» · testo «I
     dati del cliente di questa card sono stati cancellati.» · nessun nome, nessun pulsante.
 
-**Schermata «Card non attiva»** (`/card/:cardId`, nuova rotta dentro `RequireAuth`; `cardId` è l'id della
-riga di `app.cards`, **mai l'uid** nell'URL; id non uuid → "Card non trovata" senza chiamare il server). Non
-c'è nei wireframe: disegno proposto con i componenti esistenti (`AppShell`, `ListRow`, `StatusView`,
-`Button`, `ConfirmDialog`, `CardLinkWriter`), da aggiungere alla tela come "Card-non-attiva-admin":
+**Schermata «Card non attiva»** (`/card/:cardId`, nuova rotta sotto **`RequireCashier`**, accanto a
+`clienti/:id/card` in `src/app/routes.tsx`: la pagina usa `useCurrentOperator()`, che su un dispositivo senza
+cassiere non ha un operatore; la rotta si aggiunge anche a `docs/specs/contract.md` e a
+`src/app/routes.test.tsx`; `cardId` è l'id della riga di `app.cards`, **mai l'uid** nell'URL; id non uuid →
+"Card non trovata" senza chiamare il server). Non c'è nei wireframe: disegno proposto con i componenti
+esistenti (`AppShell`, `ListRow`, `StatusView`, `Button`, `ConfirmDialog`, `CardLinkWriter`), da aggiungere
+alla tela come "Card-non-attiva-admin":
+
+- **Tablet** (`SPEC-tablet-kiosk.md` punto 10 e criterio 7): una colonna larga, come Associa card, azioni
+  principali ≥ 70 px dal bordo inferiore; `e2e/tablet-layout.spec.ts` ha un passo che misura questa rotta come
+  le altre;
 
 - intestazione «Card non attiva» con «Indietro» → `/`;
 - riga con icona card: «Card …E5F6» e, sotto, «Disattivata il 12 nov» (fuso `Europe/Rome`, anno se diverso);
@@ -222,10 +247,15 @@ c'è nei wireframe: disegno proposto con i componenti esistenti (`AppShell`, `Li
 
 **Riattiva**:
 
-1. senza altra card attiva: nessuna conferma (azione reversibile: la card si può disattivare di nuovo da
-   Modifica cliente) → `app.reactivate_card(p_card_id, null)`;
+1. **sempre una conferma**, anche senza un'altra card attiva: una card si disattiva di solito perché è
+   stata persa, e chi la riporta alla cassa può spendere i punti del cliente appena è riattivata; i punti
+   riscattati nel frattempo non si recuperano disattivandola di nuovo. Senza altra card attiva:
+   `ConfirmDialog` (tono normale) «Riattivare la card …E5F6?» · «Disattivata il 12 nov. Riattiva solo se la
+   card è tornata a Maria: chi la usa potrà spendere i suoi punti.» · «Riattiva» / «Lascia com'è» →
+   `app.reactivate_card(p_card_id, null)`;
 2. con un'altra card attiva: `ConfirmDialog` (tono normale) «Scambiare le card di Maria?» · «La card …E5F6
-   torna attiva. La card …A1B2, ora attiva, si disattiva e il suo link non mostrerà più i punti. I punti
+   (disattivata il 12 nov) torna attiva. Riattiva solo se la card è tornata a Maria: chi la usa potrà spendere
+   i suoi punti. La card …A1B2, ora attiva, si disattiva e il suo link non mostrerà più i punti. I punti
    restano a Maria.» · «Scambia le card» / «Lascia com'è» → `app.reactivate_card(p_card_id,
    <id della card …A1B2>)`. Se nel frattempo la card attiva del cliente è cambiata il server risponde
    `active_card_changed`: la schermata ricarica i dati e mostra di nuovo la conferma con la card giusta;
@@ -237,7 +267,7 @@ c'è nei wireframe: disegno proposto con i componenti esistenti (`AppShell`, `Li
    …E5F6 riattivata. Link non scritto.»;
 4. errori: `customer_anonymized` → «Questo cliente non può avere una card.» (non dovrebbe accadere: la
    schermata non offre Riattiva); `card_released` → «Questa card è già stata riformattata.»; `forbidden` →
-   testo dell'operatore; rete → «Card non riattivata: controlla la connessione.» con «Riprova» (sicuro:
+   «Card non attiva: chiedi a un amministratore.»; rete → «Card non riattivata: controlla la connessione.» con «Riprova» (sicuro:
    riattivare una card già attiva non cambia nulla).
 
 **Riformatta** (telefono Android con Web NFC; **non sul tablet**, Open Question 4):
@@ -256,9 +286,11 @@ c'è nei wireframe: disegno proposto con i componenti esistenti (`AppShell`, `Li
    libera.»; la stessa card riletta in home apre **Nuovo cliente** con la card (`lookup_card` non la trova
    più);
 5. esiti non riusciti (`role="alert"`, «Riprova» primario e «Annulla» secondario; nulla cambia sul server):
-   `timeout`/`io` «Card non riformattata: si è staccata troppo presto.»; `wrong-card` con `otherUid` «Questa
-   non è la card …E5F6. La card …ABCD potrebbe essere stata svuotata: se aveva il link ai punti, riscrivilo
-   dalla scheda del suo cliente.»; `verify-failed` «La card non risulta vuota. Riprova.»; `not-allowed` «Il
+   `timeout`/`io` «Card non riformattata: si è staccata troppo presto.»; `wrong-card` con `mayHaveWritten:
+   false` (card sbagliata nel passo `waiting-card`, prima di scrivere) «Questa non è la card …E5F6: avvicina
+   quella giusta.»; `wrong-card` con `mayHaveWritten: true` (durante `write()` o la verifica) «Questa non è la
+   card …E5F6. La card …ABCD potrebbe essere stata svuotata: se aveva il link ai punti, riscrivilo dalla scheda
+   del suo cliente.»; `verify-failed` «La card non risulta vuota. Riprova.»; `not-allowed` «Il
    telefono non permette di scrivere la card: controlla il permesso NFC di Chrome.»; `unreadable` «La card non
    si legge. È la card …E5F6? Puoi riformattarla comunque.» con «Riformatta comunque» (`allowUnreadable:
    true`; la verifica richiede comunque l'uid giusto); `cannot-write` → la nota del dispositivo che non scrive;
@@ -268,14 +300,18 @@ c'è nei wireframe: disegno proposto con i componenti esistenti (`AppShell`, `Li
    disattivata): riletta in home riapre questa schermata e si riformatta di nuovo, senza danni;
 7. errori del server dopo la scrittura: `card_active` (un altro amministratore l'ha riattivata nel frattempo)
    → «La card è stata riattivata nel frattempo e non è stata liberata. Il suo link è stato cancellato:
-   riscrivilo dalla scheda di Maria.»; `forbidden` → testo dell'operatore;
+   riscrivilo dalla scheda di Maria.»; `forbidden` → «Card non attiva: chiedi a un amministratore.»;
 8. **dispositivo che non scrive** (tablet con lettore USB, iPhone, NFC spento dopo la lettura): il pulsante
    «Riformatta la card» non c'è; al suo posto la nota «Per riformattare la card serve un telefono Android con
    l'NFC attivo: apri Enjoy Card sul telefono e avvicina la card.» Riattiva resta disponibile.
 
 **Associa card di un cliente** (`SPEC-cards.md` punto 4, caso «card disattivata dello stesso cliente → si
-riattiva»): per coerenza con la regola del titolare, solo un amministratore la riattiva da lì; un operatore
-riceve `forbidden` e vede «Card non attiva: chiedi a un amministratore.» (Open Question 3). Gli altri casi di
+riattiva»): per coerenza con la regola del titolare (riattivare una card disattivata: solo amministratori),
+solo un amministratore la riattiva da lì; un operatore riceve `forbidden` e vede «Card non attiva: chiedi a un
+amministratore.» (Open Question 3). Oggi un `forbidden` dai servizi delle card cade in
+`CustomerError('forbidden')`, il cui testo è «Solo un amministratore può cancellare i dati di un cliente.»:
+`forbidden` entra in `CARD_ERROR_CODES` (`src/features/cards/supabaseCardsService.ts`) con una traduzione
+propria (vedi "Codici d'errore nuovi"). Gli altri casi di
 Associa card, Nuovo cliente da card e card già associata non cambiano; una card **riformattata** vi appare come
 sconosciuta.
 
@@ -285,7 +321,16 @@ sconosciuta.
 type EraseCard = (options: { expectedUid: string; signal?: AbortSignal; allowUnreadable?: boolean;
                              onStep?: (step: CardWriteStep) => void }) => Promise<CardWriteResult>;
 function useCardWriter(): { canWrite: boolean; writeUrl: WriteUrl; eraseCard: EraseCard };
+
+// webNfcWriter.ts: the wrong-card outcome says whether write() had already started.
+type CardWriteResult =
+  | { ok: true }
+  | { ok: false; reason: 'wrong-card'; otherUid: string; mayHaveWritten: boolean }
+  | { ok: false; reason: Exclude<CardWriteFailure, 'wrong-card'> };
 ```
+
+`mayHaveWritten` vale anche per `writeUrl` (stesso motore): `false` per una card sbagliata letta nel passo
+`waiting-card`, `true` da quando `write()` è partito. I testi di `cards` si scelgono su questo campo.
 
 - stesse precondizioni, sessione esclusiva, passo 1 (card giusta, `IN_FIELD_MS`), tempi
   (`WRITE_TIMEOUT_MS`, `VERIFY_TIMEOUT_MS`), esiti e regola "mai ritentare da solo" di `writeUrl`: le due
@@ -297,10 +342,15 @@ function useCardWriter(): { canWrite: boolean; writeUrl: WriteUrl; eraseCard: Er
   dei tipi di record; developer.chrome.com/docs/capabilities/nfc: «An unformatted NFC tag that supports NDEF
   contains a single record of the empty type»). È quindi lo stato "vergine" che Chrome vede su un NTAG215
   nuovo; **mai `makeReadOnly()`** (irreversibile; la card resta riscrivibile, come oggi);
-- verifica: una lettura di `expectedUid` il cui messaggio non ha record diversi da `empty` (nessun record
-  `url`); un altro contenuto → `verify-failed`; un altro uid con il messaggio vuoto durante la verifica →
-  ignorato (non si può sapere se è stata svuotata da noi), un altro uid durante `write()` → `abort()` e
-  `wrong-card` con `otherUid` (Chrome scrive sul primo tag che trova);
+- **vuota** (definizione stretta): messaggio con **zero record o soli record `empty`**; qualunque altro
+  record (`url`, `text`, `mime`, `absolute-url`, `unknown`, tipi esterni…) non è vuoto;
+- verifica: una lettura di `expectedUid` vuota → riuscita; `expectedUid` con un altro contenuto →
+  `verify-failed`; un **altro uid** letto durante `write()` → `abort()` e `wrong-card` con `otherUid` e
+  `mayHaveWritten: true` (Chrome scrive sul primo tag che trova); un **altro uid letto vuoto durante la
+  verifica** → **non** si ignora: `wrong-card` con `otherUid` e `mayHaveWritten: true` (`write()` può essersi
+  risolto sulla card B, e l'evento di lettura di B può arrivare dopo: B è stata svuotata, l'amministratore deve
+  saperlo); un altro uid letto **non vuoto** durante la verifica → ignorato come oggi per `writeUrl` (non
+  l'abbiamo scritta noi); un altro uid nel passo `waiting-card` → `wrong-card` con `mayHaveWritten: false`;
 - l'adattatore Web NFC inoltra allo scrittore, oltre agli URL, `blank: boolean` (nessun record o solo record
   `empty`); come gli URL, non arriva mai ai consumatori di `useCardRead`;
 - adattatore finto (build E2E): la memoria dei tag diventa `uid → url | null` (`null` = card vuota);
@@ -318,7 +368,8 @@ cliente anonimizzato per lo storico (`released_at` valorizzato), l'uid torna lib
 
 ### 6. Home: elenco dei clienti con scorrimento infinito
 
-- **Al posto di SERVITI OGGI** (decisione, Open Question 2): una sola sezione **CLIENTI** sotto il campo di
+- **Al posto di SERVITI OGGI** (default da confermare col titolare, Open Question 2: il titolare ha chiesto
+  l'elenco sotto la ricerca, non di togliere SERVITI OGGI): una sola sezione **CLIENTI** sotto il campo di
   ricerca, sempre presente (anche senza ricerca). L'ordine per ultima attività mette già in cima i clienti
   serviti oggi, quindi SERVITI OGGI non serve più; titolo `h2` «CLIENTI» nello stesso stile di «SERVITI OGGI».
 - **Riga** (`ListRow`, tocco → scheda con `customerBackState(text)` come oggi): nome; sotto l'ultima attività
@@ -330,19 +381,33 @@ cliente anonimizzato per lo storico (`released_at` valorizzato), l'uid torna lib
   bar; le correzioni non contano; Open Question 1), dal più recente; poi quelli senza movimenti, dal più
   recente per data di creazione; a parità, `id` decrescente. Clienti con dati cancellati **mai** presenti.
 - **Ricerca nello stesso elenco**: il testo filtra la stessa lista con lo stesso ordine (attesa di 250 ms
-  dall'ultimo tasto, testo nell'URL `?q=` con `replace`, risposte superate scartate: come oggi). Da 2
+  dall'ultimo tasto, risposte superate scartate: come oggi). **Il testo non va più nell'URL**: ora che si cerca
+  anche per email, `?q=rossi@example.com` finirebbe nella cronologia del browser e, a ogni caricamento non
+  servito dal service worker, nei log delle richieste di Vercel. Si salva nello **stato della cronologia**
+  (`navigate('.', { replace: true, state: { q } })`, letto da `useLocation().state` all'apertura; lo stato
+  sopravvive al ricaricamento e a «Indietro» dalla scheda, come oggi `?q=`); `HomePage.tsx` `changeText` non
+  usa più `setSearchParams`. Lo stesso vale per l'uid della card sconosciuta: `?card=<uid>` di
+  `useNewCustomerCard` (home → Nuovo cliente, `SPEC-cards.md` punto 2) diventa `state: { card: uid }`. Test:
+  durante una ricerca per email `location.search` non contiene mai `@`, e dopo una lettura di card sconosciuta
+  non contiene l'uid. Da 2
   caratteri: un cliente compare se **ogni parola** è contenuta nella chiave del nome (regola attuale di
   `search_customers`, via `customer_name_key`) **oppure** il testo intero, in minuscolo, è contenuto nella sua
   email (`%`, `_` e `\` cercati alla lettera). Con meno di 2 caratteri l'elenco è quello completo. La regola
   "sole cifre = telefono" sparisce. Etichetta del campo «Cerca per nome o email» (con il riquadro grande della
   card sopra: «Oppure cerca per nome o email»), placeholder «Es. Rossi o rossi@».
 - **Paginazione a chiave (keyset), 20 per pagina**: la prima pagina all'apertura della home; le successive
-  quando una sentinella dopo l'ultima riga entra nella vista (`IntersectionObserver`, `rootMargin` 400 px,
-  rispetto al contenitore che scorre: la pagina sul telefono, la colonna destra sul tablet se scorre da sola);
+  quando una sentinella dopo l'ultima riga entra nella vista (`IntersectionObserver` con **`root: null`**, cioè
+  la finestra, e `rootMargin: '400px'`, sul telefono **e** sul tablet: su entrambi scorre il documento —
+  `AppShell` ha `min-height: 100dvh` senza contenitore che scorre, e sul tablet la colonna del lettore è
+  `position: sticky`, non la colonna destra a scorrere da sola);
   sotto l'elenco resta anche il pulsante secondario «Mostra altri clienti» finché ce ne sono (per tastiera,
-  TalkBack e browser senza `IntersectionObserver`). Una sola richiesta per volta; righe già presenti
-  deduplicate per `id` (un cliente servito mentre si scorre può salire in cima). Fine elenco: quando una pagina
-  ha meno di 20 righe (una pagina piena seguita da una vuota non mostra nulla di più).
+  TalkBack e browser senza `IntersectionObserver`). Una sola richiesta per volta. Fine elenco: quando una
+  pagina ha meno di 20 righe (una pagina piena seguita da una vuota non mostra nulla di più).
+- **Clienti serviti mentre si scorre** (comportamento accettato): `last_activity_at` cresce soltanto, quindi un
+  cliente servito sale **sopra il cursore**. Se era già caricato resta dov'era nell'elenco; se non era ancora
+  caricato **non compare in questo scorrimento** finché la prima pagina non si ricarica (apertura della home,
+  `visibilitychange`, ritorno dalla scheda). "Senza doppioni né buchi" vale su dati fermi; la deduplica per
+  `id` resta solo come protezione (non dovrebbe mai scattare).
 - **Cursore**: i valori dell'ultima riga ricevuta (`last_activity_at`, `created_at`, `id`) rimandati **così come
   sono arrivati** (stringhe ISO di PostgREST, con i microsecondi): convertirli in `Date` di JavaScript perde i
   microsecondi e salterebbe o ripeterebbe righe.
@@ -362,12 +427,18 @@ cliente anonimizzato per lo storico (`released_at` valorizzato), l'uid torna lib
 - **Tablet** (`SPEC-tablet-kiosk.md` punto 10): colonna destra con ricerca, «Nuovo cliente» e la sezione
   CLIENTI in **due colonne** (la griglia di oggi di SERVITI OGGI), sentinella e «Mostra altri clienti» sotto la
   griglia; il lettore USB a sinistra non cambia.
-- **Riquadro della card**: invariato (compatto quando c'è una ricerca); la lettura card non aspetta l'elenco.
+- **Riquadro della card**: invariato, ma la condizione "compatto" cambia: oggi è `search.status !== 'idle'`
+  (`HomePage.tsx`), che con l'elenco sempre caricato sarebbe sempre vera; diventa **"il testo ha almeno 2
+  caratteri"** (dopo `clean_name`, la stessa soglia della ricerca). La lettura card non aspetta l'elenco.
 - **Server** — `app.list_customers(p_query text default null, p_after_activity_at timestamptz default null,
   p_after_created_at timestamptz default null, p_after_id uuid default null, p_limit int default 20) returns
   table (id uuid, name text, email text, balance int, last_activity_at timestamptz, created_at timestamptz)`,
   `stable security definer set search_path = ''`, `not_operator` per primo; `p_limit` fuori da 1–50 →
-  `invalid_limit` (22023); `p_after_id` valorizzato senza `p_after_created_at` → `invalid_cursor` (22023);
+  `invalid_limit` (22023); cursore incompleto → `invalid_cursor` (22023): `p_after_id` null con
+  `p_after_activity_at` o `p_after_created_at` valorizzato, oppure `p_after_id` valorizzato con
+  `p_after_created_at` null (senza questo controllo il confronto di riga con un `null` dà `NULL` e restituisce
+  una pagina vuota, che sembra la fine dell'elenco); il cursore valido è "tutti null" (prima pagina) oppure
+  `p_after_id` e `p_after_created_at` valorizzati;
   testo tagliato a 80 caratteri e ripulito con `clean_name`. Saldo con `private.customer_balance` solo per le
   righe restituite (sottoquery limitata, come oggi `search_customers`).
 - **Ultima attività denormalizzata** (migrazione 1): `app.customers.last_activity_at timestamptz null`,
@@ -390,6 +461,38 @@ cliente anonimizzato per lo storico (`released_at` valorizzato), l'uid torna lib
 - `app.get_customer` continua a valorizzare `last_served_at` (ultimo movimento di **oggi**): dopo la
   rimozione di SERVITI OGGI nessuna schermata lo usa più, ma resta nel tipo per non cambiare altre firme (Open
   Question 11).
+- **Contratto del servizio** (`src/features/customers/types.ts`; lo condividono `supabaseCustomerService`,
+  `fakeCustomerService`, `useCustomerList` e `HomePage`):
+
+  ```ts
+  /** One row of the home list: what list_customers returns, nothing else. */
+  type CustomerListRow = {
+    id: string;
+    name: string;
+    balance: number;
+    /** PostgREST's ISO string, microseconds included; null without purchases or redemptions. */
+    lastActivityAt: string | null;
+    /** PostgREST's ISO string, kept as received. */
+    createdAt: string;
+  };
+  /** The last row received, sent back unchanged; null for the first page. */
+  type CustomerListCursor = { activityAt: string | null; createdAt: string; id: string };
+
+  interface CustomerService {
+    // …create, update, get, anonymize as today (email instead of phone)…
+    list(input: { query: string; after: CustomerListCursor | null }): Promise<{
+      customers: CustomerListRow[];
+      hasMore: boolean; // customers.length === 20
+    }>;
+  }
+  ```
+
+  - `email` **non** è in `CustomerListRow` (l'elenco non la mostra, Open Question 5) anche se `list_customers`
+    la restituisce: il parser la scarta; si valuta di toglierla dalla tabella restituita in fase di piano.
+  - Righe lette da un parser proprio (`customerListRow.ts`, +test), **non** da `customerRow.ts`, che richiede
+    `notes` e `anonymizedAt` assenti in `list_customers`; i timestamp restano stringhe (mai `Date`).
+  - `search` e `servedToday` **spariscono** da `CustomerService`, da `supabaseCustomerService` e da
+    `fakeCustomerService`; il fake implementa `list` con lo stesso ordine, filtro e cursore del server.
 
 ### Modello dati e regole di accesso (riepilogo delle modifiche)
 
@@ -467,9 +570,20 @@ nessun messaggio, `detail` o log contiene uid, token o email):
   private.is_admin() then raise exception 'forbidden'` (Open Question 3).
 - `app.list_customers`, `public.card_rewards`, `private.card_customer_for_token` (sopra).
 - Eliminate: `app.search_customers(text)`, `app.customers_served_today()`, `private.normalize_phone(text)`.
-- Codici d'errore nuovi (in `errorCodes.ts` e nelle tabelle di traduzione dei servizi): `email_invalid`,
-  `customer_email_taken`, `card_released`, `card_active`, `active_card_changed`; via `phone_invalid`.
-  `scripts/ledgerErrorCodes.test.ts` e `customersBoundary.test.ts` si aggiornano di conseguenza.
+- Codici d'errore nuovi (in `errorCodes.ts` e nelle tabelle di traduzione dei servizi): clienti
+  `email_invalid`, `customer_email_taken`; card `card_released`, `card_active`, `active_card_changed` e
+  **`forbidden`** (oggi assente da `CARD_ERROR_CODES` in `src/features/cards/supabaseCardsService.ts`); via
+  `phone_invalid`. La voce `forbidden` di `TRANSLATIONS` delle card produce un errore tipizzato il cui testo, in
+  Associa card e su `/card/:cardId`, è «Card non attiva: chiedi a un amministratore.» (non più il
+  `CustomerError('forbidden')` della cancellazione dati).
+- Test dei codici da cambiare: `scripts/ledgerErrorCodes.test.ts`, `scripts/customersBoundary.test.ts`,
+  **`scripts/customerErrorCodes.test.ts`** (oggi legge il solo file che finisce in `_customers.sql`, dove
+  `phone_invalid` è ancora sollevato: fallirebbe togliendolo) e **`scripts/cardErrorCodes.test.ts`** (oggi legge
+  solo `_cards.sql`: nulla di `<ts>_customers_v2_email.sql` né di `<ts>_cards_v2_release.sql` verrebbe
+  controllato). Entrambi leggono `_customers*.sql` / `_cards*.sql` (o un elenco esplicito di file) e costruiscono
+  l'insieme dei codici dalla **definizione più recente di ogni funzione ancora presente**, escludendo quelle
+  eliminate (`private.normalize_phone`, `app.search_customers`, `app.customers_served_today`), così i codici
+  nuovi sono obbligatori e `phone_invalid` sparisce.
 
 ## Ordine delle migrazioni
 
@@ -505,7 +619,15 @@ già presente continua a valorizzare `last_activity_at` tramite il trigger.
   su `main` **subito dopo** `db push` in produzione (o viceversa entro pochi minuti), fuori dall'orario di
   apertura; nessun telefono della cassa deve restare con l'app vecchia aperta (un ricaricamento basta: il service
   worker prende la versione nuova al riavvio dell'app).
-- **Dopo il `db push` in produzione** (e su staging): dal SQL Editor `vacuum full app.customers;` per riscrivere
+- **Prima del merge**: conferma esplicita del titolare sulla cancellazione dei telefoni già salvati
+  (Open Question 17). Senza conferma la migrazione 2 non si rilascia.
+- **Telefoni nelle note** (dopo il `db push`, **prima** del `vacuum full`): un amministratore esegue dal SQL
+  Editor
+  `select id, name from app.customers where anonymized_at is null and notes ~ '\+?\d[\d .-]{7,}';`
+  e, per ogni cliente trovato, toglie il numero dalle note da Modifica cliente (l'app; mai un `update` a mano
+  sul testo). La query non stampa le note: chi la esegue le legge solo nell'app.
+- **Dopo il `db push` in produzione** (e su staging), finito il controllo delle note: dal SQL Editor
+  `vacuum full app.customers;` per riscrivere
   la tabella senza le versioni vecchie delle righe con i telefoni. È un blocco esclusivo di pochi millisecondi su
   qualche centinaio di righe. Se il SQL Editor lo rifiuta perché lo avvolge in una transazione, eseguirlo con
   `psql` sulla stringa di connessione del progetto. Le copie di sicurezza automatiche di Supabase che contengono
@@ -529,6 +651,9 @@ l'informativa con queste novità:
 - la pagina dei punti aperta con la card mostra punti e premi attivi del bar, senza dati personali;
 - cancellazione su richiesta: nome, email e note si cancellano, i movimenti restano anonimi; card riformattate
   restano nello storico senza dati personali;
+- telefoni già raccolti: tolti dalla colonna e dai dati di prova (se il titolare conferma la cancellazione); le
+  **note** dell'operatore, testo libero, sono state controllate **a mano** per togliere i numeri scritti lì, ma
+  non c'è una garanzia automatica; restano nelle copie di sicurezza di Supabase fino alla loro scadenza;
 - se in produzione sono già stati registrati clienti con un'informativa che citava il telefono: il consulente
   valuta se serve informarli (il dato è stato cancellato, non aggiunto).
 
@@ -544,7 +669,7 @@ l'informativa con queste novità:
 | Uid riusato per un altro cliente | Ora voluto (decisione 2026-11-23) e solo dopo `release_card`; la riga vecchia resta col suo cliente, la nuova riparte senza link. Un link vecchio non può mostrare i punti del cliente nuovo: i token sono legati a `card_id`, non all'uid, e quelli della riga vecchia sono già cancellati. |
 | Due card attive / stalli | Indice parziale `cards_one_active_per_customer`; blocchi cliente → card in ogni RPC; test di concorrenza in `tests/integration` (due `reactivate_card` contemporanee su due card dello stesso cliente: una sola attiva alla fine; `release_card` contro `reactivate_card` sulla stessa card: una sola vince). |
 | Conferma dello scambio superata | `p_expected_active_card_id` → `active_card_changed`: nessuno scambio diverso da quello confermato. |
-| Telefoni residui | `update … set phone = null`, `drop column`, `vacuum full`; nessun telefono in seed, fixture, test o documentazione nuova. |
+| Telefoni residui | Nessun telefono nella colonna né nei dati di prova: `update … set phone = null`, `drop column`, `vacuum full`; nessun telefono in seed, fixture, test o documentazione nuova (test di confine). **Note controllate a mano** (query delle note di rilascio prima del `vacuum full`): testo libero, nessuna garanzia automatica. |
 | Email doppia per corsa | Indice unico; `unique_violation` tradotta in `customer_email_taken`. |
 | Formula nel CSV | `guardFormula` sull'email. |
 | Ricerca con caratteri speciali | `%`, `_`, `\` scappati anche nel pattern dell'email; testo tagliato a 80 caratteri; `p_limit` limitato a 50. |
@@ -567,21 +692,38 @@ supabase/tests/customers_v2.test.sql (nuovo) · customers.test.sql · cards.test
                card_points.test.sql · export.test.sql · ledger_reads.test.sql · function_privileges.test.sql
 supabase/seed.sql
 src/features/customers/  email.ts (+test, nuovo) · phone.ts (eliminato) · CustomerForm · CustomerPage
-                         HomePage · useCustomerList.ts (nuovo; sostituisce useCustomerSearch e useServedToday)
+                         HomePage (testo nello stato della cronologia, riquadro compatto da 2 caratteri)
+                         useCustomerList.ts (nuovo; sostituisce useCustomerSearch e useServedToday)
+                         customerListRow.ts (+test, nuovo)
                          activityLabel.ts (+test, nuovo) · AnonymizeSection · errorCodes · types
                          customerRow.ts (email al posto di phone; lo usa anche cards)
                          supabaseCustomerService
 src/features/cards/      InactiveCardPage.tsx (+css, +test, +tablet test, nuovo) · useInactiveCard.ts (nuovo)
-                         useHomeCardRead · homeCardNotice · supabaseCardsService · types
+                         useHomeCardRead · homeCardNotice · supabaseCardsService (forbidden) · types
+                         CardSummary.tsx (+test: «Card attiva …E5F6 · email» o «Senza email»)
+                         useNewCustomerCard (uid nello stato della cronologia, non in ?card=)
                          public/CardPointsPage · public/cardPointsService (+ fetchCardRewards)
 src/features/card-input/ webNfcWriter (eraseCard) · webNfcAdapter (blank) · useCardWriter · fakeCardAdapter
                          web-nfc.d.ts · CardReadPanel (testo stato off)
 src/features/export/     buildCustomersCsv · types · supabaseExportService
-src/app/routes.tsx       rotta /card/:cardId
-src/test/                fakeCustomerService · fakeCardsService · fakeWebNfc · fakeExportService
-e2e/                     customers · cards · card-points · export · tablet*.spec.ts · nfc.ts
+src/app/routes.tsx       rotta /card/:cardId sotto RequireCashier · routes.test.tsx
+src/app/dev/UiGallery.tsx campo telefono e «Cerca per nome o telefono» → email
+src/test/                fakeCustomerService (list; via search e servedToday) · fakeCardsService · fakeWebNfc
+                         fakeExportService · fakeLedgerService (applyMovement aggiorna lastActivityAt e l'ordine
+                         dell'elenco al posto di lastServedAt)
+scripts/                 customersBoundary · customerErrorCodes · cardErrorCodes · ledgerErrorCodes (.test.ts)
+e2e/                     customers · cards · card-points · export · tablet*.spec.ts (tablet-layout: /card/:cardId;
+                         tablet-pin: parametro phone rinominato) · nfc.ts
+                         ledger.spec.ts (criterio 3: il cliente è in cima a CLIENTI con «Oggi, HH:MM», non più
+                         «in Serviti oggi»)
 tests/integration/       customers · cards · export · ledger (trigger di last_activity_at)
+                         tablet-kiosk (p_phone → p_email in create_customer e update_customer)
+docs/specs/contract.md   rotta /card/:cardId
 ```
+
+Criterio di `SPEC-ledger.md` che cambia: il criterio 3 ("dopo 10 s si torna alla home, con il cliente in
+Serviti oggi") diventa "… con il cliente in cima a CLIENTI con «Oggi, HH:MM»"; si aggiorna con le spec
+originali dopo il rilascio.
 
 ## Code Style
 
@@ -603,11 +745,11 @@ export function normalizeEmail(input: string): string | null | 'invalid' {
 
 | Livello | Cosa copre |
 |---|---|
-| pgTAP (`customers_v2.test.sql` e test esistenti aggiornati) | colonna `phone` assente e `private.normalize_phone` assente; `email` normalizzata (`'  Rossi@Example.COM '` → `rossi@example.com`), formato rifiutato (`email_invalid`), unica (anche `ROSSI@example.com` contro `rossi@example.com` → `customer_email_taken` con `detail`), liberata dall'anonimizzazione (un altro cliente la riusa), svuotata con `update_customer`, `null` multipli ammessi; `anonymize_customer` azzera nome, email, note; `list_customers`: ordine (spesa annullata conta, correzione no, riscatto conta, senza movimenti per creazione), anonimizzati esclusi, filtro per parole del nome e per parte dell'email, `%`/`_`/`\` alla lettera, keyset senza duplicati né buchi su 3 pagine anche con `created_at` uguali al microsecondo, cursore non valido, limite fuori intervallo, `not_operator`; trigger: `last_activity_at` aggiornata da spesa e riscatto, non da correzione, mai all'indietro; `performs_within` media < 50 ms per prima pagina, pagina centrale e ricerca con 1 000 clienti e 20 000 movimenti finti; `explain` della prima pagina usa `customers_home_order_idx`; card: `get_card`, `reactivate_card` (operatore `forbidden`, admin ok, scambio con `p_expected_active_card_id`, `active_card_changed`, cliente anonimizzato, card rilasciata, idempotenza), `release_card` (operatore `forbidden`, card attiva `card_active`, idempotenza con lo stesso `operation_id`, `operation_id` riusato su un'altra card, riga conservata con uid, `private.card_links` vuota), uid rilasciato → `lookup_card` vuota → `associate_card` e `create_customer_with_card` lo associano a un altro cliente, `raise_card_taken` con due righe dello stesso uid, trigger che vieta di togliere `released_at` o riattivare una card rilasciata; riattivazione da `associate_card` riservata all'admin; `card_rewards`: token valido → premi attivi in ordine di punti, inattivi esclusi, token non valido/in attesa/card disattivata/rilasciata/cliente anonimizzato → zero righe, intestazione `no-store`; allowlist `anon` = `card_points`, `card_rewards`; `export_customers` con `email` |
-| Unit (Vitest) | `normalizeEmail` con gli stessi vettori di pgTAP; `activityLabel` (oggi, ieri, quest'anno, altri anni, nessun movimento, cambio dell'ora legale); `buildCustomersCsv` (colonna Email, `guardFormula`, anonimizzati vuoti); `webNfcWriter.eraseCard` con `fakeWebNfc` (un solo record `empty`, `overwrite: true`, verifica `blank`, `verify-failed` se resta un URL, `wrong-card`, `unreadable`/`allowUnreadable`, tempi, `makeReadOnly` mai chiamato); adattatore: `blank` vero per nessun record e per soli `empty`, mai ai consumatori; servizi: ogni codice d'errore nuovo → errore tipizzato; `fetchCardRewards` (forma, timeout, token non valido senza chiamata) |
-| Componenti | Home: prima pagina, sentinella (IntersectionObserver finto) e «Mostra altri clienti» caricano la pagina 2 con il cursore come stringhe ricevute, deduplica, fine elenco, errori della prima e delle pagine successive, archivio vuoto, ricerca (attesa, URL `?q=`, risposte superate scartate, nessun risultato con e senza `@`), etichette nuove, nessuna email nelle righe, aggiornamento su `visibilitychange` solo con la sola prima pagina, layout tablet a due colonne; card in home: admin → `/card/:id`, operatore → avviso «Card non attiva: chiedi a un amministratore» (cliente e anonimizzato); `InactiveCardPage`: stati, Riattiva senza e con scambio (conferma, `active_card_changed` → nuova conferma), scrittura del link dopo la riattivazione, Riformatta (conferma, passi, ogni esito, rete dopo la scrittura → «Riprova» con lo stesso `operation_id`, `card_active`), tablet e `canWrite` falso senza Riformatta, operatore → errore, card anonimizzata senza Riattiva; form: campo email, errori, «Apri la scheda»; scheda: email o «Senza email», nessun `mailto:`; pagina pubblica: sezione PREMI, singolare «1 punto», catalogo vuoto senza sezione, «Card non attiva» senza premi, errore di una delle due chiamate → «Riprova» |
+| pgTAP (`customers_v2.test.sql` e test esistenti aggiornati) | colonna `phone` assente e `private.normalize_phone` assente; `email` normalizzata (`'  Rossi@Example.COM '` → `rossi@example.com`), formato rifiutato (`email_invalid`), unica (anche `ROSSI@example.com` contro `rossi@example.com` → `customer_email_taken` con `detail`), liberata dall'anonimizzazione (un altro cliente la riusa), svuotata con `update_customer`, `null` multipli ammessi; `anonymize_customer` azzera nome, email, note; `list_customers`: ordine (spesa annullata conta, correzione no, riscatto conta, senza movimenti per creazione), anonimizzati esclusi, filtro per parole del nome e per parte dell'email, `%`/`_`/`\` alla lettera, keyset senza duplicati né buchi su 3 pagine (dati fermi) anche con `created_at` uguali al microsecondo, cursore non valido (`p_after_id` null con un timestamp valorizzato, `p_after_id` senza `p_after_created_at` → `invalid_cursor`), limite fuori intervallo, `not_operator`; trigger: `last_activity_at` aggiornata da spesa e riscatto, non da correzione, mai all'indietro; con 1 000 clienti e 20 000 movimenti finti (test annullato a fine transazione) `explain` di prima pagina, pagina centrale e ricerca mostra `Index Only Scan` o `Index Scan` su `customers_home_order_idx` (**questo** è il controllo bloccante, deterministico); nessuna asserzione di tempo in pgTAP (i runner condivisi della CI la renderebbero casuale): il tempo si misura a mano (RUNBOOK) con un limite largo, < 500 ms; card: `get_card`, `reactivate_card` (operatore `forbidden`, admin ok, scambio con `p_expected_active_card_id`, `active_card_changed`, cliente anonimizzato, card rilasciata, idempotenza), `release_card` (operatore `forbidden`, card attiva `card_active`, idempotenza con lo stesso `operation_id`, `operation_id` riusato su un'altra card, riga conservata con uid, `private.card_links` vuota), uid rilasciato → `lookup_card` vuota → `associate_card` e `create_customer_with_card` lo associano a un altro cliente, `raise_card_taken` con due righe dello stesso uid, trigger che vieta di togliere `released_at` o riattivare una card rilasciata; riattivazione da `associate_card` riservata all'admin; `card_rewards`: token valido → premi attivi in ordine di punti, inattivi esclusi, token non valido/in attesa/card disattivata/rilasciata/cliente anonimizzato → zero righe, intestazione `no-store`; allowlist `anon` = `card_points`, `card_rewards`; `export_customers` con `email` |
+| Unit (Vitest) | `normalizeEmail` con gli stessi vettori di pgTAP; `activityLabel` (oggi, ieri, quest'anno, altri anni, nessun movimento, cambio dell'ora legale); `buildCustomersCsv` (colonna Email, `guardFormula`, anonimizzati vuoti); `webNfcWriter.eraseCard` con `fakeWebNfc` (un solo record `empty`, `overwrite: true`, verifica `blank`, `verify-failed` se resta un URL, un record `text` o un record `mime`, `wrong-card` con `mayHaveWritten: false` nel passo `waiting-card` e `true` durante `write()`, un altro uid letto vuoto durante la verifica → `wrong-card` con `mayHaveWritten: true`, `unreadable`/`allowUnreadable`, tempi, `makeReadOnly` mai chiamato; `writeUrl` con `mayHaveWritten`); adattatore: `blank` vero per nessun record e per soli `empty`, falso con un record `text`, `mime` o `url`, mai ai consumatori; `customerListRow` (timestamp come stringhe, righe senza `notes`); servizi delle card: `forbidden` → «Card non attiva: chiedi a un amministratore.»; servizi: ogni codice d'errore nuovo → errore tipizzato; `fetchCardRewards` (forma, timeout, token non valido senza chiamata) |
+| Componenti | Home: prima pagina, sentinella (IntersectionObserver finto) e «Mostra altri clienti» caricano la pagina 2 con il cursore come stringhe ricevute, deduplica, fine elenco, errori della prima e delle pagine successive, archivio vuoto, ricerca (attesa, testo nello stato della cronologia e ripristinato dopo «Indietro», `location.search` mai con `@` né con l'uid della card, risposte superate scartate, nessun risultato con e senza `@`), riquadro compatto solo da 2 caratteri, `IntersectionObserver` con `root: null`, etichette nuove, nessuna email nelle righe, aggiornamento su `visibilitychange` solo con la sola prima pagina, layout tablet a due colonne; card in home: admin → `/card/:id`, operatore → avviso «Card non attiva: chiedi a un amministratore» (cliente e anonimizzato); `InactiveCardPage`: stati, Riattiva **senza** scambio passa dalla conferma («Riattiva solo se la card è tornata a Maria…», con «Disattivata il …»; nessuna chiamata a `reactivate_card` prima del tocco su «Riattiva»), Riattiva con scambio (conferma, `active_card_changed` → nuova conferma), `forbidden` → testo per l'operatore, scrittura del link dopo la riattivazione, Riformatta (conferma, passi, ogni esito, i due testi di `wrong-card` secondo `mayHaveWritten`, rete dopo la scrittura → «Riprova» con lo stesso `operation_id`, `card_active`), tablet e `canWrite` falso senza Riformatta, operatore → errore, card anonimizzata senza Riattiva; form: campo email, errori, «Apri la scheda»; scheda: email o «Senza email», nessun `mailto:`; pagina pubblica: sezione PREMI, singolare «1 punto», catalogo vuoto senza sezione, «Card non attiva» senza premi, errore di una delle due chiamate → «Riprova» |
 | Integrazione (`tests/integration`) | RPC nuove e traduzione degli errori contro lo stack locale; concorrenza (`reactivate_card` × 2, `release_card` contro `reactivate_card`, `create_customer` × 2 con la stessa email) |
-| E2E (390×844 e tablet 1280×800, Supabase locale) | admin: cliente con email → lo trova scrivendo parte dell'email → email doppia rifiutata con «Apri la scheda» → cancella i dati → l'email si riusa; home: 45 clienti del test → scorrimento fino all'ultimo senza doppioni, il cliente appena servito è in cima; card: disattiva → riletta con `__enjoyFakeCard` da admin → Riattiva con scambio → link scritto (`__enjoyFakeCardWrites`) → spesa; disattiva → Riformatta → registro con `url: null` → riletta → Nuovo cliente con la card; operatore → avviso; tablet: card disattivata dal lettore USB (`page.keyboard`) → Riattiva, nessun Riformatta; pagina `/s/<token>` con i premi attivi del seed in ordine |
+| E2E (390×844 e tablet 1280×800, Supabase locale) | admin: cliente con email → lo trova scrivendo parte dell'email → email doppia rifiutata con «Apri la scheda» → cancella i dati → l'email si riusa; home: 45 clienti del test con un prefisso unico della corsa (`uniqueName`) → si scrive il prefisso nel campo → nell'elenco filtrato 20 righe, poi le altre scorrendo, nessun doppione, fine dell'elenco al 45°, il cliente appena servito in cima (l'elenco senza filtro, che cambia per gli altri test in parallelo sullo stesso database, si prova solo nei test di componente con il servizio finto); card: disattiva → riletta con `__enjoyFakeCard` da admin → Riattiva con scambio → link scritto (`__enjoyFakeCardWrites`) → spesa; disattiva → Riformatta → registro con `url: null` → riletta → Nuovo cliente con la card; operatore → avviso; tablet: card disattivata dal lettore USB (`page.keyboard`) → Riattiva, nessun Riformatta; pagina `/s/<token>` con i premi attivi del seed in ordine |
 | Manuale (RUNBOOK, anteprima su staging, NTAG215 di prova) | Riformatta su Android: la card si svuota e Chrome la verifica; riletta in home apre Nuovo cliente; fuori dall'app Android e un iPhone non aprono nulla con la card vuota; una card riformattata si riassocia e riceve un link nuovo che funziona; pagina dei punti con i premi su un telefono qualsiasi a 320 px |
 
 ## Boundaries (delta rispetto alle spec originali)
@@ -616,18 +758,21 @@ export function normalizeEmail(input: string): string | null | 'invalid' {
   (`@example.com`, nessun telefono); `guardFormula` sull'email nel CSV; cursore rimandato com'è arrivato;
   `released_at is null` in ogni ricerca per uid; card svuotata solo dopo averla riconosciuta (`expectedUid`).
 - **Ask first**: mostrare l'email negli elenchi; contare o non contare le spese annullate nell'ultima attività;
+  cancellare i telefoni già salvati (Open Question 17); riattivare senza conferma;
   rendere disponibile Riformatta sul tablet o senza scrittura; mostrare premi o altro su «Card non attiva»;
   qualunque uso dell'email per scrivere ai clienti (newsletter: consenso marketing separato).
 - **Never**: link `mailto:` o invii di email ai clienti; `makeReadOnly()`; cancellare righe di `app.cards`,
-  `app.customers` o movimenti; uid, token o email in log, errori o URL; consenso marketing pre-selezionato o
+  `app.customers` o movimenti; uid, token o email in log, messaggi o `detail` d'errore, o nell'URL (anche lato client: testo della ricerca e uid della card sconosciuta passano per lo stato della cronologia, punto 6); consenso marketing pre-selezionato o
   unito al consenso privacy; testo legale scritto dall'agente.
 
 ## Success Criteria
 
 1. Dopo le migrazioni `app.customers` non ha la colonna `phone`, `private.normalize_phone`,
-   `app.search_customers` e `app.customers_served_today` non esistono, e nessun file in `src/`, `e2e/`,
-   `tests/`, `scripts/` o `supabase/seed.sql` contiene un numero di telefono di cliente o il campo `phone`
-   (test di confine).
+   `app.search_customers` e `app.customers_served_today` non esistono; il test di confine (regola del punto 1:
+   identificatori `phone:`, `.phone`, `p_phone`, `'phone'`, `normalize_phone`, `maskPhone`, `phone_invalid`,
+   testi «Telefono»/«Senza telefono»/«Tel.», letterali `\+39\d{6,}`, in `src/`, `e2e/`, `tests/`, `scripts/` e
+   `supabase/seed.sql`, escluso il test stesso) è verde: nessun telefono nella colonna né nei dati di prova;
+   note controllate a mano (note di rilascio).
 2. Un operatore crea un cliente con `'  Rossi@Example.COM '`: si salva `rossi@example.com`; un secondo cliente con
    `ROSSI@example.com` è rifiutato con «Esiste già un cliente con questa email.» e «Apri la scheda» del primo;
    `rossi@` senza dominio è rifiutato con «Email non valida: controlla come è scritta.»; due clienti senza email
@@ -637,19 +782,22 @@ export function normalizeEmail(input: string): string | null | 'invalid' {
 4. Dalla home, scrivendo «rossi@exa» si trova il cliente; scrivendo «maria rossi» si trova per nome; la scheda
    mostra l'email per intero e nessun link `mailto:`; il CSV dei clienti ha la colonna «Email» al posto di
    «Telefono», vuota per gli anonimizzati, con `guardFormula`.
-5. La home senza ricerca mostra la sezione CLIENTI: 20 righe, poi le successive scorrendo, senza doppioni né
-   buchi, fino all'ultimo cliente; prima chi ha la spesa o il riscatto più recente (anche annullati), poi chi non
+5. La home senza ricerca mostra la sezione CLIENTI: 20 righe, poi le successive scorrendo, su dati fermi senza
+   doppioni né buchi, fino all'ultimo cliente (un cliente servito durante lo scorrimento compare al ricaricamento
+   della prima pagina); prima chi ha la spesa o il riscatto più recente (anche annullati), poi chi non
    ha movimenti dal più nuovo; nessun cliente con dati cancellati; scrivendo nel campo la stessa lista si filtra
    con lo stesso ordine; ogni stato (caricamento, errore della prima pagina, errore di una pagina successiva,
    archivio vuoto, nessun risultato) ha un test di componente; anche sul tablet a 1280×800, in due colonne.
-6. Con 1 000 clienti e 20 000 movimenti finti `list_customers` resta in media sotto 50 ms (prima pagina,
-   pagina centrale, ricerca) e la prima pagina usa `customers_home_order_idx`.
+6. Con 1 000 clienti e 20 000 movimenti finti il piano di `list_customers` (prima pagina, pagina centrale,
+   ricerca) è un `Index Only Scan` o `Index Scan` su `customers_home_order_idx` (asserzione `explain` in pgTAP);
+   il tempo, misurato a mano (RUNBOOK), resta sotto un limite largo di 500 ms.
 7. La pagina `/s/<token>` di una card attiva mostra sotto i punti la sezione «PREMI» con nome e punti dei soli
    premi attivi, dal meno caro, e nient'altro; senza premi attivi la sezione non c'è; «Card non attiva» resta
    identica a oggi; `card_rewards` non restituisce righe per nessun token non valido; `anon` può eseguire solo
    `card_points` e `card_rewards`.
 8. Un amministratore che avvicina in home una card disattivata arriva a «Card non attiva» e con «Riattiva la
-   card» la card torna al suo cliente; se il cliente aveva un'altra card attiva, dopo la conferma che la nomina
+   card», dopo la conferma «Riattiva solo se la card è tornata a Maria…» (anche senza un'altra card attiva), la
+   card torna al suo cliente; se il cliente aveva un'altra card attiva, dopo la conferma che la nomina
    quella si disattiva e restano i punti; subito dopo il link si scrive sulla card; un cliente non ha mai due
    card attive (anche con due amministratori in contemporanea).
 9. Un amministratore che con «Riformatta la card» conferma e tiene la card sul telefono ottiene una card con un
@@ -681,30 +829,37 @@ export function normalizeEmail(input: string): string | null | 'invalid' {
 
 1. **Spese e riscatti annullati nell'ultima attività?** Default: sì, contano (il cliente è venuto al bar, come in
    SERVITI OGGI); le correzioni no.
-2. **Cosa sostituisce SERVITI OGGI?** Default: la sezione CLIENTI stessa; i clienti di oggi stanno in cima con
+2. **SERVITI OGGI si toglie?** Il titolare ha chiesto l'elenco dei clienti sotto la ricerca, non la rimozione di
+   SERVITI OGGI. Default da confermare: la sezione CLIENTI la sostituisce; i clienti di oggi stanno in cima con
    «Oggi, 10:15». Nessuna sezione separata.
 3. **Riattivazione da Associa card per gli operatori** (oggi permessa per la card disattivata dello stesso
-   cliente). Default: solo amministratori, come ha chiesto il titolare per la riattivazione; l'operatore vede
+   cliente). Default, conseguenza della regola del titolare «riattivare una card disattivata: solo
+   amministratori» (da confermare che valga anche da lì): solo amministratori; l'operatore vede
    «Card non attiva: chiedi a un amministratore.»
 4. **Riformatta sul tablet** (il lettore USB non scrive). Default: non disponibile; nota che rimanda al telefono
    Android. Niente scollegamento sul solo server.
 5. **Email negli elenchi della home?** Default: no, solo in scheda e in Modifica (meno dati personali sotto gli
    occhi di chi è al banco).
-6. **Maiuscole nella parte locale dell'email** (tecnicamente può distinguerle). Default: tutto minuscolo; due
-   indirizzi che differiscono solo per le maiuscole sono la stessa email.
+6. **Maiuscole nella parte locale dell'email** (tecnicamente può distinguerle). Il titolare ha detto "unica",
+   non "senza distinguere maiuscole". Default da confermare: tutto minuscolo; due indirizzi che differiscono solo
+   per le maiuscole sono la stessa email.
 7. **Controllo dell'email**: default formato semplice (`qualcosa@dominio.estensione`), nessuna verifica di
    esistenza, nessuna email di conferma (l'app non scrive ai clienti).
-8. **Premi sulla pagina pubblica**: default ordine per punti crescenti poi nome, nessun segno di "raggiungibile",
-   sezione nascosta senza premi attivi, «Card non attiva» senza premi.
+8. **Premi sulla pagina pubblica**: default da confermare: ordine per punti crescenti poi nome, nessun segno di
+   "raggiungibile", sezione nascosta senza premi attivi, «Card non attiva» senza premi (il titolare ha chiesto i
+   premi "sotto i punti"; non ha escluso la pagina «Card non attiva»).
 9. **Errore di una sola delle due chiamate della pagina pubblica**: default la pagina mostra l'errore con
    «Riprova» (un solo stato d'errore, nessun saldo senza premi o viceversa).
 10. **Posizione dell'elenco tornando dalla scheda**: default nessun ripristino; l'elenco riparte dalla prima pagina
-    (la ricerca nell'URL invece resta).
+    (il testo della ricerca invece resta, nello stato della cronologia).
 11. **`last_served_at` in `app.customer_summary`**: non lo usa più nessuna schermata. Default: resta nel tipo e
     `get_customer` continua a valorizzarlo (nessun cambio di firma in più); si toglie in una pulizia futura.
-12. **Riattiva senza un'altra card attiva**: default nessuna conferma (azione reversibile).
-13. **Riga della card riformattata**: default conservata con uid e cliente di allora (`released_at`); l'uid si
-    libera con un indice unico parziale.
+12. **Riattiva senza un'altra card attiva**: chiusa dalla revisione della spec: **sempre una conferma** (una card
+    disattivata di solito è stata persa; i punti riscattati da chi l'ha trovata non tornano). Non contraddice il
+    titolare, che ha chiesto la conferma per lo scambio.
+13. **Riga della card riformattata**: il titolare ha chiesto di dissociarla per sempre e renderla di nuovo
+    disponibile, non come. Default da confermare: riga conservata con uid e cliente di allora (`released_at`);
+    l'uid si libera con un indice unico parziale.
 14. **Nuovo cliente da una ricerca per email senza risultati**: default «Nuovo cliente» senza precompilare
     l'email (come oggi per il telefono).
 15. **Testi nuovi** (errori email, «Card non attiva», Riattiva/Riformatta, CLIENTI, «Oggi, 10:15», «PREMI»…):
@@ -712,3 +867,8 @@ export function normalizeEmail(input: string): string | null | 'invalid' {
     all'informativa.
 16. **Clienti già registrati con l'informativa che citava il telefono**: decide il consulente se informarli;
     default nessuna azione dell'app.
+17. **Cancellare i telefoni già salvati** (irreversibile). Il titolare ha detto «rimuoviamo il numero di
+    telefono, abbiamo deciso di non collezionarli»: è deciso che il campo sparisce e che non se ne raccolgono più;
+    non è stato detto esplicitamente di cancellare quelli già in archivio. Default proposto: cancellarli
+    (`update … set phone = null`, `drop column`, `vacuum full`). **Domanda da fare al titolare, con risposta
+    prima del merge della migrazione 2**: «Cancelliamo anche i numeri già salvati? Non si potranno recuperare.»
