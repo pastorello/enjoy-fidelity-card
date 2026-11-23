@@ -1,53 +1,44 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CARD_ERROR_CODES } from '../src/features/cards/supabaseCardsService';
 import { CUSTOMER_ERROR_CODES } from '../src/features/customers/errorCodes';
+import { liveFunctionsIn, raisedMessageCodes } from './migrationFunctions';
 
 // errorCodes.ts is the single list of the customers RPCs' message-codes: a code raised by the
-// migrations but missing from the list would reach the user untranslated as 'unknown'.
+// migrations but missing from the list would reach the user untranslated as 'unknown'. The codes are
+// those of the latest definition of each function still present whose latest definition is in a
+// `_customers*.sql` migration (SPEC-customers-v2, "Codici d'errore"): the functions dropped by
+// customers_v2_email (the phone normalizer, app.search_customers, app.customers_served_today)
+// and the old app.create_customer / app.update_customer no longer count.
 
-const MIGRATIONS = 'supabase/migrations';
-
-/** The message-codes the migrations whose name matches `pattern` raise with errcode P0001, sorted. */
-function raisedCodes(pattern: RegExp): string[] {
-  const files = readdirSync(MIGRATIONS).filter((name) => pattern.test(name));
-  if (files.length === 0) throw new Error(`no migration matches ${String(pattern)}`);
-  const codes = files.flatMap((name) =>
-    [
-      ...readFileSync(join(MIGRATIONS, name), 'utf8').matchAll(
-        /raise exception '([a-z_]+)'\s+using errcode = 'P0001'/g,
-      ),
-    ].map((match) => match[1] ?? ''),
-  );
-  return [...new Set(codes)].toSorted((a, b) => a.localeCompare(b));
-}
-
-/**
- * Codes the app no longer translates although a migration still raises them: the customer phone
- * (SPEC-customers-v2, point 1). The app sends no phone, so the server cannot raise it; the code
- * leaves the migrations with task 25 and this list with task 26 (latest definition of each function).
- */
-const RETIRED_CUSTOMER_CODES: ReadonlySet<string> = new Set(['phone_invalid']);
+const CUSTOMER_MIGRATIONS = /_customers[a-z0-9_]*\.sql$/;
 
 const sorted = (codes: readonly string[]) => codes.toSorted((a, b) => a.localeCompare(b));
+
+const aboutPhone = (codes: readonly string[]) => codes.filter((code) => /phone/.test(code));
+
+function raisedCustomerCodes(): string[] {
+  // customers_v2_email redefines create_customer_with_card too: its card codes are CARD_ERROR_CODES.
+  const cardOnly = new Set<string>(
+    CARD_ERROR_CODES.filter((code) => !(CUSTOMER_ERROR_CODES as readonly string[]).includes(code)),
+  );
+  return raisedMessageCodes(liveFunctionsIn(CUSTOMER_MIGRATIONS)).filter(
+    (code) => !cardOnly.has(code),
+  );
+}
 
 describe('customer error codes', () => {
   it('lists each code once', () => {
     expect(new Set(CUSTOMER_ERROR_CODES).size).toBe(CUSTOMER_ERROR_CODES.length);
   });
 
-  it('lists exactly the codes the customers migrations raise', () => {
-    // customers_v2_email redefines create_customer_with_card too: its card codes are CARD_ERROR_CODES.
-    const cardOnly = new Set<string>(
-      CARD_ERROR_CODES.filter(
-        (code) => !(CUSTOMER_ERROR_CODES as readonly string[]).includes(code),
-      ),
-    );
-    const raised = raisedCodes(/_customers(_v2_[a-z0-9_]+)?\.sql$/).filter(
-      (code) => !cardOnly.has(code) && !RETIRED_CUSTOMER_CODES.has(code),
-    );
+  it('requires the email codes and has no phone code left (SPEC-customers-v2, points 1 and 2)', () => {
+    const raised = raisedCustomerCodes();
     expect(raised).toEqual(expect.arrayContaining(['email_invalid', 'customer_email_taken']));
-    expect(sorted(CUSTOMER_ERROR_CODES)).toEqual(raised);
+    expect(aboutPhone(raised)).toEqual([]);
+    expect(aboutPhone(CUSTOMER_ERROR_CODES)).toEqual([]);
+  });
+
+  it('lists exactly the codes the live customers functions raise', () => {
+    expect(sorted(CUSTOMER_ERROR_CODES)).toEqual(raisedCustomerCodes());
   });
 });
