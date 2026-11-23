@@ -239,9 +239,9 @@ useServedToday.ts (eliminati), e2e/fixtures.ts · **Dimensione:** M
 home (`useHomeCardRead`) naviga con `state: { card: uid }`; il testo della card in `CardReadPanel` stato `off`
 diventa «… cerca il cliente per nome o email.».
 **Accettazione:**
-- [ ] Componenti: dopo la lettura di una card sconosciuta `location.search` non contiene l'uid; Nuovo cliente
+- [x] Componenti: dopo la lettura di una card sconosciuta `location.search` non contiene l'uid; Nuovo cliente
       ha la card associata come oggi (anche dopo un ricaricamento)
-- [ ] `CardReadPanel` con il testo nuovo; E2E `cards` e `card-input` verdi
+- [x] `CardReadPanel` con il testo nuovo; E2E `cards` e `card-input` verdi
 **Verifica:** `npm test -- cards card-input && npm run e2e`
 **Dipendenze:** 13 · **File:** src/features/cards/useNewCustomerCard.ts, src/features/cards/useHomeCardRead.ts
 (+test), src/features/cards/NewCustomerCardSection.test.tsx, src/features/card-input/CardReadPanel.tsx (+test),
