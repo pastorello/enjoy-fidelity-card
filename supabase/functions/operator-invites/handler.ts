@@ -31,6 +31,11 @@ export type InviteInput = {
   name: string;
   email: string;
   role: 'admin' | 'operator';
+  /**
+   * The cashier's PIN, typed again on the till tablet for an admin (Open Questions 11): passed to
+   * operator_invite_begin, which checks it, and never logged, stored or sent anywhere else.
+   */
+  pin?: string;
 };
 export type OperatorInput = { action: 'resend' | 'cancel'; operator_id: string };
 export type Input = InviteInput | OperatorInput;
@@ -42,6 +47,8 @@ export type ErrorCode =
   | 'forbidden'
   | 'self'
   | 'admin_from_device'
+  | 'wrong_pin'
+  | 'pin_locked'
   | 'in_progress'
   | 'name_taken'
   | 'email_taken'
@@ -57,6 +64,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const MAX_NAME = 60;
 const MAX_EMAIL = 254;
+const PIN = /^[0-9]{4}$/;
 
 export async function handle(request: Request, deps: HandlerDeps): Promise<Response> {
   const origin = allowedOrigin(request.headers.get('Origin'), deps.env);
@@ -88,6 +96,7 @@ type RpcError = { code?: string } | null;
 /** The code of a refused begin: the caller's rights never come from anything but the RPC. */
 function refusalCode(error: NonNullable<RpcError>): ErrorCode {
   if (error.code === '42501') return 'forbidden';
+  // EO005: from a device an admin needs the cashier's PIN, and none was sent.
   if (error.code === 'EO005') return 'admin_from_device';
   if (error.code === '22023') return 'invalid_input';
   if (error.code === 'EO002') return 'self';
@@ -107,6 +116,8 @@ const STATUS: Record<ErrorCode, number> = {
   forbidden: 403,
   self: 403,
   admin_from_device: 403,
+  wrong_pin: 403,
+  pin_locked: 403,
   in_progress: 409,
   name_taken: 409,
   email_taken: 409,
@@ -304,8 +315,35 @@ function readBegin(data: unknown): Begin {
         : null;
     return { status: 'proceed', invitedBy, existing };
   }
+  const pin = pinRefusal(fields);
+  if (pin !== null) return pin;
   const refused = fields.status === 'forbidden' ? null : conflict(fields);
   return refused === null ? { status: 'unknown' } : { status: 'refused', outcome: refused };
+}
+
+/** A whole count from the database (attempts, seconds), or null when it is anything else. */
+function count(value: unknown): number | null {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+/**
+ * The PIN of a device refused by begin, before anything is reserved: the attempts left, or the
+ * seconds the lock of the device still lasts. A count that is not a whole number is not trusted.
+ */
+function pinRefusal(fields: Record<string, unknown>): Begin | null {
+  if (fields.status === 'wrong_pin') {
+    const left = count(fields.attempts_left);
+    return left === null
+      ? { status: 'unknown' }
+      : { status: 'refused', outcome: failure('wrong_pin', { attempts_left: left }) };
+  }
+  if (fields.status === 'locked') {
+    const seconds = count(fields.lock_seconds_left);
+    return seconds === null
+      ? { status: 'unknown' }
+      : { status: 'refused', outcome: failure('pin_locked', { lock_seconds_left: seconds }) };
+  }
+  return null;
 }
 
 const ROLE_LABEL = { admin: 'amministratore', operator: 'operatore' } as const;
@@ -346,6 +384,7 @@ async function invite(
         p_name: input.name,
         p_email: input.email,
         p_role: input.role,
+        ...(input.pin === undefined ? {} : { p_pin: input.pin }),
       });
     if (error) return failure(refusalCode(error));
     begin = readBegin(data);
@@ -509,8 +548,14 @@ function parseInput(text: string): Input | null {
   const keys = Object.keys(fields).toSorted().join(',');
 
   if (fields.action === 'invite') {
-    if (keys !== 'action,email,name,operation_id,role') return null;
-    const { operation_id: operationId, name, email, role } = fields;
+    if (
+      keys !== 'action,email,name,operation_id,role' &&
+      keys !== 'action,email,name,operation_id,pin,role'
+    ) {
+      return null;
+    }
+    const { operation_id: operationId, name, email, role, pin } = fields;
+    if ('pin' in fields && (typeof pin !== 'string' || !PIN.test(pin))) return null;
     if (typeof operationId !== 'string' || !UUID.test(operationId)) return null;
     if (typeof name !== 'string' || typeof email !== 'string') return null;
     const trimmedName = name.trim();
@@ -524,6 +569,7 @@ function parseInput(text: string): Input | null {
       name: trimmedName,
       email: trimmedEmail,
       role,
+      ...(typeof pin === 'string' ? { pin } : {}),
     };
   }
   if (fields.action === 'resend' || fields.action === 'cancel') {

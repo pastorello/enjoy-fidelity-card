@@ -584,3 +584,166 @@ describe('operator-invites served locally: resend and cancel for real (Mailpit)'
     expect(runSql(`select count(*) from app.movements;`)).toBe(movementsBefore);
   });
 });
+
+/** The device's counter of wrong PINs and whether it is locked, as `n|locked`. */
+const pinAttempts = () =>
+  runSql(
+    `select failed_pin_attempts || '|' || (locked_until is not null) from app.devices
+     where name = :'device';`,
+    { device: device.name },
+  );
+
+async function deviceClient() {
+  const client = memoryClient(local.url, local.publishableKey);
+  const { error } = await client.auth.signInWithPassword({
+    email: device.email,
+    password: device.password,
+  });
+  if (error) throw error;
+  return client;
+}
+
+// Open Questions 11 (decided 2026-11-23): from the till tablet an admin cashier invites or names
+// an admin only by typing their PIN again. The PIN is checked inside the begin RPC (the function
+// only passes it on) and inside set_operator_role_with_pin, with the counter and the lock of
+// /cassa; a wrong PIN must stay counted after the request, which only a real request proves.
+describe('operator-invites served locally: an admin from the till tablet with the PIN', () => {
+  const PIN = '2468';
+
+  beforeAll(() => {
+    runSql(
+      `insert into private.operator_pins (operator_id, pin_hash)
+       values (:'admin'::uuid, extensions.crypt(:'pin', extensions.gen_salt('bf', 4)))
+       on conflict (operator_id) do update set pin_hash = excluded.pin_hash;
+       update app.devices
+       set cashier_operator_id = :'admin'::uuid, cashier_since = now(),
+           failed_pin_attempts = 0, locked_until = null
+       where name = :'device';`,
+      { admin: admin.id, pin: PIN, device: device.name },
+    );
+  });
+
+  afterAll(() => {
+    runSql(
+      `update app.devices
+       set cashier_operator_id = null, cashier_since = null, failed_pin_attempts = 0, locked_until = null
+       where name = :'device';
+       delete from private.operator_pins where operator_id = :'admin'::uuid;
+       update app.operators set role = 'operator' where id = :'operator'::uuid;`,
+      { admin: admin.id, device: device.name, operator: operator.id },
+    );
+  });
+
+  it('an admin invited from the tablet: no PIN 403, a wrong PIN 403 wrong_pin, the right one sends the email', async () => {
+    const since = new Date();
+    const authorization = `Bearer ${tokenOf(device)}`;
+
+    const missing = inviteBody('tablet-senza-pin', 'admin');
+    expect(await call(missing, authorization)).toEqual({
+      status: 403,
+      body: { error: 'admin_from_device' },
+    });
+    await expectNoTrace(missing, since);
+
+    const wrong = { ...inviteBody('tablet-pin-errato', 'admin'), pin: '0000' };
+    expect(await call(wrong, authorization)).toEqual({
+      status: 403,
+      body: { error: 'wrong_pin', attempts_left: 4 },
+    });
+    await expectNoTrace(wrong, since);
+    expect(pinAttempts()).toBe('1|false');
+
+    const right = { ...inviteBody('tablet-pin', 'admin'), pin: PIN };
+    const answer = await call(right, authorization);
+    expect(answer.status).toBe(200);
+    expect(answer.body).toMatchObject({
+      status: 'invited',
+      operator: { name: right.name, role: 'admin' },
+    });
+    expect(pinAttempts()).toBe('0|false');
+    expect(profilesNamed(right.name)).toEqual([
+      `invited|admin|${admin.id}|true|${right.name}|${admin.name}|amministratore`,
+    ]);
+    const messages = await settledMessagesTo(right.email, since);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]?.html ?? '').not.toContain(PIN);
+    expect(
+      runSql(
+        `select count(*) from private.operator_invites i
+         where i.operation_id = :'op'::uuid and to_jsonb(i)::text like '%' || :'pin' || '%';`,
+        { op: right.operation_id, pin: PIN },
+      ),
+    ).toBe('0');
+  });
+
+  it('a wrong PIN on a role change stays counted after the request; the right one names the admin', async () => {
+    const client = await deviceClient();
+    const wrong = await client.schema('app').rpc('set_operator_role_with_pin', {
+      p_operator_id: operator.id,
+      p_role: 'admin',
+      p_pin: '1111',
+    });
+    expect(wrong.error).toBeNull();
+    expect(wrong.data).toEqual({ status: 'wrong_pin', attempts_left: 4 });
+    expect(pinAttempts()).toBe('1|false');
+    expect(
+      runSql(`select role from app.operators where id = :'id'::uuid;`, { id: operator.id }),
+    ).toBe('operator');
+
+    const missing = await client
+      .schema('app')
+      .rpc('set_operator_role', { p_operator_id: operator.id, p_role: 'admin' });
+    expect(missing.error?.code).toBe('EO005');
+
+    const right = await client.schema('app').rpc('set_operator_role_with_pin', {
+      p_operator_id: operator.id,
+      p_role: 'admin',
+      p_pin: PIN,
+    });
+    expect(right.error).toBeNull();
+    expect(right.data).toMatchObject({
+      status: 'ok',
+      operator: { id: operator.id, role: 'admin', status: 'active', is_me: false },
+    });
+    expect(pinAttempts()).toBe('0|false');
+
+    // Back to operator from the tablet: demoting needs no PIN.
+    const back = await client
+      .schema('app')
+      .rpc('set_operator_role', { p_operator_id: operator.id, p_role: 'operator' });
+    expect(back.error).toBeNull();
+  });
+
+  it('five wrong PINs in a row lock the till: pin_locked even with the right PIN, and /cassa too', async () => {
+    const since = new Date();
+    const authorization = `Bearer ${tokenOf(device)}`;
+    // One after the other: each answer depends on the wrong PINs counted before it.
+    const answers = await [0, 1, 2, 3, 4].reduce<Promise<Answer[]>>(
+      async (previous, attempt) => [
+        ...(await previous),
+        await call({ ...inviteBody(`blocco-${attempt}`, 'admin'), pin: '9999' }, authorization),
+      ],
+      Promise.resolve([]),
+    );
+    expect(answers.map((answer) => answer.body)).toEqual([
+      { error: 'wrong_pin', attempts_left: 4 },
+      { error: 'wrong_pin', attempts_left: 3 },
+      { error: 'wrong_pin', attempts_left: 2 },
+      { error: 'wrong_pin', attempts_left: 1 },
+      { error: 'pin_locked', lock_seconds_left: 300 },
+    ]);
+    expect(pinAttempts()).toBe('0|true');
+
+    const right = { ...inviteBody('blocco-giusto', 'admin'), pin: PIN };
+    const locked = await call(right, authorization);
+    expect(locked.status).toBe(403);
+    expect(locked.body).toMatchObject({ error: 'pin_locked' });
+    await expectNoTrace(right, since);
+
+    const client = await deviceClient();
+    const unlock = await client
+      .schema('app')
+      .rpc('unlock_cashier', { p_operator_id: admin.id, p_pin: PIN });
+    expect(unlock.data).toMatchObject({ status: 'locked' });
+  });
+});

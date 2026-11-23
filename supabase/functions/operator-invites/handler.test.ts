@@ -222,6 +222,12 @@ describe('body', () => {
     ['a resend without operator_id', { action: 'resend' }],
     ['a cancel with a bad operator_id', { action: 'cancel', operator_id: 'x' }],
     ['a resend with extra fields', { ...resend, email: 'giulia@example.test' }],
+    ['a PIN of 3 digits', { ...invite, role: 'admin', pin: '123' }],
+    ['a PIN of 5 digits', { ...invite, role: 'admin', pin: '12345' }],
+    ['a PIN with a letter', { ...invite, role: 'admin', pin: '12a4' }],
+    ['a PIN that is a number', { ...invite, role: 'admin', pin: 1234 }],
+    ['a null PIN', { ...invite, role: 'admin', pin: null }],
+    ['a PIN on a resend', { ...resend, pin: '1234' }],
   ])('answers 400 invalid_input for %s, with no client call', async (_label, body) => {
     const { deps, touched } = trackedDeps();
     const response = await handle(post(body), deps);
@@ -363,6 +369,25 @@ describe('caller check', () => {
         schema: 'app',
         fn: 'operator_cancel_begin',
         args: { p_operator_id: OPERATION_ID },
+      },
+    ]);
+  });
+
+  it('passes the PIN of a device to begin as p_pin, only when there is one', async () => {
+    const { deps, calls } = rpcDeps({ caller: refused('42501') });
+    await handle(post({ ...invite, role: 'admin', pin: '0042' }), deps);
+    expect(calls).toEqual([
+      {
+        client: 'caller',
+        schema: 'app',
+        fn: 'operator_invite_begin',
+        args: {
+          p_operation_id: OPERATION_ID,
+          p_name: 'Giulia',
+          p_email: 'giulia@example.test',
+          p_role: 'admin',
+          p_pin: '0042',
+        },
       },
     ]);
   });
@@ -668,7 +693,7 @@ describe('invite', () => {
   });
 
   it.each<[string, string, number, string]>([
-    ['EO005, an admin invited from a device', 'EO005', 403, 'admin_from_device'],
+    ['EO005, an admin invited from a device without the PIN', 'EO005', 403, 'admin_from_device'],
     [
       '22023, invalid input or the same operation_id with other data',
       '22023',
@@ -683,6 +708,63 @@ describe('invite', () => {
     expect(response.status).toBe(status);
     expect(await response.json()).toEqual({ error });
     expect(steps()).toEqual(['caller.operator_invite_begin']);
+  });
+
+  it.each<[string, unknown, string, unknown]>([
+    [
+      'wrong_pin',
+      { status: 'wrong_pin', attempts_left: 3 },
+      'wrong_pin',
+      { error: 'wrong_pin', attempts_left: 3 },
+    ],
+    [
+      'locked',
+      { status: 'locked', lock_seconds_left: 287 },
+      'pin_locked',
+      { error: 'pin_locked', lock_seconds_left: 287 },
+    ],
+  ])(
+    'begin answers %s for the PIN of a device: 403, nothing reserved so nothing released',
+    async (_label, data, logged, body) => {
+      const { deps, steps, logs } = inviteDeps({ 'caller.operator_invite_begin': ok(data) });
+      const response = await handle(post({ ...invite, role: 'admin', pin: '2468' }), deps);
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual(body);
+      expect(steps()).toEqual(['caller.operator_invite_begin']);
+      expect(logs).toEqual([{ operation_id: OPERATION_ID, action: 'invite', outcome: logged }]);
+    },
+  );
+
+  it('a PIN answer without a number is read as upstream, never trusted', async () => {
+    const { deps } = inviteDeps({
+      'caller.operator_invite_begin': ok({ status: 'wrong_pin', attempts_left: 'many' }),
+    });
+    const response = await handle(post({ ...invite, role: 'admin', pin: '2468' }), deps);
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: 'upstream' });
+  });
+
+  it('never puts the PIN in a response, a log or a later step', async () => {
+    const scenarios: Partial<Record<Step, Answer>>[] = [
+      {},
+      { 'caller.operator_invite_begin': ok({ status: 'wrong_pin', attempts_left: 4 }) },
+      { 'caller.operator_invite_begin': ok({ status: 'locked', lock_seconds_left: 300 }) },
+      { 'admin.inviteUserByEmail': authError(500) },
+    ];
+    const runs = scenarios.map((answers) => inviteDeps(answers));
+    const responses = await Promise.all(
+      runs.map((run) => handle(post({ ...invite, role: 'admin', pin: '8642' }), run.deps)),
+    );
+    const bodies = await Promise.all(responses.map((response) => response.text()));
+    runs.forEach(({ logs, calls }, index) => {
+      const texts = [
+        bodies[index] ?? '',
+        JSON.stringify([...(responses[index]?.headers ?? [])]),
+        JSON.stringify(logs),
+        JSON.stringify(calls.filter((call) => call.step !== 'caller.operator_invite_begin')),
+      ];
+      for (const text of texts) expect(text).not.toContain('8642');
+    });
   });
 
   it('begin with an answer it does not know: 502 and nothing else (it may not hold the reservation)', async () => {
