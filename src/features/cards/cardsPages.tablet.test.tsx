@@ -106,3 +106,31 @@ describe('Catalogo premi at 1280×800 (wireframe "Tablet: catalogo premi")', () 
     expect(screen.queryByRole('contentinfo')).toBeNull();
   });
 });
+
+describe('«Card non attiva» at 1280×800 (SPEC-customers-v2, point 4)', () => {
+  it('one wide column, no footer at the bottom edge', async () => {
+    stubLayout(true);
+    const customers = createFakeCustomerService({ customers: [MARIA] });
+    const lost = fakeCard({
+      uid: '04112233445566',
+      customerId: MARIA.id,
+      active: false,
+      deactivatedAt: '2026-11-12T10:00:00.000Z',
+    });
+    renderApp(
+      `/card/${lost.id}`,
+      signedInFake({ device: fakeDevice, cashier: admin }),
+      createFakeSettingsService(),
+      customers,
+      createFakeRewardsService(),
+      createTestCardReader(),
+      createFakeCardsService({ customers, cards: [lost] }),
+    );
+    const card = await screen.findByText('Card …5566');
+    expect(column('inactive-card')).toContainElement(card);
+    expect(
+      within(column('inactive-card')).getByRole('link', { name: /Era di Maria Rossi/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('contentinfo')).toBeNull();
+  });
+});

@@ -1,0 +1,78 @@
+/* «Card non attiva» (SPEC-customers-v2, point 4): no board in the wireframes, built from the rows
+   of Associa card and Scheda cliente. */
+
+/* The card read: the card icon, «Card …5566» and «Disattivata il 12 nov» in muted ink. */
+.cardRow {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--space-2) + var(--space-1));
+  min-height: 64px;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.cardIcon {
+  flex-shrink: 0;
+  color: var(--color-ink-muted);
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cardLabel {
+  font-family: var(--type-body-lg-family);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  font-weight: var(--type-label-lg-weight);
+  color: var(--color-ink);
+}
+
+.cardDate {
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* The customer row, a ListRow (64 px, the whole row is the touch target). */
+.customer {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erased {
+  margin: 0;
+  padding-block: var(--space-2);
+  color: var(--color-ink-muted);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+/* What Riattiva and Riformatta do, each over its action (tasks 31 and 32). */
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.choice {
+  margin: 0;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line-height);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+/* Till tablet: one wide column in the middle, as Associa card, the actions in it rather than in a
+   footer at the bottom edge (SPEC-tablet-kiosk, point 10). */
+.tabletColumn {
+  flex: 1;
+  align-self: center;
+  width: 560px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--space-3) + var(--space-2));
+}

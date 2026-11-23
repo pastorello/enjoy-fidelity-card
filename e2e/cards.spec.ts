@@ -265,6 +265,13 @@ test('an administrator reading a deactivated card on the home lands on «Card no
   await expect(page.getByRole('heading', { level: 1, name: 'Card non attiva' })).toBeVisible();
   expect(page.url()).not.toContain(uid);
   await expect(page.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/');
+  // The page's data, from app.get_card by the id of the row.
+  await expect(page.getByText(`Card …${uid.slice(-4)}`)).toBeVisible();
+  await expect(page.getByText(/^Disattivata il \d{1,2} \w{3}/)).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: /Era di Maria Admin Disattiva E2E/ }),
+  ).toHaveAttribute('href', `/clienti/${customer.id}`);
+  await expect(page.getByText('La card torna a Maria e apre di nuovo la sua spesa.')).toBeVisible();
 });
 
 for (const width of [390, 360]) {

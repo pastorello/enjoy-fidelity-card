@@ -169,7 +169,11 @@ describe('useHomeCardRead: a card read on the home', () => {
       expect(router.state.location.search).toBe('');
       expect(router.state.location.pathname).not.toContain(LOST.uid);
       expect(router.state.location.pathname).not.toContain(OF_ERASED.uid);
-      expect(fixture.cards.calls.map((call) => call.method)).toEqual(['lookup']);
+      // The read asks only lookup_card; the page then loads its card by the id of the row.
+      expect(fixture.cards.calls).toEqual([
+        { method: 'lookup', args: [expect.any(String)] },
+        { method: 'getCard', args: [cardId] },
+      ]);
       expect(fixture.card.nfc.writes).toHaveLength(0);
     },
   );
