@@ -347,7 +347,10 @@ Da `SPEC-customers-v2.md`, "Note di rilascio". Le migrazioni sono quattro e vann
 1. **Prima del merge — Open Question 17.** Serve la risposta esplicita del titolare alla domanda «Cancelliamo
    anche i numeri già salvati? Non si potranno recuperare.» Senza un sì la migrazione 2 non si rilascia e la PR
    non si unisce (se il titolare vuole conservarli, la migrazione 2 va rifatta senza il `drop column`, come
-   dice la spec). Annotare la risposta in `brain/DECISIONS.md`.
+   dice la spec). Annotare la risposta in `brain/DECISIONS.md`. **Fatto il 2026-11-23**: il titolare ha detto
+   «Sì, cancellali». Staging: `db push` delle quattro migrazioni il 2026-11-23, controllo in sola lettura
+   (colonna `phone` assente, RLS su tutte le tabelle, `anon` esegue solo `card_points`, `card_rewards` e
+   `rls_auto_enable`, nessuna nota con numeri: passo 4 senza correzioni); `vacuum full` dello staging da fare.
 2. **Staging.** `npx supabase link --project-ref <staging>` → `npx supabase db push` → prova sull'anteprima
    della PR (prova manuale qui sotto) → controllo delle note e `vacuum full` sullo staging (passi 4 e 5).
 3. **Produzione, a bar chiuso** (fuori dall'orario di apertura). Dopo la migrazione 2 l'app vecchia non cerca,
