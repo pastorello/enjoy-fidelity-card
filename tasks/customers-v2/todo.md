@@ -342,8 +342,8 @@ src/features/customers/AnonymizeSection.tsx (+test) · **Dimensione:** M
 per gli anonimizzati; `supabaseExportService` legge `email`; tipi e finto aggiornati; E2E con la nuova
 intestazione.
 **Accettazione:**
-- [ ] Unit: `=cmd@example.com` protetta da `guardFormula`; anonimizzato vuoto; intestazione nuova
-- [ ] E2E `export` verde (criterio 4)
+- [x] Unit: `=cmd@example.com` protetta da `guardFormula`; anonimizzato vuoto; intestazione nuova
+- [x] E2E `export` verde (criterio 4)
 **Verifica:** `npm test -- export && npm run e2e`
 **Dipendenze:** 16 · **File:** src/features/export/buildCustomersCsv.ts (+test), src/features/export/types.ts,
 src/features/export/supabaseExportService.ts (+test), src/test/fakeExportService.ts, e2e/export.spec.ts
