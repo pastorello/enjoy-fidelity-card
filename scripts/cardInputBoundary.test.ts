@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 // permissions.query, keydown listeners on document) live only in src/features/card-input/; the module
 // never logs (uids and URLs carry the customer's token) and never locks a tag (makeReadOnly); the E2E
 // fake card (window.__enjoyFakeCard*) lives only in fakeCardAdapter.ts and is loaded only by main.tsx
-// behind `import.meta.env.VITE_E2E === '1'`.
+// behind `import.meta.env.VITE_E2E === '1'`. Every global the fake installs starts with `__enjoyFakeCard`,
+// the needle of `check:bundle`, and the E2E helpers (e2e/nfc.ts) declare the same write log, erasures
+// (`url: null`, SPEC-customers-v2 point 4) included.
 
 const SRC = 'src';
 const MODULE = 'src/features/card-input/';
@@ -70,6 +72,18 @@ export function moduleOffenders(files: readonly SourceFile[]): string[] {
         ...(/\bmakeReadOnly\b/.test(code) ? [`${file.path}: makeReadOnly`] : []),
       ];
     });
+}
+
+/** The `__enjoy…` globals named in `code` that `check:bundle` would miss (not `__enjoyFakeCard…`). */
+export function unguardedFakeGlobals(code: string): string[] {
+  const names = new Set(stripComments(code).match(/\b__enjoy\w*/g) ?? []);
+  return [...names].filter((name) => !name.startsWith('__enjoyFakeCard')).toSorted();
+}
+
+/** The type of `FakeCardWrite` as declared in `text`, whitespace collapsed; null when absent. */
+export function fakeCardWriteType(text: string): string | null {
+  const match = /export type FakeCardWrite\s*=\s*(\{[^}]*\});/.exec(text);
+  return match?.[1]?.replaceAll(/\s+/g, ' ') ?? null;
 }
 
 /** Files other than fakeCardAdapter.ts that name `__enjoyFakeCard` in their code. */
@@ -140,6 +154,18 @@ describe('card-input boundary', () => {
   it('loads the fake adapter only from main.tsx behind VITE_E2E', () => {
     expect(fakeImportOffenders(files)).toEqual([]);
   });
+
+  it('names only __enjoyFakeCard… globals in the fake adapter, so check:bundle sees them all', () => {
+    const fake = files.find((file) => file.path === FAKE_ADAPTER);
+    expect(fake).toBeDefined();
+    expect(unguardedFakeGlobals(fake?.text ?? '')).toEqual([]);
+  });
+
+  it('declares the same write log, with url null for an erased card, in the app and in e2e/nfc.ts', () => {
+    const app = fakeCardWriteType(readFileSync(FAKE_ADAPTER, 'utf8'));
+    expect(app).toBe('{ uid: string; url: string | null; at: number }');
+    expect(fakeCardWriteType(readFileSync('e2e/nfc.ts', 'utf8'))).toBe(app);
+  });
 });
 
 describe('card-input boundary guard (self-test)', () => {
@@ -194,6 +220,21 @@ describe('card-input boundary guard (self-test)', () => {
         { path: component, text: "window.__enjoyFakeCard?.('04A1');" },
       ]),
     ).toEqual([component]);
+  });
+
+  it('fails on an __enjoy… global outside the __enjoyFakeCard prefix, comments aside', () => {
+    expect(
+      unguardedFakeGlobals(
+        '// window.__enjoyDebug in a comment\nhost.__enjoyFakeCardWrites = [];\nhost.__enjoyErase = f;',
+      ),
+    ).toEqual(['__enjoyErase']);
+  });
+
+  it('reads the FakeCardWrite type, or null when it is missing', () => {
+    expect(
+      fakeCardWriteType('export type FakeCardWrite = {\n  uid: string;\n  url: string;\n};'),
+    ).toBe('{ uid: string; url: string; }');
+    expect(fakeCardWriteType('export type Other = { a: 1 };')).toBeNull();
   });
 
   it('fails when the fake adapter is imported outside the VITE_E2E block', () => {

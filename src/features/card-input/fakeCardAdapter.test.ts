@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createCardReader,
   REPEAT_WINDOW_MS,
+  type CardContent,
   type CardRead,
   type NfcInputAdapter,
   type NfcStatus,
@@ -67,15 +68,22 @@ function setup() {
     },
     /** The links the card holds, as a running write would see them on the next tap. */
     linksOn: (uid: string): readonly string[] | 'unreadable' => {
-      let seen: readonly string[] | 'unreadable' = 'unreadable';
-      const session = reader.openWriteSession((_read, content) => {
-        seen = content.urls;
-      });
-      tap(uid);
-      session.close();
-      return seen;
+      const seen = contentOn(uid);
+      return seen === 'unreadable' ? seen : seen.urls;
     },
+    /** What the card holds, as a running write would see it on the next tap. */
+    contentOn,
   };
+
+  function contentOn(uid: string): CardContent | 'unreadable' {
+    let seen: CardContent | 'unreadable' = 'unreadable';
+    const session = reader.openWriteSession((_read, content) => {
+      seen = content;
+    });
+    tap(uid);
+    session.close();
+    return seen;
+  }
 }
 
 afterEach(() => {
@@ -138,10 +146,19 @@ describe('createFakeCard: reads', () => {
     expect(onRead).toHaveBeenCalledOnce();
   });
 
-  it('a blank tag holds no links', () => {
-    const { activateWriting, linksOn } = setup();
+  it('a card never written is blank, like a new NTAG215: no links', () => {
+    const { activateWriting, contentOn } = setup();
     activateWriting();
-    expect(linksOn(UID)).toEqual([]);
+    expect(contentOn(UID)).toEqual({ urls: [], blank: true });
+  });
+
+  it('a card holding a link is not blank', async () => {
+    const { reader, tap, activateWriting, contentOn, advance } = setup();
+    activateWriting();
+    tap(UID);
+    await reader.writeUrl(URL_A, { expectedUid: UID });
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(contentOn(UID)).toEqual({ urls: [URL_A], blank: false });
   });
 });
 
@@ -250,7 +267,7 @@ describe('createFakeCard: writes (E2E fake writer)', () => {
   });
 
   it("failNextWrite('verify-failed'): the card reads back another content", async () => {
-    const { reader, tap, writes, control, activateWriting } = setup();
+    const { reader, tap, writes, control, activateWriting, contentOn } = setup();
     activateWriting();
     tap(UID);
     control().failNextWrite('verify-failed');
@@ -260,6 +277,8 @@ describe('createFakeCard: writes (E2E fake writer)', () => {
       reason: 'verify-failed',
     });
     expect(writes()).toEqual([]);
+    // Neither the link nor a blank card: something else (say, a text record).
+    expect(contentOn(UID)).toEqual({ urls: [], blank: false });
   });
 
   it("failNextWrite('timeout'): the write never ends, timeout after the time limit", async () => {
@@ -355,6 +374,164 @@ describe('createFakeCard: writes (E2E fake writer)', () => {
   });
 });
 
+/** A card holding URL_A, tapped just now. */
+async function withLink() {
+  const harness = setup();
+  harness.activateWriting();
+  harness.tap(UID);
+  await harness.reader.writeUrl(URL_A, { expectedUid: UID });
+  harness.advance(REPEAT_WINDOW_MS + 1);
+  harness.tap(UID); // still on the phone for the next write (IN_FIELD_MS)
+  return harness;
+}
+
+describe('createFakeCard: eraseCard (E2E fake writer, SPEC-customers-v2 point 4)', () => {
+  it('erases the card just read: ok, read back blank, logged with url null', async () => {
+    const { reader, tap, writes, contentOn, onRead, advance } = await withLink();
+    const steps: CardWriteStep[] = [];
+
+    const result = await reader.eraseCard({
+      expectedUid: UID,
+      onStep: (step) => steps.push(step),
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(steps).toEqual(['waiting-card', 'writing', 'verifying']);
+    expect(writes()).toEqual([
+      { uid: UID, url: URL_A, at: expect.any(Number) },
+      { uid: UID, url: null, at: expect.any(Number) },
+    ]);
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(contentOn(UID)).toEqual({ urls: [], blank: true });
+    // Read again on a screen: a blank card gives its uid like any other.
+    advance(REPEAT_WINDOW_MS + 1);
+    const before = onRead.mock.calls.length;
+    tap(UID);
+    expect(onRead).toHaveBeenCalledTimes(before + 1);
+  });
+
+  it('with the card no longer on the phone, waits for a tap of it, then erases', async () => {
+    const { reader, tap, writes, advance, contentOn } = await withLink();
+    advance(IN_FIELD_MS);
+
+    const result = reader.eraseCard({ expectedUid: UID });
+    expect(writes()).toHaveLength(1);
+    tap(UID);
+
+    await expect(result).resolves.toEqual({ ok: true });
+    expect(writes().at(-1)).toEqual({ uid: UID, url: null, at: expect.any(Number) });
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(contentOn(UID)).toEqual({ urls: [], blank: true });
+  });
+
+  it('a tap of another card while waiting: wrong-card, nothing erased', async () => {
+    const { reader, tap, writes, advance, linksOn } = await withLink();
+    advance(IN_FIELD_MS);
+
+    const result = reader.eraseCard({ expectedUid: UID });
+    tap(OTHER_UID);
+
+    await expect(result).resolves.toEqual({
+      ok: false,
+      reason: 'wrong-card',
+      otherUid: OTHER_UID,
+      mayHaveWritten: false,
+    });
+    expect(writes()).toHaveLength(1);
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(linksOn(UID)).toEqual([URL_A]);
+  });
+
+  it("failNextWrite('not-allowed') applies to eraseCard: the link stays, nothing logged", async () => {
+    const { reader, writes, control, advance, linksOn } = await withLink();
+    control().failNextWrite('not-allowed');
+
+    await expect(reader.eraseCard({ expectedUid: UID })).resolves.toEqual({
+      ok: false,
+      reason: 'not-allowed',
+    });
+    expect(writes()).toHaveLength(1);
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(linksOn(UID)).toEqual([URL_A]);
+  });
+
+  it("failNextWrite('verify-failed') applies to eraseCard: the card reads back not blank", async () => {
+    const { reader, writes, control, advance, contentOn } = await withLink();
+    control().failNextWrite('verify-failed');
+
+    await expect(reader.eraseCard({ expectedUid: UID })).resolves.toEqual({
+      ok: false,
+      reason: 'verify-failed',
+    });
+    expect(writes()).toHaveLength(1);
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(contentOn(UID)).toEqual({ urls: [], blank: false });
+  });
+
+  it("failNextWrite('io') applies to eraseCard: the card is damaged until erased with allowUnreadable", async () => {
+    const { reader, tap, writes, control, advance, contentOn } = await withLink();
+    control().failNextWrite('io');
+
+    await expect(reader.eraseCard({ expectedUid: UID })).resolves.toEqual({
+      ok: false,
+      reason: 'io',
+    });
+    expect(writes()).toHaveLength(1);
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(contentOn(UID)).toBe('unreadable');
+
+    advance(IN_FIELD_MS);
+    const repaired = reader.eraseCard({ expectedUid: UID, allowUnreadable: true });
+    tap(UID);
+    await expect(repaired).resolves.toEqual({ ok: true });
+    expect(writes().at(-1)).toEqual({ uid: UID, url: null, at: expect.any(Number) });
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(contentOn(UID)).toEqual({ urls: [], blank: true });
+  });
+
+  it("failNextWrite('timeout') applies to eraseCard: timeout, the link stays", async () => {
+    vi.useFakeTimers();
+    const { reader, writes, control, advance, linksOn } = await withLink();
+    control().failNextWrite('timeout');
+
+    const result = reader.eraseCard({ expectedUid: UID });
+    await vi.advanceTimersByTimeAsync(WRITE_TIMEOUT_MS);
+
+    await expect(result).resolves.toEqual({ ok: false, reason: 'timeout' });
+    expect(writes()).toHaveLength(1);
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(linksOn(UID)).toEqual([URL_A]);
+  });
+
+  it("failNextWrite('unreadable') applies to eraseCard: the next card tapped gives no uid", async () => {
+    const { reader, tap, writes, control, advance, linksOn } = await withLink();
+    advance(IN_FIELD_MS);
+    control().failNextWrite('unreadable');
+
+    const result = reader.eraseCard({ expectedUid: UID });
+    tap(UID);
+
+    await expect(result).resolves.toEqual({ ok: false, reason: 'unreadable' });
+    expect(writes()).toHaveLength(1);
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(linksOn(UID)).toEqual([URL_A]);
+  });
+
+  it('a link written on an erased card replaces the blank state and is logged', async () => {
+    const { reader, tap, writes, advance, contentOn } = await withLink();
+    await reader.eraseCard({ expectedUid: UID });
+    advance(IN_FIELD_MS);
+
+    const result = reader.writeUrl(URL_B, { expectedUid: UID });
+    tap(UID);
+
+    await expect(result).resolves.toEqual({ ok: true });
+    expect(writes().map((entry) => entry.url)).toEqual([URL_A, null, URL_B]);
+    advance(REPEAT_WINDOW_MS + 1);
+    expect(contentOn(UID)).toEqual({ urls: [URL_B], blank: false });
+  });
+});
+
 describe('createFakeCard: write() with no card on the phone', () => {
   const message = { records: [{ recordType: 'url', data: URL_A }] };
 
@@ -385,5 +562,41 @@ describe('createFakeCard: write() with no card on the phone', () => {
 
     await expect(written).rejects.toMatchObject({ name: 'AbortError' });
     expect(host.__enjoyFakeCardWrites).toEqual([]);
+  });
+
+  it('rejects with TypeError a message the app never writes (no record, two records, text)', async () => {
+    const { host } = setup();
+    const fake = createFakeCard(host, { now: () => 0 });
+    const signal = new AbortController().signal;
+    const invalid: NDEFMessageInit[] = [
+      { records: [] },
+      { records: [{ recordType: 'empty' }, { recordType: 'url', data: URL_A }] },
+      { records: [{ recordType: 'text', data: 'invented' }] },
+    ];
+
+    const outcomes = await Promise.allSettled(
+      invalid.map((each) => fake.writer.createWriter().write(each, { overwrite: true, signal })),
+    );
+    for (const outcome of outcomes) {
+      expect(outcome).toMatchObject({ status: 'rejected', reason: expect.any(TypeError) });
+    }
+    host.__enjoyFakeCard?.(OTHER_UID);
+    expect(host.__enjoyFakeCardWrites).toEqual([]);
+  });
+
+  it('a message of one empty record erases the next card: logged with url null', async () => {
+    const { host } = setup();
+    const fake = createFakeCard(host, { now: () => 0 });
+    const written = fake.writer
+      .createWriter()
+      .write(
+        { records: [{ recordType: 'empty' }] },
+        { overwrite: true, signal: new AbortController().signal },
+      );
+
+    host.__enjoyFakeCard?.(OTHER_UID);
+
+    await expect(written).resolves.toBeUndefined();
+    expect(host.__enjoyFakeCardWrites).toEqual([{ uid: OTHER_UID, url: null, at: 0 }]);
   });
 });

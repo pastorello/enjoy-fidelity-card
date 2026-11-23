@@ -1,7 +1,10 @@
 import { expect, type Page } from '@playwright/test';
 
-/** One link written by the fake writer (src/features/card-input/fakeCardAdapter.ts). */
-export type FakeCardWrite = { uid: string; url: string; at: number };
+/**
+ * One write of the fake writer (src/features/card-input/fakeCardAdapter.ts): the link written, or
+ * `null` for a card erased by «Riformatta» (SPEC-customers-v2, point 4).
+ */
+export type FakeCardWrite = { uid: string; url: string | null; at: number };
 
 declare global {
   interface Window {
@@ -18,8 +21,9 @@ declare global {
 }
 
 /**
- * The links the fake writer has written so far, oldest first (SPEC-card-input, point 7): the log the
- * tests read to open the link written on a card. Fails if the page is not an E2E build.
+ * What the fake writer has written so far, oldest first (SPEC-card-input, point 7): the log the tests
+ * read to open the link written on a card (`url: null` for an erased card). Fails if the page is not
+ * an E2E build.
  */
 export async function fakeCardWrites(page: Page): Promise<FakeCardWrite[]> {
   return page.evaluate(() => {
@@ -27,6 +31,16 @@ export async function fakeCardWrites(page: Page): Promise<FakeCardWrite[]> {
     if (!Array.isArray(writes)) throw new Error('Not an E2E build: no __enjoyFakeCardWrites');
     return writes.map((entry) => ({ ...entry }));
   });
+}
+
+/**
+ * The cards the fake writer has erased so far, oldest first (SPEC-customers-v2, point 4: the entries
+ * of the log with `url: null`), only those of `uid` when given. Fails if the page is not an E2E build.
+ */
+export async function fakeCardErasures(page: Page, uid?: string): Promise<FakeCardWrite[]> {
+  return (await fakeCardWrites(page)).filter(
+    (entry) => entry.url === null && (uid === undefined || entry.uid === uid),
+  );
 }
 
 /** How the stubbed `scan()` ends: `'ok'` resolves, any other value rejects with that DOMException. */

@@ -1,6 +1,6 @@
 import { signIn } from './auth';
 import { expect, test } from './fixtures';
-import { fakeCardWrites, stubWebNfc } from './nfc';
+import { fakeCardErasures, fakeCardWrites, stubWebNfc } from './nfc';
 
 /**
  * Card reading end to end (docs/specs/SPEC-card-input.md, Testing Strategy). Web NFC does not exist
@@ -28,6 +28,7 @@ test('the E2E build exposes the fake writer: an empty write log and the test con
     ]),
   ).toEqual(['function', 'function']);
   expect(await fakeCardWrites(page)).toEqual([]);
+  expect(await fakeCardErasures(page)).toEqual([]);
 });
 
 const HOME_TITLE = 'Avvicina la card';
