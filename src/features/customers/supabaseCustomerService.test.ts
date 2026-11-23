@@ -3,7 +3,7 @@ import { ServerFaultError } from '../../lib/serverFault';
 import { CUSTOMER_ERROR_CODES } from './errorCodes';
 import { supabaseCustomerService } from './supabaseCustomerService';
 import { CustomerError } from './types';
-import type { CustomerSummary } from './types';
+import type { CustomerListRow, CustomerSummary } from './types';
 
 type Answer = { data: unknown; error: unknown; status: number };
 
@@ -28,6 +28,22 @@ const row = {
   balance: 0,
   last_served_at: null,
 };
+/** A row of `app.list_customers`, timestamps with microseconds as PostgREST sends them. */
+const listRow = {
+  id: ID,
+  name: 'Maria Rossi',
+  balance: 12,
+  last_activity_at: '2026-11-23T10:15:00.123456+00:00',
+  created_at: '2026-11-01T08:00:00.000001+00:00',
+};
+const listed: CustomerListRow = {
+  id: ID,
+  name: 'Maria Rossi',
+  balance: 12,
+  lastActivityAt: '2026-11-23T10:15:00.123456+00:00',
+  createdAt: '2026-11-01T08:00:00.000001+00:00',
+};
+
 const customer: CustomerSummary = {
   id: ID,
   name: 'Maria Rossi',
@@ -65,6 +81,22 @@ beforeEach(() => {
 
 /** Every service call, with the RPC and arguments it must send and a well-formed answer. */
 const calls = [
+  {
+    name: 'list',
+    run: () => supabaseCustomerService.list({ query: 'rossi', after: null }),
+    rpc: [
+      'list_customers',
+      {
+        p_query: 'rossi',
+        p_after_activity_at: null,
+        p_after_created_at: null,
+        p_after_id: null,
+        p_limit: 20,
+      },
+    ],
+    data: [listRow],
+    result: { customers: [listed], hasMore: false },
+  },
   {
     name: 'search',
     run: () => supabaseCustomerService.search('rossi'),
@@ -282,5 +314,86 @@ describe('reads', () => {
   it('a list answer that is not an array is unknown', async () => {
     db.rpc.mockResolvedValue({ data: row, error: null, status: 200 });
     expect((await customerError(supabaseCustomerService.search('rossi'))).kind).toBe('unknown');
+  });
+});
+
+function answer(data: unknown): Answer {
+  return { data, error: null, status: 200 };
+}
+
+describe('list', () => {
+  it('sends the cursor back exactly as received, microseconds included', async () => {
+    db.rpc.mockResolvedValue(answer([]));
+    await supabaseCustomerService.list({
+      query: '',
+      after: {
+        activityAt: '2026-11-23T10:15:00.123456+00:00',
+        createdAt: '2026-11-01T08:00:00.000001+00:00',
+        id: ID,
+      },
+    });
+    expect(db.rpc).toHaveBeenCalledWith('list_customers', {
+      p_query: '',
+      p_after_activity_at: '2026-11-23T10:15:00.123456+00:00',
+      p_after_created_at: '2026-11-01T08:00:00.000001+00:00',
+      p_after_id: ID,
+      p_limit: 20,
+    });
+  });
+
+  it('sends a null activity for a last row without movements', async () => {
+    db.rpc.mockResolvedValue(answer([]));
+    await supabaseCustomerService.list({
+      query: 'ro',
+      after: { activityAt: null, createdAt: '2026-11-01T08:00:00.5+00:00', id: ID },
+    });
+    expect(db.rpc).toHaveBeenCalledWith(
+      'list_customers',
+      expect.objectContaining({
+        p_after_activity_at: null,
+        p_after_created_at: '2026-11-01T08:00:00.5+00:00',
+      }),
+    );
+  });
+
+  it('a full page of 20 rows says there are more', async () => {
+    const rows = Array.from({ length: 20 }, (_, index) => ({
+      ...listRow,
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    }));
+    db.rpc.mockResolvedValue(answer(rows));
+    const page = await supabaseCustomerService.list({ query: '', after: null });
+    expect(page.customers).toHaveLength(20);
+    expect(page.hasMore).toBe(true);
+  });
+
+  it('a shorter page is the end of the list', async () => {
+    db.rpc.mockResolvedValue(answer(Array.from({ length: 19 }, () => listRow)));
+    await expect(supabaseCustomerService.list({ query: '', after: null })).resolves.toMatchObject({
+      hasMore: false,
+    });
+  });
+
+  it('drops the email if the server ever sends it', async () => {
+    db.rpc.mockResolvedValue(answer([{ ...listRow, email: 'rossi@example.com' }]));
+    const page = await supabaseCustomerService.list({ query: 'rossi@', after: null });
+    expect(page.customers[0]).not.toHaveProperty('email');
+  });
+
+  it.each(['invalid_cursor', 'invalid_limit'])(
+    'a %s (22023, a bug of this client) is unknown, never a server fault',
+    async (message) => {
+      db.rpc.mockResolvedValue(pgError('22023', 400, message));
+      const error = await rejection(supabaseCustomerService.list({ query: '', after: null }));
+      expect(error).toBeInstanceOf(CustomerError);
+      expect(error).toMatchObject({ kind: 'unknown' });
+    },
+  );
+
+  it('a missing list_customers (migration not pushed) is misconfigured', async () => {
+    db.rpc.mockResolvedValue(pgError('PGRST202', 404, 'Could not find the function'));
+    const error = await rejection(supabaseCustomerService.list({ query: '', after: null }));
+    expect(error).toMatchObject({ kind: 'misconfigured' });
+    expect(error).toBeInstanceOf(ServerFaultError);
   });
 });

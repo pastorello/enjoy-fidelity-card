@@ -1,8 +1,9 @@
 import { ServerFaultError, serverFaultFor } from '../../lib/serverFault';
 import { getSupabase } from '../../lib/supabase';
+import { parseCustomerList } from './customerListRow';
 import { toCustomerSummary } from './customerRow';
 import { isCustomerErrorCode } from './errorCodes';
-import { CustomerError } from './types';
+import { CUSTOMER_LIST_PAGE_SIZE, CustomerError } from './types';
 import type { CustomerService, CustomerSummary } from './types';
 
 // The only module that calls the customers RPCs (scripts/customersBoundary.test.ts).
@@ -63,6 +64,21 @@ async function many(fn: string, args?: Record<string, unknown>): Promise<Custome
 }
 
 export const supabaseCustomerService: CustomerService = {
+  // The cursor goes back exactly as received. invalid_cursor and invalid_limit (22023) can only
+  // come from a bug in this client: like any unexpected answer, they are `unknown`.
+  async list({ query, after }) {
+    const customers = parseCustomerList(
+      await call('list_customers', {
+        p_query: query,
+        p_after_activity_at: after?.activityAt ?? null,
+        p_after_created_at: after?.createdAt ?? null,
+        p_after_id: after?.id ?? null,
+        p_limit: CUSTOMER_LIST_PAGE_SIZE,
+      }),
+    );
+    return { customers, hasMore: customers.length === CUSTOMER_LIST_PAGE_SIZE };
+  },
+
   search(query) {
     return many('search_customers', { p_query: query });
   },

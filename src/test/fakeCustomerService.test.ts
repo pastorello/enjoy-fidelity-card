@@ -221,3 +221,153 @@ describe('createFakeCustomerService', () => {
     await expect(service.get(customer.id)).resolves.toMatchObject({ name: 'Anna Verdi' });
   });
 });
+
+function names(page: { customers: { name: string }[] }): string[] {
+  return page.customers.map((c) => c.name);
+}
+
+describe('createFakeCustomerService: list', () => {
+  it('orders like list_customers: latest activity, then latest creation, then id; never anonymized', async () => {
+    const quiet = fakeCustomer({ name: 'Senza Movimenti', createdAt: '2026-11-20T09:00:00+00:00' });
+    const older = fakeCustomer({ name: 'Creato Prima', createdAt: '2026-11-02T09:00:00+00:00' });
+    const served = fakeCustomer({
+      name: 'Servito Ieri',
+      createdAt: '2026-10-01T09:00:00+00:00',
+      lastActivityAt: '2026-11-22T18:40:00.000001+00:00',
+    });
+    const today = fakeCustomer({
+      name: 'Servito Oggi',
+      createdAt: '2026-10-01T09:00:00+00:00',
+      lastActivityAt: '2026-11-23T10:15:00+00:00',
+    });
+    const twinA = fakeCustomer({
+      id: '00000000-0000-4000-8000-00000000000a',
+      name: 'Gemello A',
+      createdAt: '2026-11-10T09:00:00.123456+00:00',
+    });
+    const twinB = fakeCustomer({
+      id: '00000000-0000-4000-8000-00000000000b',
+      name: 'Gemello B',
+      createdAt: '2026-11-10T09:00:00.123456+00:00',
+    });
+    const erased = fakeCustomer({
+      name: 'Cliente cancellato 00000000',
+      anonymizedAt: '2026-11-17T09:00:00Z',
+      lastActivityAt: '2026-11-23T11:00:00+00:00',
+    });
+    const { service } = createFakeCustomerService({
+      customers: [older, quiet, served, erased, twinA, today, twinB],
+    });
+
+    const page = await service.list({ query: '', after: null });
+    expect(names(page)).toEqual([
+      'Servito Oggi',
+      'Servito Ieri',
+      'Senza Movimenti',
+      'Gemello B',
+      'Gemello A',
+      'Creato Prima',
+    ]);
+    expect(page.hasMore).toBe(false);
+    expect(page.customers[1]).toEqual({
+      id: served.id,
+      name: 'Servito Ieri',
+      balance: 0,
+      lastActivityAt: '2026-11-22T18:40:00.000001+00:00',
+      createdAt: '2026-10-01T09:00:00+00:00',
+    });
+  });
+
+  it('gives fixtures and created customers a creation time, newest last, with microseconds', async () => {
+    const first = fakeCustomer({ name: 'Primo' });
+    const { service } = createFakeCustomerService({ customers: [first] });
+    await service.create(newCustomer({ name: 'Secondo' }));
+    const page = await service.list({ query: '', after: null });
+    expect(names(page)).toEqual(['Secondo', 'Primo']);
+    for (const row of page.customers) {
+      expect(row.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}\+00:00$/);
+      expect(row.lastActivityAt).toBeNull();
+    }
+  });
+
+  it('filters by every word of the name or by part of the email, from 2 characters', async () => {
+    const maria = fakeCustomer({ name: 'Maria Rossi', email: 'mrossi@example.com' });
+    const nicola = fakeCustomer({ name: 'Nicolò D’Angelo', email: null });
+    const percent = fakeCustomer({ name: 'Anna Verdi', email: 'anna_50%@example.com' });
+    const plain = fakeCustomer({ name: 'Anna Bianchi', email: 'annax50y@example.com' });
+    const { service } = createFakeCustomerService({
+      customers: [maria, nicola, percent, plain],
+    });
+    const found = async (query: string) => names(await service.list({ query, after: null }));
+
+    await expect(found('rossi maria')).resolves.toEqual(['Maria Rossi']);
+    await expect(found('  ROSSI   ma ')).resolves.toEqual(['Maria Rossi']);
+    await expect(found("nicolo d'ang")).resolves.toEqual(['Nicolò D’Angelo']);
+    await expect(found('MROSSI@exa')).resolves.toEqual(['Maria Rossi']);
+    await expect(found('example.com')).resolves.toEqual([
+      'Anna Bianchi',
+      'Anna Verdi',
+      'Maria Rossi',
+    ]);
+    await expect(found('_50%')).resolves.toEqual(['Anna Verdi']);
+    await expect(found('rossi verdi')).resolves.toEqual([]);
+    await expect(found('r')).resolves.toHaveLength(4);
+    await expect(found(' ')).resolves.toHaveLength(4);
+  });
+
+  it('pages of 20 through the cursor of the last row, without duplicates or gaps', async () => {
+    const many = Array.from({ length: 45 }, (_, index) =>
+      fakeCustomer({
+        name: `Cliente ${String(index).padStart(2, '0')}`,
+        // Groups of three created in the same microsecond: the id breaks the tie.
+        createdAt: `2026-11-01T08:00:${String(Math.floor(index / 3)).padStart(2, '0')}.000001+00:00`,
+        lastActivityAt:
+          index % 4 === 0 ? `2026-11-20T08:00:00.${String(index).padStart(6, '0')}+00:00` : null,
+      }),
+    );
+    const { service } = createFakeCustomerService({ customers: many });
+
+    const seen: string[] = [];
+    let after = null;
+    const sizes: number[] = [];
+    for (;;) {
+      // oxlint-disable-next-line no-await-in-loop -- each page needs the cursor of the one before it.
+      const page: Awaited<ReturnType<typeof service.list>> = await service.list({
+        query: 'cliente',
+        after,
+      });
+      sizes.push(page.customers.length);
+      seen.push(...page.customers.map((c) => c.id));
+      const last = page.customers.at(-1);
+      if (!page.hasMore || !last) break;
+      after = { activityAt: last.lastActivityAt, createdAt: last.createdAt, id: last.id };
+    }
+    expect(sizes).toEqual([20, 20, 5]);
+    expect(new Set(seen).size).toBe(45);
+    const all = await service.list({ query: '', after: null });
+    expect(seen.slice(0, 20)).toEqual(all.customers.map((c) => c.id));
+  });
+
+  it('a page that ends exactly on the last customer is followed by an empty one', async () => {
+    const twenty = Array.from({ length: 20 }, (_, index) => fakeCustomer({ name: `C ${index}` }));
+    const { service } = createFakeCustomerService({ customers: twenty });
+    const first = await service.list({ query: '', after: null });
+    expect(first.hasMore).toBe(true);
+    const last = first.customers.at(-1);
+    if (!last) throw new Error('expected a row');
+    const second = await service.list({
+      query: '',
+      after: { activityAt: last.lastActivityAt, createdAt: last.createdAt, id: last.id },
+    });
+    expect(second).toEqual({ customers: [], hasMore: false });
+  });
+
+  it('is logged and programmable like every other method', async () => {
+    const fake = createFakeCustomerService();
+    fake.failNext('list', 'not_operator');
+    await expect(fake.service.list({ query: '', after: null })).rejects.toMatchObject({
+      kind: 'not_operator',
+    });
+    expect(fake.calls).toEqual([{ method: 'list', args: [{ query: '', after: null }] }]);
+  });
+});

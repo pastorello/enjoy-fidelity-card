@@ -91,6 +91,37 @@ describe('createFakeLedgerService: purchases', () => {
     await expect(customers.service.get(maria.id)).resolves.toMatchObject({ balance: 5 });
   });
 
+  it('a purchase brings the customer to the top of the list; its cancellation does not move it', async () => {
+    const { maria, customers, ledger } = setup();
+    const luca = await customers.service.create({
+      operationId: OP_4,
+      name: 'Luca Bianchi',
+      phone: '',
+      privacyConsent: true,
+      notes: '',
+    });
+    const before = await customers.service.list({ query: '', after: null });
+    expect(before.customers.map((c) => c.id)).toEqual([luca.id, maria.id]);
+
+    const { movement } = await ledger.service.recordPurchase({
+      operationId: OP_1,
+      customerId: maria.id,
+      amountCents: 500,
+    });
+    const after = await customers.service.list({ query: '', after: null });
+    expect(after.customers.map((c) => c.id)).toEqual([maria.id, luca.id]);
+    expect(after.customers[0]).toMatchObject({ balance: 5, lastActivityAt: movement.createdAt });
+
+    ledger.advanceClock(1000);
+    await ledger.service.cancelMovement({ operationId: OP_2, movementId: movement.id });
+    const cancelled = await customers.service.list({ query: '', after: null });
+    expect(cancelled.customers[0]).toMatchObject({
+      id: maria.id,
+      balance: 0,
+      lastActivityAt: movement.createdAt,
+    });
+  });
+
   it('refuses amounts outside 1..9.999.999 integer cents with invalid', async () => {
     const { maria, ledger } = setup();
     const kinds = await Promise.all(

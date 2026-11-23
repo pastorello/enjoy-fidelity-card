@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 const SRC = 'src';
 const SERVICE = 'src/features/customers/supabaseCustomerService.ts';
 const RPCS = [
+  'list_customers',
   'search_customers',
   'customers_served_today',
   'get_customer',
