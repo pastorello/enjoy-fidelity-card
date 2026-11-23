@@ -68,13 +68,13 @@ stesso nome (`where released_at is null`); indice `cards_released_by_idx`; `priv
 `app.release_card(p_operation_id, p_card_id)` (admin, blocchi cliente → card, idempotente, `card_active`,
 `card_not_found`, 22023, `delete from private.card_links`). Classificata in `tablet_kiosk_access.test.sql`.
 **Accettazione:**
-- [ ] pgTAP: operatore e cassiere operatore → `forbidden`; card attiva → `card_active`; stesso
+- [x] pgTAP: operatore e cassiere operatore → `forbidden`; card attiva → `card_active`; stesso
       `operation_id` → nessun cambiamento; `operation_id` riusato su un'altra card → 22023; riga conservata con
       uid e cliente, saldo e movimenti invariati, `private.card_links` vuota
-- [ ] pgTAP: uid rilasciato → `lookup_card` vuota → `associate_card` e `create_customer_with_card` lo
+- [x] pgTAP: uid rilasciato → `lookup_card` vuota → `associate_card` e `create_customer_with_card` lo
       associano a un altro cliente; `raise_card_taken` con due righe dello stesso uid; `unique_violation` →
       ancora `card_taken`
-- [ ] pgTAP: il trigger vieta di togliere `released_at` e di riattivare una card rilasciata; vale anche per
+- [x] pgTAP: il trigger vieta di togliere `released_at` e di riattivare una card rilasciata; vale anche per
       la card di un cliente anonimizzato (criterio 10)
 **Verifica:** `npm run db:reset && npm run db:test`
 **Dipendenze:** 1 · **File:** supabase/migrations/*_cards_v2_release.sql, supabase/tests/cards_v2.test.sql,
