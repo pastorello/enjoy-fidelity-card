@@ -535,8 +535,10 @@ apre qualcosa con la card vuota diventa una trappola al §4. Quando tutti i pass
     (vuoto per tutti gli altri), mai allargando il filtro in `fixtures.ts`.
 34. Gli E2E dei clienti girano nel progetto `phone` (parallelo) e usano nomi con un suffisso unico per
     esecuzione (`… E2E <suffisso>`): si rieseguono senza `db:reset`, ma lo stack locale accumula clienti di
-    prova (anche anonimizzati, che restano come righe). È innocuo; `npm run db:reset` riparte dai 5 clienti
-    del seed. Il seed `Giulia Bianchi` serve al test del nome già usato: non rinominarlo.
+    prova (anche anonimizzati, che restano come righe). È innocuo, salvo per il piano di `list_customers`:
+    con molte centinaia di avanzi (visto con 826 clienti, 2026-11-23) la ricerca di
+    `supabase/tests/customers_v2_plan.test.sql` può passare a `Seq Scan` e `db:test` fallisce; su uno stack
+    pulito, come in CI, è verde. `npm run db:reset` riparte dai 5 clienti del seed. Il seed `Giulia Bianchi` serve al test del nome già usato: non rinominarlo.
 35. `app.customer_summary` e le firme di `search_customers`, `get_customer`, `customers_served_today` sono
     definitive: `ledger` ne cambia solo i corpi con `create or replace` in una **migrazione nuova** (mai
     modificando `*_customers.sql`, che va su staging con `db push`), mantenendo il controllo `not_operator`

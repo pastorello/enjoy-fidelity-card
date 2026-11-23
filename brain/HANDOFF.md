@@ -5,22 +5,27 @@
 > Sezioni (cancellare quelle vuote): Questo turno · Prima cosa per la prossima finestra · Procedure trovate ·
 > In attesa di altri · Nuove trappole · Ancora caldo.
 
-## Questo turno (2026-11-19)
+## Questo turno (2026-11-23)
 
-- `tablet-kiosk`, task 27: tabella "Verifica dei criteri di successo" in `tasks/tablet-kiosk/plan.md` e
-  `scripts/kioskCriteria.test.ts` (ogni criterio 1-8 cita prove che esistono davvero). Quality bar
-  completa, build e `check:bundle` verdi in locale. PR da `feat/tablet-kiosk` verso `main` aperta in bozza.
-- `tablet-kiosk`, task 23-25: layout 1280×800 di Registra spesa, Premio libero, Riscatta premio, Nuovo
-  cliente, Associa card, Catalogo premi e conferme (cornice comune `TabletColumns`), misurati in
-  `e2e/tablet-layout.spec.ts`. Criterio 7 completo; PR #23 pronta per la revisione.
+- `customers-v2` (richiesta del titolare del 2026-11-23), task 37: tabella "Verifica dei criteri di successo"
+  in `tasks/customers-v2/plan.md` e `scripts/customersV2Criteria.test.ts` (ogni criterio 1-13 cita prove che
+  esistono davvero; pgTAP, integrazione, E2E telefono e tablet e passi della CI dove la spec li chiede).
+  Quality bar completa, build e `check:bundle` verdi in locale. PR da `feat/customers-v2` verso `main`,
+  indipendente dalla #24 (`operators`).
+- Turno precedente archiviato in `handoffs/2026-11-19-0000.md` (`tablet-kiosk`, PR #23).
 
 ## Prima cosa per la prossima finestra
 
-- PR #23 (`tablet-kiosk`) da unire; poi `db push` delle due migrazioni `*_tablet_kiosk*.sql` sullo staging
-  e, dopo il merge, in produzione.
+- **Open Question 17** di `docs/specs/SPEC-customers-v2.md`, da chiedere al titolare **prima del merge**:
+  «Cancelliamo anche i numeri già salvati? Non si potranno recuperare.»
+- Ordine di merge tra #24 e la PR di `customers-v2`: nessuna dipendenza, ma file in comune (elencati nella
+  PR). Chi arriva secondo si riallinea a `main` e rilancia la quality bar; le migrazioni di #24 hanno
+  timestamp precedenti a quelle di `customers-v2`.
+- Dopo il merge: `db push` delle migrazioni sullo staging, poi in produzione (RUNBOOK, note di rilascio di
+  `customers-v2`); prove a mano su Android (Riformatta, pagina pubblica con i premi).
 
 ## In attesa di altri
 
-- Prova sul tablet vero con il lettore USB, con l'utente, dopo `db push` sullo staging (`docs/setup-tablet.md`).
-- Decisioni aperte del piano: blocchi crescenti contro la forza bruta sul PIN; password dell'account del bar
-  cambiabile dall'API di Auth.
+- Titolare: Open Question 17; revisione dei testi nuovi (Open Question 15) e dell'informativa senza telefono
+  con il consulente.
+- Prova sul tablet vero con il lettore USB, con l'utente (`docs/setup-tablet.md`).

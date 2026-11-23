@@ -79,7 +79,7 @@ del modulo `identity`.
    virgola decimale, date Europe/Rome, difesa dalle formule), sezione ESPORTA DATI in fondo a
    `/impostazioni` con "Clienti CSV" e "Movimenti CSV". Migrazione `*_export.sql` da applicare allo staging
    con `db push`; prova manuale sul telefono con l'utente (criterio 10, RUNBOOK, "Prova manuale
-   dell'esportazione"). **`tablet-kiosk` completo** su `feat/tablet-kiosk` (2026-11-19, PR #23 verso `main`): task 1-27 fatti, criteri 1-8 verificati test per test (`scripts/kioskCriteria.test.ts`, `tasks/tablet-kiosk/plan.md`), layout 1280×800 di tutte le schermate Tablet-* misurati in E2E (`e2e/tablet-layout.spec.ts`). Migrazioni `*_tablet_kiosk.sql` e `*_tablet_kiosk_pin_lock_order.sql` da applicare allo staging con `db push`; prova sul tablet vero col lettore USB con l'utente.
+   dell'esportazione"). **`tablet-kiosk` completo** su `feat/tablet-kiosk` (2026-11-19, PR #23 verso `main`): task 1-27 fatti, criteri 1-8 verificati test per test (`scripts/kioskCriteria.test.ts`, `tasks/tablet-kiosk/plan.md`), layout 1280×800 di tutte le schermate Tablet-* misurati in E2E (`e2e/tablet-layout.spec.ts`). Migrazioni `*_tablet_kiosk.sql` e `*_tablet_kiosk_pin_lock_order.sql` da applicare allo staging con `db push`; prova sul tablet vero col lettore USB con l'utente. **`customers-v2` completo** su `feat/customers-v2` (2026-11-23, richiesta del titolare dello stesso giorno, PR verso `main` indipendente dalla #24 `operators`): telefono del cliente tolto ovunque, email facoltativa e unica (minuscola), elenco CLIENTI in home a scorrimento infinito (`app.list_customers`, ordine per ultima attività), premi attivi sulla pagina pubblica (`public.card_rewards`), «Card non attiva» con Riattiva e Riformatta solo per gli amministratori (`/card/:cardId`, `reactivate_card`, `release_card`); task 1-37 fatti, criteri 1-13 verificati test per test (`scripts/customersV2Criteria.test.ts`, `tasks/customers-v2/plan.md`). **Prima del merge**: Open Question 17 della spec (cancellare i telefoni già salvati) da chiudere con il titolare. Quattro migrazioni `*_customers_v2_*.sql`, `*_cards_v2_release.sql`, `*_card_rewards_public.sql` da applicare con `db push` dopo il merge (RUNBOOK, note di rilascio).
 3. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
@@ -100,6 +100,8 @@ del modulo `identity`.
 
 - In `main` (2026-11-19): PR #13-#22 (da `identity` a `export`). Fuori da `main`: `feat/tablet-kiosk`
   (PR #23 pronta). Le migrazioni restano da applicare allo staging con `db push`.
+- Fuori da `main` (2026-11-23): `feat/operators` (PR #24) e `feat/customers-v2` (PR su `main`, indipendente
+  dalla #24; file in comune elencati nella PR).
 
 ## Ultima sessione
 
