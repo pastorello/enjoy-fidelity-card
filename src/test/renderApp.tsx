@@ -7,6 +7,7 @@ import { CustomerServiceProvider } from '../features/customers/CustomerServicePr
 import { ExportServiceProvider } from '../features/export/ExportServiceProvider';
 import { AuthProvider } from '../features/identity/AuthProvider';
 import { LedgerServiceProvider } from '../features/ledger/LedgerServiceProvider';
+import { OperatorsServiceProvider } from '../features/operators/OperatorsServiceProvider';
 import { RewardsServiceProvider } from '../features/rewards/RewardsServiceProvider';
 import { SettingsServiceProvider } from '../features/settings/SettingsProvider';
 import { KioskServiceProvider } from '../features/tablet-kiosk/KioskServiceProvider';
@@ -17,12 +18,13 @@ import { createFakeCustomerService } from './fakeCustomerService';
 import { createFakeExportService } from './fakeExportService';
 import { createFakeKioskService } from './fakeKioskService';
 import { createFakeLedgerService } from './fakeLedgerService';
+import { createFakeOperatorsService } from './fakeOperatorsService';
 import { createFakeRewardsService } from './fakeRewardsService';
 import { createFakeSettingsService } from './fakeSettingsService';
 
 /**
  * Renders the whole app at `path` (a URL, or a location with its history state), with fake Auth, Settings, Customer, Rewards, Cards, Ledger,
- * Export and Kiosk services instead of Supabase (the export fake's download spy instead of saving files), and
+ * Export, Kiosk and Operators services instead of Supabase (the export fake's download spy instead of saving files), and
  * a card reader with `fakeWebNfc` and the USB wedge on jsdom's `document`. The cards fake reads (and creates) its customers in `customers`, and the ledger fake
  * reads `customers`, `rewards` and `settings` (and writes balances in `customers`), unless one is
  * passed.
@@ -38,6 +40,7 @@ export function renderApp(
   ledger = createFakeLedgerService({ customers, rewards, settings }),
   exportService = createFakeExportService(),
   kiosk = createFakeKioskService(),
+  operators = createFakeOperatorsService(),
 ) {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   render(
@@ -52,9 +55,11 @@ export function renderApp(
                   download={exportService.download}
                 >
                   <KioskServiceProvider service={kiosk.service}>
-                    <CardReaderProvider reader={card.reader}>
-                      <RouterProvider router={router} />
-                    </CardReaderProvider>
+                    <OperatorsServiceProvider service={operators.service}>
+                      <CardReaderProvider reader={card.reader}>
+                        <RouterProvider router={router} />
+                      </CardReaderProvider>
+                    </OperatorsServiceProvider>
                   </KioskServiceProvider>
                 </ExportServiceProvider>
               </LedgerServiceProvider>
@@ -64,7 +69,19 @@ export function renderApp(
       </SettingsServiceProvider>
     </AuthProvider>,
   );
-  return { router, fake, settings, customers, rewards, card, cards, ledger, exportService, kiosk };
+  return {
+    router,
+    fake,
+    settings,
+    customers,
+    rewards,
+    card,
+    cards,
+    ledger,
+    exportService,
+    kiosk,
+    operators,
+  };
 }
 
 /** A fake with a session already saved on the device. */

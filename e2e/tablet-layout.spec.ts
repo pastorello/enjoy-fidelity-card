@@ -3,7 +3,15 @@ import { SEED_PINS, seedAccounts, seedDevices, signInDevice } from './auth';
 import { runSql } from './db';
 import { expect, homeCustomers, test } from './fixtures';
 import { freshUid, uniqueName } from './nfc';
-import { operatorButton, resetDevice, tapPin } from './tablet';
+import {
+  expectColumn,
+  expectNoHorizontalScroll,
+  expectTouchTargets,
+  operatorButton,
+  resetDevice,
+  tapPin,
+  TOLERANCE,
+} from './tablet';
 
 /**
  * The screens of the till tablet at 1280×800 (docs/specs/SPEC-tablet-kiosk.md, point 10 and
@@ -20,7 +28,6 @@ test.describe.configure({ mode: 'serial' });
 const VIEWPORT_HEIGHT = 800;
 /** Android's system bars take 50–70 points off the bottom (wireframe note nt1). */
 const BOTTOM_CLEARANCE = 70;
-const TOLERANCE = 1;
 
 /** Types an amount on the app's keypad, digit by digit, as on a POS. */
 async function typeAmount(page: Page, digits: string) {
@@ -32,50 +39,6 @@ async function typeAmount(page: Page, digits: string) {
         typed.then(() => keypad.getByRole('button', { name: digit, exact: true }).click()),
       Promise.resolve(),
     );
-}
-
-/** The page never scrolls sideways. */
-async function expectNoHorizontalScroll(page: Page) {
-  const { scrollWidth, clientWidth } = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(scrollWidth, 'document scroll width').toBeLessThanOrEqual(clientWidth);
-}
-
-/**
- * Every visible control is at least 48 px tall. Links inside a sentence are exempt (WCAG 2.5.8,
- * "inline"), and so are the native inputs a styled control hides (their label is the target).
- */
-async function expectTouchTargets(page: Page) {
-  const small = await page.evaluate(() => {
-    const controls = document.querySelectorAll<HTMLElement>(
-      'button, a[href], [role="radio"], [role="checkbox"], input, select, textarea',
-    );
-    return [...controls].flatMap((control) => {
-      // A native radio or checkbox is tapped through its label, which is the target.
-      const target =
-        control instanceof HTMLInputElement && ['radio', 'checkbox'].includes(control.type)
-          ? (control.closest('label') ?? control)
-          : control;
-      const box = target.getBoundingClientRect();
-      const style = getComputedStyle(control);
-      const hidden =
-        box.width === 0 ||
-        box.height === 0 ||
-        style.visibility === 'hidden' ||
-        style.opacity === '0' ||
-        control.closest('.visually-hidden') !== null;
-      const inline = control.tagName === 'A' && control.closest('p') !== null;
-      if (hidden || inline || box.height >= 48) return [];
-      const label =
-        control.getAttribute('aria-label') ??
-        (target.textContent?.trim() || control.getAttribute('name')) ??
-        '';
-      return [`${control.tagName.toLowerCase()} "${label}" ${Math.round(box.height)} px`];
-    });
-  });
-  expect(small, `controls under 48 px on ${page.url()}`).toEqual([]);
 }
 
 /** The main action ends at least 70 px above the bottom edge. */
@@ -93,15 +56,6 @@ async function expectTabletScreen(page: Page, mainAction: Locator | null) {
   await expectNoHorizontalScroll(page);
   await expectTouchTargets(page);
   if (mainAction) await expectAwayFromBottom(page, mainAction);
-}
-
-/** A column `width` px wide (±1), against the left or the right edge of the page. */
-async function expectColumn(column: Locator, width: number, side: 'left' | 'right') {
-  const box = await column.boundingBox();
-  if (!box) throw new Error('The column has no box');
-  expect(Math.abs(box.width - width), `column width ${box.width}`).toBeLessThanOrEqual(TOLERANCE);
-  if (side === 'left') expect(box.x + box.width).toBeLessThanOrEqual(1280 / 2);
-  else expect(box.x).toBeGreaterThanOrEqual(1280 / 2);
 }
 
 test('every screen of the tablet wireframes at 1280×800 (criterion 7)', async ({ page }) => {
@@ -277,8 +231,8 @@ test('the cashier chip fits a narrow window of the till tablet (390 px wide)', a
   await page.getByRole('searchbox').fill('Bianchi');
   await page.getByRole('link', { name: /Giulia Bianchi/ }).click();
   await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}$/);
-  // Measured once the customer has loaded: the header re-renders when it arrives, and a chip
-  // measured before that can be detached between `toBeVisible` and `boundingBox`.
+  // Measured once the new page is drawn: the URL changes first, and until React commits the
+  // navigation the chip found is the one of the home page, which is then removed.
   await expect(page.getByRole('heading', { level: 1, name: 'Giulia Bianchi' })).toBeVisible();
   await expectHeaderFits(page.getByRole('link', { name: /Modifica/ }));
 

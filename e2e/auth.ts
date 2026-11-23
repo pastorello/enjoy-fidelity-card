@@ -28,6 +28,8 @@ export const seedDevices = {
   layoutTill: { email: 'cassa-layout@example.com', name: 'Tablet layout' },
   /** Reserved to the «Card non attiva» test of e2e/tablet.spec.ts, with an admin at its till. */
   cardTill: { email: 'cassa-card@example.com', name: 'Tablet card non attiva' },
+  /** Reserved to e2e/tablet-operators.spec.ts (the Operatori screen and a deactivated cashier). */
+  operatorsTill: { email: 'cassa-operatori@example.com', name: 'Tablet operatori' },
 } as const;
 
 /** Fake till PINs of the seed operators (supabase/seed.sql). */

@@ -126,6 +126,19 @@ function toIdentity(data: unknown): SessionIdentity | null | undefined {
   };
 }
 
+/** Consumes the token of an email link; the session becomes the link user's. */
+async function verifyLink(
+  type: 'recovery' | 'invite',
+  tokenHash: string,
+): Promise<VerifyRecoveryResult> {
+  try {
+    const { error } = await getSupabase().auth.verifyOtp({ type, token_hash: tokenHash });
+    return verifyRecoveryResultFor(error);
+  } catch {
+    return 'network';
+  }
+}
+
 export const supabaseAuthService: AuthService = {
   async currentUserId() {
     const { data, error } = await getSupabase().auth.getSession();
@@ -190,16 +203,12 @@ export const supabaseAuthService: AuthService = {
     }
   },
 
-  async verifyRecovery(tokenHash) {
-    try {
-      const { error } = await getSupabase().auth.verifyOtp({
-        type: 'recovery',
-        token_hash: tokenHash,
-      });
-      return verifyRecoveryResultFor(error);
-    } catch {
-      return 'network';
-    }
+  verifyRecovery(tokenHash) {
+    return verifyLink('recovery', tokenHash);
+  },
+
+  verifyInvite(tokenHash) {
+    return verifyLink('invite', tokenHash);
   },
 
   async updatePassword(password) {

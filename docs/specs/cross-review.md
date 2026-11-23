@@ -30,23 +30,28 @@ aggiungono soltanto parti delimitate (colonna "Contributi").
 | Card già di un altro cliente | `/clienti/:id/card` | `cards` | — |
 | Lettura card: primo avvio | (riquadro) | `card-input` | — |
 | Lettura card spenta o non disponibile | (riquadro) | `card-input` | — |
-| Impostazioni (amministratore) | `/impostazioni` | `identity` (pagina e riquadro account) | `settings`, `identity-password`, `rewards`, `export` (sezioni, ordine sotto) |
+| Impostazioni (amministratore) | `/impostazioni` | `identity` (pagina e riquadro account) | `settings`, `identity-password`, `operators`, `rewards`, `export` (sezioni, ordine sotto) |
 | Impostazioni (operatore) | `/impostazioni` | `identity` | `settings` (PUNTI, nota finale), `identity-password` (ACCOUNT) |
 | Catalogo premi | `/impostazioni/premi` | `rewards` | — |
-| Operatori | — | **nessuno: rinviato** (decisione 2026-11-17, gestione in Supabase) | anche la riga "Operatori" di GESTIONE |
+| Operatori | `/impostazioni/operatori` | `operators` (dal 2026-11-22, [SPEC-operators.md](SPEC-operators.md); prima rinviato) | anche la riga "Operatori" di GESTIONE e il layout "Tablet: operatori" |
 | Accesso | `/accedi` | `identity` (V1) | `identity-password` (link "Password dimenticata?") |
 | Password dimenticata | `/password-dimenticata` | `identity-password` | — |
-| Invito: scegli la password | `/imposta-password` | `identity-password` (solo la versione "recupero"; la versione "invito" è rinviata) | — |
+| Invito: scegli la password | `/imposta-password` | `identity-password` (versione "recupero") | `operators` (versione "invito", [SPEC-operators.md](SPEC-operators.md)) |
 
 Tutti i 15 wireframe della pagina tablet (Tablet-* e "Tablet: cambio operatore") appartengono a
 `tablet-kiosk`, che cambia solo impaginazione e intestazione delle schermate dei moduli proprietari.
+Eccezione dal 2026-11-22: "Tablet: operatori" lo realizza `operators`, costruito dopo `tablet-kiosk`
+(`/impostazioni/operatori` con la colonna "Invita operatore" da 480 px, [SPEC-operators.md](SPEC-operators.md));
+dal tablet un amministratore si invita, si promuove o si riattiva solo col PIN del cassiere ripetuto (`EO005`
+senza PIN; decisione del 2026-11-23).
 
 **Ordine unico delle sezioni di `/impostazioni`** (prima non era scritto in un solo posto, e la sezione
 ACCOUNT non aveva una posizione per l'amministratore):
 1. riquadro account: `identity` (sul tablet "Disconnetti il tablet" di `tablet-kiosk`);
 2. PUNTI E CONTROLLI (admin) / PUNTI (operatore): `settings`;
 3. ACCOUNT: "Cambia password" di `identity-password` e "PIN della cassa" di `tablet-kiosk`, nascosta sul tablet;
-4. GESTIONE (solo admin): `rewards`;
+4. GESTIONE (solo admin): riga Operatori di `operators` (`OperatorsSettingsRow`, mostrata da
+   `RewardsSettingsSection` come primo `<li>`), poi Catalogo premi di `rewards`;
 5. LETTORE CARD (solo tablet con cassiere admin): `tablet-kiosk`;
 6. ESPORTA DATI (solo admin): `export`;
 7. nota finale (solo operatore): `settings`.

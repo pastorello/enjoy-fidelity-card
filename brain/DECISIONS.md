@@ -63,6 +63,52 @@
 - **Contesto**: messaggio del titolare del 2026-11-23 e sue risposte alle domande su email, scambio delle
   card, ruoli e ordine dell'elenco. Testo originale nelle fonti della sessione, riassunto qui.
 
+### 2026-11-23 — Amministratori dal tablet con PIN ripetuto; link d'invito di 24 ore
+
+- **Decisione**: (1) dal tablet della cassa, con un cassiere amministratore, si invita un amministratore,
+  si promuove una persona ad amministratore e si riattiva un amministratore disattivato, ma solo dopo che
+  il cassiere ha **inserito di nuovo il proprio PIN**. Il PIN si verifica sul server nella stessa
+  transazione dell'azione, con lo stesso contatore e lo stesso blocco di `/cassa` (5 errori → 5 minuti);
+  senza PIN il server rifiuta (`EO005`). Dal telefono nulla cambia: nessun PIN. (2) Il link dell'email
+  d'invito vale **24 ore** (`otp_expiry` = 86400): la stessa durata vale anche per il link di "Password
+  dimenticata", che in Supabase condivide l'impostazione.
+- **Perché**: risposte del titolare alle Open Questions 11 ("Sì, chiedendo di nuovo il PIN") e 7 (24 ore)
+  di `docs/specs/SPEC-operators.md`. Il PIN ripetuto impedisce che chi trova il tablet sbloccato da un
+  titolare (turno di 12 ore senza chiusura per inattività) si crei un account amministratore permanente;
+  un'ora era poca per un cameriere che apre l'email a fine turno.
+- **Alternative scartate (Rejected alternatives)**:
+  - Nessun amministratore dal tablet (il default conservativo della spec, `EO005` sempre): costringeva a
+    prendere il telefono anche per riattivare un titolare.
+  - Amministratori dal tablet senza altre verifiche: il turno lungo e il PIN di 4 cifre bastavano per un
+    account permanente.
+  - Lasciare il link a un'ora (default di Supabase) o allungarlo oltre le 24 ore: troppo poco per chi lo
+    apre dopo il lavoro; oltre, il link di recupero resterebbe valido troppo a lungo.
+- **Ambito**: modulo `operators` (RPC `set_operator_role_with_pin`, `set_operator_active_with_pin`,
+  `operator_invite_begin` col PIN, funzione `operator-invites`, passo del PIN sul tablet); `identity`
+  (testi del link di recupero); `supabase/config.toml` e, sui progetti online, Auth "Email OTP Expiration"
+  = 86400 (staging e produzione, a cura dell'orchestratore).
+- **Contesto**: sostituisce il default "niente amministratori dal tablet" della voce del 2026-11-22 e
+  della spec (Open Questions 11) e l'ora di validità del link (Open Questions 7).
+
+### 2026-11-22 — Schermata Operatori nell'app, con invito via email
+
+- **Decisione**: un amministratore aggiunge, dall'app, altri amministratori e operatori (nome, email,
+  ruolo) dalla schermata "Operatori" (Impostazioni → GESTIONE), come nelle specifiche e nei wireframe
+  "Operatori" e "Tablet: operatori". La schermata mostra l'elenco delle persone; da lì si cambia il ruolo,
+  si disattiva e si riattiva un account e si rimanda l'invito. La persona aggiunta riceve un'email da
+  `info@enjoygaeta.it` e sceglie da sola la password su `/imposta-password`: nessuno conosce la sua password.
+  `private.add_operator` resta per il primo amministratore e come riserva.
+- **Perché**: richiesta del titolare del 2026-11-22 ("un amministratore deve poter creare un altro
+  amministratore dall'applicazione, senza scriverlo nel database"); scelte confermate dall'utente
+  (schermata completa, invito via email).
+- **Alternative scartate (Rejected alternatives)**:
+  - Solo "Aggiungi amministratore", o aggiunta senza gestione: lasciano a mano ruoli e disattivazioni.
+  - Password provvisoria scelta dall'amministratore: qualcuno oltre alla persona conoscerebbe la password.
+- **Ambito**: nuovo modulo `operators`; sostituisce, per inviti e schermata Operatori, il rinvio delle voci
+  "identity V1" e "Email di Auth attive" del 2026-11-17.
+- **Contesto**: il mittente gratuito di Supabase manda poche email l'ora; prima del lancio serve comunque
+  il servizio email (SMTP) già in lista.
+
 ### 2026-11-18 — Indirizzo scritto sulle card: enjoy-fidelity-card.vercel.app
 
 - **Decisione**: i link scritti sulle Enjoy Card usano l'origine `https://enjoy-fidelity-card.vercel.app`

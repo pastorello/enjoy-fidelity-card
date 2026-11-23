@@ -10,6 +10,7 @@ import { LoginPage } from '../features/identity/LoginPage';
 import { RequireAuth } from '../features/identity/RequireAuth';
 import { ResetPasswordPage } from '../features/identity/ResetPasswordPage';
 import { SettingsPage } from '../features/identity/SettingsPage';
+import { OperatorsPage } from '../features/operators/OperatorsPage';
 import { MovementsPage } from '../features/ledger/MovementsPage';
 import { PurchasePage } from '../features/ledger/PurchasePage';
 import { RedeemPage } from '../features/ledger/RedeemPage';
@@ -69,6 +70,7 @@ export const routes: RouteObject[] = [
               { path: 'clienti/:id/movimenti', Component: MovementsPage },
               { path: 'impostazioni', Component: SettingsPage },
               { path: 'impostazioni/premi', Component: RewardsCatalogPage },
+              { path: 'impostazioni/operatori', Component: OperatorsPage },
               // An operator's own till PIN, from the phone; a device goes to / (SPEC-tablet-kiosk, 7).
               { path: 'impostazioni/pin', Component: PinSettingsPage },
             ],

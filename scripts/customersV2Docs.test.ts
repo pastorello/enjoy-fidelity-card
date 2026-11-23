@@ -156,9 +156,11 @@ describe('no secret and no real contact in the documents', () => {
 
   it('has only fake or the bar’s own email addresses', () => {
     // `nome@esempio.it` is the placeholder of the email fields, `qualcosa@dominio.estensione` the
-    // shape the delta spec describes: neither is anybody's address.
+    // shape the delta spec describes: neither is anybody's address. SPEC-operators (merged from
+    // main) adds two more of the same kind, `marco@esempio.it` (an example in the invite text) and
+    // the shape `x@y.z`, and a package pin, `supabase-js@2.119.0`, which is a version, not a domain.
     const allowed =
-      /@(example\.com|enjoygaeta\.it)$|^nome@esempio\.it$|^qualcosa@dominio\.estensione$/i;
+      /@(example\.com|enjoygaeta\.it|esempio\.it)$|^qualcosa@dominio\.estensione$|^x@y\.z$|@\d+(\.\d+)+$/i;
     const offenders = documents.flatMap((path) =>
       (read(path).match(/[\w.+-]+@[\w-]+(\.[\w-]+)+/g) ?? [])
         .filter((address) => !allowed.test(address))

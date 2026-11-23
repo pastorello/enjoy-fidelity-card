@@ -588,6 +588,10 @@ describe('the local secret key', () => {
 
   it('is only used by the integration tests (E2E and the app get the publishable key only)', () => {
     const readers = trackedFilesMatching('-F', 'secretKey');
-    expect(readers.filter((path) => !path.startsWith('tests/integration/'))).toEqual([]);
+    // The one exception: the Edge Function reads its own secret key from the Edge runtime
+    // environment (SPEC-operators point 5), only in index.ts, never in handler.ts or the app.
+    expect(readers.filter((path) => !path.startsWith('tests/integration/'))).toEqual([
+      'supabase/functions/operator-invites/index.ts',
+    ]);
   });
 });

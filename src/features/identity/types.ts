@@ -71,6 +71,11 @@ export type AuthService = {
   requestPasswordReset(email: string, redirectTo: string): Promise<ResetRequestResult>;
   /** Consumes the link token and replaces this device's session with the link user's. */
   verifyRecovery(tokenHash: string): Promise<VerifyRecoveryResult>;
+  /**
+   * The same for an invite link (`verifyOtp({ type: 'invite' })`): it also confirms the email.
+   * 'invalid-link' when expired, used or replaced by a newer invite.
+   */
+  verifyInvite(tokenHash: string): Promise<VerifyRecoveryResult>;
   /** Sets the password of the current session's user. */
   updatePassword(password: string): Promise<UpdatePasswordResult>;
   /** Revokes the sessions of the same user on other devices; never fails. */

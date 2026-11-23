@@ -101,9 +101,16 @@ function recordCalls(page: Page): { calls: string[]; stop: () => void } {
 /**
  * The calls from an active card read on the home to Registra spesa on screen (criterion 13): the
  * lookup of the card, then the customer the purchase page loads. The same as before customers-v2
- * (main: `useHomeCardRead` looks up and navigates; no `get_card` on this path).
+ * (main: `useHomeCardRead` looks up and navigates; no `get_card` on this path). Since `operators`
+ * (PR #24, SPEC-operators point 7) `RequireAuth` reads the operator's identity again at every route
+ * change, without blocking the page: that call is main's, not customers-v2's, and it runs alongside
+ * `get_customer`, so the calls are compared in alphabetical order.
  */
-const EXPECTED_PURCHASE_CALLS = ['POST /rest/v1/rpc/lookup_card', 'POST /rest/v1/rpc/get_customer'];
+const EXPECTED_PURCHASE_CALLS = [
+  'POST /rest/v1/rpc/get_customer',
+  'POST /rest/v1/rpc/get_session_identity',
+  'POST /rest/v1/rpc/lookup_card',
+];
 
 test('an administrator reactivates a lost card in place of the active one: swap, new link, then a purchase in less than 10 s with no extra call (criteria 8, 13)', async ({
   page,
@@ -190,7 +197,7 @@ test('an administrator reactivates a lost card in place of the active one: swap,
   await expect(page.getByRole('heading', { level: 1, name: 'Registra spesa' })).toBeVisible();
   await expect(page.getByText(/nuovo saldo 0 punti/)).toBeVisible();
   recording.stop();
-  expect(recording.calls).toEqual(EXPECTED_PURCHASE_CALLS);
+  expect(recording.calls.toSorted()).toEqual(EXPECTED_PURCHASE_CALLS);
 
   await typeAmount(page, '500');
   await page.getByRole('button', { name: 'Conferma +5' }).click();

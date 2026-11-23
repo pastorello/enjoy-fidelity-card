@@ -81,9 +81,20 @@ Non inventare requisiti: se un'informazione manca o le fonti si contraddicono, c
 - **Operatore** (camerieri): cerca e crea clienti, consegna card, registra spese, riscatta premi, annulla
   entro 10 secondi la propria spesa o il proprio riscatto appena registrati; non riattiva né riformatta card
   disattivate (anche da Associa card): «Card non attiva: chiedi a un amministratore».
-- Account creati solo da un amministratore. **V1**: a mano dal pannello di Supabase + `private.add_operator`
-  (`docs/setup-accounts.md` §4), niente inviti dall'app. Le email di Auth partono da `info@enjoygaeta.it`;
-  "Password dimenticata" arriva con una spec aggiuntiva dopo la V1 (`brain/DECISIONS.md` 2026-11-17).
+- Account creati solo da un amministratore, **dall'app** (`operators`, `docs/specs/SPEC-operators.md`,
+  `brain/DECISIONS.md` 2026-11-22): schermata Operatori `/impostazioni/operatori` (Impostazioni → GESTIONE),
+  invito via email con nome, email e ruolo; la persona sceglie la password su `/imposta-password` (versione
+  invito). Dalla stessa schermata: cambio di ruolo, Disattiva/Riattiva (profili mai cancellati), Reinvia e
+  Annulla invito; mai azioni su sé stessi, sempre almeno un amministratore attivo (`EO001`). Gli inviti
+  passano dalla Edge Function `supabase/functions/operator-invites`, l'unico posto con la chiave segreta
+  (mai nell'app, su Vercel o nel repo). `private.add_operator` (pannello di Supabase + SQL Editor,
+  `docs/setup-accounts.md` §4) resta solo per il **primo amministratore** e come riserva. **Dal tablet**, con
+  un cassiere amministratore, un amministratore si invita, si promuove o si riattiva solo dopo il **PIN del
+  cassiere inserito di nuovo**, verificato nella stessa RPC con il contatore e il blocco di `/cassa`
+  (`EO005` senza PIN; `brain/DECISIONS.md` 2026-11-23). Il link d'invito e quello di recupero valgono **24
+  ore** (`otp_expiry` 86400; online Auth "Email OTP Expiration"). Le email
+  di Auth (invito e recupero) partono da `info@enjoygaeta.it`; "Password dimenticata" e "Cambia password":
+  `docs/specs/SPEC-identity-password.md`.
   Sessione persistente sul telefono; sul tablet condiviso: account di dispositivo + cambio operatore con
   PIN di 4 cifre verificato sul server (blocco temporaneo dopo 5 errori).
 - **Tablet della cassa** (`tablet-kiosk`, `docs/specs/SPEC-tablet-kiosk.md`): account del bar creato con
@@ -173,11 +184,15 @@ npm run db:start / db:stop  # Supabase locale (Docker)
 npm run db:reset            # riapplica migrazioni e seed
 npm run db:test             # test pgTAP
 npm run test:integration    # Vitest contro Supabase locale (tests/integration/)
+npx supabase functions serve # Edge Function operator-invites in locale (prima: cp supabase/functions/.env.example supabase/functions/.env)
 npm run tokens              # rigenera i token CSS da design/tokens.json
 npm run icons               # rigenera le icone PWA
 ```
 Deploy: Vercel da GitHub (anteprime = Supabase staging, `main` = produzione); migrazioni remote a mano con
-`npx supabase db push` (vedi `docs/setup-accounts.md` e RUNBOOK). Trappole operative: RUNBOOK §4.
+`npx supabase db push` (vedi `docs/setup-accounts.md` e RUNBOOK); Edge Function, suoi segreti e template "Invite
+user" a mano secondo le "Note di deploy" di `docs/specs/SPEC-operators.md`. `npm run test:integration` e
+`npm run e2e` vogliono `npx supabase functions serve` acceso (RUNBOOK §1, "Operatori"). Trappole operative:
+RUNBOOK §4.
 
 ## Struttura del repository
 ```
@@ -190,7 +205,7 @@ CAPABILITY-MAP.md # moduli, dipendenze, ordine di costruzione
 docs/            # specs/ (SPEC-<id>.md di ogni modulo, contratti), setup-accounts.md, setup-tablet.md, adr/ da creare
 design/          # token e loghi del design system "Enjoy Bar"
 src/             # app (app/, shared/ui/, lib/, styles/)
-supabase/        # migrazioni, test pgTAP, config locale
+supabase/        # migrazioni, test pgTAP, config locale, templates/ delle email, functions/ (Edge Function operator-invites)
 e2e/             # test Playwright
 scripts/         # generazione token e icone
 tasks/           # piano e task del modulo in corso

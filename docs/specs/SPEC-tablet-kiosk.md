@@ -146,9 +146,14 @@ chi è alla cassa. Le card si leggono con un lettore NFC USB in emulazione tasti
     amministratore compare "Disconnetti il tablet" (proposta, non nel wireframe: Open Questions 4;
     `ConfirmDialog` pericoloso: "Per riaccedere servono email e password dell'account del bar"), che fa
     `signOut` e porta ad `/accedi`.
-13. **Operatori** (wireframe "Tablet: operatori"): rinviato come sul telefono (decisione identity V1 e
-    DECISIONS 2026-11-17). La riga "Operatori" in GESTIONE non c'è; operatori e dispositivi si gestiscono
-    in Supabase; lo stato "PIN impostato / da impostare" si vede in "Chi è alla cassa?".
+13. **Operatori** (wireframe "Tablet: operatori"; aggiornamento 2026-11-22, DECISIONS "Schermata Operatori
+    nell'app, con invito via email"): la riga "Operatori · Account, ruoli, inviti e PIN" in GESTIONE e la
+    schermata esistono anche sul tablet, per un cassiere amministratore, e appartengono al modulo
+    `operators` ([SPEC-operators.md](SPEC-operators.md)); questo modulo ne dà solo l'impaginazione (colonna
+    "Invita operatore" da 480 px) e lo stato "PIN impostato / da impostare". Dal tablet un amministratore si
+    nomina solo col PIN del cassiere ripetuto, con il contatore e il blocco di `unlock_cashier`
+    (SPEC-operators, Open Questions 11, deciso il 2026-11-23). Solo i dispositivi si gestiscono ancora in Supabase
+    (`private.add_device`).
 14. **Tastiera virtuale di Android**: con il lettore USB collegato Android nasconde la tastiera a
     schermo; per cercare per nome va attivata "Mostra tastiera virtuale" nelle impostazioni del tablet.
     Va nella procedura `docs/setup-tablet.md` (installazione PWA, accesso, prova del lettore e del
@@ -254,7 +259,7 @@ export type UnlockResult =
   `acting_operator_id()` in ogni scrittura; layout tablet provati a 1280×800; solo account `@example.com`
   e PIN finti nel seed e nei test.
 - **Ask first**: cambiare durata del blocco o del turno; PIN più lunghi; inattività che chiude il turno;
-  schermate di gestione operatori o dispositivi nell'app; modifiche all'adattatore USB di `card-input`.
+  schermata di gestione dei dispositivi nell'app (quella degli operatori è decisa: SPEC-operators.md); modifiche all'adattatore USB di `card-input`.
 - **Never**: PIN in chiaro, nei log o nel `localStorage`; verifica del PIN nel client; scritture o letture
   dell'account di dispositivo senza cassiere; amministratore che imposta il PIN di altri.
 
@@ -279,9 +284,8 @@ export type UnlockResult =
 
 ## Out of Scope (Deferred)
 
-- Schermata Operatori (anche tablet: elenco con stato, "Disattiva", "Invita operatore" e invito via email),
-  riga "Operatori · Account, ruoli, inviti e PIN" in GESTIONE, gestione dispositivi dall'app: rinviati
-  come in identity (DECISIONS 2026-11-17).
+- Gestione dei dispositivi dall'app: resta `private.add_device`. (La schermata Operatori, anche sul tablet,
+  non è più rinviata: SPEC-operators.md, DECISIONS 2026-11-22.)
 - Lettura NFC sul tablet senza lettore USB; lettori PC/SC (scartati in DECISIONS).
 - Chiusura del turno per inattività; PIN di lunghezza diversa da 4.
 - Intercettare le raffiche del lettore dentro i campi di testo (regola di `card-input`; vedi Open Questions 13).

@@ -377,6 +377,41 @@ describe('verifyRecovery', () => {
   });
 });
 
+describe('verifyInvite', () => {
+  beforeEach(() => {
+    auth.verifyOtp.mockReset();
+  });
+
+  it('verifies the link token as an invite', async () => {
+    auth.verifyOtp.mockResolvedValue({ data: {}, error: null });
+    await expect(supabaseAuthService.verifyInvite('hash-1')).resolves.toBe('ok');
+    expect(auth.verifyOtp).toHaveBeenCalledExactlyOnceWith({
+      type: 'invite',
+      token_hash: 'hash-1',
+    });
+  });
+
+  it('expired, used or replaced invite', async () => {
+    auth.verifyOtp.mockResolvedValue({
+      data: {},
+      error: new AuthApiError('Email link is invalid or has expired', 403, 'otp_expired'),
+    });
+    await expect(supabaseAuthService.verifyInvite('hash-1')).resolves.toBe('invalid-link');
+  });
+
+  it('no answer and throwing call', async () => {
+    auth.verifyOtp.mockResolvedValueOnce({ data: {}, error: noResponse() });
+    await expect(supabaseAuthService.verifyInvite('hash-1')).resolves.toBe('network');
+    auth.verifyOtp.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(supabaseAuthService.verifyInvite('hash-1')).resolves.toBe('network');
+  });
+
+  it.each([429, 500])('anything else (%i) is unknown', async (status) => {
+    auth.verifyOtp.mockResolvedValue({ data: {}, error: httpError(status) });
+    await expect(supabaseAuthService.verifyInvite('hash-1')).resolves.toBe('unknown');
+  });
+});
+
 describe('updatePassword', () => {
   beforeEach(() => {
     auth.updateUser.mockReset();
@@ -482,6 +517,7 @@ describe('no sensitive data in logs', () => {
       'http://x/imposta-password',
     );
     await supabaseAuthService.verifyRecovery('token-segreto');
+    await supabaseAuthService.verifyInvite('token-segreto');
     await supabaseAuthService.updatePassword('password-segreta');
     await supabaseAuthService.signOutOtherDevices();
     for (const spy of spies) {

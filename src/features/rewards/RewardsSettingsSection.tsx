@@ -1,11 +1,12 @@
 import { ListRow } from '../../shared/ui/ListRow';
 import { useCurrentOperator } from '../identity/AuthProvider';
+import { OperatorsSettingsRow } from '../operators/OperatorsSettingsRow';
 import styles from './RewardsSettingsSection.module.css';
 
 /**
  * GESTIONE section of /impostazioni (wireframe "Impostazioni", docs/specs/cross-review.md §1):
- * administrators only, after ACCOUNT. The "Operatori" row of the wireframe is deferred
- * (decision 2026-11-17), so the section holds the catalogue row only.
+ * administrators only, after ACCOUNT. As in the wireframe, the "Operatori" row of `operators`
+ * (SPEC-operators point 1) comes first, then the catalogue row of `rewards`.
  */
 export function RewardsSettingsSection() {
   const operator = useCurrentOperator();
@@ -16,6 +17,7 @@ export function RewardsSettingsSection() {
         GESTIONE
       </h2>
       <ul className={styles.list}>
+        <OperatorsSettingsRow />
         <ListRow
           to="/impostazioni/premi"
           title="Catalogo premi"

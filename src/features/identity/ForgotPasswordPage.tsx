@@ -89,8 +89,8 @@ export function ForgotPasswordPage() {
             <Icon name="check" size={32} />
           </span>
           <p ref={confirmation} tabIndex={-1} className={styles.text}>
-            Se l’email è di un account dell’Enjoy Card, ti abbiamo mandato un link. Il link vale
-            un’ora: se non arriva, controlla lo spam o chiedi a un amministratore.
+            Se l’email è di un account dell’Enjoy Card, ti abbiamo mandato un link. Il link vale 24
+            ore: se non arriva, controlla lo spam o chiedi a un amministratore.
           </p>
           <ButtonLink to={backTo} block>
             {signedIn ? 'Torna alle impostazioni' : 'Torna all’accesso'}
@@ -123,7 +123,7 @@ export function ForgotPasswordPage() {
             Invia il link
           </Button>
           <p className={styles.note}>
-            Il link vale un’ora. Se non arriva, controlla lo spam o chiedi a un amministratore.
+            Il link vale 24 ore. Se non arriva, controlla lo spam o chiedi a un amministratore.
           </p>
         </form>
       )}

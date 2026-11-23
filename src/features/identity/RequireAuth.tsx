@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { StatusView } from '../../shared/ui/StatusView';
 import { useAuth } from './AuthProvider';
@@ -17,10 +18,31 @@ export type SignInLocationState = { from?: string };
  * tablet), otherwise /accedi. Inside it, `RequireCashier` guards the pages that also need an
  * operator at work (on a device, its cashier) and mounts the settings and the card reader; /cassa,
  * where the cashier is chosen, stays outside that guard.
+ *
+ * An administrator can deactivate an operator account or change its role while the app is open
+ * (SPEC-operators, point 7): at every route change after the first page (whose identity was just
+ * checked) the operator's identity is read again, without blocking the page. Not enabled any more
+ * → /accedi with "Account non abilitato…"; another role → the session is updated; offline →
+ * nothing changes. A device is re-checked by `RequireCashier`, as before.
  */
 export function RequireAuth() {
-  const { state, retry } = useAuth();
+  const { state, retry, refreshIdentity } = useAuth();
   const location = useLocation();
+  const isOperator = state.status === 'signed-in';
+  const routeKey = location.key;
+  // The route already seen by an operator session: null until its first page.
+  const seenRoute = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!isOperator) {
+      seenRoute.current = null;
+      return;
+    }
+    if (seenRoute.current === routeKey) return;
+    const first = seenRoute.current === null;
+    seenRoute.current = routeKey;
+    if (!first) void refreshIdentity();
+  }, [isOperator, routeKey, refreshIdentity]);
 
   if (state.status === 'loading') {
     return (

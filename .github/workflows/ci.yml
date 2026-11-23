@@ -37,6 +37,17 @@ jobs:
           -x studio,imgproxy,storage-api,realtime,edge-runtime,logflare,vector,supavisor,postgres-meta
       - name: Reload Auth email templates (Auth can start before the gateway serves them)
         run: ./scripts/reload-auth-templates.sh
+      - name: Serve the Edge Functions (APP_ORIGINS from the committed example, no keys)
+        run: |
+          cp supabase/functions/.env.example supabase/functions/.env
+          npx supabase functions serve > functions-serve.log 2>&1 &
+          for _ in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:54321/functions/v1/operator-invites -H 'Origin: http://localhost:5173' || true)
+            [ "$code" = "401" ] && exit 0
+            sleep 2
+          done
+          cat functions-serve.log
+          exit 1
       - name: Integration (Vitest against the local stack)
         run: npm run test:integration
       - name: Production build has no E2E fake card reader (SPEC-card-input criterion 8)
@@ -48,6 +59,7 @@ jobs:
         run: |
           docker logs supabase_auth_enjoy-card-app 2>&1 | tail -n 200
           docker logs supabase_kong_enjoy-card-app 2>&1 | tail -n 100
+          tail -n 100 functions-serve.log || true
           docker inspect supabase_auth_enjoy-card-app --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E 'MAILER_(SUBJECTS|TEMPLATES)'
       - name: Upload Playwright report
         if: failure()

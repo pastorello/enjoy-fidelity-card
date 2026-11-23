@@ -1,0 +1,76 @@
+/* The fieldset "Ruolo" of the wireframe "Operatori": a muted legend, two radios side by side. */
+.fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-3);
+}
+
+/* The whole label is the target: 48 px tall (the wireframe draws 44). */
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.option[data-disabled='true'] {
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
+/* The whole form is disabled (the invite form while the list loads): every option is grey. */
+fieldset:disabled .option {
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
+.radio {
+  flex-shrink: 0;
+  width: var(--icon);
+  height: var(--icon);
+  margin: 0;
+  accent-color: var(--color-enjoy-green);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-ink-muted);
+}
+
+/* Why the server refused the role, like the error under a TextField. */
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--type-body-sm-size);
+  line-height: var(--type-body-sm-line-height);
+  color: var(--color-danger-text);
+}
+
+.error svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}

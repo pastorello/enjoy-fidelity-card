@@ -17,7 +17,9 @@ npm run db:start / db:stop                  # Supabase locale (Docker)
 npm run db:reset                            # riapplica migrazioni + seed
 npm run db:test                             # test pgTAP in supabase/tests/
 npm run test:integration                    # Vitest contro lo stack locale (tests/integration/), Supabase acceso
-./scripts/reload-auth-templates.sh          # se arriva l'email "Reset your password" (trappola 28)
+./scripts/reload-auth-templates.sh          # se arriva l'email "Reset your password" o "You've been invited" (trappole 28 e 53)
+cp supabase/functions/.env.example supabase/functions/.env   # una volta: APP_ORIGINS della Edge Function, nessuna chiave
+npx supabase functions serve                # Edge Function operator-invites in locale (serve a integrazione ed E2E degli inviti)
 docker exec -i supabase_db_enjoy-card-app psql -U postgres -d postgres < scripts/measure-list-customers.sql   # tempo di list_customers (customers-v2, criterio 6)
 npx supabase migration new <nome> </dev/null   # nuova migrazione (vedi trappola 5)
 npm run tokens                              # rigenera src/styles/tokens.css da design/tokens.json
@@ -41,6 +43,13 @@ di `e2e/tablet.spec.ts`), `cassa-blocco@example.com` ("Tablet blocco", riservato
 `e2e/tablet.spec.ts`, con un amministratore alla cassa); `pin@example.com`
 ("Pin Prova", operatore senza PIN, riservato allo stesso test). PIN finti del seed: Admin Prova `2468`,
 Operatore Prova `1357`, Recupero Prova `8024`.
+Operatori (`operators`, stessa password): `admin-operatori@example.com` ("Admin Operatori", amministratore),
+`disattiva@example.com` ("Disattiva Prova") e `ruolo@example.com` ("Ruolo Prova"), riservati a
+`e2e/operators.spec.ts`; `cassa-operatori@example.com` ("Tablet operatori") con `turno@example.com` ("Turno
+Prova", PIN `8642`) e `nuovo@example.com` ("Nuovo Prova", senza PIN), riservati a
+`e2e/tablet-operators.spec.ts` (trappola 47). PIN finti: Disattiva Prova `3579`, Ruolo Prova `4680`, Admin
+Operatori `9753`. Gli invitati dei test hanno nomi ed email casuali
+(`invito-<casuale>@example.com`).
 
 Stack locale minimo per E2E e integrazione (Postgres, Auth, API REST, Mailpit: lo stesso della CI):
 
@@ -54,9 +63,28 @@ nei test con `e2e/mailpit.ts` (API `/api/v1/search`).
 
 ### Operatori
 
-Registrare, togliere, rimettere un operatore: `docs/setup-accounts.md` §4 (pannello Supabase +
-`select private.add_operator('<email>', '<nome>', 'admin' | 'operator');` nello SQL Editor). Nei progetti
-online lo schema `app` va esposto nella Data API (§3 della stessa guida). Password dimenticata: la persona
+Invitare, cambiare ruolo, disattivare e riattivare: dall'app, **Impostazioni → GESTIONE → Operatori**
+(`/impostazioni/operatori`, solo amministratori), procedura in `docs/setup-accounts.md` §4.
+Solo il **primo amministratore** (e la riserva, se l'invito non è disponibile) passa dal pannello Supabase +
+`select private.add_operator('<email>', '<nome>', 'admin' | 'operator');` nello SQL Editor. Nei progetti
+online lo schema `app` va esposto nella Data API (§3 della stessa guida); migrazione, Edge Function e
+template "Invite user" li pubblica l'orchestratore ("Note di deploy" di `docs/specs/SPEC-operators.md`).
+Sui progetti online (staging e produzione) Auth → **Email OTP Expiration** = `86400` (24 ore, link d'invito e
+di recupero: `docs/setup-accounts.md` §6 passo 3; in locale `otp_expiry` di `supabase/config.toml`, che
+vale solo dopo `npx supabase stop` e un nuovo `start`). Dal tablet un amministratore si invita, si promuove o
+si riattiva solo col PIN del cassiere ripetuto (stesso contatore di `/cassa`); se il tablet resta in
+"Troppi tentativi", vale la riga di §3.
+
+Edge Function in locale (`supabase/functions/operator-invites/`):
+1. stack acceso (comando sopra, Mailpit compreso) e `./scripts/reload-auth-templates.sh`;
+2. la prima volta `cp supabase/functions/.env.example supabase/functions/.env` (solo `APP_ORIGINS`; il file
+   è ignorato da git e non ospita mai chiavi: `SUPABASE_URL` e le chiavi le dà l'Edge runtime);
+3. `npx supabase functions serve` in un terminale a parte (parte anche con `edge-runtime` escluso da
+   `supabase start -x`); pronta quando `curl -s -o /dev/null -w '%{http_code}' -X POST
+   http://127.0.0.1:54321/functions/v1/operator-invites -H 'Origin: http://localhost:5173'` dà `401`;
+4. ora `npm run test:integration` e `npm run e2e`; l'email d'invito si legge su http://127.0.0.1:54324.
+Senza il passo 3 `tests/integration/operators.test.ts` si ferma con "operator-invites is not served". La CI
+fa gli stessi passi (`.github/workflows/ci.yml`). La funzione non si pubblica mai da qui. Password dimenticata: la persona
 usa "Password dimenticata?" su `/accedi` (o Impostazioni → Cambia password); nei progetti online serve la
 procedura del §6 (URL di ritorno, template "Reset password", minimo 8 caratteri), dalla dashboard, prima
 staging poi produzione, mai `supabase config push`.
@@ -432,8 +460,11 @@ apre qualcosa con la card vuota diventa una trappola al §4. Quando tutti i pass
 | Online: "Servizio momentaneamente non disponibile" | Data API in ricarica (503 `PGRST002`), di solito dopo aver cambiato gli schemi esposti | attendere un minuto e riprovare |
 | Online: "Account non abilitato" | Profilo collegato? `select * from app.operators;` nello SQL Editor | `private.add_operator` (§4 della guida) |
 | In locale l'email di recupero non arriva | Mailpit acceso? http://127.0.0.1:54324 (`npx supabase status`) | riavviare lo stack senza `mailpit` tra gli esclusi (`-x`); dopo modifiche a `config.toml`: `npx supabase stop && npm run db:start` |
-| Online: il link dell'email apre "Il link è scaduto o è già stato usato." | Template "Reset password" ancora quello predefinito (`#error_code=…` nell'URL)? | `docs/setup-accounts.md` §6 passo 2; link davvero usato o più vecchio di un'ora |
+| Online: il link dell'email apre "Il link è scaduto o è già stato usato." | Template "Reset password" ancora quello predefinito (`#error_code=…` nell'URL)? | `docs/setup-accounts.md` §6 passo 2; link davvero usato o più vecchio di 24 ore (Email OTP Expiration = 86400, §6 passo 3) |
 | Online: il link apre la home e non `/imposta-password` | Redirect URLs del progetto | `docs/setup-accounts.md` §6 passo 1 (l'app inoltra comunque a `/imposta-password`) |
+| In locale "Invia invito" non riesce, o l'integrazione dice "operator-invites is not served" | `npx supabase functions serve` acceso? `supabase/functions/.env` presente? | RUNBOOK §1 "Operatori", passi 2–3 |
+| In locale arriva "You've been invited" invece di "Enjoy Card: il tuo invito", o nessuna email d'invito | `docker logs supabase_auth_enjoy-card-app` (`templatemailer_template_body_http_error`) | trappole 28 e 53 |
+| Online: un amministratore non riesce a mettere sé stesso operatore o a disattivare l'ultimo amministratore | è voluto (`EO001`, `EO002`) | prima rendi amministratore un'altra persona (`docs/setup-accounts.md` §4) |
 | Tablet: dopo l'accesso si apre la home e non `/cassa` | Si è entrati con un account personale | `docs/setup-tablet.md` §3 |
 | Tablet: "Account non abilitato" con l'account del bar | `select name, user_id is not null as collegato from app.devices;` | `private.add_device` (`docs/setup-accounts.md` §4, "Tablet della cassa") |
 | Tablet: la card apre Nuovo cliente per un cliente che ha già la card, o "Codice non riconosciuto…" | Formato del lettore (Impostazioni → LETTORE CARD, solo con un amministratore alla cassa) | `docs/setup-tablet.md` §6, trappola 50 |
@@ -595,11 +626,13 @@ apre qualcosa con la card vuota diventa una trappola al §4. Quando tutti i pass
     `tests/integration/localSupabase.ts`), mai contro un progetto online. Nello SQL Editor online si
     leggono come `postgres`; il PIN in chiaro non esiste da nessuna parte (solo l'hash bcrypt).
 47. Il cassiere sta sulla riga del dispositivo: due test che sbloccano lo stesso tablet in parallelo si
-    sostituiscono il cassiere a vicenda. Per questo il seed ha cinque tablet: `cassa@example.com`
+    sostituiscono il cassiere a vicenda. Per questo il seed ha sei tablet: `cassa@example.com`
     (`e2e/tablet.spec.ts`), `cassa-blocco@example.com` (i 5 PIN errati: il test ne azzera prima il blocco
-    con `e2e/db.ts`, così si riesegue entro i 5 minuti), `cassa-pin@example.com` (`e2e/tablet-pin.spec.ts`)
-    `cassa-layout@example.com` (`e2e/tablet-layout.spec.ts`) e `cassa-card@example.com` (il test di «Card non
-    attiva» dal lettore USB in `e2e/tablet.spec.ts`, con l'amministratore alla cassa).
+    con `e2e/db.ts`, così si riesegue entro i 5 minuti), `cassa-pin@example.com` (`e2e/tablet-pin.spec.ts`),
+    `cassa-layout@example.com` (`e2e/tablet-layout.spec.ts`), `cassa-operatori@example.com`
+    (`e2e/tablet-operators.spec.ts`, con le persone riservate `turno@example.com`, disattivata alla cassa e
+    riattivata, e `nuovo@example.com`, senza PIN) e `cassa-card@example.com` (il test di «Card non attiva»
+    dal lettore USB in `e2e/tablet.spec.ts`, con l'amministratore alla cassa).
     Un E2E tablet nuovo che sblocca un cassiere usa un dispositivo suo nel seed, o uno di questi in serie.
 48. Progetti Playwright: `tablet` (1280×800, touch, `tablet*.spec.ts`; il progetto `phone` li ignora) e
     `tablet-settings` (`tablet-settings.spec.ts`, cambia `usb_uid_format` nella riga condivisa di
@@ -621,34 +654,61 @@ apre qualcosa con la card vuota diventa una trappola al §4. Quando tutti i pass
 52. Il layout del tablet dipende dalla finestra in punti CSS (almeno 1024×600, `useTabletLayout`), non
     dall'account né dai pixel fisici: con la densità di Android un 1280×800 fisico può dare il layout del
     telefono. Si misura sul tablet vero (`docs/setup-tablet.md` §5); negli E2E vale il viewport del progetto.
-
-53. Il `drop column` di Postgres non cancella fisicamente i valori: li rende invisibili finché le righe non
+53. Kong monta **un singolo file** per ogni template delle email (`recovery.html`, `invite.html`): se un
+    editor salva sostituendo il file (nuovo inode), il gateway continua a servire quello vecchio, cancellato,
+    e Auth riceve 404 (`templatemailer_template_body_http_error … status code 404`) e manda l'email
+    predefinita. Con due template il rischio raddoppia. Rimedio: `docker restart supabase_kong_enjoy-card-app`,
+    poi `scripts/reload-auth-templates.sh` (aspetta "reloaded template type: recovery" e "… invite").
+54. In locale il gateway Kong aggiunge `Access-Control-Allow-Origin: *` a ogni risposta delle funzioni: i
+    test d'integrazione non controllano quell'intestazione (lo fanno i test di `handler.test.ts`, dove la
+    funzione non manda mai `*`). Online decide solo la funzione.
+55. GoTrue, verificando il token d'invito (`verifyOtp` con `type: 'invite'`), conferma l'email e dà a chi non
+    ha password una **password temporanea casuale** nella stessa transazione: in `auth.users` chi ha solo
+    aperto il link e chi ha scelto la password sono indistinguibili. Per questo lo stato "invito inviato" /
+    "attivo" si legge da `app.operators.invite_accepted_at` (trigger su `auth.users` al primo cambio di
+    password con l'email confermata, migrazione `*_operators_invite_accepted.sql`), mai da
+    `email_confirmed_at` (SPEC-operators, Open Questions 12).
+56. `private.operator_invites` conserva le prenotazioni di ogni invito vero (integrazione, E2E): un test che
+    ne conta le righe parte da una tabella vuota dentro la propria transazione (`operators_invites.test.sql`).
+    L'idempotenza vale per `operation_id`: due inviti con id diversi alla stessa email o allo stesso nome
+    entro 2 minuti danno `in_progress`; una prenotazione `pending` più vecchia passa a `failed` al primo invito
+    successivo con la stessa email o lo stesso nome.
+57. `npm run e2e` lanciato subito dopo `npx supabase db reset` può fallire nei primi test (accesso con
+    "Servizio momentaneamente non disponibile: riprova tra poco.", pagina dei punti con "Non riesco a caricare
+    i punti."): Auth e Data API stanno ancora ripartendo. Non è un difetto dell'app: attendere qualche
+    secondo (o rieseguire) prima degli E2E; dopo un reset rieseguire anche `./scripts/reload-auth-templates.sh`.
+58. `otp_expiry` di `supabase/config.toml` (86400 dal 2026-11-23) entra in Auth solo alla creazione del
+    container: dopo averlo cambiato servono `npx supabase stop` e di nuovo `npx supabase start -x …` (poi
+    `./scripts/reload-auth-templates.sh` e `npx supabase functions serve`, che lo `stop` ferma); `docker
+    inspect supabase_auth_enjoy-card-app` mostra `GOTRUE_MAILER_OTP_EXP`. Sui progetti online la voce è Auth →
+    Email OTP Expiration e vale anche per il link di recupero.
+59. Il `drop column` di Postgres non cancella fisicamente i valori: li rende invisibili finché le righe non
     vengono riscritte. Per questo `customers_v2_email.sql` azzera i numeri **prima** del `drop column` e dopo
     il `db push` serve `vacuum full app.customers;` a mano (§1, «Rilascio di `customers-v2`»): `VACUUM` non
     gira dentro la transazione di una migrazione né, a volte, nello SQL Editor (allora `psql`).
-54. Le trappole 34 e 35 parlano di `search_customers` e `customers_served_today`: da `customers-v2` non
+60. Le trappole 34 e 35 parlano di `search_customers` e `customers_served_today`: da `customers-v2` non
     esistono più. L'elenco della home è `app.list_customers` a pagine con un cursore a chiave
     (`last_activity_at`/`created_at`, `id`); il cursore torna al server **com'è arrivato**, stringhe di
     PostgREST con i microsecondi: convertito in `Date` di JavaScript perde i microsecondi e salta o ripete righe
     (`customerListRow.ts`, test di integrazione con timestamp uguali al millisecondo).
-55. Negli E2E l'elenco CLIENTI **senza filtro** cambia per gli altri test in parallelo sullo stesso database:
+61. Negli E2E l'elenco CLIENTI **senza filtro** cambia per gli altri test in parallelo sullo stesso database:
     si prova solo filtrato con il prefisso unico della corsa (`uniqueName`, `e2e/customers-list.spec.ts`);
     l'elenco completo si prova nei test di componente con il servizio finto.
-56. Testo della ricerca e uid della card nuova stanno nello **stato della cronologia** (`{ q }`, `{ card }`),
+62. Testo della ricerca e uid della card nuova stanno nello **stato della cronologia** (`{ q }`, `{ card }`),
     mai in `?q=` o `?card=`: email e uid non devono finire nell'URL, nella cronologia del browser né nei log
     delle richieste. Un vecchio segnalibro con `?card=` apre Nuovo cliente senza card, ed è voluto.
-57. `cards_uid_key` è un indice unico **parziale** (`where released_at is null`): ogni ricerca per uid e ogni
+63. `cards_uid_key` è un indice unico **parziale** (`where released_at is null`): ogni ricerca per uid e ogni
     `on conflict` sull'uid deve portare `released_at is null`, altrimenti una card riformattata risulta ancora
     del cliente di prima o l'inserimento fallisce. La riga riformattata resta (uid, cliente di allora,
     `released_at`) e il trigger vieta di togliere `released_at` o di riattivarla.
-58. I test dei codici d'errore (`scripts/customerErrorCodes.test.ts`, `cardErrorCodes.test.ts`) leggono le
+64. I test dei codici d'errore (`scripts/customerErrorCodes.test.ts`, `cardErrorCodes.test.ts`) leggono le
     migrazioni con `scripts/migrationFunctions.ts`, che le riapplica in ordine e tiene l'ultima definizione di
     ogni funzione ancora presente: una funzione eliminata o una firma sostituita non contano più. Una funzione
     ridefinita in una migrazione nuova si controlla da sola, senza elenchi di codici "in pensione".
-59. Gli E2E che misurano un elemento dell'intestazione (chip del cassiere, pulsanti) aspettano prima il
+65. Gli E2E che misurano un elemento dell'intestazione (chip del cassiere, pulsanti) aspettano prima il
     titolo della pagina caricata: l'intestazione si ridisegna all'arrivo del cliente e un `boundingBox` preso
     prima può trovare l'elemento staccato ("received undefined", a intermittenza sul progetto `tablet`).
-60. Riformatta si fa solo con un dispositivo che scrive (`canWrite`: Android con Web NFC attivo): sul tablet,
+66. Riformatta si fa solo con un dispositivo che scrive (`canWrite`: Android con Web NFC attivo): sul tablet,
     su iPhone e con l'NFC spento la pagina «Card non attiva» mostra la nota «Per riformattare la card serve un
     telefono Android…» al posto del pulsante. La card si svuota e si verifica **prima** di `release_card`; se `release_card` non
     risponde, «Riprova» rimanda lo **stesso** `operation_id` senza riscrivere la card.

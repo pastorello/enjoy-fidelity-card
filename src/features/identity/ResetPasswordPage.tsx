@@ -5,7 +5,9 @@ import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { ScreenTitle } from '../../shared/ui/ScreenTitle';
 import { TextField } from '../../shared/ui/TextField';
-import { useAuth, type RecoveryOutcome } from './AuthProvider';
+import { NOT_IN_DISPLAY } from '../cards/customerName';
+import { INVITE_NAME_MAX } from '../operators/validateInvite';
+import { useAuth, type LinkKind, type RecoveryOutcome } from './AuthProvider';
 import styles from './ResetPasswordPage.module.css';
 
 const MIN_LENGTH = 8;
@@ -44,13 +46,41 @@ function validate(password: string, repeat: string): FieldErrors {
   return {};
 }
 
-/** The token of a recovery link, or null when the link is missing or not a recovery one. */
-function recoveryToken(search: string, hash: string): string | null {
+/** What the URL says: which link opened the page, and its token (null when unusable). */
+type Link = { kind: LinkKind; tokenHash: string | null; fragment: URLSearchParams };
+
+function readLink(search: string, hash: string): Link {
   const params = new URLSearchParams(search);
-  const tokenHash = params.get('type') === 'recovery' ? params.get('token_hash') : null;
-  // An error in the fragment comes from Supabase's default template (used or expired link).
-  if (!tokenHash || hash.includes('error')) return null;
-  return tokenHash;
+  const type = params.get('type');
+  const kind: LinkKind = type === 'invite' ? 'invite' : 'recovery';
+  const fragment = new URLSearchParams(hash.slice(1));
+  // Supabase's default template reports a used or expired link with these keys in the fragment;
+  // the invite's names travel there too, so "Terrore" in a name is not an error.
+  const failed = fragment.has('error') || fragment.has('error_code');
+  const tokenHash = type === kind && !failed ? params.get('token_hash') : null;
+  return { kind, tokenHash: tokenHash || null, fragment };
+}
+
+/** The `role_label` of the invite email (operator-invites). */
+const ROLES = new Set(['operatore', 'amministratore']);
+
+/** A name of the fragment, trimmed, when it has 1 to 60 characters (code points, as Postgres). */
+function fragmentName(fragment: URLSearchParams, key: string): string | null {
+  const value = fragment.get(key)?.trim() ?? '';
+  const length = Array.from(value).length;
+  return length >= 1 && length <= INVITE_NAME_MAX ? value : null;
+}
+
+/**
+ * The invite's texts from the fragment (never sent to the server). Display text only: when any
+ * value is missing or not valid, the page uses the generic texts.
+ */
+function inviteTexts(fragment: URLSearchParams) {
+  const name = fragmentName(fragment, 'nome');
+  const by = fragmentName(fragment, 'da');
+  const role = fragment.get('ruolo');
+  if (!name || !by || !role || !ROLES.has(role)) return null;
+  return { name, by, role };
 }
 
 function Brand() {
@@ -62,15 +92,52 @@ function Brand() {
   );
 }
 
+/** The page's title and text: the recovery's, the invite's from the fragment, or the generic invite's. */
+function Intro({ kind, fragment }: Pick<Link, 'kind' | 'fragment'>) {
+  if (kind === 'recovery') {
+    return (
+      <>
+        <ScreenTitle>Scegli una nuova password</ScreenTitle>
+        <p className={styles.text}>Scegli la password per accedere all’Enjoy Card.</p>
+      </>
+    );
+  }
+  const invite = inviteTexts(fragment);
+  if (!invite) {
+    return (
+      <>
+        <ScreenTitle>Scegli la password</ScreenTitle>
+        <p className={styles.text}>
+          Sei stato invitato all’Enjoy Card. Scegli la password per accedere.
+        </p>
+      </>
+    );
+  }
+  return (
+    <>
+      <ScreenTitle>
+        Ciao, {/* A name with a glyph Enjoy Display lacks is set in the body font. */}
+        <span className={styles.titleName} data-body-font={NOT_IN_DISPLAY.test(invite.name)}>
+          {invite.name}
+        </span>
+      </ScreenTitle>
+      <p className={styles.text}>
+        {`${invite.by} ti ha invitato come ${invite.role} dell’Enjoy Card. Scegli la password per accedere.`}
+      </p>
+    </>
+  );
+}
+
 /**
- * Wireframe "Invito: scegli la password", adapted to recovery: public page opened from the
- * email link. The token is consumed only when "Salva e accedi" is tapped, never on opening.
+ * Wireframe "Invito: scegli la password": public page opened from the email link, in its invite
+ * version (`type=invite`, SPEC-operators point 4) or adapted to recovery. The token is consumed
+ * only when "Salva e accedi" is tapped, never on opening.
  */
 export function ResetPasswordPage() {
   const { state, completeRecovery, abandonRecovery } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const tokenHash = recoveryToken(location.search, location.hash);
+  const { kind, tokenHash, fragment } = readLink(location.search, location.hash);
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -94,9 +161,19 @@ export function ResetPasswordPage() {
         <Brand />
         {/* Focus only when the view replaced the form after "Salva e accedi". */}
         <ScreenTitle focusOnMount={invalidLink}>Il link è scaduto o è già stato usato.</ScreenTitle>
-        <ButtonLink to="/password-dimenticata" block className={styles.submit}>
-          Chiedi un nuovo link
-        </ButtonLink>
+        {kind === 'invite' ? (
+          <>
+            {/* "Password dimenticata" cannot help an invite never accepted. */}
+            <p className={styles.text}>Chiedi a chi ti ha invitato di mandarti un nuovo invito.</p>
+            <ButtonLink to="/accedi" block className={styles.submit}>
+              Vai all’accesso
+            </ButtonLink>
+          </>
+        ) : (
+          <ButtonLink to="/password-dimenticata" block className={styles.submit}>
+            Chiedi un nuovo link
+          </ButtonLink>
+        )}
       </main>
     );
   }
@@ -113,7 +190,7 @@ export function ResetPasswordPage() {
     setBusy(true);
     let outcome: RecoveryOutcome;
     try {
-      outcome = await completeRecovery(tokenHash, password);
+      outcome = await completeRecovery(tokenHash, password, kind);
     } catch {
       outcome = 'save-unknown';
     } finally {
@@ -135,8 +212,7 @@ export function ResetPasswordPage() {
   return (
     <main className={styles.page}>
       <Brand />
-      <ScreenTitle>Scegli una nuova password</ScreenTitle>
-      <p className={styles.text}>Scegli la password per accedere all’Enjoy Card.</p>
+      <Intro kind={kind} fragment={fragment} />
       {signedInAs && (
         <output className={styles.notice}>
           <Icon name="circle-alert" size={20} />
