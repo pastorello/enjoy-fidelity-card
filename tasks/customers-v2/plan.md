@@ -141,7 +141,7 @@ Dettaglio di ogni task (criteri, verifica, file) in [todo.md](todo.md).
 
 ### Fase 3: Home con l'elenco CLIENTI
 - [x] Task 10: Contratto `list` del servizio clienti (tipi, parser, Supabase, finto, ledger finto)
-- [ ] Task 11: `activityLabel` e `useCustomerList` (pagine, sentinella, ricerca, aggiornamento)
+- [x] Task 11: `activityLabel` e `useCustomerList` (pagine, sentinella, ricerca, aggiornamento)
 - [ ] Task 12: Campo di ricerca della home negli E2E tramite un solo helper
 - [ ] Task 13: Home: sezione CLIENTI, ricerca nello stato della cronologia, «nome o email», tablet a due colonne
 - [ ] Task 14: Card sconosciuta dalla home a Nuovo cliente tramite lo stato della cronologia

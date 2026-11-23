@@ -196,8 +196,8 @@ deduplica per `id`, fine elenco con meno di 20 righe, attesa di 250 ms e rispost
 caratteri l'elenco completo, ricarica della prima pagina a `visibilitychange` solo se è caricata solo lei,
 `not_operator` → `reportNotEnabled()`, callback con `useLatest`.
 **Accettazione:**
-- [ ] Unit: `activityLabel` per oggi, ieri, quest'anno, altri anni, nessun movimento, cambio dell'ora legale
-- [ ] Test del hook: cursore = valori **stringa** dell'ultima riga; una sola richiesta per volta; errore della
+- [x] Unit: `activityLabel` per oggi, ieri, quest'anno, altri anni, nessun movimento, cambio dell'ora legale
+- [x] Test del hook: cursore = valori **stringa** dell'ultima riga; una sola richiesta per volta; errore della
       prima pagina e di una successiva (le righe restano); risposta superata ignorata; refresh solo con la sola
       prima pagina
 **Verifica:** `npm test -- customers`
