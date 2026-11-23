@@ -472,9 +472,9 @@ stati: caricamento, «Card non trovata» (anche id non uuid, senza chiamata), er
 con «Apri la scheda di Maria», già riformattata, operatore → errore «Solo un amministratore può riattivare o
 riformattare una card.»
 **Accettazione:**
-- [ ] Componenti: ogni stato; anonimizzato senza Riattiva e senza riga cliente (criterio 10); nessun uid
+- [x] Componenti: ogni stato; anonimizzato senza Riattiva e senza riga cliente (criterio 10); nessun uid
       nell'URL
-- [ ] Impeccable pulito; target ≥ 48 px; titoli in Enjoy Display senza glifi mancanti
+- [x] Impeccable pulito; target ≥ 48 px; titoli in Enjoy Display senza glifi mancanti
 **Verifica:** `npm test -- cards`
 **Dipendenze:** 29 · **File:** src/features/cards/useInactiveCard.ts, src/features/cards/InactiveCardPage.tsx
 (+css, +test), src/app/routes.tsx, scripts/displayGlyphs.test.ts (solo se servono stringhe nuove)
