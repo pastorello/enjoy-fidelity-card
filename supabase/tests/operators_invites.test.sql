@@ -108,8 +108,8 @@ $$;
 
 -- Shape ------------------------------------------------------------------------------------
 select has_table('private', 'operator_invites', 'private.operator_invites exists');
-select has_function('app', 'operator_invite_begin', array['uuid', 'text', 'text', 'text'],
-  'app.operator_invite_begin(uuid, text, text, text) exists');
+select has_function('app', 'operator_invite_begin', array['uuid', 'text', 'text', 'text', 'text'],
+  'app.operator_invite_begin(uuid, text, text, text, text) exists (the PIN last, default null)');
 select has_function('app', 'operator_invite_finish', array['uuid', 'uuid'],
   'app.operator_invite_finish(uuid, uuid) exists');
 select has_function('app', 'operator_invite_fail', array['uuid'],
@@ -118,7 +118,7 @@ select has_function('app', 'operator_invite_orphan', array['uuid', 'uuid'],
   'app.operator_invite_orphan(uuid, uuid) exists');
 select is(
   (select bool_and(p.prosecdef and p.proconfig @> array['search_path=""']) from pg_proc p
-   where p.oid in ('app.operator_invite_begin(uuid, text, text, text)'::regprocedure,
+   where p.oid in ('app.operator_invite_begin(uuid, text, text, text, text)'::regprocedure,
                    'app.operator_invite_finish(uuid, uuid)'::regprocedure,
                    'app.operator_invite_fail(uuid)'::regprocedure,
                    'app.operator_invite_orphan(uuid, uuid)'::regprocedure)),
@@ -128,7 +128,7 @@ select is(
 
 -- Privileges --------------------------------------------------------------------------------
 select ok(has_function_privilege('authenticated',
-  'app.operator_invite_begin(uuid, text, text, text)', 'execute'),
+  'app.operator_invite_begin(uuid, text, text, text, text)', 'execute'),
   'authenticated can execute operator_invite_begin (is_admin is checked inside)');
 select is(
   array(
@@ -318,7 +318,7 @@ select is(
 select pg_temp.as_user('00000000-0000-4000-d700-000000000011');
 set local role authenticated;
 select throws_ok($$select pg_temp.begin_invite(13, 'Tredici Inviti', 'inv.tredici@example.com', 'admin')$$,
-  'EO005', null, 'a device with an admin cashier cannot invite an admin');
+  'EO005', null, 'a device with an admin cashier cannot invite an admin without the PIN');
 select is(pg_temp.begin_invite(13, 'Tredici Inviti', 'inv.tredici@example.com', 'operator'),
   '{"status": "proceed", "invited_by_name": "Anna Inviti"}'::jsonb,
   'a device with an admin cashier invites an operator, in the name of the cashier');

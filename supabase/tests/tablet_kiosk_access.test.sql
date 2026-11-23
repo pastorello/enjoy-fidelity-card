@@ -4,7 +4,7 @@
 -- one, every check and every author column follows the cashier. Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(75);
+select plan(77);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -155,6 +155,12 @@ insert into rpc_calls values
    '42501', 'Only an admin can change the operators'),
   ('set_operator_active', 'write',
    $$select * from app.set_operator_active('00000000-0000-4000-0000-0000000000ff', false)$$,
+   '42501', 'Only an admin can change the operators'),
+  ('set_operator_role_with_pin', 'write',
+   $$select app.set_operator_role_with_pin('00000000-0000-4000-0000-0000000000ff', 'admin', '1234')$$,
+   '42501', 'Only an admin can change the operators'),
+  ('set_operator_active_with_pin', 'write',
+   $$select app.set_operator_active_with_pin('00000000-0000-4000-0000-0000000000ff', true, '1234')$$,
    '42501', 'Only an admin can change the operators'),
   ('operator_invite_begin', 'write',
    $$select app.operator_invite_begin(gen_random_uuid(), 'Nuovo Cassa', 'nuovo.cassa@example.com',

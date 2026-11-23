@@ -1,8 +1,9 @@
 -- operators: the list of people, the change of role, deactivation and reactivation
 -- (SPEC-operators.md points 2 and 7, "Modello dati e regole di accesso"). Only an admin
 -- (an admin account, or a device with an admin cashier) lists and changes profiles; nobody
--- changes their own; a profile without an account cannot be changed; an admin is never
--- named from a device; the bar never loses its last admin with an accepted invite.
+-- changes their own; a profile without an account cannot be changed; from a device an admin is
+-- named only with the cashier's PIN (here: never without it); the bar never loses its last admin
+-- with an accepted invite.
 -- Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
@@ -361,7 +362,7 @@ select is(pg_temp.history(), current_setting('test.history'),
 select pg_temp.as_user('00000000-0000-4000-d500-000000000011');
 set local role authenticated;
 select throws_ok(format($$select * from app.set_operator_role(%L, 'admin')$$, pg_temp.op('Gamma')),
-  'EO005', null, 'an admin cashier cannot name an admin from a device');
+  'EO005', null, 'an admin cashier cannot name an admin from a device without the PIN');
 select throws_ok(format($$select * from app.set_operator_role(%L, 'admin')$$, pg_temp.op('Beta')),
   'EO005', null, 'EO005 even for someone who is already an admin');
 select throws_ok(format($$select * from app.set_operator_role(%L, 'operator')$$, pg_temp.op('alfa')),
@@ -384,13 +385,14 @@ select is(
   pg_temp.op('alfa'),
   'from a device, deactivated_by is the cashier'
 );
--- Reactivating a deactivated admin from a device would give back a permanent admin account
--- (SPEC-operators point 7): EO005, like naming one. A deactivated operator comes back from there.
+-- Reactivating a deactivated admin from a device gives back a permanent admin account
+-- (SPEC-operators point 7): without the PIN it is EO005, like naming one (with the PIN:
+-- operators_admin_pin.test.sql). A deactivated operator comes back from there without one.
 update app.operators set role = 'admin' where id = pg_temp.op('Aaa Spento');
 select pg_temp.as_user('00000000-0000-4000-d500-000000000011');
 set local role authenticated;
 select throws_ok(format($$select * from app.set_operator_active(%L, true)$$, pg_temp.op('Aaa Spento')),
-  'EO005', null, 'an admin cashier cannot reactivate a deactivated admin from a device');
+  'EO005', null, 'an admin cashier cannot reactivate a deactivated admin from a device without the PIN');
 select is(
   (select r.status from app.set_operator_active(pg_temp.op('Epsilon'), true) r),
   'invited',
