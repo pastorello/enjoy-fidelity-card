@@ -457,9 +457,9 @@ operatore → avviso `role="alert"` «Card non attiva: chiedi a un amministrator
 (cliente / dati cancellati); card attiva invariata. Rotta sotto `RequireCashier` (pagina segnaposto fino al
 task 30) in `routes.tsx`, `routes.test.tsx`, `docs/specs/contract.md`.
 **Accettazione:**
-- [ ] Componenti: admin → `/card/:id`, operatore → avviso con e senza cliente; card attiva → Registra spesa
+- [x] Componenti: admin → `/card/:id`, operatore → avviso con e senza cliente; card attiva → Registra spesa
       con le stesse chiamate di prima (criterio 13)
-- [ ] Rotta presente nel contratto e nel test delle rotte; dispositivo senza cassiere → `/cassa`
+- [x] Rotta presente nel contratto e nel test delle rotte; dispositivo senza cassiere → `/cassa`
 **Verifica:** `npm test -- cards routes`
 **Dipendenze:** 28 · **File:** src/features/cards/useHomeCardRead.ts (+test), src/features/cards/homeCardNotice.tsx,
 src/app/routes.tsx, src/app/routes.test.tsx, docs/specs/contract.md · **Dimensione:** M
