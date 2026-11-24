@@ -83,7 +83,7 @@ del modulo `identity`.
 3. **Prossimo modulo**: nessuno. `customers-v2` è l'ultimo dell'ordine di `CAPABILITY-MAP.md`
    (quality bar completa, build e `check:bundle` verdi in locale il 2026-11-23 con
    `npx supabase functions serve` attivo; CI verde su PR #25). Restano il **checkpoint di lancio** (privacy,
-   amministratori in produzione, 50 card provate), il merge della #25 e i `db push`.
+   amministratori in produzione, 50 card provate), il `vacuum full` di `app.customers` su staging e produzione (#25 unita e rilasciata il 2026-11-24).
 4. Ancora aperto: monitoraggio errori prima del lancio.
 
 ## Bloccanti / da confermare
