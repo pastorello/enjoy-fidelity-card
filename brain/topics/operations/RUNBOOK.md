@@ -350,7 +350,9 @@ Da `SPEC-customers-v2.md`, "Note di rilascio". Le migrazioni sono quattro e vann
    dice la spec). Annotare la risposta in `brain/DECISIONS.md`. **Fatto il 2026-11-23**: il titolare ha detto
    «Sì, cancellali». Staging: `db push` delle quattro migrazioni il 2026-11-23, controllo in sola lettura
    (colonna `phone` assente, RLS su tutte le tabelle, `anon` esegue solo `card_points`, `card_rewards` e
-   `rls_auto_enable`, nessuna nota con numeri: passo 4 senza correzioni); `vacuum full` dello staging da fare.
+   `rls_auto_enable`, nessuna nota con numeri: passo 4 senza correzioni). Produzione: `db push` il 2026-11-24 a
+   bar chiuso, subito dopo il merge della #25, stesso controllo con lo stesso esito; la versione nuova è online.
+   `vacuum full` (passo 5) da fare su staging e produzione dallo SQL Editor.
 2. **Staging.** `npx supabase link --project-ref <staging>` → `npx supabase db push` → prova sull'anteprima
    della PR (prova manuale qui sotto) → controllo delle note e `vacuum full` sullo staging (passi 4 e 5).
 3. **Produzione, a bar chiuso** (fuori dall'orario di apertura). Dopo la migrazione 2 l'app vecchia non cerca,
