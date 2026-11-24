@@ -284,7 +284,13 @@ describe('CardLinkWriter: outcomes that did not write the link (SPEC-cards, poin
     async (failure) => {
       const fixture = await setup();
       const write = await currentWrite(fixture);
-      await act(async () => write.finish({ ok: false, reason: failure.reason }));
+      await act(async () =>
+        write.finish(
+          failure.reason === 'wrong-card'
+            ? { ok: false, reason: 'wrong-card', otherUid: '04FFEEDDCCABCD', mayHaveWritten: false }
+            : { ok: false, reason: failure.reason },
+        ),
+      );
       await settle();
 
       const alert = screen.getByRole('alert');
@@ -470,11 +476,16 @@ describe('CardLinkWriter: no answer to the confirmation (criterion 15)', () => {
 });
 
 describe('CardLinkWriter: another card, an unreadable card (SPEC-cards, point 8.4)', () => {
-  it('wrong-card with otherUid names both cards; «Scrivi di nuovo il link» stays', async () => {
+  it('wrong-card once write() started names both cards; «Scrivi di nuovo il link» stays', async () => {
     const fixture = await setup();
     const write = await currentWrite(fixture);
     await act(async () =>
-      write.finish({ ok: false, reason: 'wrong-card', otherUid: '04FFEEDDCCABCD' }),
+      write.finish({
+        ok: false,
+        reason: 'wrong-card',
+        otherUid: '04FFEEDDCCABCD',
+        mayHaveWritten: true,
+      }),
     );
     await settle();
 
@@ -486,10 +497,17 @@ describe('CardLinkWriter: another card, an unreadable card (SPEC-cards, point 8.
     expect(fixture.cards.service.confirmLink).not.toHaveBeenCalled();
   });
 
-  it('wrong-card without otherUid: the short text', async () => {
+  it('wrong-card before write() started (nothing written): the short text', async () => {
     const fixture = await setup();
     const write = await currentWrite(fixture);
-    await act(async () => write.finish({ ok: false, reason: 'wrong-card' }));
+    await act(async () =>
+      write.finish({
+        ok: false,
+        reason: 'wrong-card',
+        otherUid: '04FFEEDDCCABCD',
+        mayHaveWritten: false,
+      }),
+    );
     await settle();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Questa non è la card …E5F6: il link non è stato scritto.',

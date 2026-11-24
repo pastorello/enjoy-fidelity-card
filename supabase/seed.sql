@@ -9,7 +9,9 @@
 -- a second tablet reserved to the E2E of the 5-wrong-PIN lock, so the lock never stops other tests;
 -- cassa-pin@example.com a third tablet reserved to the E2E of the PIN set from the phone, so its
 -- cashier never replaces the one of the tests on cassa@example.com running at the same time;
--- cassa-layout@example.com a fourth tablet reserved to the E2E of the 1280×800 layouts, likewise.
+-- cassa-layout@example.com a fourth tablet reserved to the E2E of the 1280×800 layouts, likewise;
+-- cassa-card@example.com a sixth tablet reserved to the E2E of «Card non attiva» from the USB
+-- reader (customers-v2), with an admin at its till.
 -- operators: disattiva@example.com "Disattiva Prova" and ruolo@example.com "Ruolo Prova" (operators)
 -- and admin-operatori@example.com "Admin Operatori" (admin) are reserved to the E2E of the Operatori
 -- screen, which deactivate them or change their role and restore them; cassa-operatori@example.com
@@ -39,7 +41,8 @@ from (values
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid, 'admin-operatori@example.com'),
   ('cccccccc-cccc-4ccc-8ccc-cccccccccccc'::uuid, 'cassa-operatori@example.com'),
   ('dddddddd-dddd-4ddd-8ddd-dddddddddddd'::uuid, 'turno@example.com'),
-  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'::uuid, 'nuovo@example.com')
+  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'::uuid, 'nuovo@example.com'),
+  ('abababab-abab-4bab-8bab-abababababab'::uuid, 'cassa-card@example.com')
 ) as fake (id, email);
 
 insert into auth.identities (
@@ -54,7 +57,7 @@ where email in ('admin@example.com', 'operatore@example.com', 'recupero@example.
                 'pin@example.com', 'cassa@example.com', 'cassa-blocco@example.com',
                 'cassa-pin@example.com', 'cassa-layout@example.com', 'disattiva@example.com',
                 'ruolo@example.com', 'admin-operatori@example.com', 'cassa-operatori@example.com',
-                'turno@example.com', 'nuovo@example.com');
+                'turno@example.com', 'nuovo@example.com', 'cassa-card@example.com');
 
 select private.add_operator('admin@example.com', 'Admin Prova', 'admin');
 select private.add_operator('operatore@example.com', 'Operatore Prova', 'operator');
@@ -72,6 +75,7 @@ select private.add_device('cassa-blocco@example.com', 'Tablet blocco');
 select private.add_device('cassa-pin@example.com', 'Tablet cambio PIN');
 select private.add_device('cassa-layout@example.com', 'Tablet layout');
 select private.add_device('cassa-operatori@example.com', 'Tablet operatori');
+select private.add_device('cassa-card@example.com', 'Tablet card non attiva');
 
 -- Fake till PINs (tablet-kiosk), stored as set_my_pin stores them (bcrypt, cost 8):
 -- Admin Prova 2468, Operatore Prova 1357, Recupero Prova 8024, Disattiva Prova 3579,
@@ -89,23 +93,24 @@ from (values
 ) as fake (name, pin)
 join app.operators o on o.name = fake.name;
 
--- Fake customers (customers module): invented names, phones +39333000000x.
-insert into app.customers (id, name, phone, privacy_consent_at, notes, created_by, create_operation_id)
+-- Fake customers (customers module): invented names, invented @example.com emails; two
+-- customers without an email (it is optional, SPEC-customers-v2 point 2).
+insert into app.customers (id, name, email, privacy_consent_at, notes, created_by, create_operation_id)
 select
-  fake.id, fake.name, fake.phone, now(), fake.notes,
+  fake.id, fake.name, fake.email, now(), fake.notes,
   (select id from app.operators where name = 'Admin Prova'), fake.operation_id
 from (values
-  ('c0000000-0000-4000-8000-000000000001'::uuid, 'Giulia Bianchi', '+393330000001', 'Cappuccino d''orzo',
-   'c1000000-0000-4000-8000-000000000001'::uuid),
-  ('c0000000-0000-4000-8000-000000000002'::uuid, 'Marco Esposito', '+393330000002', null,
+  ('c0000000-0000-4000-8000-000000000001'::uuid, 'Giulia Bianchi', 'giulia.bianchi@example.com',
+   'Cappuccino d''orzo', 'c1000000-0000-4000-8000-000000000001'::uuid),
+  ('c0000000-0000-4000-8000-000000000002'::uuid, 'Marco Esposito', 'marco.esposito@example.com', null,
    'c1000000-0000-4000-8000-000000000002'::uuid),
-  ('c0000000-0000-4000-8000-000000000003'::uuid, 'Anna Ferrari', '+393330000003', null,
+  ('c0000000-0000-4000-8000-000000000003'::uuid, 'Anna Ferrari', null, null,
    'c1000000-0000-4000-8000-000000000003'::uuid),
   ('c0000000-0000-4000-8000-000000000004'::uuid, 'Luca Romano', null, null,
    'c1000000-0000-4000-8000-000000000004'::uuid),
-  ('c0000000-0000-4000-8000-000000000005'::uuid, 'Sara Colombo', '+393330000005', 'Senza lattosio',
-   'c1000000-0000-4000-8000-000000000005'::uuid)
-) as fake (id, name, phone, notes, operation_id);
+  ('c0000000-0000-4000-8000-000000000005'::uuid, 'Sara Colombo', 'sara.colombo@example.com',
+   'Senza lattosio', 'c1000000-0000-4000-8000-000000000005'::uuid)
+) as fake (id, name, email, notes, operation_id);
 
 -- Fake rewards (rewards module): the catalogue of the "Catalogo premi" wireframe.
 -- The ledger E2E relies on them: tests never modify these rows.

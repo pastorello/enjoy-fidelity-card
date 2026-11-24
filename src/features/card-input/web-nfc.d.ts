@@ -1,6 +1,7 @@
 // Minimal Web NFC types (https://w3c.github.io/web-nfc/): they are not in TypeScript's lib.dom.
-// Only what card-input uses: scanning, the reading events and writing one URL record
-// (SPEC-card-input, points 3 and 9). `makeReadOnly()` is deliberately left out: cards stay writable.
+// Only what card-input uses: scanning, the reading events and writing one record, a `url` one or an
+// `empty` one for a blank card (SPEC-card-input, points 3 and 9; SPEC-customers-v2, point 4). An `empty`
+// record has no type, id nor data. `makeReadOnly()` is deliberately left out: cards stay writable.
 
 interface NDEFRecord {
   readonly recordType: string;

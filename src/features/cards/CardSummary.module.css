@@ -1,4 +1,8 @@
-/* "Card attiva …E5F6 · Tel. 333 ••• 4521": the card icon and the secondary text of "Senza telefono". */
+/*
+ * "Card attiva …E5F6 · rossi@example.com": the card icon and muted secondary text. A long email
+ * has no spaces: `anywhere` lets it wrap (and shrink the line's min-content) instead of
+ * overflowing the 390 px screen.
+ */
 .summary {
   display: flex;
   align-items: center;
@@ -8,6 +12,7 @@
   font-size: var(--type-body-sm-size);
   line-height: var(--type-body-sm-line-height);
   color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
 }
 
 .icon {

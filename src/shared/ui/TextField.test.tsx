@@ -70,8 +70,8 @@ describe('TextField', () => {
   });
 
   it('links a hint to the input when there is no error', () => {
-    render(<TextField label="Telefono" value="" onChange={() => {}} hint="Facoltativo" />);
-    const input = screen.getByRole('textbox', { name: 'Telefono' });
+    render(<TextField label="Email" value="" onChange={() => {}} hint="Facoltativo" />);
+    const input = screen.getByRole('textbox', { name: 'Email' });
     expect(input).not.toHaveAttribute('aria-invalid');
     expect(input).toHaveAccessibleDescription('Facoltativo');
   });
@@ -79,16 +79,16 @@ describe('TextField', () => {
   it('passes input attributes through', () => {
     render(
       <TextField
-        label="Telefono"
+        label="Email"
         value=""
         onChange={() => {}}
-        type="tel"
+        type="email"
         autoComplete="off"
         required
       />,
     );
-    const input = screen.getByRole('textbox', { name: 'Telefono' });
-    expect(input).toHaveAttribute('type', 'tel');
+    const input = screen.getByRole('textbox', { name: 'Email' });
+    expect(input).toHaveAttribute('type', 'email');
     expect(input).toBeRequired();
   });
 

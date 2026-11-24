@@ -1,4 +1,4 @@
-import { formatCardLabel, formatCardSince, shortName } from './formatCard';
+import { formatCardDay, formatCardLabel, formatCardSince, shortName } from './formatCard';
 
 describe('formatCardLabel', () => {
   it('shows an ellipsis and the last four characters of the uid', () => {
@@ -48,5 +48,20 @@ describe('formatCardSince', () => {
 
   it('rejects a text that is not a date', () => {
     expect(() => formatCardSince('ieri', now)).toThrow(RangeError);
+  });
+});
+
+describe('formatCardDay', () => {
+  const now = new Date('2026-11-18T10:00:00Z');
+
+  it('is the day and the short month in Europe/Rome, the year only when not the current one', () => {
+    expect(formatCardDay('2026-11-12T09:00:00Z', now)).toBe('12 nov');
+    expect(formatCardDay('2025-09-14T09:00:00Z', now)).toBe('14 set 2025');
+    // 23:30 UTC on 11 November is 12 November in Rome.
+    expect(formatCardDay('2026-11-11T23:30:00Z', now)).toBe('12 nov');
+  });
+
+  it('rejects a value that is not a date', () => {
+    expect(() => formatCardDay('ieri', now)).toThrow(RangeError);
   });
 });

@@ -11,7 +11,7 @@ import { renderApp, signedInFake } from '../../test/renderApp';
 import type { CardWriteResult, WriteUrlOptions } from '../card-input/webNfcWriter';
 import type { CardSummary, LinkState } from './types';
 
-const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393331234521' });
+const MARIA = fakeCustomer({ name: 'Maria Rossi' });
 const GIULIA = fakeCustomer({ name: 'Giulia Bianchi' });
 
 /** Invented uid; associated on 3 November of the current year, so the date has no year. */

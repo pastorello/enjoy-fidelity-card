@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ServerFaultError } from '../lib/serverFault';
 import {
+  ActiveCardChangedError,
+  CardActiveError,
+  CardForbiddenError,
   CardInactiveError,
   CardNotFoundError,
+  CardReleasedError,
+  CardsError,
   CardTakenError,
   CustomerUnavailableError,
   InvalidUidError,
@@ -17,6 +22,8 @@ import { createFakeCustomerService, fakeCustomer } from './fakeCustomerService';
 
 const OP_1 = '11111111-1111-4111-8111-111111111111';
 const OP_2 = '22222222-2222-4222-8222-222222222222';
+const OP_3 = '33333333-3333-4333-8333-333333333333';
+const MISSING_CARD = '00000000-0000-4000-a000-999999999999';
 const UID_1 = '04AABBCCDDEE01';
 const UID_2 = '04AABBCCDDEE02';
 const TOKEN = /^[A-Za-z0-9_-]{22}$/;
@@ -27,7 +34,7 @@ function newCustomer(
   return {
     operationId: OP_1,
     name: 'Maria Rossi',
-    phone: '',
+    email: '',
     privacyConsent: true,
     notes: '',
     uid: UID_1,
@@ -45,11 +52,17 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
 }
 
 /** Two customers in a customers fake, and a cards fake that reads them. */
-function setup(options: { cards?: ReturnType<typeof fakeCard>[] } = {}) {
-  const maria = fakeCustomer({ name: 'Maria Rossi' });
+function setup(
+  options: { cards?: ReturnType<typeof fakeCard>[]; role?: 'admin' | 'operator' } = {},
+) {
+  const maria = fakeCustomer({ name: 'Maria Rossi', balance: 42 });
   const antonio = fakeCustomer({ name: 'Antonio Esposito' });
   const customers = createFakeCustomerService({ customers: [maria, antonio] });
-  const cards = createFakeCardsService({ customers, cards: options.cards ?? [] });
+  const cards = createFakeCardsService({
+    customers,
+    cards: options.cards ?? [],
+    ...(options.role ? { role: options.role } : {}),
+  });
   return { maria, antonio, customers, cards };
 }
 
@@ -225,10 +238,24 @@ describe('createFakeCardsService: createCustomerWithCard', () => {
     const customers = createFakeCustomerService();
     const cards = createFakeCardsService({ customers });
     const created = await cards.service.createCustomerWithCard(
-      newCustomer({ phone: '333 1234521' }),
+      newCustomer({ email: ' Maria.Rossi@Example.com' }),
     );
 
-    expect(created).toMatchObject({ name: 'Maria Rossi', phone: '+393331234521', balance: 0 });
+    // Only the summary's fields: no phone (SPEC-customers-v2, point 1).
+    expect(Object.keys(created).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'anonymizedAt',
+      'balance',
+      'email',
+      'id',
+      'lastServedAt',
+      'name',
+      'notes',
+    ]);
+    expect(created).toMatchObject({
+      name: 'Maria Rossi',
+      email: 'maria.rossi@example.com',
+      balance: 0,
+    });
     await expect(customers.service.get(created.id)).resolves.toEqual(created);
     await expect(cards.service.lookup(UID_1)).resolves.toMatchObject({
       status: 'active',
@@ -273,6 +300,42 @@ describe('createFakeCardsService: createCustomerWithCard', () => {
     await expect(
       cards.service.createCustomerWithCard(newCustomer({ name: 'Luca Bianchi', uid: UID_2 })),
     ).resolves.toMatchObject({ name: 'Luca Bianchi' });
+  });
+});
+
+describe('createFakeCardsService: createCustomerWithCard with an email', () => {
+  it('email_invalid or customer_email_taken (with the other id) leave neither customer nor card', async () => {
+    const maria = fakeCustomer({ name: 'Maria Rossi', email: 'maria.rossi@example.com' });
+    const customers = createFakeCustomerService({ customers: [maria] });
+    const cards = createFakeCardsService({ customers });
+
+    await expect(
+      cards.service.createCustomerWithCard(newCustomer({ name: 'Luca Bianchi', email: 'luca@' })),
+    ).rejects.toMatchObject({ kind: 'email_invalid', existingCustomerId: null });
+    const taken = await rejection(
+      cards.service.createCustomerWithCard(
+        newCustomer({ name: 'Luca Bianchi', email: 'MARIA.rossi@example.com' }),
+      ),
+    );
+    expect(taken).toBeInstanceOf(CustomerError);
+    expect(taken).toMatchObject({ kind: 'customer_email_taken', existingCustomerId: maria.id });
+
+    expect(customers.customers()).toHaveLength(1);
+    expect(cards.cards()).toHaveLength(0);
+    await expect(cards.service.lookup(UID_1)).resolves.toEqual({ status: 'unknown' });
+  });
+
+  it('an email freed by the anonymization can be given to a new customer with a card', async () => {
+    const maria = fakeCustomer({ name: 'Maria Rossi', email: 'maria.rossi@example.com' });
+    const customers = createFakeCustomerService({ customers: [maria] });
+    const cards = createFakeCardsService({ customers });
+    await customers.service.anonymize(maria.id);
+
+    await expect(
+      cards.service.createCustomerWithCard(
+        newCustomer({ name: 'Luca Bianchi', email: 'maria.rossi@example.com' }),
+      ),
+    ).resolves.toMatchObject({ name: 'Luca Bianchi', email: 'maria.rossi@example.com' });
   });
 });
 
@@ -340,6 +403,240 @@ describe('createFakeCardsService: link to the points', () => {
     const unknown = '00000000-0000-4000-8000-000000000999';
     await expect(service.issueLink(unknown)).rejects.toBeInstanceOf(CardNotFoundError);
     await expect(service.confirmLink(unknown, token)).rejects.toBeInstanceOf(CardNotFoundError);
+  });
+});
+
+/** Maria with a deactivated card (UID_1) and an active one (UID_2). */
+async function swapSetup(role?: 'admin' | 'operator') {
+  const context = setup(role ? { role } : {});
+  const { maria, cards } = context;
+  const old = (await cards.service.associate(maria.id, UID_1)).card;
+  const current = (await cards.service.associate(maria.id, UID_2)).card;
+  return { ...context, old, current };
+}
+
+describe('createFakeCardsService: getCard', () => {
+  it('a deactivated card, with its customer, balance and the active card a swap would replace', async () => {
+    const { maria, cards, old, current } = await swapSetup();
+    await expect(cards.service.getCard(old.id)).resolves.toEqual({
+      id: old.id,
+      uid: UID_1,
+      customerId: maria.id,
+      customerName: 'Maria Rossi',
+      customerAnonymized: false,
+      customerBalance: 42,
+      active: false,
+      deactivatedAt: expect.any(String),
+      releasedAt: null,
+      otherActiveCard: { id: current.id, uid: UID_2 },
+    });
+    await expect(cards.service.getCard(current.id)).resolves.toMatchObject({
+      active: true,
+      deactivatedAt: null,
+      otherActiveCard: null,
+    });
+  });
+
+  it('an unknown id or one that is not a uuid is null', async () => {
+    const { cards } = setup();
+    await expect(cards.service.getCard(MISSING_CARD)).resolves.toBeNull();
+    await expect(cards.service.getCard('card')).resolves.toBeNull();
+  });
+
+  it('a card of an anonymized customer has no name', async () => {
+    const { maria, customers, cards } = setup();
+    const card = (await cards.service.associate(maria.id, UID_1)).card;
+    await customers.service.anonymize(maria.id);
+    await expect(cards.service.getCard(card.id)).resolves.toMatchObject({
+      customerName: null,
+      customerAnonymized: true,
+      active: false,
+    });
+  });
+});
+
+describe('createFakeCardsService: reactivateCard', () => {
+  it('swaps the confirmed active card out; the old one comes back from "link not written"', async () => {
+    const { maria, cards, old, current } = await swapSetup();
+    await cards.service.confirmLink(current.id, await cards.service.issueLink(current.id));
+
+    const { card, replacedCardId } = await cards.service.reactivateCard(old.id, current.id);
+    expect(card).toMatchObject({ id: old.id, active: true, deactivatedAt: null });
+    expect(card.linkState).toBe('not-written');
+    expect(replacedCardId).toBe(current.id);
+    expect(cards.cards().find((row) => row.id === current.id)).toMatchObject({
+      active: false,
+      linkState: 'not-written',
+    });
+    expect(cards.tokens(current.id)).toEqual({ written: null, pending: null });
+    await expect(cards.service.getActiveCard(maria.id)).resolves.toEqual(card);
+  });
+
+  it('a card with no other active one needs null; repeating it changes nothing', async () => {
+    const { maria, cards } = setup();
+    const card = (await cards.service.associate(maria.id, UID_1)).card;
+    await cards.service.deactivate(card.id);
+
+    const first = await cards.service.reactivateCard(card.id, null);
+    expect(first).toMatchObject({ card: { id: card.id, active: true }, replacedCardId: null });
+    const before = cards.cards();
+    // A resend after a lost answer: no check of the confirmation, nothing twice.
+    await expect(cards.service.reactivateCard(card.id, 'anything')).resolves.toEqual({
+      card: first.card,
+      replacedCardId: null,
+    });
+    expect(cards.cards()).toEqual(before);
+  });
+
+  it('active_card_changed when the active card is not the one confirmed, changing nothing', async () => {
+    const { cards, old, current } = await swapSetup();
+    const before = cards.cards();
+    await expect(cards.service.reactivateCard(old.id, null)).rejects.toBeInstanceOf(
+      ActiveCardChangedError,
+    );
+    await expect(cards.service.reactivateCard(old.id, old.id)).rejects.toMatchObject({
+      kind: 'active_card_changed',
+    });
+    expect(cards.cards()).toEqual(before);
+    await expect(cards.service.reactivateCard(old.id, current.id)).resolves.toMatchObject({
+      replacedCardId: current.id,
+    });
+  });
+
+  it('card_not_found, card_released, customer_anonymized', async () => {
+    const { maria, antonio, customers, cards } = setup();
+    await expect(cards.service.reactivateCard(MISSING_CARD, null)).rejects.toBeInstanceOf(
+      CardNotFoundError,
+    );
+    const released = (await cards.service.associate(maria.id, UID_1)).card;
+    await cards.service.deactivate(released.id);
+    await cards.service.releaseCard(OP_1, released.id);
+    await expect(cards.service.reactivateCard(released.id, null)).rejects.toBeInstanceOf(
+      CardReleasedError,
+    );
+    const erased = (await cards.service.associate(antonio.id, UID_2)).card;
+    await customers.service.anonymize(antonio.id);
+    await expect(cards.service.reactivateCard(erased.id, null)).rejects.toMatchObject({
+      kind: 'customer_anonymized',
+    });
+  });
+});
+
+describe('createFakeCardsService: releaseCard', () => {
+  it('unbinds a deactivated card: the row stays, its uid is unknown and free for another customer', async () => {
+    const { maria, antonio, cards, old } = await swapSetup();
+
+    const released = await cards.service.releaseCard(OP_1, old.id);
+    expect(released).toMatchObject({ id: old.id, uid: UID_1, customerId: maria.id, active: false });
+    await expect(cards.service.getCard(old.id)).resolves.toMatchObject({
+      customerName: 'Maria Rossi',
+      releasedAt: expect.any(String),
+    });
+    await expect(cards.service.lookup(UID_1)).resolves.toEqual({ status: 'unknown' });
+
+    const { card } = await cards.service.associate(antonio.id, UID_1);
+    expect(card).toMatchObject({ uid: UID_1, customerId: antonio.id, active: true });
+    expect(card.id).not.toBe(old.id);
+    await expect(cards.service.lookup(UID_1)).resolves.toMatchObject({
+      status: 'active',
+      cardId: card.id,
+      customerId: antonio.id,
+    });
+    expect(cards.cards().filter((row) => row.uid === UID_1)).toHaveLength(2);
+  });
+
+  it('a released uid can start a new customer too', async () => {
+    const { cards, old } = await swapSetup();
+    await cards.service.releaseCard(OP_1, old.id);
+    const created = await cards.service.createCustomerWithCard(
+      newCustomer({ operationId: OP_2, name: 'Luca Bianchi', uid: UID_1 }),
+    );
+    await expect(cards.service.lookup(UID_1)).resolves.toMatchObject({ customerId: created.id });
+  });
+
+  it('the same operation_id (or any call on a released card) changes nothing', async () => {
+    const { cards, old } = await swapSetup();
+    const first = await cards.service.releaseCard(OP_1, old.id);
+    const before = await cards.service.getCard(old.id);
+
+    await expect(cards.service.releaseCard(OP_1, old.id)).resolves.toEqual(first);
+    await expect(cards.service.releaseCard(OP_2, old.id)).resolves.toEqual(first);
+    await expect(cards.service.getCard(old.id)).resolves.toEqual(before);
+  });
+
+  it('an operation_id already used for another card is refused (22023: unknown)', async () => {
+    const { maria, antonio, cards, old } = await swapSetup();
+    await cards.service.releaseCard(OP_1, old.id);
+    const other = (await cards.service.associate(antonio.id, UID_1)).card;
+    await cards.service.deactivate(other.id);
+
+    const error = await rejection(cards.service.releaseCard(OP_1, other.id));
+    expect(error).toBeInstanceOf(CardsError);
+    expect(error).toMatchObject({ kind: 'unknown' });
+    await expect(cards.service.getCard(other.id)).resolves.toMatchObject({ releasedAt: null });
+    await expect(cards.service.releaseCard(OP_3, other.id)).resolves.toMatchObject({
+      id: other.id,
+    });
+    await expect(cards.service.getActiveCard(maria.id)).resolves.toMatchObject({ uid: UID_2 });
+  });
+
+  it('an active card is card_active; an unknown one card_not_found', async () => {
+    const { cards, current } = await swapSetup();
+    await expect(cards.service.releaseCard(OP_1, current.id)).rejects.toBeInstanceOf(
+      CardActiveError,
+    );
+    await expect(cards.service.lookup(UID_2)).resolves.toMatchObject({ status: 'active' });
+    await expect(cards.service.releaseCard(OP_1, MISSING_CARD)).rejects.toBeInstanceOf(
+      CardNotFoundError,
+    );
+  });
+
+  it('a card of an anonymized customer can be released', async () => {
+    const { maria, customers, cards } = setup();
+    const card = (await cards.service.associate(maria.id, UID_1)).card;
+    await customers.service.anonymize(maria.id);
+    await expect(cards.service.releaseCard(OP_1, card.id)).resolves.toMatchObject({ id: card.id });
+    await expect(cards.service.lookup(UID_1)).resolves.toEqual({ status: 'unknown' });
+  });
+});
+
+describe('createFakeCardsService: admins only', () => {
+  it('an operator gets forbidden from reactivateCard, releaseCard and the reactivation in associate', async () => {
+    const { maria, cards, old, current } = await swapSetup('operator');
+    const before = cards.cards();
+
+    const refusals = [
+      await rejection(cards.service.reactivateCard(old.id, current.id)),
+      await rejection(cards.service.releaseCard(OP_1, old.id)),
+      await rejection(cards.service.associate(maria.id, UID_1)),
+    ];
+    for (const error of refusals) {
+      expect(error).toBeInstanceOf(CardForbiddenError);
+      expect(error).toMatchObject({ text: 'Card non attiva: chiedi a un amministratore.' });
+    }
+    expect(cards.cards()).toEqual(before);
+  });
+
+  it('an operator still associates new cards and reads any card', async () => {
+    const { maria, cards, old } = await swapSetup('operator');
+    await expect(cards.service.getCard(old.id)).resolves.toMatchObject({ id: old.id });
+    await expect(cards.service.associate(maria.id, '04AABBCCDDEE03')).resolves.toMatchObject({
+      card: { uid: '04AABBCCDDEE03', active: true },
+    });
+  });
+
+  it('failNext can program the new kinds', async () => {
+    const { cards, old } = await swapSetup();
+    cards.failNext('releaseCard', 'forbidden');
+    cards.failNext('reactivateCard', 'active_card_changed');
+    cards.failNext('getCard', 'network');
+    await expect(cards.service.releaseCard(OP_1, old.id)).rejects.toBeInstanceOf(
+      CardForbiddenError,
+    );
+    await expect(cards.service.reactivateCard(old.id, null)).rejects.toBeInstanceOf(
+      ActiveCardChangedError,
+    );
+    await expect(cards.service.getCard(old.id)).rejects.toBeInstanceOf(NetworkError);
   });
 });
 

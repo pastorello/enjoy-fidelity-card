@@ -17,6 +17,8 @@ type AppShellProps = {
   /** Screen title in the header, with a back link; without it the header shows the logo. */
   title?: string;
   backTo?: string;
+  /** The navigation state the back link carries (e.g. the home's search, kept out of the URL). */
+  backState?: unknown;
   /**
    * "Indietro" goes back one step in the history (`navigate(-1)`), as the system back; `backTo`
    * only when the screen is the first of the history (opened from a link or a reload).
@@ -93,6 +95,7 @@ export function AppShell({
   children,
   title,
   backTo,
+  backState,
   backInHistory = false,
   headerAction,
   account,
@@ -120,7 +123,13 @@ export function AppShell({
     <div className={styles.shell}>
       <header className={[styles.header, hasBack ? styles.withBack : ''].join(' ')}>
         {hasBack && (
-          <Link to={backTo} onClick={goBack} className={styles.iconButton} aria-label="Indietro">
+          <Link
+            to={backTo}
+            state={backState}
+            onClick={goBack}
+            className={styles.iconButton}
+            aria-label="Indietro"
+          >
             <Icon name="chevron-left" />
           </Link>
         )}

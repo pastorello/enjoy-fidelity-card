@@ -4,7 +4,7 @@
   gap: var(--space-3);
 }
 
-/* Under the phone, as in the wireframe: what the name and the phone are for. */
+/* Under the email, where the wireframe has the phone: what the name and the email are for. */
 .help {
   margin: 0;
   font-size: var(--type-body-sm-size);

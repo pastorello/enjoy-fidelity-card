@@ -1,5 +1,10 @@
 # Spec: cards
 
+> **Aggiornata da `SPEC-customers-v2.md` (2026-11-23).** Il bar non raccoglie più il telefono del cliente:
+> al suo posto c'è un'email facoltativa e unica. I passi di questa spec che lo riguardavano rimandano alla
+> delta; il resto resta valido.
+> Card disattivata riletta alla cassa (Riattiva, Riformatta, «Card non attiva»): delta, punti 4 e 5.
+
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3).
 Rivista il 2026-11-17 per la decisione del titolare «punti visibili al cliente con la card»: link scritto
 sulla card (punto 8), stato "link non scritto" (punti 4–5) e pagina pubblica dei punti (punto 9).
@@ -51,7 +56,7 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
    - card sconosciuta → `navigate('/clienti/nuovo?card=<UID>')`;
    - card disattivata (card persa e poi ritrovata) → **non** apre la spesa; avviso nel riquadro di lettura
      (`role="alert"`): «Card disattivata» · «Questa card non è più attiva: era di Maria Rossi. Cerca il
-     cliente per nome o telefono.» · pulsante «Apri la scheda di Maria» (`/clienti/:id`); la lettura resta
+     cliente per nome o email.» · pulsante «Apri la scheda di Maria» (`/clienti/:id`); la lettura resta
      attiva e una nuova card sostituisce l'avviso;
    - card di un cliente anonimizzato (sempre disattivata, vedi punto 7) → «Card non più valida» · «I dati
      del cliente di questa card sono stati cancellati. Usa un'altra card.»; nessun nome, nessun pulsante
@@ -64,7 +69,7 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
      nome e saldo, nessun tastierino) che `ledger` sostituisce mantenendo la stessa rotta.
 2. **Nuovo cliente da card nuova** (`/clienti/nuovo?card=<UID>`, wireframe "Card sconosciuta: nuovo
    cliente"). Il modulo estende il form di `customers`:
-   - titolo e campi restano quelli di `customers` (Nome e cognome, Telefono, PRIVACY, «Salva cliente»);
+   - titolo e campi restano quelli di `customers` (Nome e cognome, Email, PRIVACY, «Salva cliente»; `SPEC-customers-v2.md` punto 2);
    - riquadro `aria-label="Card letta"` al posto della sezione «Card (facoltativa)»: «Card nuova letta» ·
      «Codice 04A1B2C3D4E5F6: non è di nessun cliente, verrà associata a questo.» (uid completo);
    - testo e link «È la nuova card di un cliente già registrato? Cerca il cliente e associa la card dalla
@@ -80,7 +85,7 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
      avviso come nel punto 4 con, in più, «Continua senza card» (toglie `?card` e resta nel form; il
      salvataggio successivo usa `app.create_customer` con lo stesso `operation_id`, che non ha creato nulla);
    - una nuova lettura sulla pagina segue le regole del punto 3 (l'ultima card letta vale);
-   - errori del form (nome già usato, consenso mancante, telefono non valido) restano quelli di `customers`.
+   - errori del form (nome già usato, consenso mancante, email non valida o già usata) restano quelli di `customers`.
 3. **Card nel form Nuovo cliente senza card** (`/clienti/nuovo`, wireframe "Nuovo cliente senza card"):
    sezione `aria-label="Card"` «Card (facoltativa)» · «Lettura attiva: avvicina una card nuova per
    associarla adesso, oppure fallo più tardi dalla scheda.» Alla lettura si chiama `app.lookup_card`:
@@ -156,8 +161,8 @@ mostra solo i punti del suo cliente, quello di una card disattivata non mostra p
    - errore di caricamento della card → riga «Card non caricata» con «Riprova»; il resto del form resta
      usabile.
 6. **Scheda cliente** (wireframe "Scheda cliente"): la riga sotto il nome mostra «Card attiva …E5F6» o
-   «Senza card» (stesso stile di «Senza telefono» della home), seguito da « · » e dalla parte telefono di
-   `customers` («Tel. 333 ••• 4521» o «Senza telefono»). Cliente anonimizzato: la riga resta quella di
+   «Senza card» (stesso stile di «Senza email»), seguito da « · » e dalla parte email di
+   `customers` (l'email intera o «Senza email», `SPEC-customers-v2.md` punto 2). Cliente anonimizzato: la riga resta quella di
    `customers`, senza parte card.
 7. **Cliente anonimizzato**: un trigger di questo modulo disattiva la card attiva quando `customers`
    imposta `anonymized_at`; l'uid resta legato a quel cliente e non si riusa mai. Con la disattivazione
@@ -331,7 +336,7 @@ sempre `extensions.digest(convert_to(token, 'UTF8'), 'sha256')` del testo di 22 
     in `card_taken`. Uid non valido → `invalid_uid`.
   - `app.deactivate_card(p_card_id uuid)` → riga aggiornata; già disattivata → nessuna modifica;
     inesistente → `card_not_found`.
-  - `app.create_customer_with_card(p_operation_id uuid, p_name text, p_phone text, p_privacy_consent
+  - `app.create_customer_with_card(p_operation_id uuid, p_name text, p_email text, p_privacy_consent
     boolean, p_notes text, p_uid text) returns app.customer_summary`: stessa firma di
     `app.create_customer` più `p_uid`. Se `create_operation_id = p_operation_id` esiste già restituisce
     quel cliente senza toccare le card (il primo invio era tutto-o-niente). Altrimenti, nella stessa

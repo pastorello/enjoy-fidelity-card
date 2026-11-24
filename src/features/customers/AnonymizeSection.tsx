@@ -86,15 +86,14 @@ function AdminAnonymizeSection({ customer }: { customer: CustomerSummary }) {
         Cancella i dati del cliente
       </Button>
       <p className={styles.help}>
-        Nome e telefono si cancellano, i movimenti restano senza dati personali. Solo
-        amministratori.
+        Nome ed email si cancellano, i movimenti restano senza dati personali. Solo amministratori.
       </p>
       {refusal !== null && <SaveFailure text={refusal} />}
       <ConfirmDialog
         open={open}
         tone="danger"
         title={`Cancellare i dati di ${customer.name}?`}
-        description="Nome, telefono e note si cancellano per sempre e la card si disattiva. I movimenti e il saldo restano, senza dati personali. Non si può tornare indietro."
+        description="Nome, email e note si cancellano per sempre e la card si disattiva. I movimenti e il saldo restano, senza dati personali. Non si può tornare indietro."
         confirmLabel="Cancella i dati"
         busy={busy}
         error={dialogError}

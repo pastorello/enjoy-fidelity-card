@@ -6,10 +6,8 @@ import { SearchField } from './SearchField';
 
 describe('SearchField', () => {
   it('is a search box labelled by its visible label', () => {
-    render(<SearchField label="Cerca per nome o telefono" value="" onChange={() => {}} />);
-    expect(
-      screen.getByRole('searchbox', { name: 'Cerca per nome o telefono' }),
-    ).toBeInTheDocument();
+    render(<SearchField label="Cerca per nome o email" value="" onChange={() => {}} />);
+    expect(screen.getByRole('searchbox', { name: 'Cerca per nome o email' })).toBeInTheDocument();
   });
 
   it('shows the clear button only when there is text', () => {

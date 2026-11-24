@@ -5,8 +5,13 @@ import { CustomerError } from '../customers/types';
 import type { CustomerSummary } from '../customers/types';
 import { CARD_ERROR_CODES, supabaseCardsService } from './supabaseCardsService';
 import {
+  ActiveCardChangedError,
+  CARD_FORBIDDEN_TEXT,
+  CardActiveError,
+  CardForbiddenError,
   CardInactiveError,
   CardNotFoundError,
+  CardReleasedError,
   CardTakenError,
   CardsError,
   CustomerUnavailableError,
@@ -15,7 +20,7 @@ import {
   NetworkError,
   NotOperatorError,
 } from './types';
-import type { CardSummary } from './types';
+import type { CardDetail, CardSummary } from './types';
 
 type Answer = { data: unknown; error: unknown; status: number };
 
@@ -37,6 +42,7 @@ const CUSTOMER_ID = '6f1c2a5e-8b3d-4c7a-9e21-0d4b5f6a7c8e';
 const OWNER_ID = '0b9e8d7c-6a5f-4e3d-8c2b-1a0f9e8d7c6b';
 const OPERATOR_ID = 'd4c3b2a1-0f9e-4d8c-b7a6-5f4e3d2c1b0a';
 const OPERATION_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
+const OTHER_UID = '04AABBCCDDEE02';
 const UID = '04AABBCCDDEE01';
 const TOKEN = 'Zq3_x-9KpL2mN8vR4tY6wA';
 
@@ -76,20 +82,60 @@ const writtenCard: CardSummary = {
 const customerRow = {
   id: CUSTOMER_ID,
   name: 'Maria Rossi',
-  phone: null,
   notes: null,
   anonymized_at: null,
   balance: 0,
   last_served_at: null,
+  email: 'maria.rossi@example.com',
 };
 const customer: CustomerSummary = {
   id: CUSTOMER_ID,
   name: 'Maria Rossi',
-  phone: null,
   notes: null,
   anonymizedAt: null,
   balance: 0,
   lastServedAt: null,
+  email: 'maria.rossi@example.com',
+};
+
+/** A row of `app.get_card`: a deactivated card of Maria, who has another active card. */
+const getCardRow = {
+  card_id: CARD_ID,
+  uid: UID,
+  customer_id: CUSTOMER_ID,
+  customer_name: 'Maria Rossi',
+  active: false,
+  deactivated_at: '2026-11-12T10:00:00+00:00',
+  released_at: null,
+  customer_anonymized: false,
+  customer_balance: 42,
+  other_active_card_id: OLD_CARD_ID,
+  other_active_card_uid: OTHER_UID,
+};
+const cardDetail: CardDetail = {
+  id: CARD_ID,
+  uid: UID,
+  customerId: CUSTOMER_ID,
+  customerName: 'Maria Rossi',
+  customerAnonymized: false,
+  customerBalance: 42,
+  active: false,
+  deactivatedAt: '2026-11-12T10:00:00+00:00',
+  releasedAt: null,
+  otherActiveCard: { id: OLD_CARD_ID, uid: OTHER_UID },
+};
+const releasedRow = {
+  ...cardRow,
+  active: false,
+  deactivated_at: '2026-11-12T10:00:00+00:00',
+  released_at: '2026-11-18T11:00:00+00:00',
+  released_by: OPERATOR_ID,
+  release_operation_id: OPERATION_ID,
+};
+const releasedCard: CardSummary = {
+  ...card,
+  active: false,
+  deactivatedAt: '2026-11-12T10:00:00+00:00',
 };
 
 /** An error raised by the app's functions, as PostgREST returns it. */
@@ -187,7 +233,7 @@ const calls = [
       supabaseCardsService.createCustomerWithCard({
         operationId: OPERATION_ID,
         name: 'Maria Rossi',
-        phone: '',
+        email: '',
         privacyConsent: true,
         notes: '',
         uid: UID,
@@ -207,6 +253,24 @@ const calls = [
     data: writtenRow,
     result: writtenCard,
   },
+  {
+    name: 'getCard',
+    run: () => supabaseCardsService.getCard(CARD_ID),
+    data: [getCardRow],
+    result: cardDetail,
+  },
+  {
+    name: 'reactivateCard',
+    run: () => supabaseCardsService.reactivateCard(CARD_ID, OLD_CARD_ID),
+    data: { ...cardRow, replaced_card_id: OLD_CARD_ID },
+    result: { card, replacedCardId: OLD_CARD_ID },
+  },
+  {
+    name: 'releaseCard',
+    run: () => supabaseCardsService.releaseCard(OPERATION_ID, CARD_ID),
+    data: releasedRow,
+    result: releasedCard,
+  },
 ] as const;
 
 /** The typed error each message-code of the cards migration becomes. */
@@ -219,6 +283,10 @@ const translations = [
   ['card_not_found', CardNotFoundError],
   ['card_inactive', CardInactiveError],
   ['link_token_mismatch', LinkTokenMismatchError],
+  ['card_released', CardReleasedError],
+  ['card_active', CardActiveError],
+  ['active_card_changed', ActiveCardChangedError],
+  ['forbidden', CardForbiddenError],
 ] as const;
 
 describe.each(calls)('$name', ({ run, data, result }) => {
@@ -320,7 +388,7 @@ describe('arguments', () => {
         supabaseCardsService.createCustomerWithCard({
           operationId: OPERATION_ID,
           name: 'Maria Rossi',
-          phone: '333 000 0001',
+          email: 'Maria.Rossi@Example.com',
           privacyConsent: true,
           notes: 'Tavolo 4',
           uid: UID,
@@ -329,7 +397,7 @@ describe('arguments', () => {
       {
         p_operation_id: OPERATION_ID,
         p_name: 'Maria Rossi',
-        p_phone: '333 000 0001',
+        p_email: 'Maria.Rossi@Example.com',
         p_privacy_consent: true,
         p_notes: 'Tavolo 4',
         p_uid: UID,
@@ -346,6 +414,25 @@ describe('arguments', () => {
       () => supabaseCardsService.confirmLink(CARD_ID, TOKEN),
       'confirm_card_link',
       { p_card_id: CARD_ID, p_token: TOKEN },
+    ],
+    ['getCard', () => supabaseCardsService.getCard(CARD_ID), 'get_card', { p_card_id: CARD_ID }],
+    [
+      'reactivateCard',
+      () => supabaseCardsService.reactivateCard(CARD_ID, OLD_CARD_ID),
+      'reactivate_card',
+      { p_card_id: CARD_ID, p_expected_active_card_id: OLD_CARD_ID },
+    ],
+    [
+      'reactivateCard with no active card expected',
+      () => supabaseCardsService.reactivateCard(CARD_ID, null),
+      'reactivate_card',
+      { p_card_id: CARD_ID, p_expected_active_card_id: null },
+    ],
+    [
+      'releaseCard',
+      () => supabaseCardsService.releaseCard(OPERATION_ID, CARD_ID),
+      'release_card',
+      { p_operation_id: OPERATION_ID, p_card_id: CARD_ID },
     ],
   ] as const)('%s calls app.%s with snake_case arguments', async (_name, run, fn, args) => {
     answerWith({ data: null, error: null, status: 200 });
@@ -473,7 +560,7 @@ describe('createCustomerWithCard', () => {
   const input = {
     operationId: OPERATION_ID,
     name: 'maria rossi',
-    phone: '',
+    email: '',
     privacyConsent: true,
     notes: '',
     uid: UID,
@@ -492,11 +579,159 @@ describe('createCustomerWithCard', () => {
     },
   );
 
+  it('sends only its arguments and drops the attributes of customer_summary it does not know', async () => {
+    answerWith({ data: { ...customerRow, future_column: null }, error: null, status: 200 });
+    const created = await supabaseCardsService.createCustomerWithCard(input);
+    expect(Object.keys(created).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'anonymizedAt',
+      'balance',
+      'email',
+      'id',
+      'lastServedAt',
+      'name',
+      'notes',
+    ]);
+    // Strict: no phone argument, not even left undefined (SPEC-customers-v2, point 1).
+    expect(
+      Object.keys(db.rpc.mock.calls[0]?.[1] ?? {}).toSorted((a, b) => a.localeCompare(b)),
+    ).toEqual(['p_email', 'p_name', 'p_notes', 'p_operation_id', 'p_privacy_consent', 'p_uid']);
+  });
+
+  it('customer_email_taken carries the customer that has the email', async () => {
+    answerWith(raised('customer_email_taken', OWNER_ID));
+    expect(await rejection(supabaseCardsService.createCustomerWithCard(input))).toMatchObject({
+      kind: 'customer_email_taken',
+      existingCustomerId: OWNER_ID,
+    });
+  });
+
+  it('email_invalid is a CustomerError without an id', async () => {
+    answerWith(raised('email_invalid', OWNER_ID));
+    expect(await rejection(supabaseCardsService.createCustomerWithCard(input))).toMatchObject({
+      kind: 'email_invalid',
+      existingCustomerId: null,
+    });
+  });
+
   it('customer_name_taken carries the existing customer', async () => {
     answerWith(raised('customer_name_taken', OWNER_ID));
     expect(await rejection(supabaseCardsService.createCustomerWithCard(input))).toMatchObject({
       kind: 'customer_name_taken',
       existingCustomerId: OWNER_ID,
     });
+  });
+});
+
+describe('getCard', () => {
+  it('an unknown id is null', async () => {
+    answerWith({ data: [], error: null, status: 200 });
+    await expect(supabaseCardsService.getCard(CARD_ID)).resolves.toBeNull();
+  });
+
+  it.each(['', 'card', '1234', `${CARD_ID}x`])(
+    'an id that is not a uuid (%j) is null, without a request',
+    async (id) => {
+      await expect(supabaseCardsService.getCard(id)).resolves.toBeNull();
+      expect(db.rpc).not.toHaveBeenCalled();
+    },
+  );
+
+  it('a customer with no other active card has none', async () => {
+    answerWith({
+      data: [{ ...getCardRow, other_active_card_id: null, other_active_card_uid: null }],
+      error: null,
+      status: 200,
+    });
+    await expect(supabaseCardsService.getCard(CARD_ID)).resolves.toMatchObject({
+      otherActiveCard: null,
+    });
+  });
+
+  it('maps a released card of an anonymized customer, with no name', async () => {
+    const row = {
+      ...getCardRow,
+      customer_name: null,
+      customer_anonymized: true,
+      released_at: '2026-11-18T11:00:00+00:00',
+      other_active_card_id: null,
+      other_active_card_uid: null,
+    };
+    answerWith({ data: [row], error: null, status: 200 });
+    await expect(supabaseCardsService.getCard(CARD_ID)).resolves.toEqual({
+      ...cardDetail,
+      customerName: null,
+      customerAnonymized: true,
+      releasedAt: '2026-11-18T11:00:00+00:00',
+      otherActiveCard: null,
+    });
+  });
+
+  it.each([
+    ['a customer not anonymized with no name', { customer_name: null }],
+    ['an anonymized customer with a name', { customer_anonymized: true }],
+    ['a balance that is not an integer', { customer_balance: 1.5 }],
+    ['half of the other active card', { other_active_card_uid: null }],
+    ['an id that is not a uuid', { card_id: 'card' }],
+  ])('rejects %s as unknown', async (_name, change) => {
+    answerWith({ data: [{ ...getCardRow, ...change }], error: null, status: 200 });
+    expect(await rejection(supabaseCardsService.getCard(CARD_ID))).toMatchObject({
+      kind: 'unknown',
+    });
+  });
+
+  it('more than one row is unknown', async () => {
+    answerWith({ data: [getCardRow, getCardRow], error: null, status: 200 });
+    expect(await rejection(supabaseCardsService.getCard(CARD_ID))).toMatchObject({
+      kind: 'unknown',
+    });
+  });
+});
+
+describe('reactivateCard and releaseCard', () => {
+  it('reactivateCard with no other card replaced none', async () => {
+    answerWith({ data: { ...cardRow, replaced_card_id: null }, error: null, status: 200 });
+    await expect(supabaseCardsService.reactivateCard(CARD_ID, null)).resolves.toEqual({
+      card,
+      replacedCardId: null,
+    });
+  });
+
+  it('a 22023 of release_card (operation id reused on another card) is unknown', async () => {
+    answerWith(pgError('22023', 400, 'operation_id already used for another card'));
+    const error = await rejection(supabaseCardsService.releaseCard(OPERATION_ID, CARD_ID));
+    expect(error).toBeInstanceOf(CardsError);
+    expect(error).toMatchObject({ kind: 'unknown' });
+  });
+});
+
+describe('forbidden', () => {
+  it('has its own text for the cards screens', async () => {
+    answerWith(raised('forbidden'));
+    const error = await rejection(supabaseCardsService.reactivateCard(CARD_ID, null));
+    expect(error).toBeInstanceOf(CardForbiddenError);
+    expect(error).toMatchObject({ kind: 'forbidden', text: CARD_FORBIDDEN_TEXT });
+    expect(CARD_FORBIDDEN_TEXT).toBe('Card non attiva: chiedi a un amministratore.');
+  });
+
+  it.each([
+    ['associate', () => supabaseCardsService.associate(CUSTOMER_ID, UID)],
+    [
+      'createCustomerWithCard',
+      () =>
+        supabaseCardsService.createCustomerWithCard({
+          operationId: OPERATION_ID,
+          name: 'Maria Rossi',
+          email: '',
+          privacyConsent: true,
+          notes: '',
+          uid: UID,
+        }),
+    ],
+  ])('from %s is no longer the CustomerError of the data erasure', async (_name, run) => {
+    answerWith(raised('forbidden'));
+    const error = await rejection(run());
+    expect(error).toBeInstanceOf(CardForbiddenError);
+    expect(error).not.toBeInstanceOf(CustomerError);
+    expect(String(error)).not.toContain('cancellare');
   });
 });

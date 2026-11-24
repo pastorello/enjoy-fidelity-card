@@ -7,7 +7,7 @@ import { useCardReaderState } from './useCardRead';
 
 const OFF_TITLE = 'Lettura card spenta';
 const OFF_TEXT =
-  'Attiva l’NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o telefono.';
+  'Attiva l’NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o email.';
 const DENIED_TEXT =
   'Il permesso NFC è negato: consentilo a Enjoy Card nelle impostazioni di Chrome (Impostazioni sito → NFC) e riprova.';
 const COMPACT_TEXT = 'Lettura attiva: puoi anche avvicinare la card';
@@ -45,8 +45,9 @@ function contentFor(status: NfcStatus, title: string, description: string): Cont
 }
 
 /**
- * What the screen says about the last card it read (e.g. "Card disattivata" on the home): shown in
- * place of the active state's text, as an alert, while reading is active.
+ * What the screen says about the last card it read (e.g. "Card non attiva: chiedi a un
+ * amministratore" on the home): shown in place of the active state's text, as an alert, while
+ * reading is active.
  */
 export type CardReadNotice = {
   title?: string | undefined;

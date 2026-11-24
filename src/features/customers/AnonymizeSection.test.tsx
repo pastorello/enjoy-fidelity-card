@@ -13,7 +13,11 @@ const TITLE = 'Cancellare i dati di Maria Rossi?';
 const NETWORK_TEXT = 'Dati non cancellati: controlla la connessione e riprova.';
 const FORBIDDEN_TEXT = 'Solo un amministratore può cancellare i dati di un cliente.';
 
-const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393331234521', notes: 'Al banco' });
+const MARIA = fakeCustomer({
+  name: 'Maria Rossi',
+  email: 'maria.rossi@example.com',
+  notes: 'Al banco',
+});
 
 const operatorAuth = () =>
   signedInFake({ operator: { id: 'op-2', name: 'Marco Prova', role: 'operator' } });
@@ -47,7 +51,7 @@ describe('AnonymizeSection: Cancellazione dei dati del cliente', () => {
     const button = within(section).getByRole('button', { name: OPEN });
     expect(button).toHaveAttribute('data-variant', 'danger-secondary');
     expect(section).toHaveTextContent(
-      'Nome e telefono si cancellano, i movimenti restano senza dati personali. Solo amministratori.',
+      'Nome ed email si cancellano, i movimenti restano senza dati personali. Solo amministratori.',
     );
   });
 
@@ -62,7 +66,7 @@ describe('AnonymizeSection: Cancellazione dei dati del cliente', () => {
     const { customers } = renderEdit();
     const dialog = await openDialog();
     expect(dialog).toHaveAccessibleDescription(
-      'Nome, telefono e note si cancellano per sempre e la card si disattiva. I movimenti e il saldo restano, senza dati personali. Non si può tornare indietro.',
+      'Nome, email e note si cancellano per sempre e la card si disattiva. I movimenti e il saldo restano, senza dati personali. Non si può tornare indietro.',
     );
     expect(within(dialog).getByRole('button', { name: CONFIRM })).toHaveAttribute(
       'data-variant',

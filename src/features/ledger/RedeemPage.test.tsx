@@ -11,7 +11,7 @@ import { createFakeRewardsService, fakeReward } from '../../test/fakeRewardsServ
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
-const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393330004521', balance: 120 });
+const MARIA = fakeCustomer({ name: 'Maria Rossi', balance: 120 });
 const ERASED = fakeCustomer({
   name: 'cancellato-7f3a',
   anonymizedAt: '2026-11-17T09:00:00.000Z',

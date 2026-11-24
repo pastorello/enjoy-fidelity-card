@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { createMemoryRouter, RouterProvider } from 'react-router';
+import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestCardReader } from '../../test/fakeCardReader';
@@ -51,7 +51,12 @@ function setup({ customers = createFakeCustomerService() } = {}) {
   return { customers, cards };
 }
 
-async function renderNewFromCard(path = `/clienti/nuovo?card=${UID}`, fixture = setup()) {
+/** Nuovo cliente opened by the home with `card` in the history state (SPEC-customers-v2 point 6). */
+function fromHome(card: unknown, search = ''): InitialEntry {
+  return { pathname: '/clienti/nuovo', search, state: { card } };
+}
+
+async function renderNewFromCard(path: InitialEntry = fromHome(UID), fixture = setup()) {
   const card = createTestCardReader();
   // The link writes after the save wait for the test.
   const writes = driveLinkWrites(card.reader);
@@ -102,15 +107,39 @@ async function saveTaken(fixture: ReturnType<typeof setup>) {
   const rendered = await renderNewFromCard(undefined, fixture);
   await fillValid('Maria Rossi');
   await userEvent.type(
-    screen.getByRole('textbox', { name: 'Telefono (facoltativo)' }),
-    '333 123 4521',
+    screen.getByRole('textbox', { name: 'Email (facoltativa)' }),
+    'maria.rossi@example.com',
   );
   save();
   const notice = await screen.findByRole('alert');
   return { ...rendered, notice };
 }
 
-describe('Nuovo cliente da card nuova (/clienti/nuovo?card=)', () => {
+describe('Nuovo cliente da card nuova (/clienti/nuovo, card in the history state)', () => {
+  it('email already used: refused with the card, the error under the email and "Apri la scheda"', async () => {
+    const existing = fakeCustomer({ name: 'Anna Verdi', email: 'anna@example.com' });
+    const fixture = setup({ customers: createFakeCustomerService({ customers: [existing] }) });
+    await renderNewFromCard(undefined, fixture);
+    await fillValid('Anna Bianchi');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Email (facoltativa)' }),
+      'ANNA@example.com',
+    );
+    save();
+
+    const link = await screen.findByRole('link', { name: 'Apri la scheda' });
+    expect(link).toHaveAttribute('href', `/clienti/${existing.id}`);
+    const email = screen.getByRole('textbox', { name: 'Email (facoltativa)' });
+    expect(email).toHaveFocus();
+    expect(email).toHaveAccessibleDescription(
+      'Esiste già un cliente con questa email. Apri la scheda',
+    );
+    expect(fixture.cards.service.createCustomerWithCard).toHaveBeenCalledTimes(1);
+    expect(fixture.cards.cards()).toEqual([]);
+    // The card read stays: the next save sends it again.
+    expect(screen.getByRole('region', { name: 'Card letta' })).toBeVisible();
+  });
+
   it('shows "Card letta" with the full code above the form, and the hint to the home', async () => {
     await renderNewFromCard();
     expect(screen.getByRole('heading', { level: 1, name: 'Nuovo cliente' })).toBeInTheDocument();
@@ -123,33 +152,37 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo?card=)', () => {
   });
 
   it('accepts the uid in any hex spelling and shows it canonical', async () => {
-    await renderNewFromCard('/clienti/nuovo?card=04:a1:b2:c3:d4:e5:f6');
+    await renderNewFromCard(fromHome('04:a1:b2:c3:d4:e5:f6'));
     expect(screen.getByRole('region', { name: 'Card letta' })).toHaveTextContent(`Codice ${UID}:`);
   });
 
-  it.each(['', 'zz', '0000000000', '04A1B'])(
-    'ignores an invalid ?card=%s: the form without a card, saved with create',
-    async (card) => {
-      const fixture = setup();
-      const { router } = await renderNewFromCard(`/clienti/nuovo?card=${card}`, fixture);
-      expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('link', { name: 'Cerca il cliente' })).not.toBeInTheDocument();
-      await fillValid();
-      save();
-      const [saved] = fixture.customers.customers();
-      await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved?.id}`));
-      expect(fixture.cards.service.createCustomerWithCard).not.toHaveBeenCalled();
-      expect(fixture.cards.cards()).toEqual([]);
-    },
-  );
+  it.each<[string, InitialEntry]>([
+    ['empty', fromHome('')],
+    ['zz', fromHome('zz')],
+    ['all zeros', fromHome('0000000000')],
+    ['too short', fromHome('04A1B')],
+    ['not a string', fromHome(4)],
+    ['in the URL only (?card=)', `/clienti/nuovo?card=${UID}`],
+  ])('ignores a card %s: the form without a card, saved with create', async (_label, entry) => {
+    const fixture = setup();
+    const { router } = await renderNewFromCard(entry, fixture);
+    expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Cerca il cliente' })).not.toBeInTheDocument();
+    await fillValid();
+    save();
+    const [saved] = fixture.customers.customers();
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${saved?.id}`));
+    expect(fixture.cards.service.createCustomerWithCard).not.toHaveBeenCalled();
+    expect(fixture.cards.cards()).toEqual([]);
+  });
 
   it('saves customer and card together, then replaces the form with Registra spesa', async () => {
     const fixture = setup();
     const { router, writes } = await renderNewFromCard(undefined, fixture);
     await fillValid();
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'Telefono (facoltativo)' }),
-      '333 123 4521',
+      screen.getByRole('textbox', { name: 'Email (facoltativa)' }),
+      'Giulia@Example.com',
     );
     save();
 
@@ -162,10 +195,17 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo?card=)', () => {
     expect(fixture.cards.service.createCustomerWithCard.mock.calls[0]?.[0]).toMatchObject({
       uid: UID,
       name: 'Maria Rossi',
-      phone: '333 123 4521',
+      // As typed: the server normalizes it.
+      email: 'Giulia@Example.com',
       privacyConsent: true,
       notes: '',
     });
+    // The form's fields and the uid, nothing else: no phone (SPEC-customers-v2, point 1).
+    expect(
+      Object.keys(fixture.cards.service.createCustomerWithCard.mock.calls[0]?.[0] ?? {}).toSorted(
+        (a, b) => a.localeCompare(b),
+      ),
+    ).toEqual(['email', 'name', 'notes', 'operationId', 'privacyConsent', 'uid']);
     expect(fixture.cards.cards()).toMatchObject([
       { uid: UID, customerId: saved?.id, active: true },
     ]);
@@ -221,10 +261,10 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo?card=)', () => {
       // The card panel gives way to the notice.
       expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
       expect(fixture.customers.customers()).toEqual([]);
-      expect(router.state.location.search).toBe(`?card=${UID}`);
+      expect(router.state.location.state).toEqual({ card: UID });
       expect(screen.getByRole('textbox', { name: NAME })).toHaveValue('Maria Rossi');
-      expect(screen.getByRole('textbox', { name: 'Telefono (facoltativo)' })).toHaveValue(
-        '333 123 4521',
+      expect(screen.getByRole('textbox', { name: 'Email (facoltativa)' })).toHaveValue(
+        'maria.rossi@example.com',
       );
       expect(screen.getByRole('checkbox', { name: CONSENT })).toBeChecked();
     });
@@ -256,13 +296,15 @@ describe('Nuovo cliente da card nuova (/clienti/nuovo?card=)', () => {
       expect(within(notice).queryByRole('link')).not.toBeInTheDocument();
     });
 
-    it('"Continua senza card" drops ?card, keeps the data, saves with create and the same operation_id', async () => {
+    it('"Continua senza card" drops the card, keeps the data, saves with create and the same operation_id', async () => {
       const fixture = takenBy({ customerId: ANTONIO, name: 'Antonio Esposito', active: true });
       const { notice, router } = await saveTaken(fixture);
       fireEvent.click(within(notice).getByRole('button', { name: 'Continua senza card' }));
 
-      await waitFor(() => expect(router.state.location.search).toBe(''));
+      await waitFor(() => expect(router.state.location.state).toBeNull());
+      expect(router.state.location.search).toBe('');
       expect(router.state.location.pathname).toBe('/clienti/nuovo');
+      expect(router.state.historyAction).toBe('REPLACE');
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
       expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: NAME })).toHaveValue('Maria Rossi');

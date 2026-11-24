@@ -15,7 +15,7 @@ import { Associated, CardLinkScreen } from './CardLinkScreen';
 import { CardTakenNotice, OpenOwnerLink } from './CardTakenNotice';
 import { CustomerRowLink } from './CustomerRowLink';
 import { formatCardLabel, shortName } from './formatCard';
-import { NetworkError, type CardSummary } from './types';
+import { CARD_FORBIDDEN_TEXT, NetworkError, type CardSummary } from './types';
 import { useActiveCard } from './useActiveCard';
 import { associatedNotice, useAssociateCard } from './useAssociateCard';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
@@ -156,17 +156,20 @@ function AssociateCard({
     );
   }
 
-  const notice: CardReadNotice | null =
-    association.status === 'error'
-      ? {
-          text: associateErrorText(association.error),
-          action: (
-            <Button variant="secondary" block onClick={association.retry}>
-              Riprova
-            </Button>
-          ),
-        }
-      : null;
+  let notice: CardReadNotice | null = null;
+  if (association.status === 'error') {
+    notice = {
+      text: associateErrorText(association.error),
+      action: (
+        <Button variant="secondary" block onClick={association.retry}>
+          Riprova
+        </Button>
+      ),
+    };
+  } else if (association.status === 'forbidden') {
+    // Refused for good: no "Riprova"; the panel keeps reading for another card.
+    notice = { text: CARD_FORBIDDEN_TEXT };
+  }
 
   const cancelLink = (
     <ButtonLink to={editPath} variant="secondary" block>

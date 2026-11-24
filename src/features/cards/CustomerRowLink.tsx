@@ -4,11 +4,14 @@ import { PointsBadge } from '../../shared/ui/PointsBadge';
 import type { CustomerSummary } from '../customers/types';
 import styles from './CustomerRowLink.module.css';
 
+/** What the row shows of a customer: a full `CustomerSummary` fits, so does a card's customer. */
+export type CustomerRow = Pick<CustomerSummary, 'id' | 'name' | 'anonymizedAt' | 'balance'>;
+
 /**
  * The customer row right under the header (wireframes "Associa o sostituisci card", "Registra spesa
  * (aperta dalla card)"): name, balance and an arrow, to the customer page.
  */
-export function CustomerRowLink({ customer }: { customer: CustomerSummary }) {
+export function CustomerRowLink({ customer }: { customer: CustomerRow }) {
   // The technical name of an erased customer is never shown.
   const name = customer.anonymizedAt === null ? customer.name : 'Cliente cancellato';
   return (

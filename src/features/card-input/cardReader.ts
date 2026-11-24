@@ -1,6 +1,6 @@
 import { normalizeUid, type UsbUidFormat } from './normalizeUid';
 import type { WebNfcApi } from './webNfcAdapter';
-import { createWebNfcWriter, type WriteUrl } from './webNfcWriter';
+import { createWebNfcWriter, type EraseCard, type WriteUrl } from './webNfcWriter';
 
 /** The same uid read again within this window from its last read (delivered or not) is ignored. */
 export const REPEAT_WINDOW_MS = 2000;
@@ -29,10 +29,17 @@ export type CardReaderState = {
 export type CardConsumer = (read: CardRead) => void;
 
 /**
- * What the writer gets for each read during a write: the read and the links (`url` records) the card
- * holds, needed only to verify the write. Links never reach a `CardConsumer`.
+ * What a card holds, as only a running write needs it to verify what it wrote: the links of its `url`
+ * records and whether it is blank (no record, or only `empty` records: SPEC-customers-v2, point 4).
+ * An input that cannot see the content (the USB reader) reports no links and not blank.
  */
-export type WriteSessionConsumer = (read: CardRead, urls: readonly string[]) => void;
+export type CardContent = { readonly urls: readonly string[]; readonly blank: boolean };
+
+/**
+ * What the writer gets for each read during a write: the read and the card's content, needed only to
+ * verify the write. The content never reaches a `CardConsumer`.
+ */
+export type WriteSessionConsumer = (read: CardRead, content: CardContent) => void;
 
 /** The other events of a write session (SPEC-card-input, point 9). */
 export type WriteSessionEvents = {
@@ -51,15 +58,18 @@ export type WriteSession = { readonly lastRead: CardRead | null; close(): void }
 
 /**
  * How an adapter hands a raw uid to the service. `format` is a plain string at run time (it can come
- * from the saved settings): anything `normalizeUid` rejects is discarded. `urls` are the links the
- * card holds (Web NFC only): they go to a running write and nowhere else.
+ * from the saved settings): anything `normalizeUid` rejects is discarded. `content` is what the card
+ * holds (Web NFC and the E2E fake only): it goes to a running write and nowhere else.
  */
 export type DeliverRaw = (
   raw: string,
   format: UsbUidFormat | (string & {}),
   source: CardSource,
-  urls?: readonly string[],
+  content?: CardContent,
 ) => void;
+
+/** The content of a card whose input cannot see it: no link, and never taken for a blank card. */
+const UNKNOWN_CONTENT: CardContent = { urls: [], blank: false };
 
 /**
  * An input (E2E fake): runs only between `start` and `stop`. `unreadable` reports a tag that gives no
@@ -147,6 +157,11 @@ export type CardReader = {
    * `canWrite`: Web NFC `active` and a writer with `write()`; the USB reader never writes.
    */
   writeUrl: WriteUrl;
+  /**
+   * Writes a blank card (one `empty` record) on the expected card (SPEC-customers-v2, point 4), with
+   * the same preconditions, session and outcomes as `writeUrl`.
+   */
+  eraseCard: EraseCard;
   getState(): CardReaderState;
   subscribe(listener: () => void): () => void;
 };
@@ -227,7 +242,7 @@ export function createCardReader({
     }
   }
 
-  const deliver: DeliverRaw = (raw, format, source, urls = []) => {
+  const deliver: DeliverRaw = (raw, format, source, content = UNKNOWN_CONTENT) => {
     if (!active) return;
     const uid = normalizeUid(raw, format);
     const at = now();
@@ -243,7 +258,7 @@ export function createCardReader({
     lastSeen.set(uid, at);
     lastRead = read;
     if (session !== null) {
-      session.onRead(read, [...urls]);
+      session.onRead(read, { urls: [...content.urls], blank: content.blank });
       return;
     }
     if (previous !== undefined && at - previous <= REPEAT_WINDOW_MS) return;
@@ -314,6 +329,7 @@ export function createCardReader({
     },
     openWriteSession,
     writeUrl: writer.writeUrl,
+    eraseCard: writer.eraseCard,
     async start() {
       session?.onInterrupt?.();
       if (active) await nfc?.restart();

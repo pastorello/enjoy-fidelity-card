@@ -4,16 +4,18 @@ import {
   customerErrorField,
   customerErrorText,
   isCustomerErrorCode,
+  pointsAtExistingCustomer,
 } from './errorCodes';
 
 describe('customer error codes', () => {
   it.each([
     ['name_required', 'Scrivi nome e cognome.'],
     ['name_too_long', 'Al massimo 80 caratteri.'],
-    ['phone_invalid', 'Numero non valido: scrivi solo le cifre, con o senza prefisso.'],
     ['consent_required', 'Serve il consenso privacy per registrare il cliente.'],
     ['notes_too_long', 'Al massimo 500 caratteri.'],
     ['customer_name_taken', 'Esiste già un cliente con questo nome.'],
+    ['email_invalid', 'Email non valida: controlla come è scritta.'],
+    ['customer_email_taken', 'Esiste già un cliente con questa email.'],
     ['customer_not_found', 'Cliente non trovato'],
     ['forbidden', 'Solo un amministratore può cancellare i dati di un cliente.'],
     ['not_operator', 'Account non abilitato: chiedi a un amministratore.'],
@@ -29,7 +31,8 @@ describe('customer error codes', () => {
     ['name_required', 'name'],
     ['name_too_long', 'name'],
     ['customer_name_taken', 'name'],
-    ['phone_invalid', 'phone'],
+    ['email_invalid', 'email'],
+    ['customer_email_taken', 'email'],
     ['consent_required', 'consent'],
     ['notes_too_long', 'notes'],
     ['forbidden', null],
@@ -38,6 +41,30 @@ describe('customer error codes', () => {
     ['customer_anonymized', null],
   ] as const)('%s belongs to field %s', (code, field) => {
     expect(customerErrorField(code)).toBe(field);
+  });
+
+  it('only the two "taken" codes point at another customer', () => {
+    const pointing = CUSTOMER_ERROR_CODES.filter(pointsAtExistingCustomer);
+    expect(pointing.toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'customer_email_taken',
+      'customer_name_taken',
+    ]);
+  });
+
+  it('lists exactly these codes: none for the customer phone (SPEC-customers-v2, point 1)', () => {
+    expect(CUSTOMER_ERROR_CODES.toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'consent_required',
+      'customer_anonymized',
+      'customer_email_taken',
+      'customer_name_taken',
+      'customer_not_found',
+      'email_invalid',
+      'forbidden',
+      'name_required',
+      'name_too_long',
+      'not_operator',
+      'notes_too_long',
+    ]);
   });
 
   it('recognises only the listed codes', () => {

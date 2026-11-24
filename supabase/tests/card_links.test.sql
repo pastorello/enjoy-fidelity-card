@@ -461,9 +461,10 @@ select is(
   'no fingerprint of a dead link is left'
 );
 
--- Reactivation: Carla's old card comes back with its link not written.
+-- Reactivation: Carla's old card comes back with its link not written. Only an admin
+-- reactivates (SPEC-customers-v2.md, criterion 11).
 set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e000-000000000002","role":"authenticated"}', true);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-e000-000000000001","role":"authenticated"}', true);
 select results_eq(
   $$select active, link_written_at is null, link_written_by is null, link_pending_at is null
     from app.associate_card('00000000-0000-4000-e100-000000000001', '04DDEEFF000001')$$,

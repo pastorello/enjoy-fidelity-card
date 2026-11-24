@@ -117,7 +117,7 @@ function perMethod<T>(make: () => T): Record<Method, T> {
  * spent. Points of a purchase are rounded down with the ratio in force in `settings`, saved on
  * the movement. The balance lives in the customers fake (its starting value stands for older
  * movements): every movement adds its points there, and a purchase or a redemption puts the
- * customer at the top of "Serviti oggi". The clock is `Date.now()` (so `vi.setSystemTime`
+ * customer at the top of "Serviti oggi" and of the list (`lastActivityAt`; a correction does not). The clock is `Date.now()` (so `vi.setSystemTime`
  * drives it) plus `advanceClock`. Every method is a `vi.fn` and every call is also logged in
  * `calls`. `failNext` programs a failure (a timeout, an answer lost after the write), `holdNext`
  * delays an answer until released, `setNetworkDown` makes every call fail with `network`.

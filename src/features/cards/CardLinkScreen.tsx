@@ -1,12 +1,11 @@
 import { useCallback, useEffect, type ReactNode } from 'react';
 import { AppShell } from '../../app/AppShell';
 import { Icon } from '../../shared/ui/Icon';
-import type { CustomerSummary } from '../customers/types';
 import { CardLinkWriter, CardLinkWriterActions } from './CardLinkWriter';
 import styles from './CardLinkScreen.module.css';
 import { NOT_IN_DISPLAY } from './customerName';
-import { CustomerRowLink } from './CustomerRowLink';
-import { shortName } from './formatCard';
+import { CustomerRowLink, type CustomerRow } from './CustomerRowLink';
+import { formatCardLabel, shortName } from './formatCard';
 import type { CardSummary } from './types';
 import { useCardLinkWriter } from './useCardLinkWriter';
 
@@ -26,11 +25,29 @@ export function Associated({ name }: { name: string }) {
   );
 }
 
+/**
+ * «Card …E5F6 riattivata per Maria» (SPEC-customers-v2, point 4), as «Card associata a Maria»: the
+ * card label, whose «…» Enjoy Display lacks, in the body font.
+ */
+export function Reactivated({ uid, name }: { uid: string; name: string }) {
+  return (
+    <output className={styles.associated}>
+      <span className={styles.badge}>
+        <Icon name="check" size={18} />
+      </span>
+      <span className={styles.associatedText}>
+        Card <span className={styles.typedName}>{formatCardLabel(uid)}</span> riattivata per{' '}
+        {NOT_IN_DISPLAY.test(name) ? <span className={styles.typedName}>{name}</span> : name}
+      </span>
+    </output>
+  );
+}
+
 type CardLinkScreenProps = {
   title: string;
   /** «Indietro»: where the screen goes once left (the card is associated already). */
   backTo: string;
-  customer: CustomerSummary;
+  customer: CustomerRow;
   card: CardSummary;
   /** What the association did, above the write: hidden with a failure, as in the boards. */
   intro: ReactNode;

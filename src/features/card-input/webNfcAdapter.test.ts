@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createFakeWebNfc, type FakeScanOutcome } from '../../test/fakeWebNfc';
-import { createCardReader, type CardConsumer, type CardRead } from './cardReader';
+import { createCardReader, type CardConsumer, type WriteSessionConsumer } from './cardReader';
 import {
   createBrowserWebNfcApi,
   createWebNfcAdapter,
@@ -344,36 +344,82 @@ describe('createWebNfcAdapter: links and unreadable tags go only to the writer (
 
   it('hands the url records, decoded, to an open write session; other records are left out', async () => {
     const { nfc, reader } = await activated({ permission: 'granted' });
-    const onRead = vi.fn<(read: CardRead, urls: readonly string[]) => void>();
+    const onRead = vi.fn<WriteSessionConsumer>();
     const session = reader.openWriteSession(onRead);
 
     nfc.read('04:a1:b2:c3:d4:e5:f6', { urls: [URL], texts: ['invented text'] });
 
-    expect(onRead).toHaveBeenCalledWith({ uid: UID, source: 'web-nfc', at: 1_000_000 }, [URL]);
+    expect(onRead).toHaveBeenCalledWith(
+      { uid: UID, source: 'web-nfc', at: 1_000_000 },
+      { urls: [URL], blank: false },
+    );
     session.close();
   });
 
   it('decodes non-ASCII links as UTF-8', async () => {
     const { nfc, reader } = await activated({ permission: 'granted' });
-    const onRead = vi.fn<(read: CardRead, urls: readonly string[]) => void>();
+    const onRead = vi.fn<WriteSessionConsumer>();
     const session = reader.openWriteSession(onRead);
     const accented = 'https://example.test/p/caffè';
 
     nfc.read(UID, { urls: [accented] });
 
-    expect(onRead).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }), [accented]);
+    expect(onRead).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }), {
+      urls: [accented],
+      blank: false,
+    });
     session.close();
   });
 
   it('a card with no url record reaches the writer with no urls', async () => {
     const { nfc, reader } = await activated({ permission: 'granted' });
-    const onRead = vi.fn<(read: CardRead, urls: readonly string[]) => void>();
+    const onRead = vi.fn<WriteSessionConsumer>();
     const session = reader.openWriteSession(onRead);
 
     nfc.read(UID, { texts: ['invented text'] });
 
-    expect(onRead).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }), []);
+    expect(onRead).toHaveBeenCalledWith(expect.objectContaining({ uid: UID }), {
+      urls: [],
+      blank: false,
+    });
     session.close();
+  });
+
+  // SPEC-customers-v2, point 4: "vuota" is strict, zero records or only `empty` records.
+  it.each([
+    ['no record at all', {}, true],
+    ['one empty record', { empties: 1 }, true],
+    ['only empty records', { empties: 3 }, true],
+    ['a text record', { texts: ['invented text'] }, false],
+    ['an empty and a text record', { empties: 1, texts: ['invented text'] }, false],
+    ['a mime record', { mimes: ['application/octet-stream'] }, false],
+    ['an empty and a mime record', { empties: 1, mimes: ['text/plain'] }, false],
+    ['a url record', { urls: [URL] }, false],
+  ] as const)('a card with %s reaches the writer with blank %s', async (_label, content, blank) => {
+    const { nfc, reader } = await activated({ permission: 'granted' });
+    const onRead = vi.fn<WriteSessionConsumer>();
+    const session = reader.openWriteSession(onRead);
+
+    nfc.read(UID, content);
+
+    expect(onRead).toHaveBeenCalledTimes(1);
+    expect(onRead.mock.calls[0]?.[1].blank).toBe(blank);
+    session.close();
+  });
+
+  it('a blank card reaches a consumer as the uid alone, never with blank', async () => {
+    const { nfc, reader } = await activated({ permission: 'granted' });
+    const consumer = vi.fn<CardConsumer>();
+    reader.pushConsumer(consumer);
+    const otherUid = '04112233445566';
+
+    nfc.read(UID);
+    nfc.read(otherUid, { empties: 1 });
+
+    expect(consumer.mock.calls).toStrictEqual([
+      [{ uid: UID, source: 'web-nfc', at: 1_000_000 }],
+      [{ uid: otherUid, source: 'web-nfc', at: 1_000_000 }],
+    ]);
   });
 
   it('hands readingerror to an open write session', async () => {

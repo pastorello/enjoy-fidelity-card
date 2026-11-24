@@ -3,7 +3,7 @@ import { ServerFaultError } from '../../lib/serverFault';
 import { CUSTOMER_ERROR_CODES } from './errorCodes';
 import { supabaseCustomerService } from './supabaseCustomerService';
 import { CustomerError } from './types';
-import type { CustomerSummary } from './types';
+import type { CustomerListRow, CustomerSummary } from './types';
 
 type Answer = { data: unknown; error: unknown; status: number };
 
@@ -22,20 +22,36 @@ const OPERATION_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
 const row = {
   id: ID,
   name: 'Maria Rossi',
-  phone: '+393330000001',
   notes: null,
   anonymized_at: null,
   balance: 0,
   last_served_at: null,
+  email: 'maria.rossi@example.com',
 };
+/** A row of `app.list_customers`, timestamps with microseconds as PostgREST sends them. */
+const listRow = {
+  id: ID,
+  name: 'Maria Rossi',
+  balance: 12,
+  last_activity_at: '2026-11-23T10:15:00.123456+00:00',
+  created_at: '2026-11-01T08:00:00.000001+00:00',
+};
+const listed: CustomerListRow = {
+  id: ID,
+  name: 'Maria Rossi',
+  balance: 12,
+  lastActivityAt: '2026-11-23T10:15:00.123456+00:00',
+  createdAt: '2026-11-01T08:00:00.000001+00:00',
+};
+
 const customer: CustomerSummary = {
   id: ID,
   name: 'Maria Rossi',
-  phone: '+393330000001',
   notes: null,
   anonymizedAt: null,
   balance: 0,
   lastServedAt: null,
+  email: 'maria.rossi@example.com',
 };
 
 /** An error raised by the app's functions, as PostgREST returns it. */
@@ -66,18 +82,20 @@ beforeEach(() => {
 /** Every service call, with the RPC and arguments it must send and a well-formed answer. */
 const calls = [
   {
-    name: 'search',
-    run: () => supabaseCustomerService.search('rossi'),
-    rpc: ['search_customers', { p_query: 'rossi' }],
-    data: [row],
-    result: [customer],
-  },
-  {
-    name: 'servedToday',
-    run: () => supabaseCustomerService.servedToday(),
-    rpc: ['customers_served_today'],
-    data: [row],
-    result: [customer],
+    name: 'list',
+    run: () => supabaseCustomerService.list({ query: 'rossi', after: null }),
+    rpc: [
+      'list_customers',
+      {
+        p_query: 'rossi',
+        p_after_activity_at: null,
+        p_after_created_at: null,
+        p_after_id: null,
+        p_limit: 20,
+      },
+    ],
+    data: [listRow],
+    result: { customers: [listed], hasMore: false },
   },
   {
     name: 'get',
@@ -92,7 +110,7 @@ const calls = [
       supabaseCustomerService.create({
         operationId: OPERATION_ID,
         name: 'Maria Rossi',
-        phone: '333 000 0001',
+        email: ' Maria.Rossi@Example.com ',
         privacyConsent: true,
         notes: '',
       }),
@@ -101,7 +119,7 @@ const calls = [
       {
         p_operation_id: OPERATION_ID,
         p_name: 'Maria Rossi',
-        p_phone: '333 000 0001',
+        p_email: ' Maria.Rossi@Example.com ',
         p_privacy_consent: true,
         p_notes: '',
       },
@@ -112,10 +130,15 @@ const calls = [
   {
     name: 'update',
     run: () =>
-      supabaseCustomerService.update({ id: ID, name: 'Maria Rossi', phone: '', notes: 'Tavolo 4' }),
+      supabaseCustomerService.update({
+        id: ID,
+        name: 'Maria Rossi',
+        email: '',
+        notes: 'Tavolo 4',
+      }),
     rpc: [
       'update_customer',
-      { p_customer_id: ID, p_name: 'Maria Rossi', p_phone: '', p_notes: 'Tavolo 4' },
+      { p_customer_id: ID, p_name: 'Maria Rossi', p_email: '', p_notes: 'Tavolo 4' },
     ],
     data: row,
     result: customer,
@@ -124,8 +147,8 @@ const calls = [
     name: 'anonymize',
     run: () => supabaseCustomerService.anonymize(ID),
     rpc: ['anonymize_customer', { p_customer_id: ID }],
-    data: { ...row, name: 'Cliente cancellato 6f1c2a5e', phone: null },
-    result: { ...customer, name: 'Cliente cancellato 6f1c2a5e', phone: null },
+    data: { ...row, name: 'Cliente cancellato 6f1c2a5e', email: null },
+    result: { ...customer, name: 'Cliente cancellato 6f1c2a5e', email: null },
   },
 ] as const;
 
@@ -171,7 +194,7 @@ describe.each(calls)('$name', ({ run, rpc, data, result }) => {
   it.each([
     ['PGRST202', 404, 'Could not find the function', 'misconfigured'],
     ['PGRST106', 406, 'Invalid schema: app', 'misconfigured'],
-    ['42501', 401, 'permission denied for function search_customers', 'misconfigured'],
+    ['42501', 401, 'permission denied for function list_customers', 'misconfigured'],
     ['PGRST002', 503, 'Could not query the database for the schema cache', 'unavailable'],
     ['', 503, 'Service Unavailable', 'unavailable'],
   ])('%s (HTTP %i) is a ServerFaultError', async (code, status, message, kind) => {
@@ -197,14 +220,39 @@ describe.each(calls)('$name', ({ run, rpc, data, result }) => {
     expect((await customerError(run())).kind).toBe('unknown');
   });
 
-  it('keeps names and phones out of the error message', async () => {
+  it.each([42, undefined])('an email that is %s is unknown', async (email) => {
+    const bad = { ...row, email };
+    db.rpc.mockResolvedValue({ data: Array.isArray(data) ? [bad] : bad, error: null, status: 200 });
+    expect((await customerError(run())).kind).toBe('unknown');
+  });
+
+  it.each(CUSTOMER_ERROR_CODES)('keeps the email out of a raised %s', async (code) => {
+    db.rpc.mockResolvedValue(raised(code, 'maria.rossi@example.com'));
+    const error = await customerError(run());
+    expect(error.message).not.toMatch(/maria|example/i);
+    expect(error.existingCustomerId).toBeNull();
+  });
+
+  it('keeps names and emails out of the error message', async () => {
     db.rpc.mockResolvedValue({
       data: null,
-      error: { code: 'XX000', message: 'Maria Rossi +393330000001', details: null, hint: null },
+      error: {
+        code: 'XX000',
+        message: 'Maria Rossi maria.rossi@example.com',
+        details: null,
+        hint: null,
+      },
       status: 500,
     });
     const error = await customerError(run());
-    expect(error.message).not.toMatch(/Maria|3330000001/);
+    expect(error.message).not.toMatch(/Maria|example/i);
+  });
+
+  it('sends exactly its arguments, none for a phone (SPEC-customers-v2, point 1)', async () => {
+    db.rpc.mockResolvedValue({ data, error: null, status: 200 });
+    await run();
+    // Strict: an extra argument left undefined would fail too.
+    expect(db.rpc.mock.calls).toStrictEqual([rpc]);
   });
 });
 
@@ -215,7 +263,7 @@ describe('customer_name_taken', () => {
       supabaseCustomerService.create({
         operationId: OPERATION_ID,
         name: 'maria rossi',
-        phone: '',
+        email: '',
         privacyConsent: true,
         notes: '',
       }),
@@ -227,7 +275,12 @@ describe('customer_name_taken', () => {
   it('a detail that is not a uuid gives no id', async () => {
     db.rpc.mockResolvedValue(raised('customer_name_taken', 'not-an-id'));
     const error = await customerError(
-      supabaseCustomerService.update({ id: ID, name: 'Maria Rossi', phone: '', notes: '' }),
+      supabaseCustomerService.update({
+        id: ID,
+        name: 'Maria Rossi',
+        email: '',
+        notes: '',
+      }),
     );
     expect(error.kind).toBe('customer_name_taken');
     expect(error.existingCustomerId).toBeNull();
@@ -241,16 +294,41 @@ describe('customer_name_taken', () => {
   });
 });
 
+describe('customer_email_taken', () => {
+  it('carries the id of the customer that has the email from the detail', async () => {
+    db.rpc.mockResolvedValue(raised('customer_email_taken', OTHER_ID));
+    const error = await customerError(
+      supabaseCustomerService.update({
+        id: ID,
+        name: 'Maria Rossi',
+        email: '',
+        notes: '',
+      }),
+    );
+    expect(error.kind).toBe('customer_email_taken');
+    expect(error.existingCustomerId).toBe(OTHER_ID);
+    expect(error.message).not.toContain(OTHER_ID);
+  });
+
+  it('a detail that is not a uuid gives no id', async () => {
+    db.rpc.mockResolvedValue(raised('customer_email_taken', 'rossi@example.com'));
+    const error = await customerError(supabaseCustomerService.anonymize(ID));
+    expect(error.kind).toBe('customer_email_taken');
+    expect(error.existingCustomerId).toBeNull();
+  });
+
+  it('email_invalid carries no id', async () => {
+    db.rpc.mockResolvedValue(raised('email_invalid', OTHER_ID));
+    const error = await customerError(supabaseCustomerService.anonymize(ID));
+    expect(error.kind).toBe('email_invalid');
+    expect(error.existingCustomerId).toBeNull();
+  });
+});
+
 describe('reads', () => {
   it('get answers null when no row comes back', async () => {
     db.rpc.mockResolvedValue({ data: [], error: null, status: 200 });
     await expect(supabaseCustomerService.get(ID)).resolves.toBeNull();
-  });
-
-  it('search keeps the 21st row, which tells the page there are more', async () => {
-    const rows = Array.from({ length: 21 }, (_, index) => ({ ...row, id: `${index}` }));
-    db.rpc.mockResolvedValue({ data: rows, error: null, status: 200 });
-    await expect(supabaseCustomerService.search('rossi')).resolves.toHaveLength(21);
   });
 
   it('maps an anonymized customer with its date and a served time', async () => {
@@ -259,7 +337,7 @@ describe('reads', () => {
         {
           ...row,
           name: 'Cliente cancellato 6f1c2a5e',
-          phone: null,
+          email: null,
           notes: null,
           anonymized_at: '2026-11-17T10:00:00+00:00',
           balance: 12,
@@ -272,15 +350,102 @@ describe('reads', () => {
     await expect(supabaseCustomerService.get(ID)).resolves.toEqual({
       ...customer,
       name: 'Cliente cancellato 6f1c2a5e',
-      phone: null,
+      email: null,
       anonymizedAt: '2026-11-17T10:00:00+00:00',
       balance: 12,
       lastServedAt: '2026-11-18T09:58:00+00:00',
     });
   });
 
-  it('a list answer that is not an array is unknown', async () => {
+  it('drops the attributes of customer_summary it does not know', async () => {
+    db.rpc.mockResolvedValue({ data: [{ ...row, future_column: null }], error: null, status: 200 });
+    const read = await supabaseCustomerService.get(ID);
+    expect(read).toStrictEqual(customer);
+  });
+
+  it('a get answer that is not an array is unknown', async () => {
     db.rpc.mockResolvedValue({ data: row, error: null, status: 200 });
-    expect((await customerError(supabaseCustomerService.search('rossi'))).kind).toBe('unknown');
+    expect((await customerError(supabaseCustomerService.get(ID))).kind).toBe('unknown');
+  });
+});
+
+function answer(data: unknown): Answer {
+  return { data, error: null, status: 200 };
+}
+
+describe('list', () => {
+  it('sends the cursor back exactly as received, microseconds included', async () => {
+    db.rpc.mockResolvedValue(answer([]));
+    await supabaseCustomerService.list({
+      query: '',
+      after: {
+        activityAt: '2026-11-23T10:15:00.123456+00:00',
+        createdAt: '2026-11-01T08:00:00.000001+00:00',
+        id: ID,
+      },
+    });
+    expect(db.rpc).toHaveBeenCalledWith('list_customers', {
+      p_query: '',
+      p_after_activity_at: '2026-11-23T10:15:00.123456+00:00',
+      p_after_created_at: '2026-11-01T08:00:00.000001+00:00',
+      p_after_id: ID,
+      p_limit: 20,
+    });
+  });
+
+  it('sends a null activity for a last row without movements', async () => {
+    db.rpc.mockResolvedValue(answer([]));
+    await supabaseCustomerService.list({
+      query: 'ro',
+      after: { activityAt: null, createdAt: '2026-11-01T08:00:00.5+00:00', id: ID },
+    });
+    expect(db.rpc).toHaveBeenCalledWith(
+      'list_customers',
+      expect.objectContaining({
+        p_after_activity_at: null,
+        p_after_created_at: '2026-11-01T08:00:00.5+00:00',
+      }),
+    );
+  });
+
+  it('a full page of 20 rows says there are more', async () => {
+    const rows = Array.from({ length: 20 }, (_, index) => ({
+      ...listRow,
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    }));
+    db.rpc.mockResolvedValue(answer(rows));
+    const page = await supabaseCustomerService.list({ query: '', after: null });
+    expect(page.customers).toHaveLength(20);
+    expect(page.hasMore).toBe(true);
+  });
+
+  it('a shorter page is the end of the list', async () => {
+    db.rpc.mockResolvedValue(answer(Array.from({ length: 19 }, () => listRow)));
+    await expect(supabaseCustomerService.list({ query: '', after: null })).resolves.toMatchObject({
+      hasMore: false,
+    });
+  });
+
+  it('drops the email if the server ever sends it', async () => {
+    db.rpc.mockResolvedValue(answer([{ ...listRow, email: 'rossi@example.com' }]));
+    const page = await supabaseCustomerService.list({ query: 'rossi@', after: null });
+    expect(page.customers[0]).not.toHaveProperty('email');
+  });
+
+  it.each(['invalid_cursor', 'invalid_limit'])(
+    'a %s (22023, a bug of this client) is unknown, never a server fault',
+    async (message) => {
+      db.rpc.mockResolvedValue(pgError('22023', 400, message));
+      const error = await rejection(supabaseCustomerService.list({ query: '', after: null }));
+      expect(error).toBeInstanceOf(CustomerError);
+      expect(error).toMatchObject({ kind: 'unknown' });
+    },
+  );
+
+  it('a missing list_customers (migration not pushed) is misconfigured', async () => {
+    db.rpc.mockResolvedValue(pgError('PGRST202', 404, 'Could not find the function'));
+    const error = await rejection(supabaseCustomerService.list({ query: '', after: null }));
+    expect(error).toMatchObject({ kind: 'misconfigured' });
+    expect(error).toBeInstanceOf(ServerFaultError);
   });
 });

@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider } from 'react-router';
+import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router';
 import { routes } from '../app/routes';
 import { CardReaderProvider } from '../features/card-input/CardReaderProvider';
 import { CardsServiceProvider } from '../features/cards/CardsServiceProvider';
@@ -23,14 +23,14 @@ import { createFakeRewardsService } from './fakeRewardsService';
 import { createFakeSettingsService } from './fakeSettingsService';
 
 /**
- * Renders the whole app at `path`, with fake Auth, Settings, Customer, Rewards, Cards, Ledger,
+ * Renders the whole app at `path` (a URL, or a location with its history state), with fake Auth, Settings, Customer, Rewards, Cards, Ledger,
  * Export, Kiosk and Operators services instead of Supabase (the export fake's download spy instead of saving files), and
  * a card reader with `fakeWebNfc` and the USB wedge on jsdom's `document`. The cards fake reads (and creates) its customers in `customers`, and the ledger fake
  * reads `customers`, `rewards` and `settings` (and writes balances in `customers`), unless one is
  * passed.
  */
 export function renderApp(
-  path: string,
+  path: InitialEntry,
   fake = createFakeAuthService(),
   settings = createFakeSettingsService(),
   customers = createFakeCustomerService(),

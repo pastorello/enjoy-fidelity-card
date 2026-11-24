@@ -22,7 +22,9 @@ export type CardLinkFailure =
   | {
       kind: 'write';
       reason: Exclude<CardWriteFailure, 'aborted' | 'cannot-write'>;
+      /** With `wrong-card`: the card read instead, and whether `write()` had started on it. */
       otherUid?: string | undefined;
+      mayHaveWritten?: boolean | undefined;
     }
   | { kind: 'issue'; error: unknown }
   | { kind: 'confirm'; error: unknown };
@@ -163,7 +165,16 @@ export function useCardLinkWriter({ cardId, uid, onWritten }: Options): CardLink
           setState({ status: 'cannot-write' });
           return;
         }
-        fail({ kind: 'write', reason: result.reason, otherUid: result.otherUid });
+        fail(
+          result.reason === 'wrong-card'
+            ? {
+                kind: 'write',
+                reason: result.reason,
+                otherUid: result.otherUid,
+                mayHaveWritten: result.mayHaveWritten,
+              }
+            : { kind: 'write', reason: result.reason },
+        );
         return;
       }
       // The card holds the link and it was read back: the confirmation goes on even after «Salta».

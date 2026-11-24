@@ -56,7 +56,7 @@ export function fakeCustomerExportRow(
   return {
     id: `00000000-0000-4000-8000-${counter}`,
     name: `Cliente Prova ${counter.slice(-4)}`,
-    phone: '+393330000000',
+    email: null,
     activeCardUid: null,
     balancePoints: 0,
     privacyConsentAt: '2026-11-17T09:00:00.000000+00:00',
@@ -93,13 +93,13 @@ export function fakeMovementExportRow(
 function defaultRows(): { customers: CustomerExportRow[]; movements: MovementExportRow[] } {
   const maria = fakeCustomerExportRow({
     name: 'Maria Prova',
-    phone: '+393331234567',
+    email: 'maria.prova@example.com',
     activeCardUid: '04A1B2C3D4E5F6',
     balancePoints: 12,
   });
   const gone = fakeCustomerExportRow({
     name: null,
-    phone: null,
+    email: null,
     balancePoints: 0,
     anonymizedAt: '2026-11-17T12:00:00.000000+00:00',
   });

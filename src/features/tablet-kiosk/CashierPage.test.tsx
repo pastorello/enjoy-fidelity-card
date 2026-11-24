@@ -6,7 +6,7 @@ import { fakeDevice } from '../../test/fakeAuthService';
 import { createFakeKioskService, fakeCashier, KIOSK_LOCK_MS } from '../../test/fakeKioskService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
-const SEARCH_LABEL = 'Oppure cerca per nome o telefono';
+const SEARCH_LABEL = 'Oppure cerca per nome o email';
 const EXPLANATION =
   'Sul tablet condiviso si cambia operatore con il PIN personale di 4 cifre. Spese e riscatti vengono registrati a nome di chi è alla cassa.';
 const LOCK_NOTE = 'Dopo 5 PIN errati il cambio si blocca per qualche minuto.';

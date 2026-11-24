@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Locator, type Page } from '@playwright/test';
 
 /** Fails the test on any console error or warning, or page error (CSP and header problems included). */
 export const test = base.extend<{
@@ -48,3 +48,23 @@ export const test = base.extend<{
 });
 
 export { expect };
+
+/**
+ * The search field of the home, the only place the E2E name its label. `'full'` is the label next to
+ * the full card panel («Oppure …»), `'compact'` the one while a search shrinks the panel to one line
+ * (phone only), `'any'` either of them.
+ */
+export function homeSearch(page: Page, label: 'any' | 'full' | 'compact' = 'any'): Locator {
+  if (label === 'full') {
+    return page.getByRole('searchbox', { name: 'Oppure cerca per nome o email', exact: true });
+  }
+  if (label === 'compact') {
+    return page.getByRole('searchbox', { name: 'Cerca per nome o email', exact: true });
+  }
+  return page.getByRole('searchbox', { name: /cerca per nome o email$/i });
+}
+
+/** The CLIENTI section of the home (SPEC-customers-v2 point 6): the list, filtered by the search. */
+export function homeCustomers(page: Page): Locator {
+  return page.getByRole('region', { name: 'CLIENTI' });
+}

@@ -12,10 +12,9 @@ import {
 } from '../ledger/CustomerLedgerSection';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
 import styles from './CustomerPage.module.css';
-import { customerBackTo } from './customerBack';
+import { customerBackHomeState } from './customerBack';
 import { loadErrorText } from './loadErrorText';
 import { NavigationNotice } from './NavigationNotice';
-import { formatPhoneForCard } from './phone';
 import type { CustomerSummary } from './types';
 import { useCustomer } from './useCustomer';
 
@@ -37,7 +36,7 @@ function BalanceBox({ points }: { points: number }) {
   );
 }
 
-/** The lines under the title: the card and the phone, the notes, or "Dati cancellati il …". */
+/** The lines under the title: the card and the email, the notes, or "Dati cancellati il …". */
 function CustomerLines({ customer }: { customer: CustomerSummary }) {
   if (customer.anonymizedAt !== null) {
     // The technical name of an erased customer is never shown, and there is nothing to edit.
@@ -45,12 +44,7 @@ function CustomerLines({ customer }: { customer: CustomerSummary }) {
   }
   return (
     <>
-      <CardSummary
-        customerId={customer.id}
-        phone={
-          customer.phone === null ? 'Senza telefono' : `Tel. ${formatPhoneForCard(customer.phone)}`
-        }
-      />
+      <CardSummary customerId={customer.id} email={customer.email} />
       {customer.notes !== null && <p className={styles.notes}>{customer.notes}</p>}
     </>
   );
@@ -58,7 +52,7 @@ function CustomerLines({ customer }: { customer: CustomerSummary }) {
 
 /**
  * The customer's details. The first line is `cards`' CardSummary ("Card attiva …E5F6 · ") with the
- * phone part of this module; `ledger` mounts its `CustomerLedgerSection` (Registra spesa, Riscatta premio, ULTIMI
+ * customer's email or "Senza email"; `ledger` mounts its `CustomerLedgerSection` (Registra spesa, Riscatta premio, ULTIMI
  * MOVIMENTI) below the SALDO block.
  */
 function CustomerDetails({ customer }: { customer: CustomerSummary }) {
@@ -95,14 +89,15 @@ function TabletCustomerDetails({ customer }: { customer: CustomerSummary }) {
 
 /**
  * Scheda cliente (`/clienti/:id`; wireframe Scheda cliente): the name as title with "Modifica
- * cliente", the phone, the notes and the balance. "Indietro" returns to the search it came from.
+ * cliente", the email, the notes and the balance. "Indietro" returns to the search it came from.
  * An id that is not a UUID is "Cliente non trovato" without asking the server. A one-time message
  * of the navigation state ("Card …A1B2 associata.") opens the page.
  */
 export function CustomerPage() {
   const { id = '' } = useParams();
   const location = useLocation();
-  const backTo = customerBackTo(location.state);
+  // Always the home; the search it came from travels in the history state, never in the URL.
+  const backState = customerBackHomeState(location.state);
   const load = useCustomer(id);
   // 1280×800: SALDO and the actions on the left, ULTIMI MOVIMENTI on the right.
   const tablet = useTabletLayout();
@@ -121,7 +116,8 @@ export function CustomerPage() {
     return (
       <AppShell
         title={erased ? 'Cliente cancellato' : customer.name}
-        backTo={backTo}
+        backTo="/"
+        backState={backState}
         headingRef={heading}
         repeatCutTitle={!erased}
         headerAction={
@@ -143,7 +139,8 @@ export function CustomerPage() {
     return (
       <AppShell
         title={PLACEHOLDER_TITLE}
-        backTo={backTo}
+        backTo="/"
+        backState={backState}
         headingRef={heading}
         actions={
           <ButtonLink to="/" block>
@@ -162,7 +159,7 @@ export function CustomerPage() {
   }
 
   return (
-    <AppShell title={PLACEHOLDER_TITLE} backTo={backTo} headingRef={heading}>
+    <AppShell title={PLACEHOLDER_TITLE} backTo="/" backState={backState} headingRef={heading}>
       {load.status === 'loading' ? (
         <StatusView kind="loading" />
       ) : (

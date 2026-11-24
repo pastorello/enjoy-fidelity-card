@@ -1,4 +1,4 @@
-import { signIn } from './auth';
+import { seedAccounts, signIn } from './auth';
 import { expect, test } from './fixtures';
 import {
   asWebNfc,
@@ -28,10 +28,16 @@ test('a new card on the home opens Nuovo cliente with it, its link is written, t
   const firstRead = Date.now();
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
 
-  await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
-  await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(
+  // The uid travels in the history state, never in the URL (SPEC-customers-v2 point 6).
+  await expect(page).toHaveURL('/clienti/nuovo');
+  const cardRead = page.getByRole('region', { name: 'Card letta' });
+  await expect(cardRead).toContainText(
     `Codice ${uid}: non è di nessun cliente, verrà associata a questo.`,
   );
+  // The history state survives a reload, as ?card= did.
+  await page.reload();
+  await expect(cardRead).toContainText(`Codice ${uid}:`);
+  expect(page.url()).not.toContain(uid);
 
   const name = uniqueName('Card Nuova E2E');
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
@@ -133,8 +139,9 @@ test.describe('Associa card', () => {
     await page.goto('/');
     await expect(panel).toContainText('Avvicina la card');
     await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(mariaCard));
-    await expect(panel).toContainText('Card disattivata');
-    await expect(panel).toContainText(`era di ${maria.name}`);
+    // An operator: the notice, no way to reactivate it (SPEC-customers-v2, point 4).
+    await expect(panel).toContainText('Card non attiva: chiedi a un amministratore');
+    await expect(panel).toContainText(`Era la card di ${maria.name}.`);
     await expect(page).toHaveURL('/');
   });
 });
@@ -231,8 +238,40 @@ test('Modifica cliente: «Disattiva card» asks first, then the section says «N
   const panel = page.getByRole('region', { name: 'Lettura card' });
   await expect(panel).toContainText('Avvicina la card');
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
-  await expect(panel).toContainText('Card disattivata');
+  await expect(panel).toContainText('Card non attiva: chiedi a un amministratore');
   await expect(page).toHaveURL('/');
+});
+
+test('an administrator reading a deactivated card on the home lands on «Card non attiva», by the card id (SPEC-customers-v2, criterion 8)', async ({
+  page,
+}) => {
+  await stubWebNfc(page);
+  await signIn(page, seedAccounts.admin.email);
+  const uid = freshUid();
+  const customer = await customerWithCard(page, 'Maria Admin Disattiva E2E', uid);
+
+  await page.goto(`/clienti/${customer.id}/modifica`);
+  const section = page.getByRole('region', { name: 'CARD' });
+  await section.getByRole('button', { name: 'Disattiva card' }).click();
+  const dialog = page.getByRole('dialog', { name: `Disattivare la card …${uid.slice(-4)}?` });
+  await dialog.getByRole('button', { name: 'Disattiva card' }).click();
+  await expect(section).toContainText('Nessuna card attiva');
+
+  await page.goto('/');
+  const panel = page.getByRole('region', { name: 'Lettura card' });
+  await expect(panel).toContainText('Avvicina la card');
+  await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+  await expect(page).toHaveURL(/\/card\/[0-9a-f-]{36}$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Card non attiva' })).toBeVisible();
+  expect(page.url()).not.toContain(uid);
+  await expect(page.getByRole('link', { name: 'Indietro' })).toHaveAttribute('href', '/');
+  // The page's data, from app.get_card by the id of the row.
+  await expect(page.getByText(`Card …${uid.slice(-4)}`)).toBeVisible();
+  await expect(page.getByText(/^Disattivata il \d{1,2} \w{3}/)).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: /Era di Maria Admin Disattiva E2E/ }),
+  ).toHaveAttribute('href', `/clienti/${customer.id}`);
+  await expect(page.getByText('La card torna a Maria e apre di nuovo la sua spesa.')).toBeVisible();
 });
 
 for (const width of [390, 360]) {
@@ -288,7 +327,8 @@ test('a link not written at the till is written later from Modifica cliente (cri
     'Avvicina la card',
   );
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
-  await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
+  await expect(page).toHaveURL('/clienti/nuovo');
+  await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(`Codice ${uid}:`);
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(uniqueName('Maria Dopo E2E'));
   await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
   // The card moves away while the link is written.

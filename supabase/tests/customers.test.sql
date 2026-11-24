@@ -1,8 +1,11 @@
 -- customers: the customers table, its name key, access rules, the write RPCs and the
--- reads (SPEC-customers.md, "Modello dati e regole di accesso"). Fake data only.
+-- reads (SPEC-customers.md, "Modello dati e regole di accesso"), in the shape customers-v2
+-- left them: the email in the place of the phone, list_customers in the place of
+-- search_customers and customers_served_today (SPEC-customers-v2.md points 1, 2 and 6).
+-- Fake data only: invented names, @example.com emails.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(109);
+select plan(96);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -152,7 +155,7 @@ select throws_ok(
 
 -- Name and consent only.
 select results_eq(
-  $$select name, phone, notes, anonymized_at, balance, last_served_at
+  $$select name, email, notes, anonymized_at, balance, last_served_at
     from app.create_customer('00000000-0000-4000-c100-000000000001', '  Nicolò   Rossi ', null, true, null)$$,
   $$values ('Nicolò Rossi'::text, null::text, null::text, null::timestamptz, 0, null::timestamptz)$$,
   'name and consent are enough; the name is cleaned and the balance is 0'
@@ -192,12 +195,12 @@ select throws_ok(
   'P0001', 'name_too_long', 'a name of 81 characters is refused'
 );
 select throws_ok(
-  $$select app.create_customer(gen_random_uuid(), 'Anna Bianchi', '12', true, null)$$,
-  'P0001', 'phone_invalid', 'a phone too short is refused'
+  $$select app.create_customer(gen_random_uuid(), 'Anna Bianchi', 'anna@example', true, null)$$,
+  'P0001', 'email_invalid', 'an email without a dot after the @ is refused'
 );
 select throws_ok(
-  $$select app.create_customer(gen_random_uuid(), 'Anna Bianchi', '333 abc 4521', true, null)$$,
-  'P0001', 'phone_invalid', 'a phone with letters is refused'
+  $$select app.create_customer(gen_random_uuid(), 'Anna Bianchi', 'anna bianchi@example.com', true, null)$$,
+  'P0001', 'email_invalid', 'an email with a space inside is refused'
 );
 select throws_ok(
   $$select app.create_customer(gen_random_uuid(), 'Anna Bianchi', null, true, repeat('n', 501))$$,
@@ -209,31 +212,9 @@ select is(
   'notes of 500 characters are accepted'
 );
 select results_eq(
-  $$select phone, notes from app.create_customer(gen_random_uuid(), 'Solo Spazi', '   ', true, '   ')$$,
+  $$select email, notes from app.create_customer(gen_random_uuid(), 'Solo Spazi', '   ', true, '   ')$$,
   $$values (null::text, null::text)$$,
-  'a phone and notes of only spaces become null'
-);
-
--- Phone normalization.
-select is(
-  (select phone from app.create_customer(gen_random_uuid(), 'Telefono Uno', '333 123 4521', true, null)),
-  '+393331234521',
-  '333 123 4521 becomes +393331234521'
-);
-select is(
-  (select phone from app.create_customer(gen_random_uuid(), 'Telefono Due', '0039 333-123.4522', true, null)),
-  '+393331234522',
-  '0039 becomes +39 and separators are dropped'
-);
-select is(
-  (select phone from app.create_customer(gen_random_uuid(), 'Telefono Tre', '+44 (20) 7946 0958', true, null)),
-  '+442079460958',
-  'a foreign number keeps its prefix'
-);
-select is(
-  (select phone from app.create_customer(gen_random_uuid(), 'Telefono Quattro', '0771 123456', true, null)),
-  '+390771123456',
-  'a landline keeps its leading 0 after +39'
+  'an email and notes of only spaces become null'
 );
 
 -- Unique name.
@@ -277,9 +258,9 @@ select is(
 
 -- Table constraints (written directly by postgres, bypassing the RPC).
 select throws_ok(
-  $$insert into app.customers (name, phone, privacy_consent_at, created_by, create_operation_id)
-    values ('Telefono Grezzo', '3331234521', now(), (select id from app.operators limit 1), gen_random_uuid())$$,
-  '23514', null, 'the table refuses a phone that is not E.164'
+  $$insert into app.customers (name, email, privacy_consent_at, created_by, create_operation_id)
+    values ('Email Grezza', 'Grezza@example.com', now(), (select id from app.operators limit 1), gen_random_uuid())$$,
+  '23514', null, 'the table refuses an email that is not lowercase'
 );
 select throws_ok(
   $$insert into app.customers (name, privacy_consent_at, created_by, create_operation_id)
@@ -298,13 +279,13 @@ select ok(
 
 -- update_customer ---------------------------------------------------------------------
 -- Customers used below, written directly by postgres.
-insert into app.customers (id, name, phone, privacy_consent_at, notes, created_by, create_operation_id)
+insert into app.customers (id, name, email, privacy_consent_at, notes, created_by, create_operation_id)
 values
-  ('00000000-0000-4000-c200-000000000001', 'Marco Neri', '+393330000001', now(), 'Caffè macchiato',
+  ('00000000-0000-4000-c200-000000000001', 'Marco Neri', 'marco.neri@example.com', now(), 'Caffè macchiato',
    (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()),
   ('00000000-0000-4000-c200-000000000002', 'Già Cancellato', null, now(), null,
    (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()),
-  ('a1b2c3d4-0000-4000-c200-000000000003', 'Sara Gialli', '+393330000003', '2026-11-01 10:00+01',
+  ('a1b2c3d4-0000-4000-c200-000000000003', 'Sara Gialli', 'sara.gialli@example.com', '2026-11-01 10:00+01',
    'Senza zucchero', (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid());
 update app.customers set anonymized_at = now()
 where id = '00000000-0000-4000-c200-000000000002';
@@ -332,17 +313,17 @@ select ok(
   'authenticated can execute anonymize_customer'
 );
 select results_eq(
-  $$select id, name, phone, notes, anonymized_at, balance, last_served_at
-    from app.update_customer('00000000-0000-4000-c200-000000000001', ' Marco   Neri Serapo ', '333 000 0009', ' Al banco ')$$,
-  $$values ('00000000-0000-4000-c200-000000000001'::uuid, 'Marco Neri Serapo'::text, '+393330000009'::text,
+  $$select id, name, email, notes, anonymized_at, balance, last_served_at
+    from app.update_customer('00000000-0000-4000-c200-000000000001', ' Marco   Neri Serapo ', ' Serapo@Example.com ', ' Al banco ')$$,
+  $$values ('00000000-0000-4000-c200-000000000001'::uuid, 'Marco Neri Serapo'::text, 'serapo@example.com'::text,
             'Al banco'::text, null::timestamptz, 0, null::timestamptz)$$,
-  'an operator updates name, phone and notes, cleaned and normalized'
+  'an operator updates name, email and notes, cleaned and normalized'
 );
 select results_eq(
-  $$select phone, notes
+  $$select email, notes
     from app.update_customer('00000000-0000-4000-c200-000000000001', 'Marco Neri Serapo', '  ', '')$$,
   $$values (null::text, null::text)$$,
-  'an emptied phone and notes become null'
+  'an emptied email and notes become null'
 );
 select lives_ok(
   $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'marco neri serapo', null, null)$$,
@@ -368,8 +349,8 @@ select throws_ok(
   'P0001', 'name_too_long', 'update refuses a name of 81 characters'
 );
 select throws_ok(
-  $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'Marco Neri', '12', null)$$,
-  'P0001', 'phone_invalid', 'update refuses an invalid phone'
+  $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'Marco Neri', 'marco@', null)$$,
+  'P0001', 'email_invalid', 'update refuses an invalid email'
 );
 select throws_ok(
   $$select app.update_customer('00000000-0000-4000-c200-000000000001', 'Marco Neri', null, repeat('n', 501))$$,
@@ -395,9 +376,9 @@ select throws_ok(
 );
 reset role;
 select results_eq(
-  $$select name, phone, notes, anonymized_at from app.customers
+  $$select name, email, notes, anonymized_at from app.customers
     where id = 'a1b2c3d4-0000-4000-c200-000000000003'$$,
-  $$values ('Sara Gialli'::text, '+393330000003'::text, 'Senza zucchero'::text, null::timestamptz)$$,
+  $$values ('Sara Gialli'::text, 'sara.gialli@example.com'::text, 'Senza zucchero'::text, null::timestamptz)$$,
   'the refused anonymization leaves the row unchanged'
 );
 
@@ -408,15 +389,15 @@ select throws_ok(
   'P0001', 'customer_not_found', 'anonymizing an unknown id is refused'
 );
 select results_eq(
-  $$select id, name, phone, notes, anonymized_at, balance
+  $$select id, name, email, notes, anonymized_at, balance
     from app.anonymize_customer('a1b2c3d4-0000-4000-c200-000000000003')$$,
   $$values ('a1b2c3d4-0000-4000-c200-000000000003'::uuid, 'Cliente cancellato a1b2c3d4'::text,
             null::text, null::text, now(), 0)$$,
-  'an admin anonymizes: technical name, phone and notes null, anonymized_at set'
+  'an admin anonymizes: technical name, email and notes null, anonymized_at set'
 );
 reset role;
 select results_eq(
-  $$select name, phone, notes, anonymized_at, privacy_consent_at from app.customers
+  $$select name, email, notes, anonymized_at, privacy_consent_at from app.customers
     where id = 'a1b2c3d4-0000-4000-c200-000000000003'$$,
   $$values ('Cliente cancellato a1b2c3d4'::text, null::text, null::text, now(),
             '2026-11-01 10:00+01'::timestamptz)$$,
@@ -434,7 +415,7 @@ select results_eq(
 );
 reset role;
 select results_eq(
-  $$select name, phone, notes, anonymized_at from app.customers
+  $$select name, email, notes, anonymized_at from app.customers
     where id = 'a1b2c3d4-0000-4000-c200-000000000003'$$,
   $$values ('Cliente cancellato a1b2c3d4'::text, null::text, null::text,
             '2026-11-02 12:00+01'::timestamptz)$$,
@@ -457,28 +438,29 @@ select is(
 );
 reset role;
 
--- Reads: search_customers, get_customer, customers_served_today -----------------------
+-- Reads: list_customers and get_customer ----------------------------------------------
 -- The reads must see only the rows inserted here: the rows above and the seed are
--- set aside (renamed and anonymized) inside this rolled-back transaction.
+-- set aside (renamed, emails cleared and anonymized) inside this rolled-back transaction.
 update app.customers
-set name = 'Da parte ' || id::text, phone = null, anonymized_at = coalesce(anonymized_at, now());
+set name = 'Da parte ' || id::text, email = null, anonymized_at = coalesce(anonymized_at, now());
 
-insert into app.customers (id, name, phone, privacy_consent_at, notes, created_by, create_operation_id)
-select r.id::uuid, r.name, r.phone, now(), r.notes,
+insert into app.customers (id, name, email, privacy_consent_at, notes, created_by, create_operation_id)
+select r.id::uuid, r.name, r.email, now(), r.notes,
        (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()
 from (values
-  ('00000000-0000-4000-c300-000000000001', 'Maria Rossi', '+393331234521', 'Cappuccino'),
+  ('00000000-0000-4000-c300-000000000001', 'Maria Rossi', 'maria.rossi@example.com', 'Cappuccino'),
   ('00000000-0000-4000-c300-000000000002', 'Nicolò Bianco', null, null),
   ('00000000-0000-4000-c300-000000000003', 'D’Angelo Lettura', null, null),
-  ('00000000-0000-4000-c300-000000000004', 'Telefono Estero', '+447700900123', null),
+  ('00000000-0000-4000-c300-000000000004', 'Posta Estera', 'posta.estera@example.co.uk', null),
   ('00000000-0000-4000-c300-000000000005', 'Sconto 50% Bar', null, null),
   ('00000000-0000-4000-c300-000000000006', 'Sconto 500 Bar', null, null),
   ('00000000-0000-4000-c300-000000000007', 'Caso a_b', null, null),
   ('00000000-0000-4000-c300-000000000008', 'Caso axb', null, null),
   ('00000000-0000-4000-c300-000000000009', 'Uno\Due', null, null),
   ('00000000-0000-4000-c300-000000000010', 'Unodue', null, null),
-  ('00000000-0000-4000-c300-000000000011', 'Mario Rossi Anonimo', '+393339994521', null)
-) as r (id, name, phone, notes);
+  ('00000000-0000-4000-c300-000000000011', 'Mario Rossi Anonimo', 'mario.anonimo@example.com', null)
+) as r (id, name, email, notes);
+-- Anonymized by hand on a row that still holds its email: the reads hide it anyway.
 update app.customers set anonymized_at = now()
 where id = '00000000-0000-4000-c300-000000000011';
 -- 25 customers sharing a word, inserted in reverse order.
@@ -488,15 +470,13 @@ select 'Elenco ' || lpad(n::text, 2, '0'), now(),
 from generate_series(25, 1, -1) as n;
 
 select ok(
-  has_function_privilege('authenticated', 'app.search_customers(text)', 'execute')
-    and has_function_privilege('authenticated', 'app.get_customer(uuid)', 'execute')
-    and has_function_privilege('authenticated', 'app.customers_served_today()', 'execute'),
-  'authenticated can execute the three reads'
+  has_function_privilege('authenticated', 'app.list_customers(text, timestamptz, timestamptz, uuid, int)', 'execute')
+    and has_function_privilege('authenticated', 'app.get_customer(uuid)', 'execute'),
+  'authenticated can execute the reads'
 );
 select ok(
-  not has_function_privilege('anon', 'app.search_customers(text)', 'execute')
-    and not has_function_privilege('anon', 'app.get_customer(uuid)', 'execute')
-    and not has_function_privilege('anon', 'app.customers_served_today()', 'execute'),
+  not has_function_privilege('anon', 'app.list_customers(text, timestamptz, timestamptz, uuid, int)', 'execute')
+    and not has_function_privilege('anon', 'app.get_customer(uuid)', 'execute'),
   'anon cannot execute the reads'
 );
 select is(
@@ -504,132 +484,109 @@ select is(
     select p.proname || ':' || p.provolatile::text || ':' || p.prosecdef::text
     from pg_proc p
     where p.oid in (
-      'app.search_customers(text)'::regprocedure,
-      'app.get_customer(uuid)'::regprocedure,
-      'app.customers_served_today()'::regprocedure
+      'app.list_customers(text, timestamptz, timestamptz, uuid, int)'::regprocedure,
+      'app.get_customer(uuid)'::regprocedure
     )
     order by 1
   ),
-  array['customers_served_today:s:true', 'get_customer:s:true', 'search_customers:s:true'],
+  array['get_customer:s:true', 'list_customers:s:true'],
   'the reads are stable and security definer'
 );
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000003","role":"authenticated"}', true);
 select throws_ok(
-  $$select * from app.search_customers('rossi')$$,
+  $$select * from app.list_customers('rossi')$$,
   'P0001', 'not_operator', 'a user without a profile cannot search customers'
 );
 select throws_ok(
   $$select * from app.get_customer('00000000-0000-4000-c300-000000000001')$$,
   'P0001', 'not_operator', 'a user without a profile cannot read a customer'
 );
-select throws_ok(
-  $$select * from app.customers_served_today()$$,
-  'P0001', 'not_operator', 'a user without a profile cannot list the customers served today'
-);
 reset role;
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000002","role":"authenticated"}', true);
 
--- search_customers by name
+-- list_customers filtered by name
 select results_eq(
-  $$select id, name, phone, notes, anonymized_at, balance, last_served_at
-    from app.search_customers('rossi mari')$$,
-  $$values ('00000000-0000-4000-c300-000000000001'::uuid, 'Maria Rossi'::text, '+393331234521'::text,
-            'Cappuccino'::text, null::timestamptz, 0, null::timestamptz)$$,
+  $$select id, name, balance from app.list_customers('rossi mari')$$,
+  $$values ('00000000-0000-4000-c300-000000000001'::uuid, 'Maria Rossi'::text, 0)$$,
   'words in any order find Maria Rossi, never the anonymized Mario Rossi'
 );
 select results_eq(
-  $$select name from app.search_customers('nicolo')$$,
+  $$select name from app.list_customers('nicolo')$$,
   $$values ('Nicolò Bianco'::text)$$,
   'a search without the accent finds the accented name'
 );
 select results_eq(
-  $$select name from app.search_customers('NICOLÒ')$$,
+  $$select name from app.list_customers('NICOLÒ')$$,
   $$values ('Nicolò Bianco'::text)$$,
   'case and accents in the search do not count'
 );
 select results_eq(
-  $$select name from app.search_customers('d''angelo')$$,
+  $$select name from app.list_customers('d''angelo')$$,
   $$values ('D’Angelo Lettura'::text)$$,
   'the straight apostrophe finds the typographic one'
 );
 select results_eq(
-  $$select name from app.search_customers('d’ang')$$,
+  $$select name from app.list_customers('d’ang')$$,
   $$values ('D’Angelo Lettura'::text)$$,
   'the typographic apostrophe finds it too'
 );
 select results_eq(
-  $$select name from app.search_customers('50%')$$,
+  $$select name from app.list_customers('50%')$$,
   $$values ('Sconto 50% Bar'::text)$$,
   '% is searched literally'
 );
 select results_eq(
-  $$select name from app.search_customers('a_b')$$,
+  $$select name from app.list_customers('a_b')$$,
   $$values ('Caso a_b'::text)$$,
   '_ is searched literally'
 );
 select results_eq(
-  $$select name from app.search_customers('o\d')$$,
+  $$select name from app.list_customers('o\d')$$,
   $$values ('Uno\Due'::text)$$,
   'a backslash is searched literally'
 );
 select is_empty(
-  $$select * from app.search_customers('anonimo')$$,
-  'anonymized customers never appear in a search'
+  $$select * from app.list_customers('anonimo')$$,
+  'anonymized customers never appear in a search, by name or by email'
 );
 select results_eq(
-  $$select name from app.search_customers('rossi' || repeat(' ', 80) || 'assente')$$,
+  $$select name from app.list_customers('rossi' || repeat(' ', 80) || 'assente')$$,
   $$values ('Maria Rossi'::text)$$,
   'the text past 80 characters is cut'
 );
 
--- search_customers by phone
+-- list_customers filtered by email; digits find no phone any more
 select results_eq(
-  $$select name from app.search_customers('4521')$$,
-  $$values ('Maria Rossi'::text)$$,
-  'the last 4 digits find the phone, never the anonymized one'
+  $$select name from app.list_customers('Estera@Example.CO')$$,
+  $$values ('Posta Estera'::text)$$,
+  'part of the email, in any case, finds the customer'
 );
-select results_eq(
-  $$select name from app.search_customers('333 123')$$,
-  $$values ('Maria Rossi'::text)$$,
-  'digits with spaces find the phone'
-);
-select results_eq(
-  $$select name from app.search_customers('+39 333-123')$$,
-  $$values ('Maria Rossi'::text)$$,
-  'the prefix with + and dashes finds the phone'
-);
-select results_eq(
-  $$select name from app.search_customers('0039 333.123')$$,
-  $$values ('Maria Rossi'::text)$$,
-  'a leading 00 means +'
-);
-select results_eq(
-  $$select name from app.search_customers('+44 7700')$$,
-  $$values ('Telefono Estero'::text)$$,
-  'a foreign number is found by its digits'
+select is_empty(
+  $$select * from app.list_customers('333')$$,
+  'digits find nobody: there is no phone to search'
 );
 
--- order, limit and short text
-select results_eq(
-  $$select name from app.search_customers('elenco')$$,
-  $$select 'Elenco ' || lpad(n::text, 2, '0') from generate_series(1, 21) as n$$,
-  '25 matches: the first 21 in alphabetical order'
+-- pages
+select is(
+  (select count(*)::int from app.list_customers('elenco', p_limit => 50)),
+  25,
+  'every word match is listed'
 );
-select is_empty($$select * from app.search_customers('r')$$, 'one character searches nothing');
-select is_empty($$select * from app.search_customers('  r  ')$$, 'spaces do not count as characters');
-select is_empty($$select * from app.search_customers('45')$$, 'two digits search nothing');
-select is_empty($$select * from app.search_customers('')$$, 'an empty text searches nothing');
-select is_empty($$select * from app.search_customers(null)$$, 'a null text searches nothing');
+select is(
+  (select count(*)::int from app.list_customers('elenco')),
+  20,
+  'a page holds 20 customers by default'
+);
 
 -- get_customer
 select results_eq(
-  $$select id, name, phone, notes, anonymized_at, balance, last_served_at
+  $$select id, name, email, notes, anonymized_at, balance, last_served_at
     from app.get_customer('00000000-0000-4000-c300-000000000001')$$,
-  $$values ('00000000-0000-4000-c300-000000000001'::uuid, 'Maria Rossi'::text, '+393331234521'::text,
+  $$values ('00000000-0000-4000-c300-000000000001'::uuid, 'Maria Rossi'::text, 'maria.rossi@example.com'::text,
             'Cappuccino'::text, null::timestamptz, 0, null::timestamptz)$$,
   'get_customer returns the customer'
 );
@@ -642,9 +599,6 @@ select is_empty(
   $$select * from app.get_customer('00000000-0000-4000-c300-0000000000ff')$$,
   'get_customer returns no row for an unknown id'
 );
-
--- customers_served_today: empty until ledger replaces its body
-select is_empty($$select * from app.customers_served_today()$$, 'nobody has been served today yet');
 
 -- Names pasted from contacts or chats: non-breaking spaces at the ends are trimmed, not refused
 select is(
@@ -667,9 +621,9 @@ select is(
 );
 reset role;
 
--- Performance: 1 000 more customers, with phones
-insert into app.customers (name, phone, privacy_consent_at, created_by, create_operation_id)
-select 'Generato ' || lpad(n::text, 4, '0'), '+39333100' || lpad(n::text, 4, '0'), now(),
+-- Performance: 1 000 more customers, with emails
+insert into app.customers (name, email, privacy_consent_at, created_by, create_operation_id)
+select 'Generato ' || lpad(n::text, 4, '0'), 'generato.' || lpad(n::text, 4, '0') || '@example.com', now(),
        (select id from app.operators where name = 'Operatore Clienti'), gen_random_uuid()
 from generate_series(1, 1000) as n;
 analyze app.customers;
@@ -677,14 +631,14 @@ analyze app.customers;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-4000-c000-000000000002","role":"authenticated"}', true);
 select performs_within(
-  $$select * from app.search_customers('generato 09')$$,
+  $$select * from app.list_customers('generato 09')$$,
   25, 25, 10,
   'a search by name on 1 000 customers takes under 50 ms on average'
 );
 select performs_within(
-  $$select * from app.search_customers('1009')$$,
+  $$select * from app.list_customers('generato.0999@')$$,
   25, 25, 10,
-  'a search by phone on 1 000 customers takes under 50 ms on average'
+  'a search by email on 1 000 customers takes under 50 ms on average'
 );
 reset role;
 

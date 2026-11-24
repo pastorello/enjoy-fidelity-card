@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { seedAccounts, signIn } from './auth';
-import { expect, test } from './fixtures';
+import { expect, homeCustomers, homeSearch, test } from './fixtures';
 
 /**
  * Customers end to end (SPEC-customers). Names carry a suffix unique to the run, so the suite also
@@ -20,12 +20,12 @@ function escapeRegExp(text: string): string {
 }
 
 /** Nuovo cliente from the home's button, filled and saved: ends on the new customer's page. */
-async function createCustomer(page: Page, name: string, phone?: string) {
+async function createCustomer(page: Page, name: string, email?: string) {
   await page.goto('/');
   await page.getByRole('link', { name: 'Nuovo cliente' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Nuovo cliente' })).toBeVisible();
   await page.getByLabel('Nome e cognome').fill(name);
-  if (phone !== undefined) await page.getByLabel('Telefono (facoltativo)').fill(phone);
+  if (email !== undefined) await page.getByLabel('Email (facoltativa)').fill(email);
   await page.getByText('Ha letto l’informativa privacy').click();
   await page.getByRole('button', { name: 'Salva cliente' }).click();
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
@@ -34,13 +34,13 @@ async function createCustomer(page: Page, name: string, phone?: string) {
 
 /** Types in the home search (the results come after a short pause). */
 async function search(page: Page, text: string) {
-  await page.getByLabel('Cerca per nome o telefono').fill(text);
+  await homeSearch(page).fill(text);
 }
 
 function resultRow(page: Page, name: string) {
-  return page
-    .getByRole('list', { name: 'Risultati della ricerca' })
-    .getByRole('link', { name: new RegExp(`^${escapeRegExp(name)}\\b`) });
+  return homeCustomers(page).getByRole('link', {
+    name: new RegExp(`^${escapeRegExp(name)}\\b`),
+  });
 }
 
 test.describe('administrator', () => {
@@ -52,30 +52,46 @@ test.describe('administrator', () => {
     const name = `Nicolò Prova E2E ${suffix}`;
     await signIn(page, seedAccounts.admin.email);
 
-    await createCustomer(page, name, '333 123 4521');
-    await expect(page.getByText('Tel. 333 ••• 4521')).toBeVisible();
+    // Stored trimmed and lowercase by the server (SPEC-customers-v2, point 2).
+    const email = `nicolo.${suffix}@example.com`;
+    await createCustomer(page, name, `  Nicolo.${suffix}@Example.COM `);
     await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
+    // Scheda cliente: the email in full, never a link to write to the customer.
+    await expect(page.getByRole('main').getByText(email)).toBeVisible();
+    await expect(page.locator('[href^="mailto:" i]')).toHaveCount(0);
     const customerUrl = page.url();
 
-    // Found without the accent, and with the last 4 digits of the phone. The search names this
-    // run's customer in full: customers left by other runs never push it past the 20 rows shown.
+    // Found without the accent in CLIENTI, which never shows the email (SPEC-customers-v2 point
+    // 6). The search names this run's customer in full: customers left by other runs never push
+    // it past the first page.
     await page.goto('/');
     await search(page, `nicolo prova e2e ${suffix}`);
-    await expect(resultRow(page, name)).toContainText('••• 4521');
-    await search(page, '4521');
+    await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
+    await expect(resultRow(page, name)).toContainText('Nessun movimento');
+    await expect(resultRow(page, name)).not.toContainText('@');
+    // The text stays out of the URL.
+    expect(new URL(page.url()).search).toBe('');
     await resultRow(page, name).click();
     await expect(page).toHaveURL(customerUrl);
     await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
-    await expect(page.getByText('Tel. 333 ••• 4521')).toBeVisible();
 
-    // Modifica cliente: a new phone is saved and the page shows it.
+    // Modifica cliente shows the stored email; a new one is saved, and emptied it is removed.
     await page.getByRole('link', { name: 'Modifica cliente' }).click();
     await expect(page.getByRole('heading', { level: 1, name: 'Modifica cliente' })).toBeVisible();
-    await expect(page.getByLabel('Telefono (facoltativo)')).toHaveValue('333 123 4521');
-    await page.getByLabel('Telefono (facoltativo)').fill('347 765 4321');
+    await expect(page.getByLabel('Email (facoltativa)')).toHaveValue(email);
+    await page.getByLabel('Email (facoltativa)').fill(`nicolo.bar.${suffix}@example.com`);
     await page.getByRole('button', { name: 'Salva modifiche' }).click();
     await expect(page).toHaveURL(customerUrl);
-    await expect(page.getByText('Tel. 347 ••• 4321')).toBeVisible();
+    await page.getByRole('link', { name: 'Modifica cliente' }).click();
+    await expect(page.getByLabel('Email (facoltativa)')).toHaveValue(
+      `nicolo.bar.${suffix}@example.com`,
+    );
+    await page.getByLabel('Email (facoltativa)').fill('');
+    await page.getByRole('button', { name: 'Salva modifiche' }).click();
+    await expect(page).toHaveURL(customerUrl);
+    await page.getByRole('link', { name: 'Modifica cliente' }).click();
+    await expect(page.getByLabel('Email (facoltativa)')).toHaveValue('');
+    await page.goto(customerUrl);
 
     // A name already used is refused, under the name field, and nothing changes.
     await page.getByRole('link', { name: 'Modifica cliente' }).click();
@@ -93,21 +109,95 @@ test.describe('administrator', () => {
     await expect(page).toHaveURL('/');
     await expect(page.getByText('Dati del cliente cancellati.')).toBeVisible();
 
-    // Not found any more, by name or by phone; the page keeps the balance without personal data.
+    // Not found any more by name; the page keeps the balance without personal data.
     await search(page, name);
     await expect(page.getByRole('heading', { name: 'Nessun cliente trovato' })).toBeVisible();
-    // A fresh search (from the URL), so the outcome waited for is not the previous one.
-    await page.goto('/?q=4321');
-    await expect(
-      page
-        .getByRole('list', { name: 'Risultati della ricerca' })
-        .or(page.getByRole('heading', { name: 'Nessun cliente trovato' })),
-    ).toBeVisible();
     await expect(resultRow(page, name)).toHaveCount(0);
     await page.goto(customerUrl);
     await expect(page.getByRole('heading', { level: 1, name: 'Cliente cancellato' })).toBeVisible();
     await expect(page.getByText(name)).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Modifica cliente' })).toHaveCount(0);
+  });
+});
+
+test.describe('administrator, the email', () => {
+  // The email already used is refused by the server with a 400, shown under the email field.
+  test.use({ expectedRefusals: [/\/rest\/v1\/rpc\/create_customer$/] });
+
+  test('normalized, found by part of it, unique, freed by the erase (criteria 2, 3, 4)', async ({
+    page,
+  }) => {
+    // Unique to the run, so the suite passes again without `db:reset` and next to other tests.
+    const suffix = uniqueSuffix();
+    const name = `Maria Rossi ${suffix}`;
+    const other = `Mario Bianchi ${suffix}`;
+    const email = `rossi.${suffix}@example.com`;
+    await signIn(page, seedAccounts.admin.email);
+
+    // Criterion 2: typed with spaces and capitals, stored trimmed and lowercase.
+    await createCustomer(page, name, `  Rossi.${suffix}@Example.COM `);
+    const customerUrl = page.url();
+    await expect(page.getByRole('main').getByText(email, { exact: false })).toBeVisible();
+    await expect(page.locator('[href^="mailto:" i]')).toHaveCount(0);
+
+    // Criterion 4: found by part of the email, and by the words of the name.
+    await page.goto('/');
+    await search(page, `rossi.${suffix}@exa`);
+    await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
+    await expect(resultRow(page, name)).toBeVisible();
+    await expect(resultRow(page, name)).not.toContainText('@');
+    expect(new URL(page.url()).search).toBe('');
+    await search(page, `maria rossi ${suffix}`);
+    await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
+    await resultRow(page, name).click();
+    await expect(page).toHaveURL(customerUrl);
+
+    // Criterion 2: the same email in other capitals is refused, with «Apri la scheda» of the first.
+    await page.goto('/clienti/nuovo');
+    await page.getByLabel('Nome e cognome').fill(other);
+    await page.getByLabel('Email (facoltativa)').fill(`ROSSI.${suffix}@example.com`);
+    await page.getByText('Ha letto l’informativa privacy').click();
+    await page.getByRole('button', { name: 'Salva cliente' }).click();
+    await expect(page.getByText('Esiste già un cliente con questa email.')).toBeVisible();
+    await expect(page).toHaveURL('/clienti/nuovo');
+    const openExisting = page.getByRole('link', { name: 'Apri la scheda' });
+    await expect(openExisting).toHaveAttribute('href', new URL(customerUrl).pathname);
+
+    // An email without a domain is refused; without an email the customer is saved, like the
+    // customers of the seed with no email (two customers without one live together).
+    await page.getByLabel('Email (facoltativa)').fill('rossi@');
+    await page.getByRole('button', { name: 'Salva cliente' }).click();
+    await expect(page.getByText('Email non valida: controlla come è scritta.')).toBeVisible();
+    await expect(page).toHaveURL('/clienti/nuovo');
+    await page.getByLabel('Email (facoltativa)').fill('');
+    await page.getByRole('button', { name: 'Salva cliente' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: other })).toBeVisible();
+    await expect(page.getByText('Senza email')).toBeVisible();
+    const otherUrl = page.url();
+
+    // «Apri la scheda» led to the first customer; criterion 3: its data are erased.
+    await page.goto(customerUrl);
+    await page.getByRole('link', { name: 'Modifica cliente' }).click();
+    await page.getByRole('button', { name: 'Cancella i dati del cliente' }).click();
+    await page
+      .getByRole('dialog', { name: `Cancellare i dati di ${name}?` })
+      .getByRole('button', { name: 'Cancella i dati' })
+      .click();
+    await expect(page.getByText('Dati del cliente cancellati.')).toBeVisible();
+    await search(page, `rossi.${suffix}@exa`);
+    await expect(page.getByRole('heading', { name: 'Nessun cliente trovato' })).toBeVisible();
+
+    // At once another customer can save the same email.
+    await page.goto(otherUrl);
+    await page.getByRole('link', { name: 'Modifica cliente' }).click();
+    await page.getByLabel('Email (facoltativa)').fill(`  Rossi.${suffix}@Example.COM `);
+    await page.getByRole('button', { name: 'Salva modifiche' }).click();
+    await expect(page).toHaveURL(otherUrl);
+    await expect(page.getByRole('main').getByText(email, { exact: false })).toBeVisible();
+    await page.goto('/');
+    await search(page, `rossi.${suffix}@exa`);
+    await expect(homeCustomers(page).getByRole('link')).toHaveCount(1);
+    await expect(resultRow(page, other)).toBeVisible();
   });
 });
 
@@ -118,7 +208,7 @@ test('an operator creates a customer with only the name and the consent, and can
   await signIn(page, seedAccounts.operator.email);
 
   await createCustomer(page, name);
-  await expect(page.getByText('Senza telefono')).toBeVisible();
+  await expect(page.getByText('Senza email')).toBeVisible();
   await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
 
   await page.getByRole('link', { name: 'Modifica cliente' }).click();
@@ -153,7 +243,7 @@ test('Scheda cliente: a short name is not repeated under the header', async ({ p
   const name = `Breve ${uniqueSuffix()}`;
   await signIn(page);
   await createCustomer(page, name);
-  await expect(page.getByText('Senza telefono')).toBeVisible();
+  await expect(page.getByText('Senza email')).toBeVisible();
   await expect(page.getByRole('main').getByText(name, { exact: true })).toHaveCount(0);
 });
 
@@ -169,7 +259,7 @@ test('Nuovo cliente: touch targets are at least 48 px and the notice opens and c
     [
       page.getByRole('link', { name: 'Indietro' }),
       page.getByLabel('Nome e cognome'),
-      page.getByLabel('Telefono (facoltativo)'),
+      page.getByLabel('Email (facoltativa)'),
       // The touch area of the checkbox is its whole label row.
       page.locator('label', { has: consent }),
       page.getByRole('button', { name: 'Mostra l’informativa' }),
@@ -217,13 +307,14 @@ test('Scheda cliente: the saved customer opens with SALDO, and the header button
   await signIn(page);
   await page.goto('/clienti/nuovo');
   await page.getByLabel('Nome e cognome').fill(name);
-  await page.getByLabel('Telefono (facoltativo)').fill('333 000 9876');
+  await page
+    .getByLabel('Email (facoltativa)')
+    .fill(`scheda.${Date.now().toString(36)}@example.com`);
   await page.getByText('Ha letto l’informativa privacy').click();
   await page.getByRole('button', { name: 'Salva cliente' }).click();
 
   await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
   await expect(page).toHaveURL(/\/clienti\/[0-9a-f-]{36}$/);
-  await expect(page.getByText('Tel. 333 ••• 9876')).toBeVisible();
   await expect(page.getByRole('region', { name: 'SALDO' })).toContainText('0 punti');
 
   const boxes = await Promise.all(

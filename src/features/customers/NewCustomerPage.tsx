@@ -20,9 +20,10 @@ const FORM_ID = 'new-customer';
  * Nuovo cliente (`/clienti/nuovo`, `?nome=` optional; wireframes Nuovo cliente senza card and Nome
  * già usato): the form, checked in the app, and "Salva cliente" in the footer, busy while sending.
  * When the outcome is unknown the footer offers "Riprova", which sends the same operation again.
- * With `?card=UID` (wireframe Card sconosciuta: nuovo cliente, SPEC-cards point 2) the card read
- * is shown above the form and saved with the customer. With a card (from `?card` or read here) the
- * link is written on it after the save, then Registra spesa (with `?card`) or the customer opens.
+ * With the card of the home in the history state (wireframe Card sconosciuta: nuovo cliente,
+ * SPEC-cards point 2; never `?card=`, SPEC-customers-v2 point 6) the card read is shown above the
+ * form and saved with the customer. With a card (from the home or read here) the link is written
+ * on it after the save, then Registra spesa (card from the home) or the customer opens.
  */
 export function NewCustomerPage() {
   const [searchParams] = useSearchParams();
@@ -49,7 +50,7 @@ export function NewCustomerPage() {
       {failure?.uncertain ? 'Riprova' : 'Salva cliente'}
     </Button>
   );
-  // From `?card`: the card read, or the notice that it is someone else's (SPEC-cards, point 2).
+  // From the home: the card read, or the notice that it is someone else's (SPEC-cards, point 2).
   const linkCard =
     fromLink &&
     (card.taken ? (

@@ -20,7 +20,8 @@ describe('escapeField', () => {
 describe('guardFormula', () => {
   it.each([
     ['=SOMMA(A1)', "'=SOMMA(A1)"],
-    ['+39 333', "'+39 333"],
+    ['+1+1', "'+1+1"],
+    ['=cmd@example.com', "'=cmd@example.com"],
     ['-Mario', "'-Mario"],
     ['@SUM(A1)', "'@SUM(A1)"],
     ['\tcmd', "'\tcmd"],
@@ -37,21 +38,22 @@ describe('guardFormula', () => {
 });
 
 describe('excelText', () => {
-  it('writes a phone number or a card uid as an Excel text formula', () => {
-    expect(excelText('+393331234567')).toBe('="+393331234567"');
+  it('writes a card uid as an Excel text formula', () => {
     expect(excelText('04A1B2C3D4E5F6')).toBe('="04A1B2C3D4E5F6"');
+    expect(excelText('0012')).toBe('="0012"');
   });
 
   it('doubles the quotes of the formula once the field is escaped', () => {
-    expect(escapeField(excelText('+393331234567'))).toBe('"=""+393331234567"""');
+    expect(escapeField(excelText('04A1B2C3D4E5F6'))).toBe('"=""04A1B2C3D4E5F6"""');
   });
 
   it('falls back to guarded free text when the value is not a plain number or hex uid', () => {
-    expect(excelText('+39"),HYPERLINK("x')).toBe('\'+39"),HYPERLINK("x');
-    expect(excelText('+39ABCXYZ')).toBe("'+39ABCXYZ");
+    expect(excelText('+1234')).toBe("'+1234");
+    expect(excelText('+1"),HYPERLINK("x')).toBe('\'+1"),HYPERLINK("x');
+    expect(excelText('04"),HYPERLINK("x')).toBe('04"),HYPERLINK("x');
     expect(excelText('04a1b2c3')).toBe('04a1b2c3');
     expect(excelText('=1+1')).toBe("'=1+1");
-    expect(excelText('+' + '1'.repeat(21))).toBe("'+" + '1'.repeat(21));
+    expect(excelText('1'.repeat(21))).toBe('1'.repeat(21));
   });
 
   it('leaves an empty value empty', () => {
@@ -76,16 +78,16 @@ describe('toCsv', () => {
   });
 
   it('round-trips names with separators, quotes and line breaks through an RFC 4180 reader', () => {
-    const header = ['Codice cliente', 'Nome', 'Note', 'Telefono'];
+    const header = ['Codice cliente', 'Nome', 'Note', 'Card attiva'];
     const rows = [
       [
         'c1',
         guardFormula('Rossi; Mario "il barone"'),
         guardFormula('riga 1\r\nriga 2'),
-        excelText('+393331234567'),
+        excelText('04A1B2C3D4E5F6'),
       ],
       ['c2', guardFormula('=SOMMA(A1)'), guardFormula('nota; con "virgolette"\n'), excelText('')],
-      ['c3', guardFormula('-Bianchi;"x"'), guardFormula('\rinizio'), excelText('+39"x')],
+      ['c3', guardFormula('-Bianchi;"x"'), guardFormula('\rinizio'), excelText('04"x')],
     ];
     const text = toCsv(header, rows);
     expect(text.startsWith(BOM)).toBe(true);
@@ -94,7 +96,7 @@ describe('toCsv', () => {
     expect(parsed).toEqual([header, ...rows]);
     expect(parsed[1]?.[1]).toBe('Rossi; Mario "il barone"');
     expect(parsed[2]?.[1]).toBe("'=SOMMA(A1)");
-    expect(parsed[1]?.[3]).toBe('="+393331234567"');
+    expect(parsed[1]?.[3]).toBe('="04A1B2C3D4E5F6"');
   });
 
   it('quotes a guarded name only when it holds a separator, a quote or a line break', () => {

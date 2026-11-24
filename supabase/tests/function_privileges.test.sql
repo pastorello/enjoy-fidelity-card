@@ -1,9 +1,10 @@
 -- No function in app or private may be executable by anon or PUBLIC, today or
 -- when created later: callers must be signed in, and every grant is explicit.
+-- In public, anon executes exactly the two functions of the public points page.
 -- The steps of the Edge Function that run with the secret key are service_role only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(7);
 
 create function app.privilege_probe() returns int language sql as $$ select 1 $$;
 create function private.privilege_probe() returns int language sql as $$ select 1 $$;
@@ -31,6 +32,17 @@ select is(
   ),
   array[]::text[],
   'PUBLIC has no execute on any function in app or private'
+);
+select is(
+  array(
+    select p.oid::regprocedure::text
+    from pg_proc p
+    where p.pronamespace = 'public'::regnamespace
+      and has_function_privilege('anon', p.oid, 'execute')
+    order by 1
+  ),
+  array['card_points(text)', 'card_rewards(text)'],
+  'in public anon executes exactly card_points and card_rewards'
 );
 select ok(
   has_function_privilege('authenticated', 'app.privilege_probe()', 'execute'),

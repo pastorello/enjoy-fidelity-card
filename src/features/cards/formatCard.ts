@@ -28,14 +28,22 @@ export function shortName(name: string): string {
 }
 
 /**
- * formatCardSince('2026-11-03T09:00:00Z') → "dal 3 nov": the day the card was associated or
- * reactivated, in Europe/Rome, with the year only when it is not the current one.
+ * formatCardDay('2026-11-12T09:00:00Z') → "12 nov": a day of the card's life, in Europe/Rome, with
+ * the year only when it is not the current one («Disattivata il 12 nov»).
  */
-export function formatCardSince(iso: string, now: Date = new Date()): string {
+export function formatCardDay(iso: string, now: Date = new Date()): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
     throw new RangeError(`not a date: ${iso}`);
   }
   const sameYear = yearOnly.format(date) === yearOnly.format(now);
-  return `dal ${(sameYear ? dayMonth : dayMonthYear).format(date)}`;
+  return (sameYear ? dayMonth : dayMonthYear).format(date);
+}
+
+/**
+ * formatCardSince('2026-11-03T09:00:00Z') → "dal 3 nov": the day the card was associated or
+ * reactivated, in Europe/Rome, with the year only when it is not the current one.
+ */
+export function formatCardSince(iso: string, now: Date = new Date()): string {
+  return `dal ${formatCardDay(iso, now)}`;
 }

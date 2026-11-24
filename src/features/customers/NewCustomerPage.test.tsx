@@ -7,6 +7,7 @@ import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
 const NAME = 'Nome e cognome';
+const EMAIL = 'Email (facoltativa)';
 const NETWORK_TEXT = 'Cliente non salvato: controlla la connessione e riprova.';
 
 async function renderNewCustomer(
@@ -70,10 +71,7 @@ describe('NewCustomerPage', () => {
   it('saves and opens the new customer, replacing Nuovo cliente in the history', async () => {
     const { customers, router } = await renderNewCustomer();
     await fillValid();
-    await userEvent.type(
-      screen.getByRole('textbox', { name: 'Telefono (facoltativo)' }),
-      '333 123 4521',
-    );
+    await userEvent.type(screen.getByRole('textbox', { name: EMAIL }), 'Rossi@Bar.it');
     fireEvent.click(screen.getByRole('button', { name: 'Salva cliente' }));
 
     const [saved] = customers.customers();
@@ -83,10 +81,18 @@ describe('NewCustomerPage', () => {
     const [input] = customers.service.create.mock.calls[0] ?? [];
     expect(input).toMatchObject({
       name: 'Maria Rossi',
-      phone: '333 123 4521',
+      email: 'Rossi@Bar.it',
       privacyConsent: true,
       notes: '',
     });
+    // The form's fields and nothing else: no phone (SPEC-customers-v2, point 1).
+    expect(Object.keys(input ?? {}).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'email',
+      'name',
+      'notes',
+      'operationId',
+      'privacyConsent',
+    ]);
     expect(input?.operationId).toMatch(/^[0-9a-f-]{36}$/);
   });
 
@@ -164,6 +170,61 @@ describe('NewCustomerPage', () => {
     expect(screen.getByRole('button', { name: 'Salva cliente' })).not.toHaveAttribute('aria-busy');
   });
 
+  it('email already used: the error under the email, "Apri la scheda" to that customer, no help text', async () => {
+    const existing = fakeCustomer({ name: 'Maria Rossi', email: 'rossi@example.com' });
+    const customers = createFakeCustomerService({ customers: [existing] });
+    await renderNewCustomer('/clienti/nuovo', customers);
+    await fillValid('Maria Bianchi');
+    await userEvent.type(screen.getByRole('textbox', { name: EMAIL }), 'Rossi@Example.COM');
+    fireEvent.click(screen.getByRole('button', { name: 'Salva cliente' }));
+
+    const link = await screen.findByRole('link', { name: 'Apri la scheda' });
+    expect(link).toHaveAttribute('href', `/clienti/${existing.id}`);
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    expect(email).toHaveAttribute('aria-invalid', 'true');
+    expect(email).toHaveFocus();
+    expect(email).toHaveAccessibleDescription(
+      'Esiste già un cliente con questa email. Apri la scheda',
+    );
+    expect(screen.queryByText(/Il nome identifica il cliente/)).not.toBeInTheDocument();
+    expect(customers.customers()).toHaveLength(1);
+  });
+
+  it('name and email both used: the name first, then, with a new name, the email', async () => {
+    const existing = fakeCustomer({ name: 'Maria Rossi', email: 'rossi@example.com' });
+    const customers = createFakeCustomerService({ customers: [existing] });
+    await renderNewCustomer('/clienti/nuovo', customers);
+    await fillValid('Maria Rossi');
+    await userEvent.type(screen.getByRole('textbox', { name: EMAIL }), 'rossi@example.com');
+    fireEvent.click(screen.getByRole('button', { name: 'Salva cliente' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: NAME })).toHaveAttribute('aria-invalid', 'true'),
+    );
+    expect(screen.getByRole('textbox', { name: EMAIL })).not.toHaveAttribute('aria-invalid');
+
+    await fillValid('Maria Rossi Serapo');
+    fireEvent.click(screen.getByRole('button', { name: 'Salva cliente' }));
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: EMAIL })).toHaveAccessibleDescription(
+        'Esiste già un cliente con questa email. Apri la scheda',
+      ),
+    );
+    expect(screen.getByRole('textbox', { name: NAME })).not.toHaveAttribute('aria-invalid');
+    expect(screen.getByRole('textbox', { name: EMAIL })).toHaveFocus();
+  });
+
+  it('an email in the wrong format is refused in the app: no call', async () => {
+    const { customers } = await renderNewCustomer();
+    await fillValid();
+    await userEvent.type(screen.getByRole('textbox', { name: EMAIL }), 'rossi@');
+    fireEvent.click(screen.getByRole('button', { name: 'Salva cliente' }));
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    expect(email).toHaveAccessibleDescription('Email non valida: controlla come è scritta.');
+    expect(email).toHaveFocus();
+    expect(customers.service.create).not.toHaveBeenCalled();
+  });
+
   it('after a refusal the next save uses a new operation_id', async () => {
     const existing = fakeCustomer({ name: 'Maria Rossi' });
     const customers = createFakeCustomerService({ customers: [existing] });
@@ -187,16 +248,14 @@ describe('NewCustomerPage', () => {
   it('shows a refusal of the server under its field and focuses it', async () => {
     const { customers } = await renderNewCustomer();
     await fillValid();
-    customers.failNext('create', 'phone_invalid');
+    customers.failNext('create', 'email_invalid');
     fireEvent.click(screen.getByRole('button', { name: 'Salva cliente' }));
 
-    const phone = screen.getByRole('textbox', { name: 'Telefono (facoltativo)' });
+    const email = screen.getByRole('textbox', { name: EMAIL });
     await waitFor(() =>
-      expect(phone).toHaveAccessibleDescription(
-        'Numero non valido: scrivi solo le cifre, con o senza prefisso.',
-      ),
+      expect(email).toHaveAccessibleDescription('Email non valida: controlla come è scritta.'),
     );
-    expect(phone).toHaveFocus();
+    expect(email).toHaveFocus();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 

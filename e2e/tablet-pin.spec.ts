@@ -38,19 +38,25 @@ async function openPhone(browser: Browser, testInfo: TestInfo) {
 }
 
 /** Impostazioni → ACCOUNT → "PIN della cassa" on the phone: chosen, repeated, saved. */
-async function setPinFromPhone(phone: Page, pin: string, before: 'Da impostare' | 'Impostato') {
-  await phone.goto('/impostazioni');
-  const row = phone.getByRole('link', { name: /PIN della cassa/ });
+async function setPinFromPhone(
+  operatorPhone: Page,
+  pin: string,
+  before: 'Da impostare' | 'Impostato',
+) {
+  await operatorPhone.goto('/impostazioni');
+  const row = operatorPhone.getByRole('link', { name: /PIN della cassa/ });
   await expect(row).toContainText(before);
   await row.click();
-  await expect(phone).toHaveURL(/\/impostazioni\/pin$/);
-  await expect(phone.getByRole('heading', { name: 'Scegli il PIN' })).toBeVisible();
-  await tapPin(phone, pin);
-  await expect(phone.getByRole('heading', { name: 'Ripeti il PIN' })).toBeVisible();
-  await tapPin(phone, pin);
-  await expect(phone).toHaveURL(/\/impostazioni$/);
-  await expect(phone.getByText('PIN salvato.')).toBeVisible();
-  await expect(phone.getByRole('link', { name: /PIN della cassa/ })).toContainText('Impostato');
+  await expect(operatorPhone).toHaveURL(/\/impostazioni\/pin$/);
+  await expect(operatorPhone.getByRole('heading', { name: 'Scegli il PIN' })).toBeVisible();
+  await tapPin(operatorPhone, pin);
+  await expect(operatorPhone.getByRole('heading', { name: 'Ripeti il PIN' })).toBeVisible();
+  await tapPin(operatorPhone, pin);
+  await expect(operatorPhone).toHaveURL(/\/impostazioni$/);
+  await expect(operatorPhone.getByText('PIN salvato.')).toBeVisible();
+  await expect(operatorPhone.getByRole('link', { name: /PIN della cassa/ })).toContainText(
+    'Impostato',
+  );
 }
 
 /** Pin Prova as in the seed (no PIN) and its tablet free, whatever an earlier run left. */

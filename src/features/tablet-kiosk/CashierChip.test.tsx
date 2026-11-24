@@ -5,7 +5,7 @@ import { fakeDevice } from '../../test/fakeAuthService';
 import { createFakeKioskService, fakeCashier } from '../../test/fakeKioskService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 
-const SEARCH_LABEL = 'Oppure cerca per nome o telefono';
+const SEARCH_LABEL = 'Oppure cerca per nome o email';
 const CHIP = 'Alla cassa: Giulia · Cambia';
 
 /** A device whose cashier, Giulia, has just unlocked the till; the kiosk fake drives the identity. */

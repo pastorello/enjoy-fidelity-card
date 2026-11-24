@@ -24,7 +24,7 @@ aggiungono soltanto parti delimitate (colonna "Contributi").
 | Movimenti: conferma di annullamento | `/clienti/:id/movimenti` | `ledger` | — |
 | Nuovo cliente senza card | `/clienti/nuovo` | `customers` | `cards` (sezione "Card (facoltativa)") |
 | Nome già usato | `/clienti/nuovo` | `customers` | — |
-| Card sconosciuta: nuovo cliente | `/clienti/nuovo?card=` | `cards` | usa il form di `customers` |
+| Card sconosciuta: nuovo cliente | `/clienti/nuovo` (`state.card`) | `cards` | usa il form di `customers` |
 | Modifica cliente | `/clienti/:id/modifica` | `customers` | `cards` (sezione CARD) |
 | Associa o sostituisci card | `/clienti/:id/card` | `cards` | `card-input` (`CardReadPanel`) |
 | Card già di un altro cliente | `/clienti/:id/card` | `cards` | — |
@@ -129,7 +129,7 @@ avanti con quello.
 1. **Informativa privacy** (consulente del bar).
    - Serve il testo approvato da mostrare in Nuovo cliente.
    - Il consulente deve dire se, oltre alla data del consenso, va salvata anche la versione dell'informativa accettata.
-   - L'informativa deve citare che il CSV dei clienti, con nomi e telefoni, resta nei Download del telefono dell'amministratore.
+   - L'informativa deve citare che il CSV dei clienti, con nomi ed email, resta nei Download del telefono dell'amministratore.
    - *Default:* testo segnaposto marcato "bozza", si salva solo la data del consenso. È un bloccante del checkpoint di lancio, non dello sviluppo.
 2. **Testi dell'app che non sono nei wireframe** (errori, conferme, dialoghi, stati vuoti in tutti i moduli).
    - *Default:* i testi scritti nelle specifiche, nello stile «Stati, errori e conferme» del design system.
@@ -150,14 +150,14 @@ avanti con quello.
      - nomi dei premi fino a 60 caratteri, descrizione del premio libero fino a 80.
 6. **Cosa possono fare i camerieri.**
    - *Default:*
-     - modificano nome, telefono e note di un cliente;
+     - modificano nome, email e note di un cliente;
      - associano, sostituiscono e disattivano card;
      - non vedono la soglia di conferma;
      - non annullano dallo storico: possono annullare solo dalla schermata di conferma, entro 10 s;
      - cancellare i dati di un cliente resta riservato all'amministratore.
 7. **Clienti e premi.**
    - *Default:*
-     - lo stesso telefono può appartenere a più clienti (per esempio una famiglia);
+     - l'email è facoltativa e unica: due clienti non hanno la stessa (`SPEC-customers-v2.md`, decisione del 2026-11-23);
      - i premi non si cancellano mai, si disattivano;
      - nome e punti di un premio si possono modificare, e i riscatti già registrati non cambiano.
 8. **File CSV.**
@@ -165,7 +165,7 @@ avanti con quello.
      - sempre tutto lo storico, senza filtri per periodo;
      - le colonne sono quelle di `SPEC-export.md` punto 5;
      - date in formato gg/mm/aaaa hh:mm:ss, ora italiana;
-     - telefono e codice card scritti in modo che Excel non tolga il "+" e gli zeri iniziali.
+     - codice card scritto in modo che Excel non tolga gli zeri iniziali.
 9. **Tablet: sicurezza del PIN** (solo fase 3).
    - *Default:* blocco di 5 minuti dopo 5 PIN errati; turno valido 12 ore; nessuna uscita automatica per inattività.
    - Rischio 1: chi lascia la cassa senza "Cambia" lascia che altri registrino a suo nome.

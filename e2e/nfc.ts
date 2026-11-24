@@ -1,7 +1,10 @@
 import { expect, type Page } from '@playwright/test';
 
-/** One link written by the fake writer (src/features/card-input/fakeCardAdapter.ts). */
-export type FakeCardWrite = { uid: string; url: string; at: number };
+/**
+ * One write of the fake writer (src/features/card-input/fakeCardAdapter.ts): the link written, or
+ * `null` for a card erased by «Riformatta» (SPEC-customers-v2, point 4).
+ */
+export type FakeCardWrite = { uid: string; url: string | null; at: number };
 
 declare global {
   interface Window {
@@ -18,8 +21,9 @@ declare global {
 }
 
 /**
- * The links the fake writer has written so far, oldest first (SPEC-card-input, point 7): the log the
- * tests read to open the link written on a card. Fails if the page is not an E2E build.
+ * What the fake writer has written so far, oldest first (SPEC-card-input, point 7): the log the tests
+ * read to open the link written on a card (`url: null` for an erased card). Fails if the page is not
+ * an E2E build.
  */
 export async function fakeCardWrites(page: Page): Promise<FakeCardWrite[]> {
   return page.evaluate(() => {
@@ -27,6 +31,16 @@ export async function fakeCardWrites(page: Page): Promise<FakeCardWrite[]> {
     if (!Array.isArray(writes)) throw new Error('Not an E2E build: no __enjoyFakeCardWrites');
     return writes.map((entry) => ({ ...entry }));
   });
+}
+
+/**
+ * The cards the fake writer has erased so far, oldest first (SPEC-customers-v2, point 4: the entries
+ * of the log with `url: null`), only those of `uid` when given. Fails if the page is not an E2E build.
+ */
+export async function fakeCardErasures(page: Page, uid?: string): Promise<FakeCardWrite[]> {
+  return (await fakeCardWrites(page)).filter(
+    (entry) => entry.url === null && (uid === undefined || entry.uid === uid),
+  );
 }
 
 /** How the stubbed `scan()` ends: `'ok'` resolves, any other value rejects with that DOMException. */
@@ -133,17 +147,25 @@ export async function writeAfterSave(page: Page, uid: string, next: string | Reg
 /**
  * Registers a customer with a new card from the home, as at the till; returns its id, its name and
  * when the card was last tapped (the reader ignores the same uid for REPEAT_WINDOW_MS after it).
+ * With `email`, the optional field is filled in too.
  */
-export async function customerWithCard(page: Page, prefix: string, uid: string) {
+export async function customerWithCard(
+  page: Page,
+  prefix: string,
+  uid: string,
+  { email }: { email?: string } = {},
+) {
   await page.goto('/');
   await expect(page.getByRole('region', { name: 'Lettura card' })).toContainText(
     'Avvicina la card',
   );
   const firstTap = Date.now();
   await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
-  await expect(page).toHaveURL(`/clienti/nuovo?card=${uid}`);
+  await expect(page).toHaveURL('/clienti/nuovo');
+  await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(`Codice ${uid}:`);
   const name = uniqueName(prefix);
   await page.getByRole('textbox', { name: 'Nome e cognome' }).fill(name);
+  if (email !== undefined) await page.getByLabel('Email (facoltativa)').fill(email);
   await page.getByRole('checkbox', { name: /Ha letto l’informativa privacy/ }).check();
   await page.getByRole('button', { name: 'Salva cliente' }).click();
   const lastTap = (await writeAfterSave(page, uid, /\/clienti\/[0-9a-f-]{36}\/spesa$/)) ?? firstTap;
@@ -168,4 +190,30 @@ export async function tapUntilWritten(page: Page, uid: string, customerPath: str
     }
     await expect(page).toHaveURL(customerPath, { timeout: 1000 });
   }).toPass({ timeout: 10_000 });
+}
+
+/**
+ * Puts `uid` back on the phone whenever the panel `region` asks for it («Avvicina la card …»), until
+ * `done` passes: the fake writer writes (or erases) at once only a card tapped less than 1.5 s
+ * before (IN_FIELD_MS), otherwise it waits for the card, as the operator would put it back.
+ * `done` should fail fast (a 1 s timeout). Returns when the card was last tapped (null: not here).
+ */
+export async function tapWhileAsked(
+  page: Page,
+  uid: string,
+  region: 'Scrittura del link' | 'Riformattazione della card',
+  done: () => Promise<void>,
+): Promise<number | null> {
+  const again = page
+    .getByRole('region', { name: region })
+    .getByText(`Avvicina la card …${uid.slice(-4)}`);
+  let lastTap: number | null = null;
+  await expect(async () => {
+    if (await again.isVisible()) {
+      lastTap = Date.now();
+      await page.evaluate((read) => window.__enjoyFakeCard?.(read), asWebNfc(uid));
+    }
+    await done();
+  }).toPass({ timeout: 10_000 });
+  return lastTap;
 }

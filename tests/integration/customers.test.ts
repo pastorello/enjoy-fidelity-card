@@ -61,17 +61,27 @@ describe('operator', () => {
     current.client = operatorClient;
   });
 
-  it('creates a customer with name, phone and consent; the phone is saved in E.164', async () => {
+  it('creates a customer with name, email and consent; the email is saved normalized', async () => {
     const created = await service.create({
       operationId,
       name,
-      phone: '333 000 0009',
+      email: ` Nicolo.${SUFFIX}@Example.COM `,
       privacyConsent: true,
       notes: '  ',
     });
+    // Only the summary's fields: no phone (SPEC-customers-v2, point 1).
+    expect(Object.keys(created).toSorted((a, b) => a.localeCompare(b))).toEqual([
+      'anonymizedAt',
+      'balance',
+      'email',
+      'id',
+      'lastServedAt',
+      'name',
+      'notes',
+    ]);
     expect(created).toMatchObject({
       name,
-      phone: '+393330000009',
+      email: `nicolo.${SUFFIX}@example.com`,
       notes: null,
       anonymizedAt: null,
       balance: 0,
@@ -84,7 +94,7 @@ describe('operator', () => {
     const again = await service.create({
       operationId,
       name,
-      phone: '333 000 0009',
+      email: ` Nicolo.${SUFFIX}@Example.COM `,
       privacyConsent: true,
       notes: '',
     });
@@ -92,11 +102,10 @@ describe('operator', () => {
     expect(rowsWithOperation(operationId)).toBe('1');
   });
 
-  it('finds it by name without accents and by the phone digits', async () => {
-    const byName = await service.search(`nicolo integrazione ${SUFFIX}`);
-    expect(byName.map((customer) => customer.id)).toEqual([createdId]);
-    const byPhone = await service.search('0000009');
-    expect(byPhone.map((customer) => customer.id)).toContain(createdId);
+  it('lists it filtered by name without accents', async () => {
+    const page = await service.list({ query: `nicolo integrazione ${SUFFIX}`, after: null });
+    expect(page.customers.map((customer) => customer.id)).toEqual([createdId]);
+    expect(page.hasMore).toBe(false);
   });
 
   it('reads it back with get, and null for an id that does not exist', async () => {
@@ -109,7 +118,7 @@ describe('operator', () => {
       service.create({
         operationId: randomUUID(),
         name: `NICOLO  integrazione ${SUFFIX}`,
-        phone: '',
+        email: '',
         privacyConsent: true,
         notes: '',
       }),
@@ -117,23 +126,34 @@ describe('operator', () => {
   });
 
   it('validation refusals come back as their codes', async () => {
-    const base = { operationId: randomUUID(), name, phone: '', privacyConsent: true, notes: '' };
+    const base = {
+      operationId: randomUUID(),
+      name,
+      email: '',
+      privacyConsent: true,
+      notes: '',
+    };
     await expect(
       service.create({ ...base, name: `Senza consenso ${SUFFIX}`, privacyConsent: false }),
     ).rejects.toMatchObject({ kind: 'consent_required' });
     await expect(
-      service.create({ ...base, name: `Telefono ${SUFFIX}`, phone: '12' }),
-    ).rejects.toMatchObject({ kind: 'phone_invalid' });
+      service.create({ ...base, name: `Email Errata ${SUFFIX}`, email: 'rossi@' }),
+    ).rejects.toMatchObject({ kind: 'email_invalid' });
     await expect(service.create({ ...base, name: '   ' })).rejects.toMatchObject({
       kind: 'name_required',
     });
   });
 
-  it('updates the phone to blank, which removes it', async () => {
-    const updated = await service.update({ id: createdId, name, phone: '', notes: 'Tavolo 4' });
-    expect(updated).toMatchObject({ id: createdId, phone: null, notes: 'Tavolo 4' });
+  it('updates the email to blank, which removes it', async () => {
+    const updated = await service.update({
+      id: createdId,
+      name,
+      email: '',
+      notes: 'Tavolo 4',
+    });
+    expect(updated).toMatchObject({ id: createdId, email: null, notes: 'Tavolo 4' });
     await expect(
-      service.update({ id: randomUUID(), name, phone: '', notes: '' }),
+      service.update({ id: randomUUID(), name, email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_not_found' });
   });
 
@@ -142,20 +162,129 @@ describe('operator', () => {
     await expect(service.get(createdId)).resolves.toMatchObject({ name, anonymizedAt: null });
   });
 
-  it('servedToday lists the customer after a purchase today, with the real balance', async () => {
-    // Other customers may have been served today on this stack (e2e runs): only ours is checked.
-    await expect(service.servedToday()).resolves.not.toContainEqual(
-      expect.objectContaining({ id: createdId }),
-    );
+  it('list gives the last activity after a purchase today, with the real balance', async () => {
+    // Other customers may be served on this stack (e2e runs): only ours is checked, by its name.
+    const ours = async () =>
+      (await service.list({ query: name, after: null })).customers.find(
+        (customer) => customer.id === createdId,
+      );
+    await expect(ours()).resolves.toMatchObject({ lastActivityAt: null });
     await ledger.recordPurchase({
       operationId: randomUUID(),
       customerId: createdId,
       amountCents: 1250,
     });
 
-    const ours = (await service.servedToday()).find((customer) => customer.id === createdId);
-    expect(ours).toMatchObject({ id: createdId, balance: 12, anonymizedAt: null });
-    expect(ours?.lastServedAt).not.toBeNull();
+    const served = await ours();
+    expect(served).toMatchObject({ id: createdId, balance: 12 });
+    expect(served?.lastActivityAt).not.toBeNull();
+  });
+});
+
+describe('email (customers-v2)', () => {
+  const email = `maria.${SUFFIX}@example.com`;
+  const base = { privacyConsent: true, notes: '' };
+
+  beforeAll(() => {
+    current.client = operatorClient;
+  });
+
+  it('create stores it normalized; get returns it; the same email is taken with its id', async () => {
+    const created = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Prima ${SUFFIX}`,
+      email: `  ${email.toUpperCase()} `,
+    });
+    toErase.push(created.id);
+    expect(created.email).toBe(email);
+    await expect(service.get(created.id)).resolves.toMatchObject({ email });
+
+    await expect(
+      service.create({
+        ...base,
+        operationId: randomUUID(),
+        name: `Email Seconda ${SUFFIX}`,
+        email,
+      }),
+    ).rejects.toMatchObject({ kind: 'customer_email_taken', existingCustomerId: created.id });
+    await expect(
+      service.create({
+        ...base,
+        operationId: randomUUID(),
+        name: `Email Seconda ${SUFFIX}`,
+        email: 'maria@rossi',
+      }),
+    ).rejects.toMatchObject({ kind: 'email_invalid', existingCustomerId: null });
+  });
+
+  it('update keeps its own email, a blank email removes it, and frees it for another', async () => {
+    const owner = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Terza ${SUFFIX}`,
+      email: `terza.${SUFFIX}@example.com`,
+    });
+    toErase.push(owner.id);
+    const update = { ...base, id: owner.id, name: owner.name };
+
+    await expect(
+      service.update({ ...update, email: `Terza.${SUFFIX}@Example.com` }),
+    ).resolves.toMatchObject({ email: `terza.${SUFFIX}@example.com` });
+    await expect(service.update({ ...update, email: '' })).resolves.toMatchObject({
+      email: null,
+    });
+    const other = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Quarta ${SUFFIX}`,
+      email: `terza.${SUFFIX}@example.com`,
+    });
+    toErase.push(other.id);
+    expect(other.email).toBe(`terza.${SUFFIX}@example.com`);
+  });
+
+  it('list finds a customer by part of the email, and never returns the email in the rows', async () => {
+    const owner = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Cercata ${SUFFIX}`,
+      email: `cercata.${SUFFIX}@example.com`,
+    });
+    toErase.push(owner.id);
+    for (const query of [
+      `cercata.${SUFFIX}@exa`,
+      `CERCATA.${SUFFIX}`,
+      ` cercata.${SUFFIX}@example.com `,
+    ]) {
+      // oxlint-disable-next-line no-await-in-loop -- one query at a time keeps the failure readable.
+      const page = await service.list({ query, after: null });
+      expect(page.customers.map((customer) => customer.id)).toEqual([owner.id]);
+      expect(page.customers[0]).not.toHaveProperty('email');
+    }
+    await expect(
+      service.list({ query: `nessuna.${SUFFIX}@example.com`, after: null }),
+    ).resolves.toEqual({ customers: [], hasMore: false });
+  });
+
+  it('the anonymization clears the email and frees it', async () => {
+    const erased = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Cancellata ${SUFFIX}`,
+      email: `cancellata.${SUFFIX}@example.com`,
+    });
+    current.client = adminClient;
+    await expect(service.anonymize(erased.id)).resolves.toMatchObject({ email: null });
+    current.client = operatorClient;
+    const reused = await service.create({
+      ...base,
+      operationId: randomUUID(),
+      name: `Email Riusata ${SUFFIX}`,
+      email: `cancellata.${SUFFIX}@example.com`,
+    });
+    toErase.push(reused.id);
+    expect(reused.email).toBe(`cancellata.${SUFFIX}@example.com`);
   });
 });
 
@@ -170,7 +299,7 @@ describe('admin', () => {
     const created = await service.create({
       operationId: randomUUID(),
       name,
-      phone: '333 000 0008',
+      email: `da.cancellare.${SUFFIX}@example.com`,
       privacyConsent: true,
       notes: 'Nota di prova',
     });
@@ -179,24 +308,27 @@ describe('admin', () => {
     expect(erased).toMatchObject({
       id: created.id,
       name: `Cliente cancellato ${created.id.slice(0, 8)}`,
-      phone: null,
+      email: null,
       notes: null,
     });
     expect(erased.anonymizedAt).not.toBeNull();
 
     // Repeating it changes nothing.
     await expect(service.anonymize(created.id)).resolves.toEqual(erased);
-    await expect(service.search(`da cancellare ${SUFFIX}`)).resolves.toEqual([]);
+    await expect(service.list({ query: `da cancellare ${SUFFIX}`, after: null })).resolves.toEqual({
+      customers: [],
+      hasMore: false,
+    });
     await expect(service.get(created.id)).resolves.toEqual(erased);
     // An anonymized customer cannot be edited.
     await expect(
-      service.update({ id: created.id, name, phone: '', notes: '' }),
+      service.update({ id: created.id, name, email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_anonymized' });
   });
 });
 
 /**
- * Two phones saving at the same moment: the pre-check of the RPC does not see a row another
+ * Two operators saving at the same moment: the pre-check of the RPC does not see a row another
  * transaction has inserted but not committed yet, so the INSERT or UPDATE waits on the unique
  * index and then hits unique_violation. The RPC must settle it with the constraint it hit, never
  * with a raw 23505 (which the app would show as a network error).
@@ -212,17 +344,22 @@ describe('concurrent saves', () => {
    * Inserts a customer in a transaction kept open for HOLD_SECONDS and resolves once the row is
    * inserted (the session is sleeping); `done` settles when it has committed.
    */
-  async function holdInsert(row: { id: string; name: string; operationId: string }) {
+  async function holdInsert(row: {
+    id: string;
+    name: string;
+    operationId: string;
+    email?: string;
+  }) {
     const marker = `race-${randomUUID()}`;
     const done = runSqlInBackground(
       `begin;
-       insert into app.customers (id, name, privacy_consent_at, created_by, create_operation_id)
-       values (:'id'::uuid, :'name', now(),
+       insert into app.customers (id, name, email, privacy_consent_at, created_by, create_operation_id)
+       values (:'id'::uuid, :'name', nullif(:'email', ''), now(),
                (select id from app.operators order by created_at limit 1),
                :'op'::uuid);
        select pg_sleep(${HOLD_SECONDS}) /* ${marker} */;
        commit;`,
-      { id: row.id, name: row.name, op: row.operationId },
+      { id: row.id, name: row.name, op: row.operationId, email: row.email ?? '' },
     );
     await vi.waitFor(
       () => {
@@ -245,7 +382,7 @@ describe('concurrent saves', () => {
     const attempt = service.create({
       operationId: randomUUID(),
       name: held.name,
-      phone: '',
+      email: '',
       privacyConsent: true,
       notes: '',
     });
@@ -263,7 +400,7 @@ describe('concurrent saves', () => {
     const again = await service.create({
       operationId: held.operationId,
       name: `Gara Invio Doppio ${SUFFIX}`,
-      phone: '',
+      email: '',
       privacyConsent: true,
       notes: '',
     });
@@ -272,11 +409,44 @@ describe('concurrent saves', () => {
     expect(rowsWithOperation(held.operationId)).toBe('1');
   });
 
+  it('create: the same email twice at the same moment makes one customer, the other is taken', async () => {
+    // Different names and operation ids: only the email collides. The two calls go out together,
+    // so one of them meets the other's uncommitted row on customers_email_key.
+    const email = `gara.doppia.${SUFFIX}@example.com`;
+    const attempts = [`Gara Doppia Uno ${SUFFIX}`, `Gara Doppia Due ${SUFFIX}`].map((name, index) =>
+      service.create({
+        operationId: randomUUID(),
+        name,
+        email: index === 0 ? email : `  ${email.toUpperCase()} `,
+        privacyConsent: true,
+        notes: '',
+      }),
+    );
+    const results = await Promise.allSettled(attempts);
+    const created = results.flatMap((result) =>
+      result.status === 'fulfilled' ? [result.value] : [],
+    );
+    const refused = results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : [],
+    );
+    expect(created).toHaveLength(1);
+    const [winner] = created;
+    if (!winner) throw new Error('No customer was created');
+    toErase.push(winner.id);
+    expect(winner.email).toBe(email);
+    expect(refused).toEqual([
+      expect.objectContaining({ kind: 'customer_email_taken', existingCustomerId: winner.id }),
+    ]);
+    expect(runSql(`select count(*) from app.customers where email = :'email';`, { email })).toBe(
+      '1',
+    );
+  });
+
   it('update: a name committed meanwhile is customer_name_taken with its id', async () => {
     const renamed = await service.create({
       operationId: randomUUID(),
       name: `Gara Rinomina ${SUFFIX}`,
-      phone: '',
+      email: '',
       privacyConsent: true,
       notes: '',
     });
@@ -285,12 +455,85 @@ describe('concurrent saves', () => {
     const { done } = await holdInsert(held);
     toErase.push(held.id);
     await expect(
-      service.update({ id: renamed.id, name: held.name, phone: '', notes: '' }),
+      service.update({ id: renamed.id, name: held.name, email: '', notes: '' }),
     ).rejects.toMatchObject({ kind: 'customer_name_taken', existingCustomerId: held.id });
     await done;
     await expect(service.get(renamed.id)).resolves.toMatchObject({
       name: `Gara Rinomina ${SUFFIX}`,
     });
+  });
+
+  it('update: an email committed meanwhile is customer_email_taken with its id', async () => {
+    // Two customers without an email take, at the same moment, the email of a customer still being
+    // inserted: both pass the pre-check, wait on customers_email_key, then meet the unique_violation.
+    // One edit goes through the service, the other over plain HTTP to read the raw answer.
+    const [first, second] = await Promise.all(
+      ['Uno', 'Due'].map((word) =>
+        service.create({
+          operationId: randomUUID(),
+          name: `Gara Email Modifica ${word} ${SUFFIX}`,
+          email: '',
+          privacyConsent: true,
+          notes: '',
+        }),
+      ),
+    );
+    if (!first || !second) throw new Error('The customers to edit were not created');
+    toErase.push(first.id, second.id);
+    const email = `gara.upd.${SUFFIX}@example.com`;
+    const typed = `  GARA.UPD.${SUFFIX}@Example.com`;
+    const held = {
+      id: randomUUID(),
+      name: `Gara Email Presa ${SUFFIX}`,
+      operationId: randomUUID(),
+      email,
+    };
+    const { data } = await operatorClient.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error('No session for the operator');
+    const { done } = await holdInsert(held);
+    toErase.push(held.id);
+
+    const [viaService, raw] = await Promise.allSettled([
+      service.update({ id: first.id, name: first.name, email: typed, notes: '' }),
+      fetch(`${local.url}/rest/v1/rpc/update_customer`, {
+        method: 'POST',
+        headers: {
+          apikey: local.publishableKey,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Content-Profile': 'app',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          p_customer_id: second.id,
+          p_name: second.name,
+          p_email: typed,
+          p_notes: null,
+        }),
+      }).then(async (response) => ({ status: response.status, body: await response.text() })),
+    ]);
+    await done;
+
+    expect(viaService).toMatchObject({
+      status: 'rejected',
+      reason: { kind: 'customer_email_taken', existingCustomerId: held.id },
+    });
+    if (raw.status !== 'fulfilled') throw new Error('The raw update got no answer');
+    expect(raw.value.status).toBe(400);
+    expect(JSON.parse(raw.value.body)).toMatchObject({
+      code: 'P0001',
+      message: 'customer_email_taken',
+      details: held.id,
+    });
+    expect(raw.value.body.toLowerCase()).not.toContain(email);
+    // Neither edit was saved: both keep no email.
+    expect(
+      runSql(
+        `select count(*) from app.customers where id in (:'a'::uuid, :'b'::uuid) and email is null;`,
+        { a: first.id, b: second.id },
+      ),
+    ).toBe('2');
   });
 });
 
@@ -321,14 +564,14 @@ describe('without an active profile', () => {
     expect(error).toBeNull();
     current.client = client;
     const notOperator = { kind: 'not_operator' };
-    await expect(service.search('rossi')).rejects.toMatchObject(notOperator);
-    await expect(service.servedToday()).rejects.toMatchObject(notOperator);
+    await expect(service.list({ query: 'rossi', after: null })).rejects.toMatchObject(notOperator);
+    await expect(service.list({ query: '', after: null })).rejects.toMatchObject(notOperator);
     await expect(service.get(randomUUID())).rejects.toMatchObject(notOperator);
     await expect(
       service.create({
         operationId: randomUUID(),
         name: `Senza profilo ${SUFFIX}`,
-        phone: '',
+        email: '',
         privacyConsent: true,
         notes: '',
       }),
@@ -338,6 +581,8 @@ describe('without an active profile', () => {
   it('a server that cannot be reached is network', async () => {
     // Port 9 (discard) on the loopback: nothing listens there, the fetch fails at once.
     current.client = memoryClient('http://127.0.0.1:9', local.publishableKey);
-    await expect(service.search('rossi')).rejects.toMatchObject({ kind: 'network' });
+    await expect(service.list({ query: 'rossi', after: null })).rejects.toMatchObject({
+      kind: 'network',
+    });
   });
 });

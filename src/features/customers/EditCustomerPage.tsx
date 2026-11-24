@@ -7,7 +7,6 @@ import { CustomerCardSection } from '../cards/CustomerCardSection';
 import { AnonymizeSection } from './AnonymizeSection';
 import { CustomerForm } from './CustomerForm';
 import { loadErrorText } from './loadErrorText';
-import { formatPhoneForEdit } from './phone';
 import { SaveFailure } from './SaveFailure';
 import type { CustomerSummary } from './types';
 import { useCustomer } from './useCustomer';
@@ -50,7 +49,7 @@ function EditForm({
         withHelp={false}
         initialValues={{
           name: customer.name,
-          phone: customer.phone === null ? '' : formatPhoneForEdit(customer.phone),
+          email: customer.email ?? '',
           notes: customer.notes ?? '',
         }}
         onSubmit={save}
@@ -64,7 +63,7 @@ function EditForm({
 }
 
 /**
- * Modifica cliente (`/clienti/:id/modifica`; wireframe Modifica cliente): name, phone and notes,
+ * Modifica cliente (`/clienti/:id/modifica`; wireframe Modifica cliente): name, email and notes,
  * no PRIVACY section (the consent is given once). Loading, not found and error as on the
  * customer page; a customer whose data was erased is not edited: back to their page.
  */

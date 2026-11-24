@@ -1,17 +1,26 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { CustomerForm, validateCustomerForm, type CustomerFormValues } from './CustomerForm';
+import {
+  CustomerForm,
+  validateCustomerForm,
+  type CustomerFormValues,
+  type CustomerRefusal,
+} from './CustomerForm';
 import { PRIVACY_NOTICE_STATUS, PRIVACY_NOTICE_TEXT } from './privacyNotice';
 
 const NAME = 'Nome e cognome';
-const PHONE = 'Telefono (facoltativo)';
+const EMAIL = 'Email (facoltativa)';
+const EMAIL_INVALID = 'Email non valida: controlla come è scritta.';
+const HELP =
+  'Il nome identifica il cliente: non può essere già di un altro. L’email serve solo a ritrovarlo: l’app non scrive ai clienti.';
 const NOTES = 'Note (facoltative)';
 const CONSENT = /Ha letto l’informativa privacy/;
 
 const valid: CustomerFormValues = {
   name: 'Maria Rossi',
-  phone: '',
+  email: '',
   notes: '',
   privacyConsent: true,
 };
@@ -30,12 +39,32 @@ function renderForm(withPrivacy = true) {
   return { onSubmit, user: userEvent.setup() };
 }
 
+/** The form inside a router (its "Apri la scheda" is a link), with a refusal of the server. */
+function renderRefused(refusal: CustomerRefusal, initialValues: Partial<CustomerFormValues> = {}) {
+  const element = (
+    <CustomerForm
+      id="customer-form"
+      withPrivacy
+      initialValues={initialValues}
+      onSubmit={() => {}}
+      refusal={refusal}
+    />
+  );
+  const router = createMemoryRouter([{ path: '*', element }]);
+  render(<RouterProvider router={router} />);
+}
+
+/** Whether `b` comes after `a` in the document. */
+function follows(a: Node, b: Node): boolean {
+  return Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+}
+
 function save() {
   fireEvent.click(screen.getByRole('button', { name: 'Salva cliente' }));
 }
 
 describe('validateCustomerForm', () => {
-  it('accepts a name with consent, no phone and no notes', () => {
+  it('accepts a name with consent, no email and no notes', () => {
     expect(validateCustomerForm(valid, { requireConsent: true })).toEqual({});
   });
 
@@ -64,15 +93,24 @@ describe('validateCustomerForm', () => {
     ).toEqual({});
   });
 
-  it('rejects a phone that does not normalize, accepts a blank or a valid one', () => {
-    const phone = 'Numero non valido: scrivi solo le cifre, con o senza prefisso.';
-    expect(validateCustomerForm({ ...valid, phone: '12ab' }, { requireConsent: true })).toEqual({
-      phone,
-    });
-    expect(validateCustomerForm({ ...valid, phone: '  ' }, { requireConsent: true })).toEqual({});
+  it('rejects an email that does not normalize, accepts a blank one or one with spaces and capitals', () => {
+    for (const email of ['rossi@', 'rossi', 'a@b.c d', 'a@b', '@example.com']) {
+      expect(validateCustomerForm({ ...valid, email }, { requireConsent: true })).toEqual({
+        email: EMAIL_INVALID,
+      });
+    }
+    expect(validateCustomerForm({ ...valid, email: '   ' }, { requireConsent: true })).toEqual({});
     expect(
-      validateCustomerForm({ ...valid, phone: '333 123 4521' }, { requireConsent: true }),
+      validateCustomerForm({ ...valid, email: '  Rossi@Example.COM ' }, { requireConsent: true }),
     ).toEqual({});
+  });
+
+  it('rejects an email over 254 characters, as the server does', () => {
+    const email = `${'a'.repeat(243)}@example.com`;
+    expect(email).toHaveLength(255);
+    expect(validateCustomerForm({ ...valid, email }, { requireConsent: true })).toEqual({
+      email: EMAIL_INVALID,
+    });
   });
 
   it('asks for consent only when the form requires it', () => {
@@ -95,14 +133,19 @@ describe('CustomerForm', () => {
     renderForm();
     const name = screen.getByRole('textbox', { name: NAME });
     expect(name).toHaveAttribute('placeholder', 'Es. Maria Rossi');
-    const phone = screen.getByRole('textbox', { name: PHONE });
-    expect(phone).toHaveAttribute('type', 'tel');
-    expect(phone).toHaveAttribute('placeholder', 'Numero di cellulare');
-    expect(
-      screen.getByText(
-        'Il nome identifica il cliente: non può essere già di un altro. Il telefono serve solo a trovarlo più in fretta.',
-      ),
-    ).toBeInTheDocument();
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    expect(email).toHaveAttribute('type', 'email');
+    expect(email).toHaveAttribute('inputmode', 'email');
+    // The customer's email typed by the operator: the browser must not offer the operator's own.
+    expect(email).toHaveAttribute('autocomplete', 'off');
+    expect(email).toHaveAttribute('autocapitalize', 'none');
+    expect(email).toHaveAttribute('spellcheck', 'false');
+    expect(email).toHaveAttribute('maxLength', '254');
+    expect(email).toHaveAttribute('placeholder', 'nome@esempio.it');
+    expect(screen.getByText(HELP)).toBeInTheDocument();
+    // The email takes the place of the phone: no phone field and no phone text.
+    expect(screen.getAllByRole('textbox')).toHaveLength(3);
+    expect(document.body).not.toHaveTextContent(/telefono/i);
     expect(screen.getByRole('group', { name: 'PRIVACY' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: CONSENT })).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: CONSENT })).toHaveAccessibleName(
@@ -146,20 +189,80 @@ describe('CustomerForm', () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it('shows the phone error under the phone, and focuses it when the name is fine', () => {
+  it('keeps the order of the wireframe: name, email, help text, PRIVACY', () => {
+    renderForm();
+    const name = screen.getByRole('textbox', { name: NAME });
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    const help = screen.getByText(HELP);
+    const privacy = screen.getByRole('group', { name: 'PRIVACY' });
+    expect(follows(name, email)).toBe(true);
+    expect(follows(email, help)).toBe(true);
+    expect(follows(help, privacy)).toBe(true);
+  });
+
+  it('shows the email error under the email, and focuses it when the name is fine', () => {
     const { onSubmit } = renderForm();
     fireEvent.change(screen.getByRole('textbox', { name: NAME }), {
       target: { value: 'Maria Rossi' },
     });
-    const phone = screen.getByRole('textbox', { name: PHONE });
-    fireEvent.change(phone, { target: { value: '12ab' } });
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    fireEvent.change(email, { target: { value: 'rossi@' } });
     fireEvent.click(screen.getByRole('checkbox', { name: CONSENT }));
     save();
-    expect(phone).toHaveAccessibleDescription(
-      'Numero non valido: scrivi solo le cifre, con o senza prefisso.',
-    );
-    expect(phone).toHaveFocus();
+    expect(email).toHaveAccessibleDescription(EMAIL_INVALID);
+    expect(email).toBeInvalid();
+    expect(email).toHaveFocus();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('email already used: the error, "Apri la scheda" to the other customer, no help text', () => {
+    const other = '00000000-0000-4000-8000-000000000042';
+    renderRefused(
+      { kind: 'taken', field: 'email', existingCustomerId: other },
+      {
+        name: 'Maria Rossi',
+        email: 'rossi@example.com',
+      },
+    );
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    expect(email).toBeInvalid();
+    expect(email).toHaveFocus();
+    expect(email).toHaveAccessibleDescription(
+      'Esiste già un cliente con questa email. Apri la scheda',
+    );
+    const link = screen.getByRole('link', { name: 'Apri la scheda' });
+    expect(link).toHaveAttribute('href', `/clienti/${other}`);
+    // The link stands in place of the help text (like a name already used).
+    expect(screen.queryByText(HELP)).not.toBeInTheDocument();
+    // Only the email is wrong: the name keeps no error.
+    expect(screen.getByRole('textbox', { name: NAME })).not.toBeInvalid();
+  });
+
+  it('email already used, the other customer unknown: the error without the link', () => {
+    renderRefused({ kind: 'taken', field: 'email', existingCustomerId: null });
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    expect(email).toHaveAccessibleDescription('Esiste già un cliente con questa email.');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('name already used: the error and its suggestion under the name, nothing under the email', () => {
+    const other = '00000000-0000-4000-8000-000000000043';
+    renderRefused({ kind: 'taken', field: 'name', existingCustomerId: other });
+    const name = screen.getByRole('textbox', { name: NAME });
+    expect(name).toHaveFocus();
+    expect(name).toHaveAccessibleDescription(
+      'Esiste già un cliente con questo nome. Apri la scheda Se è un’altra persona, aggiungi un dettaglio al nome, per esempio «Maria Rossi Serapo».',
+    );
+    expect(screen.getByRole('textbox', { name: EMAIL })).not.toBeInvalid();
+    expect(screen.queryByText(HELP)).not.toBeInTheDocument();
+  });
+
+  it('a server refusal of the email format shows under the email', () => {
+    renderRefused({ kind: 'field', field: 'email', text: EMAIL_INVALID });
+    const email = screen.getByRole('textbox', { name: EMAIL });
+    expect(email).toHaveAccessibleDescription(EMAIL_INVALID);
+    expect(email).toHaveFocus();
+    expect(screen.getByText(HELP)).toBeInTheDocument();
   });
 
   it('asks for consent under the checkbox and focuses it', () => {
@@ -179,10 +282,10 @@ describe('CustomerForm', () => {
 
   it('shows every error at once and focuses the first wrong field', () => {
     renderForm();
-    fireEvent.change(screen.getByRole('textbox', { name: PHONE }), { target: { value: 'abc' } });
+    fireEvent.change(screen.getByRole('textbox', { name: EMAIL }), { target: { value: 'abc' } });
     save();
     expect(screen.getByRole('textbox', { name: NAME })).toHaveFocus();
-    expect(screen.getByRole('textbox', { name: PHONE })).toBeInvalid();
+    expect(screen.getByRole('textbox', { name: EMAIL })).toBeInvalid();
     expect(screen.getByRole('checkbox', { name: CONSENT })).toBeInvalid();
   });
 
@@ -199,8 +302,8 @@ describe('CustomerForm', () => {
     fireEvent.change(screen.getByRole('textbox', { name: NAME }), {
       target: { value: '\u00a0Maria \u202fRossi\u00a0' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: PHONE }), {
-      target: { value: '333 123 4521' },
+    fireEvent.change(screen.getByRole('textbox', { name: EMAIL }), {
+      target: { value: '  Rossi@Example.COM ' },
     });
     fireEvent.change(screen.getByRole('textbox', { name: NOTES }), {
       target: { value: 'Preferisce il caffè macchiato' },
@@ -211,7 +314,9 @@ describe('CustomerForm', () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit).toHaveBeenCalledWith({
       name: 'Maria Rossi',
-      phone: '333 123 4521',
+      // Not lowercased: the server normalizes it. The edge spaces are dropped by the browser itself
+      // (an `<input type="email">` value has no leading or trailing whitespace).
+      email: 'Rossi@Example.COM',
       notes: 'Preferisce il caffè macchiato',
       privacyConsent: true,
     });
@@ -223,11 +328,12 @@ describe('CustomerForm', () => {
       <CustomerForm
         id="customer-form"
         withPrivacy
-        initialValues={{ name: 'Maria Rossi' }}
+        initialValues={{ name: 'Maria Rossi', email: 'rossi@example.com' }}
         onSubmit={onSubmit}
       />,
     );
     expect(screen.getByRole('textbox', { name: NAME })).toHaveValue('Maria Rossi');
+    expect(screen.getByRole('textbox', { name: EMAIL })).toHaveValue('rossi@example.com');
   });
 
   it('toggles the consent from the keyboard', async () => {

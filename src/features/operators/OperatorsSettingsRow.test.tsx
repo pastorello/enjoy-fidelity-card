@@ -14,7 +14,7 @@ async function operatorsRow() {
 }
 
 describe('"Operatori" row of GESTIONE', () => {
-  it('phone: "Account, ruoli e inviti", and a tap opens /impostazioni/operatori', async () => {
+  it('on the phone: "Account, ruoli e inviti", and a tap opens /impostazioni/operatori', async () => {
     stubLayout(false);
     const { router } = renderApp('/impostazioni', signedInFake());
     const row = await operatorsRow();

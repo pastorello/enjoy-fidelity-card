@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { devices, type Browser, type Page, type TestInfo } from '@playwright/test';
 import { SEED_PASSWORD, signIn } from './auth';
 import { runSql } from './db';
-import { expect, test } from './fixtures';
+import { expect, homeSearch, test } from './fixtures';
 import { linkHref, messagesTo, waitForMessageTo } from './mailpit';
 
 /**
@@ -64,13 +64,15 @@ async function newPhone(browser: Browser, testInfo: TestInfo) {
     }
   });
   phone.on('pageerror', (error) => errors.push(error.message));
-  return { context, phone, errors };
+  // `page`, not `phone`: the customer's phone is gone and scripts/customersBoundary.test.ts
+  // refuses a `phone` key or property anywhere.
+  return { context, page: phone, errors };
 }
 
 /** A second phone signed in with `email`: the person whose account changes. */
 async function openSecondPhone(browser: Browser, testInfo: TestInfo, email: string) {
   const second = await newPhone(browser, testInfo);
-  await signIn(second.phone, email);
+  await signIn(second.page, email);
   return second;
 }
 
@@ -98,12 +100,12 @@ function messages(page: Page) {
 }
 
 /** The settings of the signed-in phone: GESTIONE (with Operatori) only for administrators. */
-async function expectSettingsOf(phone: Page, role: 'admin' | 'operator') {
-  await expect(phone).toHaveURL('/impostazioni');
-  const account = phone.getByRole('region', { name: 'Account', exact: true });
+async function expectSettingsOf(device: Page, role: 'admin' | 'operator') {
+  await expect(device).toHaveURL('/impostazioni');
+  const account = device.getByRole('region', { name: 'Account', exact: true });
   await expect(account).toContainText(role === 'admin' ? 'Amministratore' : 'Operatore');
-  const management = phone.getByRole('heading', { name: 'GESTIONE' });
-  const operatorsRow = phone.getByRole('link', { name: /Operatori/ });
+  const management = device.getByRole('heading', { name: 'GESTIONE' });
+  const operatorsRow = device.getByRole('link', { name: /Operatori/ });
   if (role === 'admin') {
     await expect(management).toBeVisible();
     await expect(operatorsRow).toBeVisible();
@@ -150,7 +152,7 @@ test('an invited administrator chooses a password from the email and enters as a
   expect(await messagesTo(email, since)).toHaveLength(1);
 
   // The invited person opens the link on their own phone.
-  const { context, phone: invited, errors } = await newPhone(browser, testInfo);
+  const { context, page: invited, errors } = await newPhone(browser, testInfo);
   try {
     await invited.goto(link);
     await expect(invited.getByRole('heading', { level: 1, name: `Ciao, ${name}` })).toBeVisible();
@@ -163,9 +165,7 @@ test('an invited administrator chooses a password from the email and enters as a
     await invited.getByLabel('Ripeti la password').fill(password);
     await invited.getByRole('button', { name: 'Salva e accedi' }).click();
     await expect(invited).toHaveURL('/');
-    await expect(
-      invited.getByRole('searchbox', { name: 'Cerca per nome o telefono' }),
-    ).toBeVisible();
+    await expect(homeSearch(invited)).toBeVisible();
     await invited.getByRole('link', { name: `Account e impostazioni: ${name}` }).click();
     await expectSettingsOf(invited, 'admin');
     expect(errors, 'console errors of the invited phone').toEqual([]);
@@ -183,7 +183,7 @@ test('a role changed from the app reaches the open session at its next route, an
   browser,
 }, testInfo) => {
   const second = await openSecondPhone(browser, testInfo, ROLE.email);
-  const { phone } = second;
+  const { page: phone } = second;
   try {
     await phone.getByRole('link', { name: `Account e impostazioni: ${ROLE.name}` }).click();
     await expectSettingsOf(phone, 'operator');
@@ -233,7 +233,7 @@ test('a deactivated person is sent to sign-in at the next route, and enters agai
   browser,
 }, testInfo) => {
   const second = await openSecondPhone(browser, testInfo, DEACTIVATE.email);
-  const { phone } = second;
+  const { page: phone } = second;
   try {
     await expect(phone).toHaveURL('/');
 

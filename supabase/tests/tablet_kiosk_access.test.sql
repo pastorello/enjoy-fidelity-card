@@ -4,7 +4,7 @@
 -- one, every check and every author column follows the cashier. Fake data only.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(77);
+select plan(79);
 
 -- Fake Auth users. Ids are fixed so the test can impersonate them.
 insert into auth.users (id, email) values
@@ -96,11 +96,13 @@ select set_config('test.hidden', pg_temp.expected_hidden()::text, true);
 -- service steps of operator-invites run only with the secret key (operators_invites.test.sql).
 create temp table rpc_calls (name text primary key, kind text, call text, errcode text, message text);
 insert into rpc_calls values
-  ('search_customers', 'read', $$select * from app.search_customers('Cliente')$$, 'P0001', 'not_operator'),
   ('get_customer', 'read',
    $$select * from app.get_customer('00000000-0000-4000-a100-000000000001')$$, 'P0001', 'not_operator'),
-  ('customers_served_today', 'read', $$select * from app.customers_served_today()$$, 'P0001', 'not_operator'),
+  ('list_customers', 'read', $$select * from app.list_customers()$$, 'P0001', 'not_operator'),
   ('lookup_card', 'read', $$select * from app.lookup_card('A0B1C2D3E4F5A6')$$, 'P0001', 'not_operator'),
+  ('get_card', 'read',
+   $$select * from app.get_card((select id from app.cards where uid = 'A0B1C2D3E4F5A6'))$$,
+   'P0001', 'not_operator'),
   ('export_customers', 'read', $$select * from app.export_customers(null, 10)$$, '42501', 'forbidden'),
   ('export_movements', 'read', $$select * from app.export_movements(null, null, 10)$$, '42501', 'forbidden'),
   ('create_customer', 'write',
@@ -117,6 +119,12 @@ insert into rpc_calls values
    $$select app.anonymize_customer('00000000-0000-4000-a100-000000000001')$$, 'P0001', 'not_operator'),
   ('associate_card', 'write',
    $$select app.associate_card('00000000-0000-4000-a100-000000000001', 'A0B1C2D3E4F5A8')$$,
+   'P0001', 'not_operator'),
+  ('release_card', 'write',
+   $$select app.release_card(gen_random_uuid(), (select id from app.cards where uid = 'A0B1C2D3E4F5A6'))$$,
+   'P0001', 'not_operator'),
+  ('reactivate_card', 'write',
+   $$select app.reactivate_card((select id from app.cards where uid = 'A0B1C2D3E4F5A6'), null)$$,
    'P0001', 'not_operator'),
   ('deactivate_card', 'write',
    $$select app.deactivate_card((select id from app.cards where uid = 'A0B1C2D3E4F5A6'))$$,

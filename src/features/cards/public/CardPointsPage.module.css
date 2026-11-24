@@ -116,3 +116,45 @@
   padding: var(--space-3) var(--space-3) calc(var(--space-4) + env(safe-area-inset-bottom));
   text-align: center;
 }
+
+/* PREMI (SPEC-customers-v2 point 3): under the points, the page's side margins, rows as ListRow. */
+.rewards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+}
+
+.rewardsTitle {
+  font-family: var(--type-spaced-caps-condensed-family);
+  font-size: var(--type-spaced-caps-condensed-size);
+  line-height: var(--type-spaced-caps-condensed-line-height);
+  font-weight: var(--type-spaced-caps-condensed-weight);
+  letter-spacing: var(--type-spaced-caps-condensed-letter-spacing);
+  color: var(--color-ink-muted);
+}
+
+.rewardList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Not a touch target (no link, no arrow): 56 px rows for reading. */
+.reward {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.rewardName {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--type-body-lg-size);
+  line-height: var(--type-body-lg-line-height);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}

@@ -1,4 +1,4 @@
-import type { NfcInputAdapter, NfcStatus } from './cardReader';
+import type { CardContent, NfcInputAdapter, NfcStatus } from './cardReader';
 
 export type NfcPermission = 'granted' | 'prompt' | 'denied';
 
@@ -93,19 +93,22 @@ function errorName(error: unknown): string {
 }
 
 /**
- * The links of the `url` records, decoded as UTF-8 (SPEC-card-input, point 3). Only a running write
- * gets them, to verify what it wrote: they hold a customer's token, so they are never logged.
+ * What the card holds (SPEC-card-input, point 3; SPEC-customers-v2, point 4): the links of the `url`
+ * records, decoded as UTF-8, and whether it is blank in the strict sense (no record, or only `empty`
+ * records; any other record, whatever its type, is content). Only a running write gets it, to verify
+ * what it wrote: a link holds a customer's token, so it is never logged.
  */
-function urlsOf(message: NDEFMessage | undefined): string[] {
+function contentOf(message: NDEFMessage | undefined): CardContent {
+  const records = message?.records ?? [];
   const urls: string[] = [];
   const decoder = new TextDecoder();
-  for (const record of message?.records ?? []) {
+  for (const record of records) {
     // Not fatal: broken bytes decode to U+FFFD, which never matches the link that was written.
     if (record.recordType === 'url' && record.data !== undefined) {
       urls.push(decoder.decode(record.data));
     }
   }
-  return urls;
+  return { urls, blank: records.every((record) => record.recordType === 'empty') };
 }
 
 /** What a failed `scan()` means for the panel (SPEC-card-input, point 3). */
@@ -162,7 +165,7 @@ export function createWebNfcAdapter(api: WebNfcApi): NfcInputAdapter {
       const reader = api.createReader();
       reader.onreading = (event) => {
         if (scan === controller) {
-          ports?.deliver(event.serialNumber, 'hex', 'web-nfc', urlsOf(event.message));
+          ports?.deliver(event.serialNumber, 'hex', 'web-nfc', contentOf(event.message));
         }
       };
       // An unreadable tag (damaged NDEF message, no uid) matters only to a running write, which the

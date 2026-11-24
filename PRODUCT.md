@@ -12,7 +12,7 @@ lettura card. Tablet della cassa 1280×800 in orizzontale nella fase 3 (modulo `
 ## Users
 
 - **Operatori** (camerieri): in piedi al bancone o in sala, di fretta, spesso con una mano sola.
-  Riconoscono il cliente dalla card NFC o lo cercano per nome o telefono, poi registrano la spesa o
+  Riconoscono il cliente dalla card NFC o lo cercano per nome o email, poi registrano la spesa o
   riscattano un premio.
 - **Amministratori** (titolari): fanno tutto quello che fanno gli operatori; in più gestiscono operatori,
   catalogo premi, rapporto euro/punto, soglia di conferma, export CSV, annullamenti e anonimizzazione.

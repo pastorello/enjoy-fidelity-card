@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { useSearchParams } from 'react-router';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { AppShell } from '../../app/AppShell';
-import { formatTime } from '../../shared/format';
 import { Button, ButtonLink } from '../../shared/ui/Button';
 import { Icon } from '../../shared/ui/Icon';
 import { ListRow } from '../../shared/ui/ListRow';
@@ -15,14 +14,13 @@ import { useCurrentOperator } from '../identity/AuthProvider';
 import { UsbReaderStatus } from '../tablet-kiosk/UsbReaderStatus';
 import { useUsbCardInput } from '../tablet-kiosk/useUsbCardInput';
 import { useTabletLayout } from '../tablet-kiosk/useTabletLayout';
+import { activityLabel } from './activityLabel';
 import styles from './HomePage.module.css';
 import { customerBackState } from './customerBack';
+import { homeSearchState, readHomeSearch } from './homeSearch';
 import { loadErrorText } from './loadErrorText';
 import { NavigationNotice } from './NavigationNotice';
-import { classifyQuery, maskPhone } from './phone';
-import type { CustomerSummary } from './types';
-import { SEARCH_SHOWN_ROWS, useCustomerSearch, type CustomerSearch } from './useCustomerSearch';
-import { useServedToday, type ServedToday } from './useServedToday';
+import { listQuery, useCustomerList, type CustomerList } from './useCustomerList';
 
 /**
  * The label of the button that registers the name searched without results (wireframe Ricerca
@@ -37,76 +35,41 @@ function newCustomerLabel(name: string): ReactNode {
   );
 }
 
-/** "••• 4521" or "Senza telefono": the second line of a customer row. */
-function phoneLine(customer: CustomerSummary): string {
-  return customer.phone === null ? 'Senza telefono' : maskPhone(customer.phone);
-}
+/** How far below the window the sentinel starts the next page (SPEC-customers-v2 point 6). */
+const SENTINEL_MARGIN = '400px';
 
-/** "••• 0388 · 10:15": the phone and the time of the last purchase or redemption. */
-function servedLine(customer: CustomerSummary): string {
-  const phone = phoneLine(customer);
-  return customer.lastServedAt === null ? phone : `${phone} · ${formatTime(customer.lastServedAt)}`;
+/**
+ * Calls `onEnter` when the element given to the returned callback ref comes within 400 px of the
+ * window. The window scrolls on the phone and on the tablet (`root: null`). The page renders the
+ * sentinel only while a next page can be asked, with the row count as its `key`: a new element
+ * for every page, so a sentinel still in view after a page loads asks the next one. Without
+ * `IntersectionObserver` nothing happens ("Mostra altri clienti" stays).
+ */
+function useSentinel(onEnter: () => void): (element: HTMLDivElement | null) => void {
+  const [target, setTarget] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (target === null || !('IntersectionObserver' in window)) return undefined;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onEnter();
+      },
+      { root: null, rootMargin: SENTINEL_MARGIN },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [target, onEnter]);
+  return setTarget;
 }
 
 /**
- * SERVITI OGGI (wireframe Cerca cliente): nothing while loading or when nobody was served today,
- * a compact row with "Riprova" when the list cannot be loaded.
+ * What the live region under the search says once a search ends (SPEC-customers-v2 point 6):
+ * TalkBack users hear that it is done. Empty for the plain list and while the rows of the text
+ * typed are not there yet, so the next outcome is a change (and is read) even when it says the
+ * same; an error has its own `role="alert"`.
  */
-function ServedTodaySection({
-  served,
-  headingRef,
-  onRetry,
-}: {
-  served: ServedToday;
-  /** The h2, which takes the focus from "Riprova" and stays mounted while the list loads. */
-  headingRef: RefObject<HTMLHeadingElement | null>;
-  onRetry: () => void;
-}) {
-  if (served.status === 'loading') return null;
-  if (served.status === 'done' && served.customers.length === 0) return null;
-  return (
-    <section aria-labelledby="served-today" className={styles.served}>
-      <h2 ref={headingRef} id="served-today" tabIndex={-1} className={styles.sectionTitle}>
-        SERVITI OGGI
-      </h2>
-      {served.status === 'error' ? (
-        <div role="alert" className={styles.servedError}>
-          <p className={styles.servedErrorText}>
-            <Icon name="circle-alert" size={20} />
-            Non riesco a caricare i clienti di oggi
-          </p>
-          <Button variant="secondary" busy={served.retrying} onClick={onRetry}>
-            Riprova
-          </Button>
-        </div>
-      ) : (
-        <ul className={styles.list}>
-          {served.customers.map((customer) => (
-            <ListRow
-              key={customer.id}
-              to={`/clienti/${customer.id}`}
-              title={customer.name}
-              subtitle={servedLine(customer)}
-              trailing={<PointsBadge points={customer.balance} />}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/**
- * What the live region under the search says once a search ends: TalkBack users hear that it is
- * done and how many rows came back. Empty while idle or loading, so the next outcome is a change
- * (and is read) even when it says the same; an error has its own `role="alert"`.
- */
-function searchAnnouncement(search: CustomerSearch): string {
-  if (search.status !== 'done') return '';
-  const count = search.customers.length;
-  if (count === 0) return 'Nessun cliente trovato';
-  if (search.hasMore) return `Più di ${SEARCH_SHOWN_ROWS} clienti trovati: scrivi qualcosa in più`;
-  return count === 1 ? '1 cliente trovato' : `${count} clienti trovati`;
+function searchAnnouncement(list: CustomerList, query: string): string {
+  if (query === '' || list.status !== 'done' || list.query !== query) return '';
+  return list.customers.length === 0 ? 'Nessun cliente trovato' : 'Clienti trovati';
 }
 
 /** Text of the card panel while reading is active (wireframe Cerca cliente). */
@@ -123,70 +86,64 @@ const TABLET_PANEL_TEXT =
 const CARD_PANEL_READING = 'Lettura della card…';
 
 /**
- * Home "Cerca cliente": card panel, search by name or phone, SERVITI OGGI, "Nuovo cliente". On the
- * till tablet (SPEC-tablet-kiosk, point 10) the same page in two columns: the USB reader on the left,
- * the search with "Nuovo cliente" beside it and SERVITI OGGI in two columns on the right.
+ * Home "Cerca cliente": card panel, search by name or email, CLIENTI, "Nuovo cliente". CLIENTI
+ * (SPEC-customers-v2 point 6) lists every customer by last activity, 20 at a time, the next page
+ * when its sentinel nears the window or with "Mostra altri clienti"; the text typed filters the
+ * same list and lives in the history state, never in the URL. On the till tablet
+ * (SPEC-tablet-kiosk, point 10) the same page in two columns: the USB reader on the left, the
+ * search with "Nuovo cliente" beside it and CLIENTI in two columns on the right.
  */
 export function HomePage() {
   const operator = useCurrentOperator();
-  // 1280×800: the reader column on the left, the search and SERVITI OGGI beside it.
+  // 1280×800: the reader column on the left, the search and CLIENTI beside it.
   const tablet = useTabletLayout();
   // The till tablet reads cards with its USB reader only, whatever the window's size.
   const usb = useUsbCardInput();
-  const served = useServedToday();
-  const [searchParams, setSearchParams] = useSearchParams();
-  // The text lives in the URL too (`?q=`, replaced), so "Indietro" from a customer finds it again.
-  const [text, setText] = useState(() => searchParams.get('q') ?? '');
-  const search = useCustomerSearch(text);
-  const searchInput = useRef<HTMLInputElement>(null);
-  const searchOutcome = useRef<HTMLDivElement>(null);
-  const servedHeading = useRef<HTMLHeadingElement>(null);
-  // Set by SERVITI OGGI's "Riprova" until its answer arrives.
-  const servedRetrying = useRef(false);
-  const servedCount = served.status === 'done' ? served.customers.length : null;
+  const location = useLocation();
+  const navigate = useNavigate();
+  // The text lives in the history state (replaced), so a reload or "Indietro" finds it again.
+  const [text, setText] = useState(() => readHomeSearch(location.state));
+  const list = useCustomerList(text);
+  // The text the list is filtered by: '' (everyone) under 2 characters.
+  const query = listQuery(text);
+  const searching = query !== '';
+  const outcome = useRef<HTMLDivElement>(null);
+  const moreArea = useRef<HTMLDivElement>(null);
+  const done = list.status === 'done' ? list : null;
+  const sentinel = useSentinel(list.loadMore);
   // `cards` handles the card reads: Registra spesa, Nuovo cliente with the card, or a notice.
   const cardRead = useHomeCardRead();
   const cardNotice = homeCardNotice(cardRead);
-  // While a search is shown the card panel shrinks to one line (wireframe Ricerca senza risultati),
-  // unless it has something to say about the card just read.
-  const searching = search.status !== 'idle';
 
-  // "Riprova" is replaced by the loading state: the focus goes to the search outcome, which
-  // stays mounted while searching and then holds the results, not to <body>.
-  function retrySearch() {
-    search.retry();
-    searchOutcome.current?.focus();
+  // "Riprova" is replaced by the loading state: the focus goes to the list's outcome, which
+  // stays mounted while loading and then holds the rows, not to <body>.
+  function retryFirst() {
+    list.retry();
+    outcome.current?.focus();
   }
 
-  function retryServed() {
-    servedRetrying.current = true;
-    served.retry();
-    servedHeading.current?.focus();
+  // "Mostra altri clienti" and the next page's "Riprova" give way to "Carico altri clienti…".
+  function loadMore() {
+    list.loadMore();
+    moreArea.current?.focus();
   }
 
-  // With nobody served today the section goes away after "Riprova": the focus goes to the search.
-  useEffect(() => {
-    if (!servedRetrying.current || servedCount === null) return;
-    servedRetrying.current = false;
-    if (servedCount === 0) searchInput.current?.focus();
-  }, [servedCount]);
-  // No results for a name: the button registers that name (`?nome=`); for a phone, nothing.
-  const typedName = text.trim().replace(/\s+/g, ' ');
+  // No results for a name: the button registers that name (`?nome=`); with an @, nothing.
   const prefill =
-    search.status === 'done' && search.customers.length === 0 && classifyQuery(typedName) === 'name'
-      ? typedName
+    done !== null &&
+    done.query === query &&
+    searching &&
+    done.customers.length === 0 &&
+    !query.includes('@')
+      ? query
       : null;
 
   function changeText(value: string) {
     setText(value);
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        if (value === '') next.delete('q');
-        else next.set('q', value);
-        return next;
-      },
-      { replace: true },
+    // The same entry, without any query string: not '.', which on the index route adds `?index`.
+    void navigate(
+      { pathname: location.pathname },
+      { replace: true, state: homeSearchState(value) },
     );
   }
 
@@ -241,70 +198,102 @@ export function HomePage() {
 
   const searchField = (
     <SearchField
-      ref={searchInput}
-      label={
-        searching && !tablet ? 'Cerca per nome o telefono' : 'Oppure cerca per nome o telefono'
-      }
-      placeholder="Es. Rossi o 4521"
+      label={searching && !tablet ? 'Cerca per nome o email' : 'Oppure cerca per nome o email'}
+      placeholder="Es. Rossi o rossi@"
       value={text}
       onChange={changeText}
     />
   );
 
-  const results = (
-    <>
-      {/* On the page from the start: TalkBack does not read a live region that arrives with its text. */}
-      <p className="visually-hidden" aria-live="polite" data-testid="search-announcer">
-        {searchAnnouncement(search)}
-      </p>
-      {/* The focus target of "Riprova": mounted from the first search to the last result. */}
-      {searching && (
-        <div ref={searchOutcome} tabIndex={-1} className={styles.outcome}>
-          {search.status === 'loading' && <StatusView kind="loading" label="Ricerca…" />}
-          {search.status === 'error' && (
-            <StatusView
-              kind="error"
-              title="Ricerca non riuscita"
-              description={loadErrorText(search.error)}
-              onRetry={retrySearch}
-            />
-          )}
-          {search.status === 'done' && search.customers.length === 0 && (
-            <StatusView
-              kind="empty"
-              title="Nessun cliente trovato"
-              description="Controlla come è scritto, o cerca con le ultime 4 cifre del telefono."
-            />
-          )}
-          {search.status === 'done' && search.customers.length > 0 && (
-            <section>
-              <ul className={styles.list} aria-label="Risultati della ricerca">
-                {search.customers.map((customer) => (
-                  <ListRow
-                    key={customer.id}
-                    to={`/clienti/${customer.id}`}
-                    // "Indietro" from the customer page comes back to this search.
-                    state={customerBackState(text)}
-                    title={customer.name}
-                    subtitle={phoneLine(customer)}
-                    trailing={<PointsBadge points={customer.balance} />}
-                  />
-                ))}
-              </ul>
-              {search.hasMore && (
-                <p className={styles.more}>
-                  Mostro i primi {SEARCH_SHOWN_ROWS}: scrivi qualcosa in più
-                </p>
-              )}
-            </section>
-          )}
+  const moreRows = done !== null && (
+    // The focus target of "Mostra altri clienti" and "Riprova": mounted with the rows.
+    <div ref={moreArea} tabIndex={-1} className={styles.moreArea}>
+      {done.more.status === 'loading' && (
+        <output className={styles.moreStatus}>
+          <Icon name="loader-circle" size={20} className={styles.spinner} />
+          Carico altri clienti…
+        </output>
+      )}
+      {done.more.status === 'error' && (
+        <div role="alert" className={styles.moreError}>
+          <p className={styles.moreErrorText}>
+            <Icon name="circle-alert" size={20} />
+            Non riesco a caricare altri clienti.
+          </p>
+          <Button variant="secondary" onClick={loadMore}>
+            Riprova
+          </Button>
         </div>
       )}
-      {/* While a search is shown, SERVITI OGGI is not. */}
-      {!searching && (
-        <ServedTodaySection served={served} headingRef={servedHeading} onRetry={retryServed} />
+      {done.more.status === 'idle' && done.hasMore && (
+        <>
+          <div
+            key={done.customers.length}
+            ref={sentinel}
+            className={styles.sentinel}
+            aria-hidden="true"
+          />
+          <Button variant="secondary" block={!tablet} onClick={loadMore}>
+            Mostra altri clienti
+          </Button>
+        </>
       )}
-    </>
+    </div>
+  );
+
+  const customersSection = (
+    <section aria-labelledby="home-customers" className={styles.customers}>
+      <h2 id="home-customers" className={styles.sectionTitle}>
+        CLIENTI
+      </h2>
+      {/* On the page from the start: TalkBack does not read a live region that arrives with its text. */}
+      <p className="visually-hidden" aria-live="polite" data-testid="search-announcer">
+        {searchAnnouncement(list, query)}
+      </p>
+      <div ref={outcome} tabIndex={-1} className={styles.outcome}>
+        {list.status === 'loading' && <StatusView kind="loading" label="Carico i clienti…" />}
+        {list.status === 'error' && (
+          <StatusView
+            kind="error"
+            title="Clienti non caricati"
+            description={loadErrorText(list.error)}
+            onRetry={retryFirst}
+          />
+        )}
+        {done !== null && done.customers.length === 0 && done.query === '' && (
+          <StatusView
+            kind="empty"
+            title="Ancora nessun cliente"
+            description="Registra il primo con «Nuovo cliente»."
+          />
+        )}
+        {done !== null && done.customers.length === 0 && done.query !== '' && (
+          <StatusView
+            kind="empty"
+            title="Nessun cliente trovato"
+            description="Controlla come è scritto, o cerca con l’email."
+          />
+        )}
+        {done !== null && done.customers.length > 0 && (
+          <>
+            <ul className={styles.list} data-columns={tablet ? '2' : undefined}>
+              {done.customers.map((customer) => (
+                <ListRow
+                  key={customer.id}
+                  to={`/clienti/${customer.id}`}
+                  // "Indietro" from the customer page comes back to this search.
+                  state={customerBackState(text)}
+                  title={customer.name}
+                  subtitle={activityLabel(customer.lastActivityAt)}
+                  trailing={<PointsBadge points={customer.balance} />}
+                />
+              ))}
+            </ul>
+            {moreRows}
+          </>
+        )}
+      </div>
+    </section>
   );
 
   if (tablet) {
@@ -318,7 +307,7 @@ export function HomePage() {
               <div className={styles.searchCell}>{searchField}</div>
               {newCustomerAction}
             </div>
-            {results}
+            {customersSection}
           </div>
         </div>
       </AppShell>
@@ -330,7 +319,7 @@ export function HomePage() {
       <NavigationNotice />
       {cardPanel}
       {searchField}
-      {results}
+      {customersSection}
     </AppShell>
   );
 }

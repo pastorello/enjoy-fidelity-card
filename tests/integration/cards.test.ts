@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { supabaseCardsService as service } from '../../src/features/cards/supabaseCardsService';
-import { CardTakenError } from '../../src/features/cards/types';
+import { CardForbiddenError, CardTakenError } from '../../src/features/cards/types';
 import { supabaseCustomerService as customers } from '../../src/features/customers/supabaseCustomerService';
 import { localSupabase, memoryClient, runSql } from './localSupabase';
 
@@ -34,7 +34,7 @@ async function newCustomer(label: string): Promise<string> {
   const created = await customers.create({
     operationId: randomUUID(),
     name: `Card ${label} ${SUFFIX}`,
-    phone: '',
+    email: '',
     privacyConsent: true,
     notes: '',
   });
@@ -262,5 +262,187 @@ describe('card_points over HTTP with the anon key (criterion 12)', () => {
     const issue = await anon.schema('app').rpc('issue_card_link', { p_card_id: randomUUID() });
     expect(issue.error).not.toBeNull();
     expect(issue.data).toBeNull();
+  });
+});
+
+/** An app RPC through supabase-js (PostgREST over HTTP): the data, or the server's error. */
+async function appRpc(
+  client: SupabaseClient,
+  fn: 'reactivate_card' | 'release_card' | 'associate_card',
+  args: Record<string, unknown>,
+): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const { error } = await client.schema('app').rpc(fn, args);
+  return error ? { ok: false, code: error.code, message: error.message } : { ok: true };
+}
+
+function cardState(cardId: string): string {
+  return runSql(`select active, released_at is not null from app.cards where id = :'id'::uuid;`, {
+    id: cardId,
+  });
+}
+
+/** A customer with `count` cards, all deactivated: the ids, oldest first. */
+async function deactivatedCards(label: string, count: number): Promise<string[]> {
+  current.client = operatorClient;
+  const customerId = await newCustomer(label);
+  const ids: string[] = [];
+  for (let index = 0; index < count; index += 1) {
+    // oxlint-disable-next-line no-await-in-loop -- each card replaces the one before it.
+    const { card } = await service.associate(customerId, newUid());
+    ids.push(card.id);
+  }
+  const last = ids.at(-1);
+  if (last) await service.deactivate(last);
+  return ids;
+}
+
+describe('reactivation and release races (SPEC-customers-v2 criterion 8)', () => {
+  // Two admin sessions at once (the seed has one admin; the server tells sessions apart, not
+  // people). Several rounds with fresh rows make the race happen every run.
+  const ROUNDS = 8;
+  let secondAdminClient: SupabaseClient;
+
+  beforeAll(async () => {
+    secondAdminClient = await signedIn('admin@example.com');
+  });
+
+  it('two admins reactivate two cards of one customer at once: one wins, one card active', async () => {
+    for (let index = 0; index < ROUNDS; index += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- every round is a fresh race.
+      const [first, second] = await deactivatedCards(`riattiva ${index}`, 2);
+      if (!first || !second) throw new Error('Two cards expected');
+      // oxlint-disable-next-line no-await-in-loop -- every round is a fresh race.
+      const outcomes = await Promise.all([
+        appRpc(adminClient, 'reactivate_card', {
+          p_card_id: first,
+          p_expected_active_card_id: null,
+        }),
+        appRpc(secondAdminClient, 'reactivate_card', {
+          p_card_id: second,
+          p_expected_active_card_id: null,
+        }),
+      ]);
+      // The loser saw no active card on screen, but one became active: no swap it did not
+      // confirm, and never a deadlock or a server fault.
+      expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1);
+      expect(outcomes.filter((outcome) => !outcome.ok)).toEqual([
+        { ok: false, code: 'P0001', message: 'active_card_changed' },
+      ]);
+      expect([cardState(first), cardState(second)].toSorted()).toEqual(['f|f', 't|f']);
+    }
+  });
+
+  it('release and reactivation of one card at once: exactly one wins, never both', async () => {
+    const winners: string[] = [];
+    for (let index = 0; index < ROUNDS; index += 1) {
+      // oxlint-disable-next-line no-await-in-loop -- every round is a fresh race.
+      const [cardId] = await deactivatedCards(`riformatta ${index}`, 1);
+      if (!cardId) throw new Error('One card expected');
+      // oxlint-disable-next-line no-await-in-loop -- every round is a fresh race.
+      const [release, reactivate] = await Promise.all([
+        appRpc(adminClient, 'release_card', { p_operation_id: randomUUID(), p_card_id: cardId }),
+        appRpc(secondAdminClient, 'reactivate_card', {
+          p_card_id: cardId,
+          p_expected_active_card_id: null,
+        }),
+      ]);
+      // Released first: the card never comes back. Reactivated first: an active card is never
+      // released. Never both, never neither.
+      const outcome = { release, reactivate, state: cardState(cardId) };
+      expect([
+        {
+          release: { ok: true },
+          reactivate: { ok: false, code: 'P0001', message: 'card_released' },
+          state: 'f|t',
+        },
+        {
+          release: { ok: false, code: 'P0001', message: 'card_active' },
+          reactivate: { ok: true },
+          state: 't|f',
+        },
+      ]).toContainEqual(outcome);
+      winners.push(release.ok ? 'release' : 'reactivate');
+    }
+    expect(winners).toHaveLength(ROUNDS);
+  });
+});
+
+describe('an operator over HTTP (SPEC-customers-v2 criterion 11)', () => {
+  it('gets forbidden from reactivate_card, release_card and the reactivation from associate_card', async () => {
+    current.client = operatorClient;
+    const customerId = await newCustomer('operatore vietato');
+    const uid = newUid();
+    const { card } = await service.associate(customerId, uid);
+    await service.deactivate(card.id);
+    const forbidden = { ok: false, code: 'P0001', message: 'forbidden' };
+
+    await expect(
+      appRpc(operatorClient, 'reactivate_card', {
+        p_card_id: card.id,
+        p_expected_active_card_id: null,
+      }),
+    ).resolves.toEqual(forbidden);
+    await expect(
+      appRpc(operatorClient, 'release_card', { p_operation_id: randomUUID(), p_card_id: card.id }),
+    ).resolves.toEqual(forbidden);
+    await expect(
+      appRpc(operatorClient, 'associate_card', { p_customer_id: customerId, p_uid: uid }),
+    ).resolves.toEqual(forbidden);
+    expect(cardState(card.id)).toBe('f|f');
+  });
+});
+
+describe('the inactive card page services against the real server (SPEC-customers-v2)', () => {
+  it('getCard, reactivateCard with the confirmed swap, releaseCard and their typed errors', async () => {
+    current.client = operatorClient;
+    const customerId = await newCustomer('servizi pagina card');
+    const oldUid = newUid();
+    const old = (await service.associate(customerId, oldUid)).card;
+    const activeNow = (await service.associate(customerId, newUid())).card;
+
+    await expect(service.getCard(randomUUID())).resolves.toBeNull();
+    await expect(service.getCard(old.id)).resolves.toMatchObject({
+      id: old.id,
+      uid: oldUid,
+      customerId,
+      customerName: `Card servizi pagina card ${SUFFIX}`,
+      customerAnonymized: false,
+      customerBalance: 0,
+      active: false,
+      releasedAt: null,
+      otherActiveCard: { id: activeNow.id, uid: activeNow.uid },
+    });
+    // An operator reads the card, but neither reactivates nor releases it.
+    await expect(service.reactivateCard(old.id, activeNow.id)).rejects.toBeInstanceOf(
+      CardForbiddenError,
+    );
+    await expect(service.releaseCard(randomUUID(), old.id)).rejects.toMatchObject({
+      kind: 'forbidden',
+    });
+
+    current.client = adminClient;
+    await expect(service.reactivateCard(old.id, null)).rejects.toMatchObject({
+      kind: 'active_card_changed',
+    });
+    await expect(service.reactivateCard(old.id, activeNow.id)).resolves.toMatchObject({
+      card: { id: old.id, active: true, linkState: 'not-written' },
+      replacedCardId: activeNow.id,
+    });
+    await expect(service.releaseCard(randomUUID(), old.id)).rejects.toMatchObject({
+      kind: 'card_active',
+    });
+
+    const operationId = randomUUID();
+    const released = await service.releaseCard(operationId, activeNow.id);
+    expect(released).toMatchObject({ id: activeNow.id, active: false });
+    await expect(service.releaseCard(operationId, activeNow.id)).resolves.toEqual(released);
+    await expect(service.getCard(activeNow.id)).resolves.toMatchObject({
+      releasedAt: expect.any(String),
+      otherActiveCard: { id: old.id },
+    });
+    await expect(service.reactivateCard(activeNow.id, old.id)).rejects.toMatchObject({
+      kind: 'card_released',
+    });
+    await expect(service.lookup(activeNow.uid)).resolves.toEqual({ status: 'unknown' });
   });
 });

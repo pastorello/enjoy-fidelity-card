@@ -44,7 +44,7 @@ async function setup(options: { supported?: boolean; writable?: boolean } = {}) 
   return { nfc, reader, onRead, steps, results };
 }
 
-/** A fake screen that reads cards and writes the link on one with a tap. */
+/** A fake screen that reads cards and writes the link on one, or erases it, with a tap. */
 function Page({
   onRead,
   onStep,
@@ -55,8 +55,15 @@ function Page({
   onResult: (result: CardWriteResult) => void;
 }) {
   useCardRead(onRead);
-  const { canWrite, writeUrl } = useCardWriter();
+  const { canWrite, writeUrl, eraseCard } = useCardWriter();
   const [writing, setWriting] = useState(false);
+  const run = (job: Promise<CardWriteResult>) => {
+    setWriting(true);
+    void job.then((result) => {
+      setWriting(false);
+      onResult(result);
+    });
+  };
   return (
     <>
       <p>{canWrite ? 'può scrivere' : 'non scrive'}</p>
@@ -64,14 +71,19 @@ function Page({
         type="button"
         disabled={writing}
         onClick={() => {
-          setWriting(true);
-          void writeUrl(URL, { expectedUid: UID, onStep }).then((result) => {
-            setWriting(false);
-            onResult(result);
-          });
+          run(writeUrl(URL, { expectedUid: UID, onStep }));
         }}
       >
         Scrivi il link
+      </button>
+      <button
+        type="button"
+        disabled={writing}
+        onClick={() => {
+          run(eraseCard({ expectedUid: UID, onStep }));
+        }}
+      >
+        Svuota la card
       </button>
     </>
   );
@@ -134,5 +146,72 @@ describe('useCardWriter', () => {
     expect(results).toEqual([{ ok: false, reason: 'cannot-write' }]);
     expect(steps).toEqual([]);
     expect(nfc.writes).toHaveLength(0);
+  });
+
+  // SPEC-customers-v2, point 4: eraseCard has the preconditions and the session of writeUrl.
+  it('eraseCard refuses with cannot-write and touches no card when canWrite is false', async () => {
+    const { nfc, steps, results } = await setup({ writable: false });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Svuota la card' }));
+    await settle();
+
+    expect(results).toEqual([{ ok: false, reason: 'cannot-write' }]);
+    expect(steps).toEqual([]);
+    expect(nfc.writes).toHaveLength(0);
+  });
+
+  it('eraseCard writes one empty record and keeps the reads from the page meanwhile', async () => {
+    const { nfc, onRead, steps, results } = await setup();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Svuota la card' }));
+    expect(steps).toEqual(['waiting-card']);
+
+    // The card is held to the phone, with its link: it goes to the writer, not to the page.
+    act(() => {
+      nfc.read(UID, { urls: [URL] });
+    });
+    expect(steps).toEqual(['waiting-card', 'writing']);
+    await settle();
+    expect(steps).toEqual(['waiting-card', 'writing', 'verifying']);
+    expect(nfc.writes).toHaveLength(1);
+    expect(nfc.writes[0]?.message).toEqual({ records: [{ recordType: 'empty' }] });
+    expect(nfc.writes[0]?.options.overwrite).toBe(true);
+
+    // Read back blank: the card is erased.
+    act(() => {
+      nfc.read(UID, { empties: 1 });
+    });
+    await settle();
+    expect(results).toEqual([{ ok: true }]);
+    expect(onRead).not.toHaveBeenCalled();
+    expect(nfc.makeReadOnlyCalls()).toBe(0);
+
+    // Once the erase is over, the page gets the reads again.
+    act(() => {
+      nfc.read(UID);
+    });
+    expect(onRead).toHaveBeenCalledTimes(1);
+  });
+
+  it('eraseCard while the link is being written: busy, and the write goes on', async () => {
+    const { nfc, reader, steps, results } = await setup();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Scrivi il link' }));
+    await expect(reader.eraseCard({ expectedUid: UID })).resolves.toEqual({
+      ok: false,
+      reason: 'busy',
+    });
+    expect(nfc.writes).toHaveLength(0);
+
+    act(() => {
+      nfc.read(UID);
+    });
+    await settle();
+    act(() => {
+      nfc.read(UID, { urls: [URL] });
+    });
+    await settle();
+    expect(steps).toEqual(['waiting-card', 'writing', 'verifying']);
+    expect(results).toEqual([{ ok: true }]);
   });
 });

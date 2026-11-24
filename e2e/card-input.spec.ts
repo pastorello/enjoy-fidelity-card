@@ -1,6 +1,6 @@
 import { signIn } from './auth';
-import { expect, test } from './fixtures';
-import { fakeCardWrites, stubWebNfc } from './nfc';
+import { expect, homeCustomers, homeSearch, test } from './fixtures';
+import { fakeCardErasures, fakeCardWrites, stubWebNfc } from './nfc';
 
 /**
  * Card reading end to end (docs/specs/SPEC-card-input.md, Testing Strategy). Web NFC does not exist
@@ -28,11 +28,12 @@ test('the E2E build exposes the fake writer: an empty write log and the test con
     ]),
   ).toEqual(['function', 'function']);
   expect(await fakeCardWrites(page)).toEqual([]);
+  expect(await fakeCardErasures(page)).toEqual([]);
 });
 
 const HOME_TITLE = 'Avvicina la card';
 const OFF_TEXT =
-  'Attiva l’NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o telefono.';
+  'Attiva l’NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o email.';
 
 test.describe('the card panel on the home', () => {
   test('first start: "Attiva la lettura" turns reading on, above the search', async ({ page }) => {
@@ -43,7 +44,7 @@ test.describe('the card panel on the home', () => {
     await expect(panel).toContainText(
       'Serve una volta sola: il telefono chiede il permesso di usare l’NFC.',
     );
-    const field = page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' });
+    const field = homeSearch(page, 'full');
     await expect(field).toBeVisible();
     const panelBox = await panel.boundingBox();
     const fieldBox = await field.boundingBox();
@@ -69,11 +70,9 @@ test.describe('the card panel on the home', () => {
     expect((await retry.boundingBox())?.height).toBeGreaterThanOrEqual(48);
 
     // A seed customer (supabase/seed.sql) is found by name.
-    await page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }).fill('bianchi');
+    await homeSearch(page, 'full').fill('bianchi');
     await expect(
-      page.getByRole('list', { name: 'Risultati della ricerca' }).getByRole('link', {
-        name: /^Giulia Bianchi\b/,
-      }),
+      homeCustomers(page).getByRole('link', { name: /^Giulia Bianchi\b/ }),
     ).toBeVisible();
     // With reading off the compact line has nothing to say.
     await expect(page.getByRole('region', { name: 'Lettura card' })).toHaveCount(0);
@@ -88,8 +87,10 @@ test.describe('the card panel on the home', () => {
     await expect(panel).toContainText('Lettura card spenta');
     await expect(panel).toContainText(OFF_TEXT);
     await expect(panel.getByRole('button')).toHaveCount(0);
-    await page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }).fill('bianchi');
-    await expect(page.getByRole('list', { name: 'Risultati della ricerca' })).toBeVisible();
+    await homeSearch(page, 'full').fill('bianchi');
+    await expect(
+      homeCustomers(page).getByRole('link', { name: /^Giulia Bianchi\b/ }),
+    ).toBeVisible();
   });
 
   test('a search shrinks the panel to one line, and clearing it brings the panel back', async ({
@@ -99,12 +100,10 @@ test.describe('the card panel on the home', () => {
     await signIn(page);
     const panel = page.getByRole('region', { name: 'Lettura card' });
     await expect(panel).toContainText(HOME_TITLE);
-    await page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' }).fill('zzzz');
+    await homeSearch(page, 'full').fill('zzzz');
     await expect(page.getByRole('heading', { name: 'Nessun cliente trovato' })).toBeVisible();
     await expect(panel).toHaveText('Lettura attiva: puoi anche avvicinare la card');
-    await expect(
-      page.getByRole('searchbox', { name: 'Cerca per nome o telefono', exact: true }),
-    ).toBeVisible();
+    await expect(homeSearch(page, 'compact')).toBeVisible();
     await page.getByRole('button', { name: 'Cancella la ricerca' }).click();
     await expect(panel).toContainText(HOME_TITLE);
   });
@@ -116,13 +115,19 @@ test.describe('the USB reader on the home (keyboard wedge, format hex)', () => {
   }) => {
     await stubWebNfc(page);
     await signIn(page);
+    // CLIENTI first: its first page arriving in the middle of the burst can hold the main thread
+    // past the wedge's 50 ms gap on a busy runner, and the burst would read as typing.
+    await expect(homeCustomers(page).getByRole('link').first()).toBeVisible();
     const newCustomer = page.getByRole('link', { name: 'Nuovo cliente' });
     await newCustomer.focus();
     await page.keyboard.type('04A1B2C3D4E5F6', { delay: 0 });
     await page.keyboard.press('Enter');
     // Enter stopped by the wedge: the burst is a read, which the home hands to `cards` (an unknown
     // card opens Nuovo cliente with it), and the link was not followed: one step back is the home.
-    await expect(page).toHaveURL(/\/clienti\/nuovo\?card=04A1B2C3D4E5F6$/);
+    await expect(page).toHaveURL(/\/clienti\/nuovo$/);
+    await expect(page.getByRole('region', { name: 'Card letta' })).toContainText(
+      'Codice 04A1B2C3D4E5F6:',
+    );
     await page.goBack();
     await expect(page).toHaveURL(/\/$/);
 
@@ -135,13 +140,12 @@ test.describe('the USB reader on the home (keyboard wedge, format hex)', () => {
   test('typing at a human pace in the search stays in the field', async ({ page }) => {
     await stubWebNfc(page);
     await signIn(page);
-    const field = page.getByRole('searchbox', { name: 'Oppure cerca per nome o telefono' });
+    const field = homeSearch(page, 'full');
     await field.focus();
     await page.keyboard.type('04A1B2C3', { delay: 120 });
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('searchbox', { name: /cerca per nome o telefono$/i })).toHaveValue(
-      '04A1B2C3',
-    );
-    await expect(page).toHaveURL(/\/\?q=04A1B2C3$/);
+    await expect(homeSearch(page)).toHaveValue('04A1B2C3');
+    // The text lives in the history state, never in the URL (SPEC-customers-v2 point 6).
+    await expect(page).toHaveURL(/\/$/);
   });
 });

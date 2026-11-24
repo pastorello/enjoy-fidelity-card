@@ -13,7 +13,7 @@ import { customerWithCard, freshUid, stubWebNfc } from './nfc';
 
 const BOM = '﻿';
 const CUSTOMERS_HEADER =
-  'Codice cliente;Nome;Telefono;Card attiva;Saldo punti;Consenso privacy;Note;Creato il;Creato da;Anonimizzato il';
+  'Codice cliente;Nome;Email;Card attiva;Saldo punti;Consenso privacy;Note;Creato il;Creato da;Anonimizzato il';
 const MOVEMENTS_HEADER =
   'Data e ora;Codice movimento;Codice cliente;Cliente;Tipo;Importo €;Punti;Euro per punto;Premio o descrizione;Operatore;Annulla il movimento;Annullato da';
 const NETWORK_MESSAGE = 'Esportazione non riuscita: controlla la connessione e riprova.';
@@ -75,7 +75,9 @@ test('an administrator downloads Clienti and Movimenti CSV with the test custome
   await stubWebNfc(page);
   await signIn(page, seedAccounts.admin.email);
   const uid = freshUid();
-  const customer = await customerWithCard(page, 'Export E2E', uid);
+  // A valid email that Excel would run as a formula (SPEC-customers-v2, point 2): the file guards it.
+  const email = `=cmd-${uid.toLowerCase()}@example.com`;
+  const customer = await customerWithCard(page, 'Export E2E', uid, { email });
   await expect(page.getByRole('heading', { level: 1, name: 'Registra spesa' })).toBeVisible();
   await typeAmount(page, '1250');
   await page.getByRole('button', { name: 'Conferma +12' }).click();
@@ -114,11 +116,11 @@ test('an administrator downloads Clienti and Movimenti CSV with the test custome
   const customerLines = customers.text.split('\r\n');
   expect(customerLines[0]).toBe(BOM + CUSTOMERS_HEADER);
   const customerRow = customerLines.find((line) => line.startsWith(`${customer.id};`));
-  // Code, name, no phone, the active card as Excel text (="…", quoted because it holds quotes),
-  // balance 12, consent, no notes, creator, not anonymized.
+  // Code, name, the email behind an apostrophe, the active card as Excel text (="…", quoted because
+  // it holds quotes), balance 12, consent, no notes, creator, not anonymized.
   expect(customerRow).toMatch(
     new RegExp(
-      `^${customer.id};${literal(customer.name)};;"=""${uid}""";12;\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2};;\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2};${seedAccounts.admin.name};$`,
+      `^${customer.id};${literal(customer.name)};'${literal(email)};"=""${uid}""";12;\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2};;\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2};${seedAccounts.admin.name};$`,
     ),
   );
   await expect(section.getByRole('status')).toHaveText(/^Clienti esportati: [\d.]+\.$/);

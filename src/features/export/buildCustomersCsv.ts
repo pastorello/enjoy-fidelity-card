@@ -9,7 +9,7 @@ import type { CustomerExportRow } from './types';
 export const CUSTOMERS_HEADER = [
   'Codice cliente',
   'Nome',
-  'Telefono',
+  'Email',
   'Card attiva',
   'Saldo punti',
   'Consenso privacy',
@@ -46,13 +46,14 @@ function personal(row: CustomerExportRow, value: string | null): string | null {
 
 function toCells(row: CustomerExportRow): string[] {
   const name = personal(row, row.name);
-  const phone = personal(row, row.phone);
+  const email = personal(row, row.email);
   const uid = personal(row, row.activeCardUid);
   const notes = personal(row, row.notes);
   return [
     row.id,
     name === null ? '' : guardFormula(name),
-    phone === null ? '' : excelText(phone),
+    // Free text, not excelText: a local part like "=cmd" is a valid email (SPEC-customers-v2, point 2).
+    email === null ? '' : guardFormula(email),
     uid === null ? '' : excelText(uid),
     String(row.balancePoints),
     romeDateTime(row.privacyConsentAt),

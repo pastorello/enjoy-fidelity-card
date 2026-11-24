@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { InitialEntry } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestCardReader } from '../../test/fakeCardReader';
 import { driveLinkWrites, type LinkWriteCall } from '../../test/fakeLinkWrites';
@@ -11,13 +12,13 @@ import { renderApp, signedInFake } from '../../test/renderApp';
 import { CardTakenError } from './types';
 
 const NAME = 'Nome e cognome';
-const PHONE = 'Telefono (facoltativo)';
+const EMAIL = 'Email (facoltativa)';
 const CONSENT = /Ha letto l’informativa privacy/;
 const SECTION_TEXT =
   'Lettura attiva: avvicina una card nuova per associarla adesso, oppure fallo più tardi dalla scheda.';
 const ONE_CUSTOMER = 'Una card può essere di un solo cliente: usa un’altra card.';
 
-const MARIA = fakeCustomer({ name: 'Maria Rossi', phone: '+393330004521', balance: 120 });
+const MARIA = fakeCustomer({ name: 'Maria Rossi', email: 'maria@example.com', balance: 120 });
 const ERASED = fakeCustomer({ name: 'cancellato-7f3a', anonymizedAt: '2026-11-17T09:00:00.000Z' });
 
 /** Uids as Web NFC gives them, and as the app keeps them. Invented. */
@@ -73,7 +74,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function renderNew(fixture: Fixture = setup(), path = '/clienti/nuovo') {
+/** Nuovo cliente opened by the home after an unknown card (the uid in the history state). */
+function fromHome(uid: string): InitialEntry {
+  return { pathname: '/clienti/nuovo', state: { card: uid } };
+}
+
+async function renderNew(fixture: Fixture = setup(), path: InitialEntry = '/clienti/nuovo') {
   const rendered = renderApp(
     path,
     fixture.auth,
@@ -100,9 +106,9 @@ function tap(fixture: Fixture, read: string) {
   });
 }
 
-async function fillValid(name = 'Giulia Bianchi', phone = '333 123 9876') {
+async function fillValid(name = 'Giulia Bianchi', email = 'giulia@example.com') {
   await userEvent.type(screen.getByRole('textbox', { name: NAME }), name);
-  if (phone !== '') await userEvent.type(screen.getByRole('textbox', { name: PHONE }), phone);
+  if (email !== '') await userEvent.type(screen.getByRole('textbox', { name: EMAIL }), email);
   await userEvent.click(screen.getByRole('checkbox', { name: CONSENT }));
 }
 
@@ -216,7 +222,7 @@ describe('Nuovo cliente senza card: the section "Card (facoltativa)"', () => {
       );
       expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
       expect(screen.getByRole('textbox', { name: NAME })).toHaveValue('Giulia Bianchi');
-      expect(screen.getByRole('textbox', { name: PHONE })).toHaveValue('333 123 9876');
+      expect(screen.getByRole('textbox', { name: EMAIL })).toHaveValue('giulia@example.com');
       expect(screen.getByRole('checkbox', { name: CONSENT })).toBeChecked();
       expect(router.state.location.pathname).toBe('/clienti/nuovo');
 
@@ -396,34 +402,37 @@ describe('Nuovo cliente senza card: the section "Card (facoltativa)"', () => {
     });
   });
 
-  it('on /clienti/nuovo?card= an unknown card read replaces the card of the link', async () => {
+  it('from the home (card in the history state): an unknown card read replaces the card of the link', async () => {
     const fixture = setup();
-    const { router } = await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+    const { router } = await renderNew(fixture, fromHome(NEW_ONE.uid));
     await screen.findByText(new RegExp(`Codice ${NEW_ONE.uid}`));
     tap(fixture, NEW_TWO.read);
     await screen.findByText(new RegExp(`Codice ${NEW_TWO.uid}`));
-    expect(router.state.location.search).toBe(`?card=${NEW_TWO.uid}`);
+    expect(router.state.location.state).toEqual({ card: NEW_TWO.uid });
+    expect(router.state.location.search).toBe('');
+    expect(router.state.historyAction).toBe('REPLACE');
   });
 
-  it('on /clienti/nuovo?card= a lookup without answer is said under the form, the card kept', async () => {
+  it('from the home (card in the history state): a lookup without answer is said under the form, the card kept', async () => {
     const fixture = setup();
-    const { router } = await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+    const { router } = await renderNew(fixture, fromHome(NEW_ONE.uid));
     await screen.findByText(new RegExp(`Codice ${NEW_ONE.uid}`));
     fixture.cards.failNext('lookup', 'lost');
     tap(fixture, NEW_TWO.read);
     const section = await screen.findByRole('region', { name: 'Card' });
     expect(await within(section).findByRole('alert')).toHaveTextContent('Card non letta');
     expect(screen.getByRole('region', { name: 'Card letta' })).toHaveTextContent(NEW_ONE.uid);
-    expect(router.state.location.search).toBe(`?card=${NEW_ONE.uid}`);
+    expect(router.state.location.state).toEqual({ card: NEW_ONE.uid });
   });
 
-  it('on /clienti/nuovo?card= a known card read drops the card of the link', async () => {
+  it('from the home (card in the history state): a known card read drops the card of the link', async () => {
     const fixture = setup();
-    const { router } = await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+    const { router } = await renderNew(fixture, fromHome(NEW_ONE.uid));
     await screen.findByText(new RegExp(`Codice ${NEW_ONE.uid}`));
     tap(fixture, OF_MARIA.read);
     expect(await screen.findByRole('alert')).toHaveTextContent('Questa card è di Maria Rossi.');
-    await waitFor(() => expect(router.state.location.search).toBe(''));
+    await waitFor(() => expect(router.state.location.state).toBeNull());
+    expect(router.state.location.search).toBe('');
     expect(screen.queryByRole('region', { name: 'Card letta' })).not.toBeInTheDocument();
   });
 });
@@ -449,9 +458,9 @@ async function saveWithReadCard(fixture: WriteFixture) {
   return { ...rendered, saved };
 }
 
-/** Nuovo cliente da card nuova (`?card=`): fills the form and saves. */
+/** Nuovo cliente da card nuova (from the home): fills the form and saves. */
 async function saveFromLink(fixture: WriteFixture) {
-  const rendered = await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+  const rendered = await renderNew(fixture, fromHome(NEW_ONE.uid));
   await fillValid();
   save();
   const [saved] = await waitFor(() => {
@@ -480,7 +489,7 @@ describe('Nuovo cliente: the link written after the save (SPEC-cards, points 2, 
   const LINK_NOTE =
     'Con il link, Giulia vede i suoi punti avvicinando la card al proprio telefono. Sulla card va solo il link: nessun dato personale.';
 
-  it('without ?card: «Card associata a Giulia», the write on that card, then the customer page', async () => {
+  it('read on the page: «Card associata a Giulia», the write on that card, then the customer page', async () => {
     const fixture = writeSetup();
     const { router, saved } = await saveWithReadCard(fixture);
 
@@ -516,7 +525,7 @@ describe('Nuovo cliente: the link written after the save (SPEC-cards, points 2, 
     );
   });
 
-  it('with ?card: the write, then Registra spesa in place of the form', async () => {
+  it('from the home: the write, then Registra spesa in place of the form', async () => {
     const fixture = writeSetup();
     const { router, saved } = await saveFromLink(fixture);
     const write = await currentWrite(fixture);
@@ -531,7 +540,7 @@ describe('Nuovo cliente: the link written after the save (SPEC-cards, points 2, 
     expect(fixture.cards.service.confirmLink).toHaveBeenCalledOnce();
   });
 
-  it('with ?card, «Salta, lo scrivo più tardi»: Registra spesa, customer and card saved without the link', async () => {
+  it('from the home, «Salta, lo scrivo più tardi»: Registra spesa, customer and card saved without the link', async () => {
     const fixture = writeSetup();
     const { router, saved } = await saveFromLink(fixture);
     const write = await currentWrite(fixture);
@@ -615,7 +624,7 @@ describe('Nuovo cliente: the link written after the save (SPEC-cards, points 2, 
 
   it('a lost answer and «Riprova» on the save: one customer, the write on its card', async () => {
     const fixture = writeSetup();
-    await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+    await renderNew(fixture, fromHome(NEW_ONE.uid));
     await fillValid();
     fixture.cards.failNext('createCustomerWithCard', 'lost');
     save();
@@ -628,9 +637,9 @@ describe('Nuovo cliente: the link written after the save (SPEC-cards, points 2, 
   });
 
   describe('a resend after a lost answer with another card: the card is not associated, and it says so', () => {
-    it('?card A saved, answer lost, card B read and «Riprova»: notice, «Associa card» opens Associa card', async () => {
+    it('card A from the home saved, answer lost, card B read and «Riprova»: notice, «Associa card» opens Associa card', async () => {
       const fixture = writeSetup();
-      const { router } = await renderNew(fixture, `/clienti/nuovo?card=${NEW_ONE.uid}`);
+      const { router } = await renderNew(fixture, fromHome(NEW_ONE.uid));
       await fillValid();
       fixture.cards.failNext('createCustomerWithCard', 'lost');
       save();

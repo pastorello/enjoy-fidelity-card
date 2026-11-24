@@ -146,7 +146,7 @@ beforeAll(async () => {
   const created = await seedOperator.schema('app').rpc('create_customer', {
     p_operation_id: randomUUID(),
     p_name: `Cassa Movimento ${run}`,
-    p_phone: null,
+    p_email: null,
     p_privacy_consent: true,
     p_notes: null,
   });
@@ -232,7 +232,7 @@ function deviceWrites(): { name: string; args: Record<string, unknown>; code: st
       args: {
         p_operation_id: randomUUID(),
         p_name: `Cassa Vuota ${run}`,
-        p_phone: null,
+        p_email: null,
         p_privacy_consent: true,
         p_notes: null,
       },
@@ -240,7 +240,7 @@ function deviceWrites(): { name: string; args: Record<string, unknown>; code: st
     {
       code: 'P0001',
       name: 'update_customer',
-      args: { p_customer_id: customer, p_name: `Cassa Vuota ${run}`, p_phone: null, p_notes: null },
+      args: { p_customer_id: customer, p_name: `Cassa Vuota ${run}`, p_email: null, p_notes: null },
     },
     { code: 'P0001', name: 'anonymize_customer', args: { p_customer_id: customer } },
     {

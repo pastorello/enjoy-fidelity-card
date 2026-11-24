@@ -11,18 +11,19 @@ function cardPart(load: ReturnType<typeof useActiveCard>): string | null {
 }
 
 /**
- * The line under the name of Scheda cliente (SPEC-cards, point 6; wireframe "Scheda cliente"): the
- * card part, « · » and the phone part of `customers` («Tel. 333 ••• 4521» or «Senza telefono»), in
- * the muted secondary text of «Senza telefono». Until the card arrives only the phone part shows,
- * so the line never guesses. Not mounted for an erased customer, whose line stays that of
- * `customers`.
+ * The line under the name of Scheda cliente (SPEC-cards point 6, SPEC-customers-v2 point 2): the
+ * card part, « · » and the email in full («rossi@example.com») or «Senza email», in muted
+ * secondary text. The email is plain selectable text, never a `mailto:` link: the app does not
+ * write to customers. Until the card arrives only the email part shows, so the line never
+ * guesses. Not mounted for an erased customer, whose line stays that of `customers`.
  */
-export function CardSummary({ customerId, phone }: { customerId: string; phone: string }) {
+export function CardSummary({ customerId, email }: { customerId: string; email: string | null }) {
   const card = cardPart(useActiveCard(customerId));
+  const contact = email ?? 'Senza email';
   return (
     <p className={styles.summary}>
       <Icon name="credit-card" size={20} className={styles.icon} />
-      {card === null ? phone : `${card} · ${phone}`}
+      {card === null ? contact : `${card} · ${contact}`}
     </p>
   );
 }

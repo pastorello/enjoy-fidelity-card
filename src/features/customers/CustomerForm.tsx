@@ -4,25 +4,36 @@ import { Icon } from '../../shared/ui/Icon';
 import { TextField } from '../../shared/ui/TextField';
 import styles from './CustomerForm.module.css';
 import { customerErrorText, type CustomerField } from './errorCodes';
-import { normalizePhone } from './phone';
+import { normalizeEmail } from './email';
 import { PrivacyNoticeDialog } from './PrivacyNoticeDialog';
 
 /** The fields sent on save: the name cleaned like the server does, the rest as typed. */
 export type CustomerFormValues = {
   name: string;
-  phone: string;
+  /** As typed (blank: none): the server normalizes it. Modifica cliente starts from the stored one. */
+  email: string;
   notes: string;
   privacyConsent: boolean;
 };
 
+/** The fields of the form, in their order (the server's `phone` is no longer one of them). */
+type FormField = CustomerField;
+
 /** One message per wrong field, in the order of the form. */
-export type CustomerFormErrors = Partial<Record<CustomerField, string>>;
+export type CustomerFormErrors = Partial<Record<FormField, string>>;
 
 const NAME_MAX = 80;
 const NOTES_MAX = 500;
-const FIELD_ORDER: CustomerField[] = ['name', 'phone', 'consent', 'notes'];
+/** `customers_email_check`: at most 254 characters. */
+const EMAIL_MAX = 254;
+const FIELD_ORDER: FormField[] = ['name', 'email', 'consent', 'notes'];
 
-const EMPTY: CustomerFormValues = { name: '', phone: '', notes: '', privacyConsent: false };
+const EMPTY: CustomerFormValues = {
+  name: '',
+  email: '',
+  notes: '',
+  privacyConsent: false,
+};
 
 /** `private.clean_name`: inner whitespace runs (non-breaking spaces too) collapsed to one, trimmed. */
 function cleanName(name: string): string {
@@ -45,11 +56,11 @@ export function nameFromQuery(text: string | null): string {
     .trimEnd();
 }
 
-/** What the server refused on save: one field's message, or the name already used. */
+/** What the server refused on save: one field's message, or the name or the email already used. */
 export type CustomerRefusal =
   | { kind: 'field'; field: CustomerField; text: string }
-  /** `existingCustomerId`: the customer that has the name, when the server says. */
-  | { kind: 'name_taken'; existingCustomerId: string | null };
+  /** `existingCustomerId`: the customer that has the name or the email, when the server says. */
+  | { kind: 'taken'; field: 'name' | 'email'; existingCustomerId: string | null };
 
 const NAME_TAKEN_HINT =
   'Se è un’altra persona, aggiungi un dettaglio al nome, per esempio «Maria Rossi Serapo».';
@@ -66,9 +77,7 @@ export function validateCustomerForm(
   const name = cleanName(values.name);
   if (name === '') errors.name = customerErrorText('name_required');
   else if (characters(name) > NAME_MAX) errors.name = customerErrorText('name_too_long');
-  if (values.phone.trim() !== '' && normalizePhone(values.phone) === null) {
-    errors.phone = customerErrorText('phone_invalid');
-  }
+  if (normalizeEmail(values.email) === 'invalid') errors.email = customerErrorText('email_invalid');
   if (requireConsent && !values.privacyConsent) {
     errors.consent = customerErrorText('consent_required');
   }
@@ -77,11 +86,17 @@ export function validateCustomerForm(
   return errors;
 }
 
-/** "Esiste già un cliente con questo nome." and, when the server says who, "Apri la scheda". */
-function NameTakenError({ existingCustomerId }: { existingCustomerId: string | null }) {
+/**
+ * "Esiste già un cliente con questo nome." (or "…questa email.") and, when the server says who,
+ * "Apri la scheda" of that customer.
+ */
+function TakenError({
+  field,
+  existingCustomerId,
+}: Omit<Extract<CustomerRefusal, { kind: 'taken' }>, 'kind'>) {
   return (
     <>
-      {customerErrorText('customer_name_taken')}
+      {customerErrorText(field === 'name' ? 'customer_name_taken' : 'customer_email_taken')}
       {existingCustomerId !== null && (
         <>
           {' '}
@@ -97,7 +112,7 @@ type CustomerFormProps = {
   id: string;
   /** New customer: the PRIVACY section and its mandatory consent. Edit: none. */
   withPrivacy: boolean;
-  /** The help text under the phone (Nuovo cliente); the wireframe Modifica cliente has none. */
+  /** The help text under the email (Nuovo cliente); the wireframe Modifica cliente has none. */
   withHelp?: boolean;
   initialValues?: Partial<CustomerFormValues>;
   /** Called only with a valid form. */
@@ -108,7 +123,8 @@ type CustomerFormProps = {
 
 /**
  * The fields shared by Nuovo cliente and Modifica cliente (wireframe Nuovo cliente senza card):
- * name, phone, help text, PRIVACY, notes at the end. Errors go under their field and the first
+ * name, email (in the place of the phone of the wireframe: SPEC-customers-v2, point 2), help
+ * text, PRIVACY, notes at the end. Errors go under their field and the first
  * wrong one gets the focus.
  */
 export function CustomerForm({
@@ -126,13 +142,13 @@ export function CustomerForm({
   const [errors, setErrors] = useState<CustomerFormErrors>({});
   const [noticeOpen, setNoticeOpen] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
-  const phoneRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
   const consentRef = useRef<HTMLInputElement>(null);
   const notesRef = useRef<HTMLInputElement>(null);
   const consentErrorId = useId();
-  const refs: Record<CustomerField, RefObject<HTMLInputElement | null>> = {
+  const refs: Record<FormField, RefObject<HTMLInputElement | null>> = {
     name: nameRef,
-    phone: phoneRef,
+    email: emailRef,
     consent: consentRef,
     notes: notesRef,
   };
@@ -140,8 +156,9 @@ export function CustomerForm({
   // A new refusal of the server moves the focus to its field, like the checks of the app.
   useEffect(() => {
     if (!refusal) return;
-    const field = refusal.kind === 'name_taken' ? 'name' : refusal.field;
-    const target = { name: nameRef, phone: phoneRef, consent: consentRef, notes: notesRef }[field];
+    const target = { name: nameRef, email: emailRef, consent: consentRef, notes: notesRef }[
+      refusal.field
+    ];
     target.current?.focus();
   }, [refusal]);
 
@@ -149,7 +166,9 @@ export function CustomerForm({
   const ownErrors = Object.keys(errors).length > 0;
   const shown: CustomerFormErrors =
     !ownErrors && refusal?.kind === 'field' ? { [refusal.field]: refusal.text } : errors;
-  const nameTaken = !ownErrors && refusal?.kind === 'name_taken' ? refusal : null;
+  const taken = !ownErrors && refusal?.kind === 'taken' ? refusal : null;
+  const nameTaken = taken?.field === 'name' ? taken : null;
+  const emailTaken = taken?.field === 'email' ? taken : null;
 
   function change<K extends keyof CustomerFormValues>(key: K, value: CustomerFormValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -177,7 +196,7 @@ export function CustomerForm({
         onChange={(value) => change('name', value)}
         error={
           nameTaken ? (
-            <NameTakenError existingCustomerId={nameTaken.existingCustomerId} />
+            <TakenError field="name" existingCustomerId={nameTaken.existingCustomerId} />
           ) : (
             shown.name
           )
@@ -186,22 +205,32 @@ export function CustomerForm({
         autoComplete="off"
         autoCapitalize="words"
       />
+      {/* autoComplete off: the customer's email, typed by the operator, never the operator's own. */}
       <TextField
-        ref={phoneRef}
-        label="Telefono (facoltativo)"
-        type="tel"
-        placeholder="Numero di cellulare"
-        value={values.phone}
-        onChange={(value) => change('phone', value)}
-        error={shown.phone}
+        ref={emailRef}
+        label="Email (facoltativa)"
+        type="email"
+        placeholder="nome@esempio.it"
+        value={values.email}
+        onChange={(value) => change('email', value)}
+        error={
+          emailTaken ? (
+            <TakenError field="email" existingCustomerId={emailTaken.existingCustomerId} />
+          ) : (
+            shown.email
+          )
+        }
+        maxLength={EMAIL_MAX}
         autoComplete="off"
-        inputMode="tel"
+        autoCapitalize="none"
+        spellCheck={false}
+        inputMode="email"
       />
-      {/* With the name already used, the suggestion under the name takes its place (wireframe). */}
-      {withHelp && !nameTaken && (
+      {/* With the name or the email already used, the error and its link take its place (wireframe). */}
+      {withHelp && !taken && (
         <p className={styles.help}>
-          Il nome identifica il cliente: non può essere già di un altro. Il telefono serve solo a
-          trovarlo più in fretta.
+          Il nome identifica il cliente: non può essere già di un altro. L’email serve solo a
+          ritrovarlo: l’app non scrive ai clienti.
         </p>
       )}
       {withPrivacy && (

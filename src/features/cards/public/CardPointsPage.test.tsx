@@ -6,10 +6,12 @@ import { CardPointsPage } from './CardPointsPage';
 
 type Answer = { data: unknown; error: unknown; status: number };
 
-// The real cardPointsService runs (token check, POST, 8 s timeout); only the client is fake.
+// The real cardPointsService runs (token check, POST, 8 s timeout); only the client is fake. Each
+// function answers from its own queue, whatever the order of the two calls.
 const db = vi.hoisted(() => ({
   rpc: vi.fn<(...args: unknown[]) => unknown>(),
-  abortSignal: vi.fn<(signal: AbortSignal) => Promise<unknown>>(),
+  points: vi.fn<() => Promise<unknown>>(),
+  rewards: vi.fn<() => Promise<unknown>>(),
 }));
 vi.mock('../../../lib/supabase', () => ({
   getSupabase: () => ({ schema: () => ({ rpc: db.rpc }) }),
@@ -17,9 +19,22 @@ vi.mock('../../../lib/supabase', () => ({
 
 const TOKEN = 'Zq3_x-9KpL2mN8vR4tY6wA';
 
+/** The next answers of public.card_points. */
 function answers(...list: Answer[]) {
-  for (const answer of list) db.abortSignal.mockResolvedValueOnce(answer);
+  for (const answer of list) db.points.mockResolvedValueOnce(answer);
 }
+
+/** The next answers of public.card_rewards (an empty catalogue when none is queued). */
+function rewardsAnswer(...list: Answer[]) {
+  for (const answer of list) db.rewards.mockResolvedValueOnce(answer);
+}
+
+function rewards(...rows: [string, number][]): Answer {
+  return { data: rows.map(([name, points]) => ({ name, points })), error: null, status: 200 };
+}
+
+const NEVER = new Promise<never>(() => {});
+const OFFLINE: Answer = { data: null, error: { message: 'TypeError: Failed to fetch' }, status: 0 };
 
 /** The page alone, as the router mounts it: no AuthProvider and no other provider around it. */
 function renderPage(token = TOKEN) {
@@ -34,8 +49,11 @@ function robotsMeta() {
 }
 
 beforeEach(() => {
-  db.rpc.mockReset().mockImplementation(() => ({ abortSignal: db.abortSignal }));
-  db.abortSignal.mockReset();
+  db.rpc.mockReset().mockImplementation((name) => ({
+    abortSignal: () => (name === 'card_points' ? db.points() : db.rewards()),
+  }));
+  db.points.mockReset();
+  db.rewards.mockReset().mockResolvedValue(rewards());
 });
 
 afterEach(() => {
@@ -45,12 +63,12 @@ afterEach(() => {
 
 describe('CardPointsPage', () => {
   it('shows «Carico i tuoi punti…» while the points load', async () => {
-    db.abortSignal.mockReturnValue(new Promise<never>(() => {}));
+    db.points.mockReturnValue(NEVER);
     renderPage();
     expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
   });
 
-  it('shows the points of the card (Saldo-punti) and nothing else', async () => {
+  it('shows the points of the card (Saldo-punti) and nothing else when no reward is active', async () => {
     answers({ data: 120, error: null, status: 200 });
     renderPage();
 
@@ -64,17 +82,60 @@ describe('CardPointsPage', () => {
       screen.getByText('Mostra la card alla cassa per usare i tuoi punti.'),
     ).toBeInTheDocument();
     expect(
-      screen.getByText('Questa pagina mostra solo i punti della card, senza dati personali.'),
+      screen.getByText(
+        'Questa pagina mostra i punti della card e i premi del bar, senza dati personali.',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText('Enjoy Bar · Gaeta')).toBeInTheDocument();
+    // An empty catalogue: no PREMI section at all.
+    expect(screen.queryByRole('region', { name: 'PREMI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
     // No name, no other data (criterion 10): the whole text of the page is the board's.
     expect(document.body.textContent).toBe(
       'ENJOY YOUR POINTS120 puntiMostra la card alla cassa per usare i tuoi punti.' +
-        'Questa pagina mostra solo i punti della card, senza dati personali.Enjoy Bar · Gaeta',
+        'Questa pagina mostra i punti della card e i premi del bar, senza dati personali.' +
+        'Enjoy Bar · Gaeta',
     );
     // No way into the operators' screens.
     expect(screen.queryAllByRole('link')).toEqual([]);
-    expect(db.rpc).toHaveBeenCalledExactlyOnceWith('card_points', { p_token: TOKEN });
+    expect(db.rpc).toHaveBeenCalledTimes(2);
+    expect(db.rpc).toHaveBeenCalledWith('card_points', { p_token: TOKEN });
+    expect(db.rpc).toHaveBeenCalledWith('card_rewards', { p_token: TOKEN });
+  });
+
+  it('lists the active rewards under the points, in the order of the server, and nothing else (criterion 7)', async () => {
+    answers({ data: 120, error: null, status: 200 });
+    rewardsAnswer(rewards(['Caffè', 50], ['Cornetto e cappuccino', 100], ['Aperitivo', 1250]));
+    renderPage();
+
+    const section = await screen.findByRole('region', { name: 'PREMI' });
+    expect(within(section).getByRole('heading', { level: 2, name: 'PREMI' })).toBeInTheDocument();
+    expect(section).not.toHaveAttribute('lang');
+    const items = within(within(section).getByRole('list')).getAllByRole('listitem');
+    expect(items.map((item) => item.textContent)).toEqual([
+      'Caffè50 punti',
+      'Cornetto e cappuccino100 punti',
+      'Aperitivo1.250 punti',
+    ]);
+    // Not something to touch: no link, no button in the rows.
+    expect(within(section).queryAllByRole('link')).toEqual([]);
+    expect(within(section).queryAllByRole('button')).toEqual([]);
+    // The section sits between the points and the hint; the whole text is the board's.
+    expect(document.body.textContent).toBe(
+      'ENJOY YOUR POINTS120 punti' +
+        'PREMICaffè50 puntiCornetto e cappuccino100 puntiAperitivo1.250 punti' +
+        'Mostra la card alla cassa per usare i tuoi punti.' +
+        'Questa pagina mostra i punti della card e i premi del bar, senza dati personali.' +
+        'Enjoy Bar · Gaeta',
+    );
+  });
+
+  it('says «1 punto» for a reward of one point', async () => {
+    answers({ data: 0, error: null, status: 200 });
+    rewardsAnswer(rewards(['Acqua', 1]));
+    renderPage();
+    const section = await screen.findByRole('region', { name: 'PREMI' });
+    expect(within(section).getByRole('listitem')).toHaveTextContent(/^Acqua1 punto$/);
   });
 
   it('groups the thousands as it-IT does', async () => {
@@ -95,8 +156,10 @@ describe('CardPointsPage', () => {
     expect(within(panel).getByText(word)).toBeInTheDocument();
   });
 
-  it('shows «Card non attiva» when the server answers null', async () => {
+  it('shows «Card non attiva» when the server answers null, without rewards', async () => {
     answers({ data: null, error: null, status: 200 });
+    // Even if rewards came back, the page of a card without points shows none.
+    rewardsAnswer(rewards(['Caffè', 50]));
     renderPage();
 
     expect(
@@ -107,6 +170,9 @@ describe('CardPointsPage', () => {
     expect(screen.getByText('Enjoy Bar · Gaeta')).toBeInTheDocument();
     expect(screen.queryByText(/ENJOY YOUR POINTS/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(document.body.textContent).toBe(
+      'Card non attivaQuesta card non mostra punti. Chiedi al bar.Enjoy Bar · Gaeta',
+    );
   });
 
   it.each([
@@ -123,10 +189,7 @@ describe('CardPointsPage', () => {
   });
 
   it('offers «Riprova» when the network fails, and loads again', async () => {
-    answers(
-      { data: null, error: { message: 'TypeError: Failed to fetch' }, status: 0 },
-      { data: 7, error: null, status: 200 },
-    );
+    answers(OFFLINE, { data: 7, error: null, status: 200 });
     renderPage();
 
     const alert = await screen.findByRole('alert');
@@ -138,12 +201,57 @@ describe('CardPointsPage', () => {
       await screen.findByRole('heading', { level: 1, name: 'ENJOY YOUR POINTS' }),
     ).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
-    expect(db.rpc).toHaveBeenCalledTimes(2);
+    // Both functions again, once each.
+    expect(db.rpc).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([
+    ['the points', () => answers(OFFLINE, { data: 7, error: null, status: 200 })],
+    [
+      'the rewards',
+      () => {
+        answers({ data: 7, error: null, status: 200 }, { data: 7, error: null, status: 200 });
+        rewardsAnswer(OFFLINE, rewards(['Caffè', 50]));
+      },
+    ],
+  ])('shows one error with «Riprova» when only %s fail, never half the page', async (_l, setUp) => {
+    setUp();
+    renderPage();
+
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('Non riesco a caricare i punti.')).toBeInTheDocument();
+    expect(screen.queryByText('ENJOY YOUR POINTS')).not.toBeInTheDocument();
+    expect(screen.queryByText('PREMI')).not.toBeInTheDocument();
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+
+    expect(await screen.findByText('7')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('keeps loading until both answers arrive', async () => {
+    answers({ data: 7, error: null, status: 200 });
+    db.rewards.mockReturnValue(NEVER);
+    renderPage();
+    expect(await screen.findByText('Carico i tuoi punti…')).toBeInTheDocument();
+    await act(() => Promise.resolve());
+    expect(screen.queryByText('7')).not.toBeInTheDocument();
+  });
+
+  it('treats 8 seconds without the rewards as a network error', async () => {
+    vi.useFakeTimers();
+    answers({ data: 7, error: null, status: 200 });
+    db.rewards.mockReturnValue(NEVER);
+    renderPage();
+    await act(() => vi.advanceTimersByTimeAsync(7_999));
+    expect(screen.getByText('Carico i tuoi punti…')).toBeInTheDocument();
+
+    await act(() => vi.advanceTimersByTimeAsync(1));
+    expect(screen.getByRole('button', { name: 'Riprova' })).toBeInTheDocument();
   });
 
   it('treats 8 seconds without an answer as a network error', async () => {
     vi.useFakeTimers();
-    db.abortSignal.mockReturnValue(new Promise<never>(() => {}));
+    db.points.mockReturnValue(NEVER);
     renderPage();
     await act(() => vi.advanceTimersByTimeAsync(7_999));
     expect(screen.getByText('Carico i tuoi punti…')).toBeInTheDocument();
@@ -178,7 +286,7 @@ function h1s() {
 
 describe('CardPointsPage: one h1 in every state, for whoever jumps by headings', () => {
   it('while loading: the page title, hidden, and no other heading', async () => {
-    db.abortSignal.mockReturnValue(new Promise<never>(() => {}));
+    db.points.mockReturnValue(NEVER);
     renderPage();
     await screen.findByText('Carico i tuoi punti…');
     expect(h1s()).toHaveLength(1);

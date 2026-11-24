@@ -1,10 +1,13 @@
-import type { CardInputAdapter, CardWriteTarget, DeliverRaw } from './cardReader';
+import type { CardContent, CardInputAdapter, CardWriteTarget, DeliverRaw } from './cardReader';
 import { normalizeUid } from './normalizeUid';
 import type { NfcWriterLike } from './webNfcAdapter';
 import { IN_FIELD_MS } from './webNfcWriter';
 
-/** One link the fake writer wrote on a fake tag (the log the E2E tests read to open the link). */
-export type FakeCardWrite = { uid: string; url: string; at: number };
+/**
+ * One write of the fake writer on a fake tag (the log the E2E tests read to open the link): the link
+ * written, or `null` for a card erased by `eraseCard` (SPEC-customers-v2, point 4).
+ */
+export type FakeCardWrite = { uid: string; url: string | null; at: number };
 
 /** How the next fake write fails (SPEC-card-input, point 7). */
 export type FakeWriteFailure = 'io' | 'timeout' | 'not-allowed' | 'verify-failed' | 'unreadable';
@@ -19,9 +22,9 @@ declare global {
   interface Window {
     /** E2E build only: puts the card `uid` on the phone (SPEC-card-input, point 7). */
     __enjoyFakeCard?: (uid: string) => void;
-    /** E2E build only: every link the fake writer wrote, in order. */
+    /** E2E build only: every link the fake writer wrote (`url: null` for an erased card), in order. */
     __enjoyFakeCardWrites?: FakeCardWrite[];
-    /** E2E build only: makes the next write fail, or the device unable to write. */
+    /** E2E build only: makes the next write or erase fail, or the device unable to write. */
     __enjoyFakeCardControl?: FakeCardControl;
   }
 }
@@ -34,35 +37,54 @@ export type FakeCardHost = Pick<
 
 export type FakeCard = { adapter: CardInputAdapter; writer: CardWriteTarget };
 
-/** A fake tag: the links it holds, or damaged (an interrupted write) and giving no uid. */
-type FakeTag = { urls: readonly string[]; damaged: boolean };
+/**
+ * What a fake tag holds: one link, or `url: null` when blank (new or erased: no record but `empty`
+ * ones); `foreign` for another content (neither a link of ours nor blank, say a text record);
+ * `damaged` (an interrupted write) when it gives no uid. A tag never written is blank.
+ */
+type FakeTag = { kind: 'url'; url: string | null } | { kind: 'foreign' } | { kind: 'damaged' };
 
+const BLANK_TAG: FakeTag = { kind: 'url', url: null };
+
+/** What a write puts on the tag: the link of its `url` record, or `null` for only `empty` records. */
 type PendingWrite = {
-  urls: readonly string[];
+  url: string | null;
   done: Promise<void>;
   resolve: () => void;
-  reject: (error: DOMException) => void;
+  reject: (error: Error) => void;
 };
 
 function domError(name: string, message: string): DOMException {
   return new DOMException(message, name);
 }
 
-function urlsOf(message: NDEFMessageInit): string[] {
-  return message.records.flatMap((record) =>
-    record.recordType === 'url' && typeof record.data === 'string' ? [record.data] : [],
-  );
+/**
+ * The content of a message as the fake tag keeps it: the link of its one `url` record, `null` for one
+ * `empty` record (an erased card), `undefined` for any other message, which the app never writes.
+ */
+function contentOf(message: NDEFMessageInit): string | null | undefined {
+  const [record, ...rest] = message.records;
+  if (record === undefined || rest.length > 0) return undefined;
+  if (record.recordType === 'empty') return null;
+  return record.recordType === 'url' && typeof record.data === 'string' ? record.data : undefined;
+}
+
+/** What the phone reads on an undamaged tag (SPEC-customers-v2, point 4: blank in the strict sense). */
+function readOf(tag: Exclude<FakeTag, { kind: 'damaged' }>): CardContent {
+  if (tag.kind === 'foreign') return { urls: [], blank: false };
+  return tag.url === null ? { urls: [], blank: true } : { urls: [tag.url], blank: false };
 }
 
 /**
  * The E2E card reader and writer (SPEC-card-input, point 7). `window.__enjoyFakeCard(uid)` is the card
  * put on the phone: it hands `uid` to the service as a `'fake'` read in `'hex'` (same rules as the real
- * inputs), with the links that fake tag holds, and completes a write waiting for a card. In place of
- * `NDEFReader.write()` the writer keeps the tags in memory (`uid → links`): a card put on the phone
+ * inputs), with what that fake tag holds, and completes a write waiting for a card. In place of
+ * `NDEFReader.write()` the writer keeps the tags in memory (`uid → url | null`, `null` for a blank
+ * card: new, or erased by `eraseCard`, SPEC-customers-v2 point 4): a card put on the phone
  * less than `IN_FIELD_MS` ago is still there, so the write happens at once and the card is read back
- * for the verification without another tap. Each successful write is added to
- * `window.__enjoyFakeCardWrites`; `window.__enjoyFakeCardControl` makes the next write fail or the
- * device unable to write. Installed by `main.tsx` only when `VITE_E2E === '1'`: never part of the
+ * for the verification without another tap. Each successful write (`url: null` for an erase) is added to
+ * `window.__enjoyFakeCardWrites`; `window.__enjoyFakeCardControl` makes the next write (or erase) fail
+ * or the device unable to write. Installed by `main.tsx` only when `VITE_E2E === '1'`: never part of the
  * normal build. Every global name starts with `__enjoyFakeCard`, which `check:bundle` looks for.
  */
 export function createFakeCard(
@@ -80,11 +102,12 @@ export function createFakeCard(
   let unreadableNextTap = false;
   let canWrite = true;
 
-  /** What the phone gets from the tag `uid`: a read with its links, or no uid when damaged. */
+  /** What the phone gets from the tag `uid`: a read with its content, or no uid when damaged. */
   function present(uid: string) {
-    const tag = tags.get(uid);
-    if (tag?.damaged === true) unreadable?.();
-    else deliver?.(uid, 'hex', 'fake', tag?.urls ?? []);
+    // A tag never written is a new NTAG215: blank, like one erased by eraseCard.
+    const tag = tags.get(uid) ?? BLANK_TAG;
+    if (tag.kind === 'damaged') unreadable?.();
+    else deliver?.(uid, 'hex', 'fake', readOf(tag));
   }
 
   /**
@@ -100,19 +123,19 @@ export function createFakeCard(
         return;
       case 'io':
         // Card moved away halfway: a damaged NDEF message, repaired only by a new write.
-        tags.set(uid, { urls: [], damaged: true });
+        tags.set(uid, { kind: 'damaged' });
         write.reject(domError('NetworkError', 'The fake card was moved away while writing.'));
         return;
       case 'not-allowed':
         write.reject(domError('NotAllowedError', 'Writing is not allowed.'));
         return;
       case 'verify-failed':
-        // Something else ends up on the card: the read back does not hold the link.
-        tags.set(uid, { urls: [], damaged: false });
+        // Something else ends up on the card: the read back holds neither the link nor a blank card.
+        tags.set(uid, { kind: 'foreign' });
         break;
       default:
-        tags.set(uid, { urls: write.urls, damaged: false });
-        for (const url of write.urls) writes.push({ uid, url, at: now() });
+        tags.set(uid, { kind: 'url', url: write.url });
+        writes.push({ uid, url: write.url, at: now() });
     }
     write.resolve();
     readBack(write.done, uid);
@@ -164,12 +187,18 @@ export function createFakeCard(
   const writer: NfcWriterLike = {
     write(message, { signal }) {
       let resolve!: () => void;
-      let reject!: (error: DOMException) => void;
+      let reject!: (error: Error) => void;
       const done = new Promise<void>((onResolve, onReject) => {
         resolve = onResolve;
         reject = onReject;
       });
-      const write: PendingWrite = { urls: urlsOf(message), done, resolve, reject };
+      const content = contentOf(message);
+      const write: PendingWrite = { url: content ?? null, done, resolve, reject };
+      if (content === undefined) {
+        // Like Chrome for a message with no record; the app writes one link or one `empty` record.
+        write.reject(new TypeError('The fake writer writes one link or a blank card.'));
+        return done;
+      }
       if (signal.aborted) {
         write.reject(domError('AbortError', 'The write was aborted.'));
         return done;

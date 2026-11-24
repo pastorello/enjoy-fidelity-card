@@ -6,6 +6,7 @@ import { useAuth } from '../identity/AuthProvider';
 import { useCardsService } from './CardsServiceProvider';
 import { formatCardLabel } from './formatCard';
 import {
+  CardForbiddenError,
   CardTakenError,
   CardsError,
   CustomerUnavailableError,
@@ -24,6 +25,11 @@ export type AssociateCardState =
   | { status: 'associated'; card: CardSummary }
   /** The card read is already this customer's active card: nothing changed. */
   | { status: 'already'; card: CardSummary }
+  /**
+   * The customer's own deactivated card, read by an operator: only an admin reactivates it
+   * (SPEC-customers-v2, Open Question 3). Nothing changed; reads stay on for another card.
+   */
+  | { status: 'forbidden' }
   /** No answer (or an unexpected one): `retry` sends the same uid again (idempotent). */
   | { status: 'error'; error: unknown }
   /** The customer cannot get a card any more: erased, or gone. */
@@ -47,7 +53,8 @@ export function associatedNotice(uid: string, linkWritten: boolean): string {
  * A new card (or the customer's own deactivated one, reactivated) is `associated`, and the page
  * writes its link; the card already active (`activeCard`, as loaded) is `already` and nothing
  * changes; `card_taken` names the owner; no answer offers "Riprova" with the same uid, which changes
- * nothing twice. Reads are off while saving, once associated, while "Card già associata" is shown
+ * nothing twice; an operator reading the customer's deactivated card is `forbidden` (no retry: it
+ * would be refused again). Reads are off while saving, once associated, while "Card già associata" is shown
  * and while `writing` (the page writes the link of the card already active). A `not_operator`
  * refusal goes to `AuthProvider`.
  */
@@ -90,6 +97,8 @@ export function useAssociateCard(
           if (!mounted.current) return;
           if (error instanceof CardTakenError) {
             setState({ status: 'taken', owner: error.owner });
+          } else if (error instanceof CardForbiddenError) {
+            setState({ status: 'forbidden' });
           } else if (error instanceof CustomerUnavailableError) {
             setState({ status: 'unavailable', reason: error.reason });
           } else if (error instanceof CardsError && error.kind === 'not_operator') {

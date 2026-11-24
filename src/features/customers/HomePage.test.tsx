@@ -1,26 +1,62 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createFakeCustomerService, fakeCustomer } from '../../test/fakeCustomerService';
+import {
+  createFakeCustomerService,
+  fakeCustomer,
+  type FakeCustomerFixture,
+} from '../../test/fakeCustomerService';
 import { renderApp, signedInFake } from '../../test/renderApp';
 import { createFakeSettingsService } from '../../test/fakeSettingsService';
 import { createFakeRewardsService } from '../../test/fakeRewardsService';
 import { createTestCardReader } from '../../test/fakeCardReader';
+import { installFakeIntersectionObserver } from '../../test/fakeIntersectionObserver';
 import { ServerFaultError } from '../../lib/serverFault';
+import type { CustomerListCursor } from './types';
+
+// SPEC-customers-v2 point 6 and success criterion 5: the CLIENTI section of the home. Invented
+// customers and addresses only.
 
 /**
- * The field is "Oppure cerca per nome o telefono" under the full card panel (wireframe Cerca cliente)
- * and "Cerca per nome o telefono" under the compact one (wireframe Ricerca senza risultati).
+ * The field is "Oppure cerca per nome o email" under the full card panel (wireframe Cerca cliente)
+ * and "Cerca per nome o email" under the compact one (wireframe Ricerca senza risultati).
  */
-const SEARCH_LABEL = /^(Oppure cerca|Cerca) per nome o telefono$/;
+const SEARCH_LABEL = /^(Oppure cerca|Cerca) per nome o email$/;
+
+/** Now, minus `minutes`: an activity of today in any time zone only a few minutes ago. */
+function minutesAgo(minutes: number): string {
+  return new Date(Date.now() - minutes * 60_000).toISOString();
+}
 
 function customersFake() {
   return createFakeCustomerService({
     customers: [
-      fakeCustomer({ name: 'Maria Rossi', phone: '+393330004521', balance: 120 }),
-      fakeCustomer({ name: 'Rosa Bianchi', phone: null, balance: 0 }),
+      fakeCustomer({
+        name: 'Rosa Bianchi',
+        balance: 0,
+        createdAt: '2025-03-01T10:00:00.000000+00:00',
+      }),
+      fakeCustomer({
+        name: 'Paolo Verdi',
+        balance: 80,
+        email: 'paolo.verdi@example.com',
+        lastActivityAt: '2025-11-12T09:00:00.123456+00:00',
+      }),
+      fakeCustomer({
+        name: 'Maria Rossi',
+        balance: 120,
+        email: 'maria.rossi@example.com',
+        lastActivityAt: minutesAgo(5),
+      }),
     ],
   });
+}
+
+/** `count` customers "Cliente Prova 01"…, each newer than the one before (listed last first). */
+function archive(count: number): FakeCustomerFixture[] {
+  return Array.from({ length: count }, (_, index) =>
+    fakeCustomer({ name: `Cliente Prova ${String(index + 1).padStart(2, '0')}` }),
+  );
 }
 
 async function renderHome(path = '/', customers = customersFake()) {
@@ -29,8 +65,8 @@ async function renderHome(path = '/', customers = customersFake()) {
   return { ...rendered, field };
 }
 
-function searchCalls(customers: ReturnType<typeof createFakeCustomerService>) {
-  return customers.calls.filter((call) => call.method === 'search');
+function listCalls(customers: ReturnType<typeof createFakeCustomerService>) {
+  return customers.service.list.mock.calls.map(([input]) => input);
 }
 
 /** Types `text` one character at a time, as a person would. */
@@ -46,12 +82,35 @@ async function advance(ms: number) {
   });
 }
 
-function resultList() {
-  return screen.getByRole('list', { name: 'Risultati della ricerca' });
+function section() {
+  return screen.getByRole('region', { name: 'CLIENTI' });
+}
+
+/** `value`, or a failure when it is missing (so a test cannot pass on a missing element). */
+function present<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) throw new Error('missing');
+  return value;
+}
+
+/** The customer rows of CLIENTI, in order. */
+function rows() {
+  return within(section()).queryAllByRole('link');
+}
+
+async function findRows(count: number) {
+  await waitFor(() => expect(rows()).toHaveLength(count));
+  return rows();
+}
+
+function becomeVisible() {
+  act(() => {
+    fireEvent(document, new Event('visibilitychange'));
+  });
 }
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe('HomePage: Cerca cliente', () => {
@@ -59,185 +118,338 @@ describe('HomePage: Cerca cliente', () => {
     const { field } = await renderHome();
     expect(screen.getByRole('heading', { level: 1, name: 'Enjoy Card' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^Account e impostazioni/ })).toBeInTheDocument();
-    expect(field).toHaveAttribute('placeholder', 'Es. Rossi o 4521');
+    expect(field).toHaveAccessibleName('Oppure cerca per nome o email');
+    expect(field).toHaveAttribute('placeholder', 'Es. Rossi o rossi@');
     expect(screen.getByRole('link', { name: 'Nuovo cliente' })).toHaveAttribute(
       'href',
       '/clienti/nuovo',
     );
   });
+});
 
-  it('searches once, 250 ms after the last key', async () => {
+describe('HomePage: CLIENTI', () => {
+  it('lists every customer by last activity: name, activity, balance, never the email', async () => {
     const customers = customersFake();
-    const { field } = await renderHome('/', customers);
-    vi.useFakeTimers();
-    typeSlowly(field, 'rossi');
-    await advance(249);
-    expect(searchCalls(customers)).toEqual([]);
-    await advance(1);
-    expect(searchCalls(customers)).toEqual([{ method: 'search', args: ['rossi'] }]);
-    expect(within(resultList()).getByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-    // The masked phone in the row is never a link to call or text the customer.
-    expect(within(resultList()).getByRole('link', { name: /Maria Rossi/ })).toHaveTextContent(
-      '••• 4521',
-    );
-    expect(document.querySelector('[href^="tel:"], [href^="sms:"]')).toBeNull();
-    await advance(1000);
-    expect(searchCalls(customers)).toHaveLength(1);
+    const [rosa, paolo, maria] = customers.customers();
+    await renderHome('/', customers);
+
+    expect(within(section()).getByRole('heading', { level: 2, name: 'CLIENTI' })).toBeVisible();
+    const shown = await findRows(3);
+    expect(shown[0]).toHaveTextContent('Maria Rossi');
+    expect(shown[0]).toHaveTextContent(/Oggi, \d{2}:\d{2}/);
+    expect(shown[0]).toHaveTextContent('120 punti');
+    expect(shown[0]).toHaveAttribute('href', `/clienti/${maria?.id}`);
+    expect(shown[1]).toHaveTextContent('Paolo Verdi');
+    expect(shown[1]).toHaveTextContent('12 nov 2025');
+    expect(shown[1]).toHaveTextContent('80 punti');
+    expect(shown[1]).toHaveAttribute('href', `/clienti/${paolo?.id}`);
+    expect(shown[2]).toHaveTextContent('Rosa Bianchi');
+    expect(shown[2]).toHaveTextContent('Nessun movimento');
+    expect(shown[2]).toHaveAttribute('href', `/clienti/${rosa?.id}`);
+    // The email stays on the customer page (Open Question 5), and nothing contacts the customer.
+    expect(section()).not.toHaveTextContent('@');
+    expect(document.querySelector('[href^="mailto:"], [href^="tel:"], [href^="sms:"]')).toBeNull();
+    expect(listCalls(customers)).toEqual([{ query: '', after: null }]);
   });
 
-  it('does not search a text that is too short', async () => {
+  it('shows "Carico i clienti…" while the first page is on its way', async () => {
+    const customers = customersFake();
+    const held = customers.holdNext('list');
+    await renderHome('/', customers);
+    expect(within(section()).getByRole('status')).toHaveTextContent('Carico i clienti…');
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    await findRows(3);
+    expect(screen.queryByText('Carico i clienti…')).not.toBeInTheDocument();
+  });
+
+  it('a failed first page shows "Clienti non caricati", and "Riprova" loads it again', async () => {
+    const customers = customersFake();
+    customers.failNext('list', 'network');
+    await renderHome('/', customers);
+
+    const alert = await within(section()).findByRole('alert');
+    expect(within(alert).getByRole('heading', { name: 'Clienti non caricati' })).toBeVisible();
+    expect(alert).toHaveTextContent('Controlla la connessione e riprova.');
+    const held = customers.holdNext('list');
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    expect(screen.getByText('Carico i clienti…')).toBeInTheDocument();
+    // The focus does not fall back to <body> while the button is replaced.
+    expect(document.activeElement).not.toBe(document.body);
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    await findRows(3);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(listCalls(customers)).toHaveLength(2);
+  });
+
+  it('a server fault is worded apart from a network error', async () => {
+    const customers = customersFake();
+    customers.failNext('list', new ServerFaultError('misconfigured'));
+    await renderHome('/', customers);
+    const alert = await within(section()).findByRole('alert');
+    expect(alert).toHaveTextContent('Servizio non configurato: chiedi a un amministratore.');
+  });
+
+  it('an empty archive says "Ancora nessun cliente"', async () => {
+    await renderHome('/', createFakeCustomerService());
+    expect(
+      await within(section()).findByRole('heading', { level: 2, name: 'Ancora nessun cliente' }),
+    ).toBeVisible();
+    expect(section()).toHaveTextContent('Registra il primo con «Nuovo cliente».');
+    expect(screen.queryByRole('button', { name: 'Mostra altri clienti' })).not.toBeInTheDocument();
+  });
+
+  it('loads the next page when the sentinel comes near the window, with the cursor as received', async () => {
+    const observer = installFakeIntersectionObserver();
+    const customers = createFakeCustomerService({ customers: archive(45) });
+    await renderHome('/', customers);
+    const first = await findRows(20);
+    expect(first[0]).toHaveTextContent('Cliente Prova 45');
+    expect(first[19]).toHaveTextContent('Cliente Prova 26');
+
+    // The window scrolls on the phone and on the tablet: root null, 400 px ahead.
+    expect(observer.live()).toHaveLength(1);
+    const options = observer.observers.at(-1)?.options;
+    expect(options?.root ?? null).toBeNull();
+    expect(options?.rootMargin).toBe('400px');
+
+    const last = customers.customers().find((customer) => customer.name === 'Cliente Prova 26');
+    observer.enter();
+    await findRows(40);
+    const cursor: CustomerListCursor = present(listCalls(customers)[1]?.after);
+    expect(cursor.id).toBe(last?.id);
+    expect(cursor.activityAt).toBeNull();
+    // The creation time goes back as the string received, microseconds included.
+    expect(cursor.createdAt).toMatch(/^2026-11-01T08:\d{2}:\d{2}\.\d{6}\+00:00$/);
+
+    observer.enter();
+    const all = await findRows(45);
+    expect(new Set(all.map((row) => row.getAttribute('href'))).size).toBe(45);
+    expect(all[44]).toHaveTextContent('Cliente Prova 01');
+    // The end: a page with fewer than 20 rows; no more sentinel nor button.
+    expect(observer.live()).toEqual([]);
+    expect(screen.queryByRole('button', { name: 'Mostra altri clienti' })).not.toBeInTheDocument();
+    observer.enter();
+    expect(listCalls(customers)).toHaveLength(3);
+  });
+
+  it('"Mostra altri clienti" loads the next page too (keyboard, TalkBack, no IntersectionObserver)', async () => {
+    const customers = createFakeCustomerService({ customers: archive(25) });
+    await renderHome('/', customers);
+    await findRows(20);
+    const held = customers.holdNext('list');
+    await userEvent.click(screen.getByRole('button', { name: 'Mostra altri clienti' }));
+
+    expect(within(section()).getByRole('status')).toHaveTextContent('Carico altri clienti…');
+    expect(screen.queryByRole('button', { name: 'Mostra altri clienti' })).not.toBeInTheDocument();
+    expect(document.activeElement).not.toBe(document.body);
+    await act(async () => {
+      held.release();
+      await Promise.resolve();
+    });
+    await findRows(25);
+    expect(listCalls(customers)[1]?.after).toMatchObject({ activityAt: null });
+    expect(screen.queryByText('Carico altri clienti…')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mostra altri clienti' })).not.toBeInTheDocument();
+  });
+
+  it('a failed next page keeps the rows, says so, and "Riprova" loads it', async () => {
+    const customers = createFakeCustomerService({ customers: archive(25) });
+    await renderHome('/', customers);
+    await findRows(20);
+    customers.failNext('list', 'network');
+    await userEvent.click(screen.getByRole('button', { name: 'Mostra altri clienti' }));
+
+    const alert = await within(section()).findByRole('alert');
+    expect(alert).toHaveTextContent('Non riesco a caricare altri clienti.');
+    expect(rows()).toHaveLength(20);
+    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
+    await findRows(25);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(listCalls(customers)[2]).toEqual(listCalls(customers)[1]);
+  });
+
+  it('does not load more from the sentinel after a failed page, until "Riprova"', async () => {
+    const observer = installFakeIntersectionObserver();
+    const customers = createFakeCustomerService({ customers: archive(25) });
+    await renderHome('/', customers);
+    await findRows(20);
+    customers.failNext('list', 'network');
+    observer.enter();
+    await within(section()).findByRole('alert');
+    observer.enter();
+    expect(listCalls(customers)).toHaveLength(2);
+  });
+
+  it('loads the first page again when the page becomes visible, only with the first page loaded', async () => {
+    const customers = createFakeCustomerService({ customers: archive(45) });
+    await renderHome('/', customers);
+    await findRows(20);
+    becomeVisible();
+    await waitFor(() => expect(listCalls(customers)).toHaveLength(2));
+    expect(listCalls(customers)[1]).toEqual({ query: '', after: null });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mostra altri clienti' }));
+    await findRows(40);
+    becomeVisible();
+    expect(listCalls(customers)).toHaveLength(3);
+    expect(rows()).toHaveLength(40);
+  });
+
+  it('not_operator: back to /accedi with "Account non abilitato"', async () => {
+    const auth = signedInFake();
+    const customers = customersFake();
+    const { router } = renderApp('/', auth, createFakeSettingsService(), customers);
+    await findRows(3);
+    auth.removeProfile();
+    customers.failNext('list', 'not_operator');
+    becomeVisible();
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
+    expect(
+      await screen.findByText('Account non abilitato: chiedi a un amministratore.'),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('HomePage: search in CLIENTI', () => {
+  it('filters the same list 250 ms after the last key, in the same order', async () => {
     const customers = customersFake();
     const { field } = await renderHome('/', customers);
+    await findRows(3);
     vi.useFakeTimers();
-    fireEvent.change(field, { target: { value: 'r' } });
+    typeSlowly(field, 'ross');
+    await advance(249);
+    expect(listCalls(customers)).toHaveLength(1);
+    await advance(1);
+    expect(listCalls(customers)).toEqual([
+      { query: '', after: null },
+      { query: 'ross', after: null },
+    ]);
+    const found = rows();
+    expect(found).toHaveLength(1);
+    expect(found[0]).toHaveTextContent('Maria Rossi');
     await advance(1000);
-    fireEvent.change(field, { target: { value: '45' } });
-    await advance(1000);
-    fireEvent.change(field, { target: { value: '   ' } });
-    await advance(1000);
-    expect(searchCalls(customers)).toEqual([]);
-    expect(screen.queryByRole('list', { name: 'Risultati della ricerca' })).not.toBeInTheDocument();
+    expect(listCalls(customers)).toHaveLength(2);
+  });
+
+  it('finds by part of the email, and the URL never carries the text', async () => {
+    const customers = customersFake();
+    const { router, field } = await renderHome('/', customers);
+    await findRows(3);
+    const seen: string[] = [];
+    const stop = router.subscribe((state) => seen.push(state.location.search));
+    await userEvent.type(field, 'paolo.verdi@exa');
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(rows()[0]).toHaveTextContent('Paolo Verdi');
+    stop();
+    expect(router.state.location.search).toBe('');
+    expect(seen.every((search) => !search.includes('@') && !search.includes('%40'))).toBe(true);
+    expect(router.state.location.state).toEqual({ q: 'paolo.verdi@exa' });
+    expect(router.state.historyAction).toBe('REPLACE');
+  });
+
+  it('under 2 characters lists everyone; "Cancella la ricerca" clears the text and the state', async () => {
+    const customers = customersFake();
+    const { router, field } = await renderHome('/', customers);
+    await findRows(3);
+    await userEvent.type(field, 'ro');
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    await userEvent.type(field, '{Backspace}');
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    expect(listCalls(customers).at(-1)).toEqual({ query: '', after: null });
+
+    await userEvent.type(field, 'ossi');
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
+    expect(field).toHaveValue('');
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    expect(router.state.location.state).toBeNull();
   });
 
   it('ignores an older answer that arrives after the newer one', async () => {
     const customers = customersFake();
     const { field } = await renderHome('/', customers);
+    await findRows(3);
     vi.useFakeTimers();
-    const first = customers.holdNext('search');
-    fireEvent.change(field, { target: { value: 'ros' } });
+    const first = customers.holdNext('list');
+    fireEvent.change(field, { target: { value: 'ro' } });
     await advance(250);
     fireEvent.change(field, { target: { value: 'rossi' } });
     await advance(250);
-    expect(within(resultList()).getByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-
+    expect(rows()).toHaveLength(1);
     await act(async () => {
       first.release();
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(searchCalls(customers).map((call) => call.args)).toEqual([['ros'], ['rossi']]);
-    expect(screen.queryByText('Rosa Bianchi')).not.toBeInTheDocument();
-    expect(within(resultList()).getAllByRole('link')).toHaveLength(1);
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]).toHaveTextContent('Maria Rossi');
   });
 
-  it('shows "Ricerca…" while the answer is on its way', async () => {
+  it('opens with the text of the history state, and finds it again after "Indietro"', async () => {
     const customers = customersFake();
-    const { field } = await renderHome('/', customers);
-    vi.useFakeTimers();
-    const held = customers.holdNext('search');
-    fireEvent.change(field, { target: { value: 'rossi' } });
-    await advance(250);
-    expect(screen.getByRole('status')).toHaveTextContent('Ricerca…');
+    const [, , maria] = customers.customers();
+    const { router } = renderApp(
+      '/impostazioni',
+      signedInFake(),
+      createFakeSettingsService(),
+      customers,
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Impostazioni' });
     await act(async () => {
-      held.release();
-      await vi.advanceTimersByTimeAsync(0);
+      await router.navigate('/', { state: { q: 'rossi' } });
     });
-    expect(screen.queryByText('Ricerca…')).not.toBeInTheDocument();
-    expect(within(resultList()).getByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-  });
+    expect(await screen.findByRole('searchbox', { name: SEARCH_LABEL })).toHaveValue('rossi');
+    await findRows(1);
+    expect(listCalls(customers)).toEqual([{ query: 'rossi', after: null }]);
 
-  it('shows name, masked phone or "Senza telefono", and the balance in each row', async () => {
-    const customers = customersFake();
-    const [maria, rosa] = customers.customers();
-    const { field } = await renderHome('/', customers);
-    vi.useFakeTimers();
-    fireEvent.change(field, { target: { value: 'ros' } });
-    await advance(250);
-
-    const rows = within(resultList()).getAllByRole('link');
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent('Maria Rossi');
-    expect(rows[0]).toHaveTextContent('••• 4521');
-    expect(rows[0]).toHaveTextContent('120 punti');
-    expect(rows[0]).toHaveAttribute('href', `/clienti/${maria?.id}`);
-    expect(rows[1]).toHaveTextContent('Rosa Bianchi');
-    expect(rows[1]).toHaveTextContent('Senza telefono');
-    expect(rows[1]).toHaveTextContent('0 punti');
-    expect(rows[1]).toHaveAttribute('href', `/clienti/${rosa?.id}`);
-  });
-
-  it('shows 20 rows and a final hint when there are more', async () => {
-    const customers = createFakeCustomerService({
-      customers: Array.from({ length: 25 }, (_, index) =>
-        fakeCustomer({ name: `Cliente Prova ${String(index + 1).padStart(2, '0')}` }),
-      ),
-    });
-    const { field } = await renderHome('/', customers);
-    vi.useFakeTimers();
-    fireEvent.change(field, { target: { value: 'prova' } });
-    await advance(250);
-
-    const rows = within(resultList()).getAllByRole('link');
-    expect(rows).toHaveLength(20);
-    expect(rows[19]).toHaveTextContent('Cliente Prova 20');
-    expect(screen.queryByText('Cliente Prova 21')).not.toBeInTheDocument();
-    expect(screen.getByText('Mostro i primi 20: scrivi qualcosa in più')).toBeInTheDocument();
-  });
-
-  it('shows no hint with 20 results or fewer', async () => {
-    const customers = createFakeCustomerService({
-      customers: Array.from({ length: 20 }, (_, index) =>
-        fakeCustomer({ name: `Cliente Prova ${String(index + 1).padStart(2, '0')}` }),
-      ),
-    });
-    const { field } = await renderHome('/', customers);
-    vi.useFakeTimers();
-    fireEvent.change(field, { target: { value: 'prova' } });
-    await advance(250);
-    expect(within(resultList()).getAllByRole('link')).toHaveLength(20);
-    expect(screen.queryByText(/Mostro i primi 20/)).not.toBeInTheDocument();
-  });
-
-  it('keeps the text in the URL with replace, and "Cancella la ricerca" clears it', async () => {
-    const { router, field } = await renderHome();
-    await userEvent.type(field, 'rossi mari');
-    await waitFor(() => expect(router.state.location.search).toBe('?q=rossi+mari'));
-    expect(router.state.historyAction).toBe('REPLACE');
-    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
-    expect(field).toHaveValue('');
-    await waitFor(() => expect(router.state.location.search).toBe(''));
-    expect(screen.queryByRole('list', { name: 'Risultati della ricerca' })).not.toBeInTheDocument();
-  });
-
-  it('opens with the search of /?q=', async () => {
-    const customers = customersFake();
-    const { field } = await renderHome('/?q=rossi', customers);
-    expect(field).toHaveValue('rossi');
-    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-    expect(searchCalls(customers)).toEqual([{ method: 'search', args: ['rossi'] }]);
-  });
-
-  it('finds the search again with "Indietro" from the customer page', async () => {
-    const customers = customersFake();
-    const [maria] = customers.customers();
-    const { router } = await renderHome('/?q=rossi', customers);
-    await userEvent.click(await screen.findByRole('link', { name: /Maria Rossi/ }));
+    await userEvent.click(present(rows()[0]));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${maria?.id}`));
-
     await act(async () => {
       await router.navigate(-1);
     });
-    expect(router.state.location.search).toBe('?q=rossi');
+    expect(router.state.location.search).toBe('');
     expect(await screen.findByRole('searchbox', { name: SEARCH_LABEL })).toHaveValue('rossi');
-    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
+    await findRows(1);
   });
 
-  it('no results by name: says so and turns the button into "Nuovo cliente «<testo>»"', async () => {
+  it('the "Indietro" of the customer page brings the text back without the URL', async () => {
+    const customers = customersFake();
+    const [, paolo] = customers.customers();
+    const { router, field } = await renderHome('/', customers);
+    await userEvent.type(field, 'verdi@exa');
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    await userEvent.click(present(rows()[0]));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/clienti/${paolo?.id}`));
+
+    const back = await screen.findByRole('link', { name: 'Indietro' });
+    expect(back).toHaveAttribute('href', '/');
+    await userEvent.click(back);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
+    expect(router.state.location.search).toBe('');
+    expect(await screen.findByRole('searchbox', { name: SEARCH_LABEL })).toHaveValue('verdi@exa');
+    await findRows(1);
+  });
+
+  it('no results for a name: says so and turns the button into "Nuovo cliente «<testo>»"', async () => {
     const { field } = await renderHome();
-    await userEvent.type(field, '  verdi   luca ');
+    await findRows(3);
+    await userEvent.type(field, '  neri   luca ');
 
     expect(
-      await screen.findByRole('heading', { level: 2, name: 'Nessun cliente trovato' }),
+      await within(section()).findByRole('heading', { level: 2, name: 'Nessun cliente trovato' }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText('Controlla come è scritto, o cerca con le ultime 4 cifre del telefono.'),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'Risultati della ricerca' })).not.toBeInTheDocument();
+    expect(section()).toHaveTextContent('Controlla come è scritto, o cerca con l’email.');
+    expect(rows()).toEqual([]);
     const links = screen.getAllByRole('link', { name: /^Nuovo cliente/ });
     expect(links).toHaveLength(1);
-    expect(links[0]).toHaveAccessibleName('Nuovo cliente «verdi luca»');
-    expect(links[0]).toHaveAttribute('href', '/clienti/nuovo?nome=verdi+luca');
+    expect(links[0]).toHaveAccessibleName('Nuovo cliente «neri luca»');
+    expect(links[0]).toHaveAttribute('href', '/clienti/nuovo?nome=neri+luca');
   });
 
   it('"Nuovo cliente «<testo>»" opens Nuovo cliente with the name in the URL', async () => {
@@ -248,9 +460,9 @@ describe('HomePage: Cerca cliente', () => {
     expect(new URLSearchParams(router.state.location.search).get('nome')).toBe("D'Angelo & figli");
   });
 
-  it('no results by phone: the button stays "Nuovo cliente" with nothing prefilled', async () => {
-    const { field } = await renderHome();
-    await userEvent.type(field, '9999');
+  it('no results for a text with @: the button stays "Nuovo cliente" with nothing prefilled', async () => {
+    const { router, field } = await renderHome();
+    await userEvent.type(field, 'nessuno@example');
 
     expect(
       await screen.findByRole('heading', { level: 2, name: 'Nessun cliente trovato' }),
@@ -259,314 +471,24 @@ describe('HomePage: Cerca cliente', () => {
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAccessibleName('Nuovo cliente');
     expect(links[0]).toHaveAttribute('href', '/clienti/nuovo');
+    expect(router.state.location.search).toBe('');
   });
 
-  it('the button goes back to "Nuovo cliente" once the search finds someone', async () => {
-    const { field } = await renderHome();
-    await userEvent.type(field, 'verdi');
-    expect(await screen.findByRole('link', { name: 'Nuovo cliente «verdi»' })).toBeInTheDocument();
-    await userEvent.clear(field);
-    await userEvent.type(field, 'rossi');
-    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /^Nuovo cliente/ })).toHaveAccessibleName(
-      'Nuovo cliente',
-    );
-  });
-
-  it('a failed search shows "Ricerca non riuscita", and "Riprova" searches again', async () => {
+  it('a failed search shows "Clienti non caricati", and "Riprova" searches again', async () => {
     const customers = customersFake();
     const { field } = await renderHome('/', customers);
-    customers.failNext('search', 'network');
+    await findRows(3);
+    customers.failNext('list', 'network');
     await userEvent.type(field, 'rossi');
 
-    const alert = await screen.findByRole('alert');
-    expect(
-      within(alert).getByRole('heading', { name: 'Ricerca non riuscita' }),
-    ).toBeInTheDocument();
-    expect(alert).toHaveTextContent('Controlla la connessione e riprova.');
-    expect(screen.queryByRole('list', { name: 'Risultati della ricerca' })).not.toBeInTheDocument();
-    expect(searchCalls(customers)).toHaveLength(1);
-
+    const alert = await within(section()).findByRole('alert');
+    expect(within(alert).getByRole('heading', { name: 'Clienti non caricati' })).toBeVisible();
     await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
-    expect(await screen.findByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(searchCalls(customers).map((call) => call.args)).toEqual([['rossi'], ['rossi']]);
-  });
-
-  it('keeps the focus in the search outcome after "Riprova", while searching and after', async () => {
-    const customers = customersFake();
-    const { field } = await renderHome('/', customers);
-    customers.failNext('search', 'network');
-    await userEvent.type(field, 'rossi');
-    const alert = await screen.findByRole('alert');
-    const held = customers.holdNext('search');
-
-    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
-    expect(screen.getByText('Ricerca…')).toBeInTheDocument();
-    expect(document.activeElement).not.toBe(document.body);
-    await act(async () => {
-      held.release();
-      await Promise.resolve();
-    });
-    const list = await screen.findByRole('list', { name: 'Risultati della ricerca' });
-    expect(document.activeElement).not.toBe(document.body);
-    expect(document.activeElement?.contains(list)).toBe(true);
-  });
-
-  it('a server fault is worded apart from a network error', async () => {
-    const customers = customersFake();
-    const { field } = await renderHome('/', customers);
-    customers.failNext('search', new ServerFaultError('misconfigured'));
-    await userEvent.type(field, 'rossi');
-
-    const alert = await screen.findByRole('alert');
-    expect(
-      within(alert).getByRole('heading', { name: 'Ricerca non riuscita' }),
-    ).toBeInTheDocument();
-    expect(alert).toHaveTextContent('Servizio non configurato: chiedi a un amministratore.');
-  });
-
-  it('not_operator: back to /accedi with "Account non abilitato"', async () => {
-    const auth = signedInFake();
-    const customers = customersFake();
-    const { router } = renderApp('/', auth, createFakeSettingsService(), customers);
-    const field = await screen.findByRole('searchbox', { name: SEARCH_LABEL });
-    auth.removeProfile();
-    customers.failNext('search', 'not_operator');
-    await userEvent.type(field, 'rossi');
-
-    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
-    expect(
-      await screen.findByText('Account non abilitato: chiedi a un amministratore.'),
-    ).toBeInTheDocument();
-  });
-});
-
-/** Customers served today, most recent first (times in Europe/Rome: UTC+1 in November). */
-function servedFake() {
-  const customers = createFakeCustomerService({
-    customers: [
-      fakeCustomer({
-        name: 'Antonio Esposito',
-        phone: '+393330000388',
-        balance: 45,
-        lastServedAt: '2026-11-18T09:15:00Z',
-      }),
-      fakeCustomer({
-        name: 'Lucia De Meo',
-        phone: null,
-        balance: 310,
-        lastServedAt: '2026-11-18T08:58:00Z',
-      }),
-    ],
-  });
-  customers.setServedToday(customers.customers().map((customer) => customer.id));
-  return customers;
-}
-
-function servedCalls(customers: ReturnType<typeof createFakeCustomerService>) {
-  return customers.calls.filter((call) => call.method === 'servedToday');
-}
-
-function servedSection() {
-  return screen.queryByRole('region', { name: 'SERVITI OGGI' });
-}
-
-function becomeVisible() {
-  act(() => {
-    fireEvent(document, new Event('visibilitychange'));
-  });
-}
-
-describe('HomePage: SERVITI OGGI', () => {
-  it('lists the customers served today: name, phone or "Senza telefono", time, balance', async () => {
-    const customers = servedFake();
-    const [antonio, lucia] = customers.customers();
-    await renderHome('/', customers);
-
-    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
-    expect(within(section).getByRole('heading', { level: 2, name: 'SERVITI OGGI' })).toBeVisible();
-    const rows = within(section).getAllByRole('link');
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent('Antonio Esposito');
-    expect(rows[0]).toHaveTextContent('••• 0388 · 10:15');
-    expect(rows[0]).toHaveTextContent('45 punti');
-    expect(rows[0]).toHaveAttribute('href', `/clienti/${antonio?.id}`);
-    expect(rows[1]).toHaveTextContent('Lucia De Meo');
-    expect(rows[1]).toHaveTextContent('Senza telefono · 09:58');
-    expect(rows[1]).toHaveTextContent('310 punti');
-    expect(rows[1]).toHaveAttribute('href', `/clienti/${lucia?.id}`);
-    // The phone never becomes a link to call or text the customer.
-    expect(document.querySelector('[href^="tel:"], [href^="sms:"]')).toBeNull();
-    expect(servedCalls(customers)).toHaveLength(1);
-  });
-
-  it('has no section when nobody was served today', async () => {
-    const customers = customersFake();
-    await renderHome('/', customers);
-    await waitFor(() => expect(servedCalls(customers)).toHaveLength(1));
-    // Let the answer arrive before checking that nothing appeared.
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(servedSection()).not.toBeInTheDocument();
-    expect(screen.queryByText('SERVITI OGGI')).not.toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-  });
-
-  it('shows nothing while the list is loading', async () => {
-    const customers = servedFake();
-    const held = customers.holdNext('servedToday');
-    await renderHome('/', customers);
-    expect(servedSection()).not.toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    await act(async () => {
-      held.release();
-      await Promise.resolve();
-    });
-    expect(await screen.findByRole('region', { name: 'SERVITI OGGI' })).toBeInTheDocument();
-  });
-
-  it('a failed load shows a compact row, and "Riprova" loads again', async () => {
-    const customers = servedFake();
-    customers.failNext('servedToday', 'network');
-    await renderHome('/', customers);
-
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Non riesco a caricare i clienti di oggi');
-    expect(screen.queryByRole('link', { name: /Antonio Esposito/ })).not.toBeInTheDocument();
-
-    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
-    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
-    expect(within(section).getAllByRole('link')).toHaveLength(2);
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(servedCalls(customers)).toHaveLength(2);
-  });
-
-  it('after "Riprova" the focus goes to SERVITI OGGI and stays there once the list arrives', async () => {
-    const customers = servedFake();
-    customers.failNext('servedToday', 'network');
-    await renderHome('/', customers);
-    const alert = await screen.findByRole('alert');
-    const held = customers.holdNext('servedToday');
-
-    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
-    const heading = screen.getByRole('heading', { level: 2, name: 'SERVITI OGGI' });
-    expect(heading).toHaveFocus();
-    await act(async () => {
-      held.release();
-      await Promise.resolve();
-    });
-    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
-    expect(within(section).getAllByRole('link')).toHaveLength(2);
-    expect(heading).toHaveFocus();
-  });
-
-  it('after "Riprova" with nobody served today, the focus goes to the search field', async () => {
-    const customers = customersFake();
-    customers.failNext('servedToday', 'network');
-    const { field } = await renderHome('/', customers);
-    const alert = await screen.findByRole('alert');
-
-    await userEvent.click(within(alert).getByRole('button', { name: 'Riprova' }));
-    await waitFor(() => expect(servedSection()).not.toBeInTheDocument());
-    expect(field).toHaveFocus();
-  });
-
-  it('loads again when the page becomes visible', async () => {
-    const customers = customersFake();
-    await renderHome('/', customers);
-    await waitFor(() => expect(servedCalls(customers)).toHaveLength(1));
-    expect(servedSection()).not.toBeInTheDocument();
-
-    const [maria] = customers.customers();
-    customers.setServedToday([maria?.id ?? '']);
-    becomeVisible();
-
-    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
-    expect(within(section).getByRole('link', { name: /Maria Rossi/ })).toBeInTheDocument();
-    expect(servedCalls(customers)).toHaveLength(2);
-  });
-
-  it('does not load again while the page is hidden', async () => {
-    const customers = customersFake();
-    await renderHome('/', customers);
-    await waitFor(() => expect(servedCalls(customers)).toHaveLength(1));
-    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
-    try {
-      becomeVisible();
-      expect(servedCalls(customers)).toHaveLength(1);
-    } finally {
-      visibility.mockRestore();
-    }
-  });
-
-  it('a failed reload on return keeps the list already shown', async () => {
-    const customers = servedFake();
-    await renderHome('/', customers);
-    await screen.findByRole('region', { name: 'SERVITI OGGI' });
-
-    customers.failNext('servedToday', 'network');
-    becomeVisible();
-    await waitFor(() => expect(servedCalls(customers)).toHaveLength(2));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Antonio Esposito/ })).toBeInTheDocument();
-  });
-
-  it('ignores an older answer that arrives after a newer one', async () => {
-    const customers = servedFake();
-    const [antonio, lucia] = customers.customers();
-    const first = customers.holdNext('servedToday');
-    await renderHome('/', customers);
-
-    customers.setServedToday([antonio?.id ?? '']);
-    becomeVisible();
-    const section = await screen.findByRole('region', { name: 'SERVITI OGGI' });
-    expect(within(section).getAllByRole('link')).toHaveLength(1);
-
-    // The fake computes a held answer when it is released: make the old answer differ from the
-    // new one, so showing it would add Lucia's row.
-    customers.setServedToday([antonio?.id ?? '', lucia?.id ?? '']);
-    await act(async () => {
-      first.release();
-      await Promise.resolve();
-    });
-    expect(servedCalls(customers)).toHaveLength(2);
-    expect(within(section).getAllByRole('link')).toHaveLength(1);
-    expect(within(section).queryByRole('link', { name: /Lucia De Meo/ })).not.toBeInTheDocument();
-  });
-
-  it('is hidden while a search is shown, and back when the search is cleared', async () => {
-    const customers = servedFake();
-    const { field } = await renderHome('/', customers);
-    await screen.findByRole('region', { name: 'SERVITI OGGI' });
-
-    await userEvent.type(field, 'lucia');
-    expect(
-      await screen.findByRole('list', { name: 'Risultati della ricerca' }),
-    ).toBeInTheDocument();
-    expect(servedSection()).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
-    expect(await screen.findByRole('region', { name: 'SERVITI OGGI' })).toBeInTheDocument();
-  });
-
-  it('not_operator: back to /accedi with "Account non abilitato"', async () => {
-    const auth = signedInFake();
-    const customers = servedFake();
-    const { router } = renderApp('/', auth, createFakeSettingsService(), customers);
-    await screen.findByRole('region', { name: 'SERVITI OGGI' });
-    auth.removeProfile();
-    customers.failNext('servedToday', 'not_operator');
-    becomeVisible();
-
-    await waitFor(() => expect(router.state.location.pathname).toBe('/accedi'));
-    expect(
-      await screen.findByText('Account non abilitato: chiedi a un amministratore.'),
-    ).toBeInTheDocument();
+    await findRows(1);
+    expect(listCalls(customers).slice(-2)).toEqual([
+      { query: 'rossi', after: null },
+      { query: 'rossi', after: null },
+    ]);
   });
 });
 
@@ -581,38 +503,21 @@ describe('HomePage: announcements', () => {
     const live = announcer();
     expect(live).toHaveAttribute('aria-live', 'polite');
     expect(live).toHaveClass('visually-hidden');
+    await findRows(3);
+    // The plain list is not a search: nothing is said.
     expect(live).toBeEmptyDOMElement();
 
     await userEvent.type(field, 'rossi');
-    await waitFor(() => expect(live).toHaveTextContent('1 cliente trovato'));
+    await waitFor(() => expect(live).toHaveTextContent('Clienti trovati'));
     expect(announcer()).toBe(live);
 
     await userEvent.clear(field);
-    await userEvent.type(field, 'verdi');
+    await userEvent.type(field, 'neri');
     await waitFor(() => expect(live).toHaveTextContent('Nessun cliente trovato'));
     expect(announcer()).toBe(live);
 
     await userEvent.clear(field);
     expect(live).toBeEmptyDOMElement();
-  });
-
-  it('counts the rows, and says when there are more than shown', async () => {
-    const customers = createFakeCustomerService({
-      customers: [
-        ...Array.from({ length: 3 }, (_, index) => fakeCustomer({ name: `Tre Prova ${index}` })),
-        ...Array.from({ length: 25 }, (_, index) =>
-          fakeCustomer({ name: `Molti Prova ${String(index).padStart(2, '0')}` }),
-        ),
-      ],
-    });
-    const { field } = await renderHome('/', customers);
-    await userEvent.type(field, 'tre prova');
-    await waitFor(() => expect(announcer()).toHaveTextContent('3 clienti trovati'));
-    await userEvent.clear(field);
-    await userEvent.type(field, 'molti');
-    await waitFor(() =>
-      expect(announcer()).toHaveTextContent('Più di 20 clienti trovati: scrivi qualcosa in più'),
-    );
   });
 
   it('the home message is written into its status row after the row is on the page', async () => {
@@ -625,15 +530,19 @@ describe('HomePage: announcements', () => {
       });
     });
     // Mounted empty first: a live region that arrives with its text is not read out.
-    const status = screen.getByRole('status');
+    const status = present(screen.getAllByRole('status')[0]);
     expect(status).toBeEmptyDOMElement();
     await waitFor(() => expect(status).toHaveTextContent('Dati del cliente cancellati.'));
-    expect(screen.getByRole('status')).toBe(status);
+    expect(screen.getAllByRole('status')[0]).toBe(status);
   });
 });
 
 describe('HomePage: status message', () => {
   const NOTICE = 'Dati del cliente cancellati.';
+
+  function notice() {
+    return screen.getByText(NOTICE).closest('output');
+  }
 
   it('shows the message passed in the navigation state, at the top, once', async () => {
     const { router } = renderApp('/impostazioni', signedInFake());
@@ -642,14 +551,13 @@ describe('HomePage: status message', () => {
     await act(async () => {
       await router.navigate('/', { replace: true, state: { notice: NOTICE } });
     });
-    const status = await screen.findByRole('status');
-    await waitFor(() => expect(status).toHaveTextContent(NOTICE));
+    await screen.findByText(NOTICE);
     // At the top of the content, before the search.
     const field = screen.getByRole('searchbox', { name: SEARCH_LABEL });
-    expect(status.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(notice()?.compareDocumentPosition(field)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     // The history entry no longer carries it: coming back does not show it again.
     await waitFor(() => expect(router.state.location.state).toBeNull());
-    expect(screen.getByRole('status')).toHaveTextContent(NOTICE);
+    expect(screen.getByText(NOTICE)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('link', { name: /^Account e impostazioni/ }));
     await screen.findByRole('heading', { level: 1, name: 'Impostazioni' });
@@ -660,15 +568,15 @@ describe('HomePage: status message', () => {
     expect(screen.queryByText(NOTICE)).not.toBeInTheDocument();
   });
 
-  it('keeps the search in the URL when it drops the message', async () => {
+  it('keeps the search of the history state when it drops the message', async () => {
     const { router } = renderApp('/impostazioni', signedInFake());
     await screen.findByRole('heading', { level: 1, name: 'Impostazioni' });
     await act(async () => {
-      await router.navigate('/?q=rossi', { state: { notice: NOTICE } });
+      await router.navigate('/', { state: { notice: NOTICE, q: 'rossi' } });
     });
     expect(await screen.findByText(NOTICE)).toBeInTheDocument();
-    await waitFor(() => expect(router.state.location.state).toBeNull());
-    expect(router.state.location.search).toBe('?q=rossi');
+    await waitFor(() => expect(router.state.location.state).toEqual({ q: 'rossi' }));
+    expect(screen.getByRole('searchbox', { name: SEARCH_LABEL })).toHaveValue('rossi');
   });
 
   it('shows no message without one, or with a state of another shape', async () => {
@@ -678,6 +586,7 @@ describe('HomePage: status message', () => {
       await router.navigate('/', { state: { notice: 42 } });
     });
     await screen.findByRole('searchbox', { name: SEARCH_LABEL });
+    await screen.findByRole('heading', { level: 2, name: 'Ancora nessun cliente' });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
@@ -704,15 +613,20 @@ function cardPanel() {
 }
 
 describe('HomePage: Lettura card', () => {
-  it('shows the full panel above "Oppure cerca per nome o telefono", as in the wireframe', async () => {
+  it('shows the full panel above "Oppure cerca per nome o email", as in the wireframe', async () => {
     const { field } = await renderWithCard();
     expect(await within(cardPanel()).findByText(HOME_TITLE)).toBeInTheDocument();
     expect(within(cardPanel()).getByText(HOME_TEXT)).toBeInTheDocument();
-    expect(field).toHaveAccessibleName('Oppure cerca per nome o telefono');
-    // The panel comes before the field in the page.
-    expect(
-      cardPanel().compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(field).toHaveAccessibleName('Oppure cerca per nome o email');
+    // The panel comes before the field in the page, the field before CLIENTI.
+    expect(cardPanel().compareDocumentPosition(field)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(field.compareDocumentPosition(section())).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('keeps the full panel while CLIENTI lists everyone (the list does not shrink it)', async () => {
+    await renderWithCard();
+    await findRows(3);
+    expect(within(cardPanel()).getByText(HOME_TITLE)).toBeInTheDocument();
   });
 
   it('asks for the permission with "Attiva la lettura" above the search', async () => {
@@ -720,24 +634,27 @@ describe('HomePage: Lettura card', () => {
     const { field } = await renderWithCard('/', card);
     await userEvent.click(await screen.findByRole('button', { name: 'Attiva la lettura' }));
     expect(await within(cardPanel()).findByText(HOME_TITLE)).toBeInTheDocument();
-    expect(field).toHaveAccessibleName('Oppure cerca per nome o telefono');
+    expect(field).toHaveAccessibleName('Oppure cerca per nome o email');
   });
 
-  it('shows the compact line while a search is shown, and the full panel once it is cleared', async () => {
+  it('shrinks to the compact line only from 2 characters, and back once cleared', async () => {
     const { field } = await renderWithCard();
     await within(cardPanel()).findByText(HOME_TITLE);
 
-    await userEvent.type(field, 'rossi');
-    expect(
-      await screen.findByRole('list', { name: 'Risultati della ricerca' }),
-    ).toBeInTheDocument();
+    await userEvent.type(field, 'r');
+    expect(within(cardPanel()).getByText(HOME_TITLE)).toBeInTheDocument();
+    expect(field).toHaveAccessibleName('Oppure cerca per nome o email');
+    await userEvent.type(field, ' ');
+    expect(within(cardPanel()).getByText(HOME_TITLE)).toBeInTheDocument();
+
+    await userEvent.type(field, 'o');
     expect(cardPanel()).toHaveTextContent('Lettura attiva: puoi anche avvicinare la card');
     expect(within(cardPanel()).queryByText(HOME_TITLE)).not.toBeInTheDocument();
-    expect(field).toHaveAccessibleName('Cerca per nome o telefono');
+    expect(field).toHaveAccessibleName('Cerca per nome o email');
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancella la ricerca' }));
     expect(await within(cardPanel()).findByText(HOME_TITLE)).toBeInTheDocument();
-    expect(field).toHaveAccessibleName('Oppure cerca per nome o telefono');
+    expect(field).toHaveAccessibleName('Oppure cerca per nome o email');
   });
 
   it('a card read is handed to cards: an unknown card opens Nuovo cliente with it', async () => {
@@ -750,6 +667,29 @@ describe('HomePage: Lettura card', () => {
     });
     expect(card.vibrate).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(router.state.location.pathname).toBe('/clienti/nuovo'));
-    expect(router.state.location.search).toBe('?card=04A1B2C3D4E5F6');
+    // The uid travels in the history state, never in the URL (SPEC-customers-v2 point 6).
+    expect(router.state.location.search).toBe('');
+    expect(router.state.location.state).toEqual({ card: '04A1B2C3D4E5F6' });
+  });
+
+  it('reads a card while the first page of CLIENTI is still on its way', async () => {
+    const card = createTestCardReader();
+    const customers = customersFake();
+    customers.holdNext('list');
+    const rendered = renderApp(
+      '/',
+      signedInFake(),
+      createFakeSettingsService(),
+      customers,
+      createFakeRewardsService(),
+      card,
+    );
+    await within(await screen.findByRole('region', { name: 'Lettura card' })).findByText(
+      HOME_TITLE,
+    );
+    act(() => {
+      card.nfc.read('04:a1:b2:c3:d4:e5:f6');
+    });
+    await waitFor(() => expect(rendered.router.state.location.pathname).toBe('/clienti/nuovo'));
   });
 });

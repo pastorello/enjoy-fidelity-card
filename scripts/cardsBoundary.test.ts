@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 
 // SPEC-cards, "Code Style" and "Boundaries": components use CardsService through useCardsService(),
 // never getSupabase(); only supabaseCardsService.ts reads app.cards or calls the cards RPCs, and only
-// public/cardPointsService.ts calls public.card_points (a POST: never `{ get: true }`, which would put
-// the token in the request URL). The module never logs (uids, tokens and link URLs), never stores
+// public/cardPointsService.ts calls public.card_points and public.card_rewards (POSTs: never
+// `{ get: true }`, which would put the token in the request URL). The module never logs (uids, tokens and link URLs), never stores
 // anything in the browser, never reads location.href (the token is in the public page's path) and
 // never locks a card (makeReadOnly).
 
@@ -21,6 +21,9 @@ const RPCS = [
   'create_customer_with_card',
   'issue_card_link',
   'confirm_card_link',
+  'get_card',
+  'reactivate_card',
+  'release_card',
 ];
 // Test support (fake services and fake NDEFReader): never imported by the app, never in a build.
 const TEST_SUPPORT = 'src/test/';
@@ -65,19 +68,22 @@ export function rpcCallers(files: readonly SourceFile[]): string[] {
     .map((file) => file.path);
 }
 
-/** Files that name public.card_points in their code. */
+/** The public page's functions: the only ones anon may execute. */
+const PUBLIC_RPC = /['"`](card_points|card_rewards)['"`]/;
+
+/** Files that name public.card_points or public.card_rewards in their code. */
 export function cardPointsCallers(files: readonly SourceFile[]): string[] {
   return appFiles(files)
-    .filter((file) => /['"`]card_points['"`]/.test(stripComments(file.text)))
+    .filter((file) => PUBLIC_RPC.test(stripComments(file.text)))
     .map((file) => file.path);
 }
 
-/** Files that call card_points with `{ get: true }` (the token would travel in the URL). */
+/** Files that call a public function with `{ get: true }` (the token would travel in the URL). */
 export function getRequestOffenders(files: readonly SourceFile[]): string[] {
   return files
     .filter((file) => {
       const code = stripComments(file.text);
-      return /['"`]card_points['"`]/.test(code) && /\bget\s*:\s*true\b/.test(code);
+      return PUBLIC_RPC.test(code) && /\bget\s*:\s*true\b/.test(code);
     })
     .map((file) => file.path);
 }
@@ -137,7 +143,7 @@ describe('cards boundary', () => {
     expect(rpcCallers(files)).toEqual([SERVICE]);
   });
 
-  it('lets only cardPointsService.ts call public.card_points, never with { get: true }', () => {
+  it('lets only cardPointsService.ts call card_points and card_rewards, never with { get: true }', () => {
     expect(cardPointsCallers(files)).toEqual([PUBLIC_SERVICE]);
     expect(getRequestOffenders(files)).toEqual([]);
   });
@@ -181,10 +187,17 @@ describe('cards boundary guard (self-test)', () => {
     ]);
   });
 
-  it('fails on card_points with { get: true } and on makeReadOnly', () => {
+  it('fails on card_points or card_rewards with { get: true } and on makeReadOnly', () => {
     const getCall = "rpc('card_points', { p_token: token }, { get: true })";
     expect(getRequestOffenders([{ path: PUBLIC_SERVICE, text: getCall }])).toEqual([
       PUBLIC_SERVICE,
+    ]);
+    const getRewards = "rpc('card_rewards', { p_token: token }, { get: true })";
+    expect(getRequestOffenders([{ path: PUBLIC_SERVICE, text: getRewards }])).toEqual([
+      PUBLIC_SERVICE,
+    ]);
+    expect(cardPointsCallers([{ path: component, text: "rpc('card_rewards', {})" }])).toEqual([
+      component,
     ]);
     expect(readOnlyOffenders([{ path: component, text: 'await writer.makeReadOnly();' }])).toEqual([
       component,

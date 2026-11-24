@@ -147,7 +147,7 @@ lo stesso uid arriva identico dal lettore USB con il formato configurato; su And
    | `checking`, `starting` | icona NFC, titolo del consumatore, "Avvio della lettura…" | — |
    | `active` | titolo e testo del consumatore (home: "Avvicina la card" / "Lettura attiva: appoggia la card sul retro del telefono. Una card nuova apre la registrazione del cliente."; Associa card: "Avvicina la card nuova" / "L'app legge il codice della card e ci scrive il link per vedere i punti." — il testo del wireframe "non ci scrive nulla" non vale più dopo la decisione del 2026-11-17) | — |
    | `needs-permission` | "Lettura delle card" / "Serve una volta sola: il telefono chiede il permesso di usare l'NFC." | "Attiva la lettura" → `start()` |
-   | `off` | "Lettura card spenta" / "Attiva l'NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o telefono." | "Riprova la lettura" → `start()` |
+   | `off` | "Lettura card spenta" / "Attiva l'NFC nelle impostazioni del telefono e torna qui. Su iPhone le card non si leggono: cerca il cliente per nome o email." (testo di `SPEC-customers-v2.md`) | "Riprova la lettura" → `start()` |
    | `denied` | "Lettura card spenta" / "Il permesso NFC è negato: consentilo a Enjoy Card nelle impostazioni di Chrome (Impostazioni sito → NFC) e riprova." | "Riprova la lettura" → `start()` |
    | `unsupported` | "Lettura card spenta" / stesso testo di `off` | nessun pulsante (non c'è nulla da riprovare) |
    - variante `mode="usb"` per il tablet: titolo e testo del consumatore (Tablet: cerca cliente "Passa la
@@ -381,7 +381,7 @@ export function useCardRead(onRead: (read: CardRead) => void, { enabled = true }
 - Schermata per scegliere il formato del lettore USB → modulo `tablet-kiosk` (sezione LETTORE CARD); intestazione tablet "Lettore NFC
   USB collegato", schermate 1280×800 e cambio operatore → `tablet-kiosk`.
 - Elementi dei wireframe elencati che non sono lettura card: titolo "Cerca cliente", avatar dell'operatore,
-  campo "Oppure cerca per nome o telefono", "Serviti oggi" e "Nuovo cliente" della home → moduli che
+  campo "Oppure cerca per nome o email" (`SPEC-customers-v2.md`), "Serviti oggi" e "Nuovo cliente" della home → moduli che
   costruiscono la home (`customers`, `ledger`); in Associa card nome e punti del cliente, avviso "La card
   attuale (…E5F6) verrà disattivata. I punti restano a Maria." e "Annulla" → `cards`; nel tablet "Alla
   cassa: … · Cambia", "Lettore NFC USB collegato", "Chi è alla cassa?" e PIN → `tablet-kiosk`.

@@ -1,6 +1,11 @@
 # Spec: export — V1
 
 Status: approvata (2026-11-17) su delega dell'utente — le Open Questions adottano i default proposti, da rivedere con il titolare (`docs/specs/cross-review.md` §3)
+
+> **Aggiornata da `SPEC-customers-v2.md` (2026-11-23).** Il bar non raccoglie più il telefono del cliente:
+> al suo posto c'è un'email facoltativa e unica. I passi di questa spec che lo riguardavano rimandano alla
+> delta; il resto resta valido.
+
 Modulo: `export` ([CAPABILITY-MAP.md](../../CAPABILITY-MAP.md)) · Dipende da: `identity`, `customers`, `cards`,
 `ledger` · Fonti: specifiche ("Ruoli e account": esportazione dati per l'amministratore; "Sicurezza e
 privacy": "Esportazione clienti e movimenti in CSV per l'amministratore", cancellazione su richiesta),
@@ -75,15 +80,16 @@ clienti anonimizzati.
      `gg/mm/aaaa hh:mm:ss` 24 ore (`hourCycle: 'h23'`, così la mezzanotte è `00`, mai `24`), ora legale
      compresa, componenti montati da `formatToParts` e non dalla stringa localizzata; data assente → campo
      vuoto;
-   - **telefono e uid** come testo per Excel: `="+393331234567"`, `="04A1B2C3D4E5F6"` (altrimenti Excel li
-     converte in numero, perde il "+" o gli zeri iniziali). Entrambi sono validati sul server (E.164 e
-     `^[0-9A-F]{8,20}$`), ma `excelText` non si fida: usa la forma `="…"` solo se il valore rispetta
-     `^\+?[0-9A-F]{1,20}$`, altrimenti scrive il valore come testo libero con la difesa dalle formule;
+   - **uid** come testo per Excel: `="04A1B2C3D4E5F6"` (altrimenti Excel lo converte in numero e perde gli
+     zeri iniziali). È validato sul server (`^[0-9A-F]{8,20}$`), ma `excelText` non si fida: usa la forma
+     `="…"` solo se il valore rispetta `^\+?[0-9A-F]{1,20}$`, altrimenti scrive il valore come testo libero
+     con la difesa dalle formule; l'**email** è testo libero con la difesa dalle formule (`guardFormula`,
+     `SPEC-customers-v2.md` punto 2);
    - **nomi file** con la data di oggi a Roma: `enjoy-clienti-AAAA-MM-GG.csv`,
      `enjoy-movimenti-AAAA-MM-GG.csv`.
 5. **Colonne** (in quest'ordine; intestazioni italiane):
    - *Clienti* (ordinati per nome, `it-IT`, insensibile a maiuscole e accenti; anonimizzati in fondo per
-     data di creazione): `Codice cliente` (uuid) · `Nome` · `Telefono` · `Card attiva` (uid o vuoto) ·
+     data di creazione): `Codice cliente` (uuid) · `Nome` · `Email` · `Card attiva` (uid o vuoto) ·
      `Saldo punti` · `Consenso privacy` (data e ora) · `Note` · `Creato il` · `Creato da` (nome
      operatore) · `Anonimizzato il` (vuoto se no).
    - *Movimenti* (ordinati per `created_at`, poi `id`, dal più vecchio): `Data e ora` · `Codice movimento`
@@ -91,7 +97,7 @@ clienti anonimizzati.
      (solo spese) · `Punti` · `Euro per punto` (rapporto in vigore, solo spese: `100 → "1,00"`) ·
      `Premio o descrizione` · `Operatore` · `Annulla il movimento` (codice del movimento corretto, solo
      correzioni) · `Annullato da` (codice della correzione, se esiste).
-   - **Clienti anonimizzati**: `Nome`, `Telefono`, `Note` e `Card attiva` vuoti in entrambi i file
+   - **Clienti anonimizzati**: `Nome`, `Email`, `Note` e `Card attiva` vuoti in entrambi i file
      (`Cliente` vuoto nei movimenti), qualunque cosa contenga la riga; restano codice, saldo, date e
      movimenti, "per i conteggi" (specifiche). L'azzeramento avviene **nella funzione SQL**: i dati
      personali di un anonimizzato non lasciano mai il server.
@@ -105,7 +111,7 @@ Nessuna tabella nuova. Due funzioni in schema `app`:
 
 ```sql
 app.export_customers(p_after_id uuid default null, p_limit int default 1000)
-  returns table (id uuid, name text, phone text, active_card_uid text, balance_points int,
+  returns table (id uuid, name text, email text, active_card_uid text, balance_points int,
                  privacy_consent_at timestamptz, notes text, created_at timestamptz,
                  created_by_name text, anonymized_at timestamptz)  -- balance_points: int
   -- ordine stabile per la paginazione: id; l'ordinamento per nome si fa nel client
@@ -124,7 +130,7 @@ app.export_movements(p_after_created_at timestamptz default null, p_after_id uui
 - `p_limit` null o fuori da 1–1000 → `22023`. Cursore: `(created_at, id) > (p_after_created_at,
   p_after_id)`; entrambi null = dall'inizio; uno solo dei due null → `22023`.
 - Il nome di un cliente non anonimizzato è quello attuale (non una copia al momento del movimento).
-- Anonimizzati (`anonymized_at is not null`): `name`, `phone`, `notes`, `active_card_uid` e
+- Anonimizzati (`anonymized_at is not null`): `name`, `email`, `notes`, `active_card_uid` e
   `customer_name` restituiti `null`.
 - `balance_points` = `private.customer_balance(id)` di `ledger` (somma di tutti i movimenti, correzioni
   comprese, `0` se nessuno): un solo calcolo del saldo in tutto il database.
@@ -185,7 +191,7 @@ allo schermo ma non a Excel).
 
 | Livello | Cosa copre |
 |---|---|
-| pgTAP (`export.test.sql`) | admin chiama entrambe le funzioni e riceve le colonne attese; operatore, utente senza profilo e `anon` → 42501 / permesso negato; anonimizzato: `name`, `phone`, `notes`, `active_card_uid`, `customer_name` null, saldo e movimenti presenti; `balance_points` = somma con correzioni, 0 senza movimenti; `corrected_by_movement_id` coerente con `corrects_movement_id`; paginazione: due pagine con `p_limit = 2` coprono tutte le righe senza duplicati; `p_limit` 0, 1001 e null → 22023; cursore con un solo campo → 22023; `anon` e `public` senza `execute` (catalogo `has_function_privilege`); nessuna scrittura (`provolatile = 's'`) |
+| pgTAP (`export.test.sql`) | admin chiama entrambe le funzioni e riceve le colonne attese; operatore, utente senza profilo e `anon` → 42501 / permesso negato; anonimizzato: `name`, `email`, `notes`, `active_card_uid`, `customer_name` null, saldo e movimenti presenti; `balance_points` = somma con correzioni, 0 senza movimenti; `corrected_by_movement_id` coerente con `corrects_movement_id`; paginazione: due pagine con `p_limit = 2` coprono tutte le righe senza duplicati; `p_limit` 0, 1001 e null → 22023; cursore con un solo campo → 22023; `anon` e `public` senza `execute` (catalogo `has_function_privilege`); nessuna scrittura (`provolatile = 's'`) |
 | Unità (Vitest) | `escapeField` (`;`, `"`, a capo), difesa formule su `=`/`+`/`-`/`@`/TAB/CR solo nel testo (un importo `-12,50` resta intatto), `excelText` (valore valido → `="…"`, valore con `"` o lettere → testo protetto); BOM e CRLF; `centsToEuroCell` (0, 5, 1250, -1250, 123456); `romeDateTime` in ora solare e legale, mezzanotte (`00:…`, mai `24:…`), fuso del processo diverso (il test fissa `process.env.TZ`/usa un fuso diverso da Roma in CI, che gira in UTC); nome file con la data di Roma alle 23:30 UTC; ordinamento clienti per nome con accenti e anonimizzati in fondo; `fetchAllPages` con 0, 1000, 1001 righe (cursori passati correttamente alla seconda pagina) ed errore alla seconda pagina (rifiuta, nessuna riga restituita); mappatura errori del servizio (`42501` → forbidden, `TypeError` di fetch → network, altro → unknown) |
 | Componenti (Vitest + Testing Library, `fakeExportService`, `fakeAuthService`, `downloadFile` sostituito) | admin vede i due pulsanti, operatore no; busy e niente doppio avvio (due clic rapidi → una sola chiamata al servizio); messaggi di "in corso", successo, nessun dato, rete, forbidden, imprevisto nella regione `aria-live`; in caso d'errore `downloadFile` non viene chiamato; dopo un errore di rete un nuovo tocco riesce; target ≥ 48 px |
 | Integrazione (Vitest + stack locale) | con le credenziali del seed l'operatore riceve 42501 da entrambe le RPC; l'admin le legge; un cliente finto creato e anonimizzato nel test con le RPC di `customers`: il suo nome originale non compare nel corpo della risposta HTTP |
@@ -214,7 +220,7 @@ usa al banco; le RPC limitano la funzione di esportazione richiesta dalle specif
    (CRLF); una spesa di 1250 centesimi con rapporto 100 compare con `12,50`, `12` e `1,00`.
 4. Un movimento del 1° luglio alle 10:05 UTC compare come `01/07/2026 12:05:00`; uno del 15 gennaio alle
    10:05 UTC come `15/01/2026 11:05:00`, con qualunque fuso del dispositivo.
-5. Un cliente anonimizzato compare con nome, telefono, note e card vuoti, saldo corretto, e i suoi movimenti
+5. Un cliente anonimizzato compare con nome, email, note e card vuoti, saldo corretto, e i suoi movimenti
    con `Cliente` vuoto; le funzioni restituiscono quei campi `null` (pgTAP) e il nome originale non è nel
    corpo della risposta HTTP (integrazione).
 6. Un nome che inizia con `=` esce come `'=…` (tra virgolette solo se contiene `;`, `"` o a capo); un nome
@@ -243,10 +249,10 @@ usa al banco; le RPC limitano la funzione di esportazione richiesta dalle specif
 
 1. **Colonne.** Le fonti dicono solo "clienti e movimenti in CSV". Proposta: le colonne del punto 5,
    con saldo nei clienti e codici (uuid) per collegare i due file (default adottato).
-2. **Anonimizzati.** Proposta: nome, telefono, note e uid card vuoti, azzerati in SQL; righe e movimenti
+2. **Anonimizzati.** Proposta: nome, email, note e uid card vuoti, azzerati in SQL; righe e movimenti
    inclusi per i conteggi (default adottato). La descrizione di un premio libero resta com'è: se un
    operatore vi ha scritto dati personali, l'anonimizzazione (modulo `customers`) non li tocca.
-3. **Telefono e uid in Excel.** Proposta: scritti come `="…"` perché Excel non tolga "+" e zeri; il
+3. **Uid in Excel.** Proposta: scritto come `="…"` perché Excel non tolga gli zeri; il
    rovescio è che in altri programmi si vede la formula testuale (default adottato).
 4. **Formato date.** Proposta: una colonna `gg/mm/aaaa hh:mm:ss` all'ora di Roma, che Excel italiano
    riconosce come data (default adottato).
@@ -260,6 +266,6 @@ usa al banco; le RPC limitano la funzione di esportazione richiesta dalle specif
 9. **Testi dei messaggi.** I wireframe mostrano solo i due pulsanti: i testi di "in corso", successo,
    nessun dato ed errori del punto 2 sono una proposta basata sul design system «Stati, errori e conferme»
    (default adottato).
-10. **Dati personali nei file.** Il file Clienti contiene nome e telefono di tutti i clienti e resta nei
+10. **Dati personali nei file.** Il file Clienti contiene nome ed email di tutti i clienti e resta nei
     Download del telefono. Proposta: nessuna protezione aggiuntiva (solo admin, file sul dispositivo); da
     citare nell'informativa privacy da far verificare al consulente (default adottato).

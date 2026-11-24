@@ -16,7 +16,12 @@ export function useUpdateCustomer(id: string): CustomerSubmit {
 
   return useCustomerSubmit({
     request: (values) =>
-      service.update({ id, name: values.name, phone: values.phone, notes: values.notes }),
+      service.update({
+        id,
+        name: values.name,
+        email: values.email,
+        notes: values.notes,
+      }),
     onSaved: openCustomer,
     onRefused: (error) => {
       if (error.kind !== 'customer_anonymized') return false;

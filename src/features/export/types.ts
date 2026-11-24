@@ -11,7 +11,8 @@ export type MovementExportKind = 'purchase' | 'redemption' | 'correction';
 export type CustomerExportRow = {
   id: string;
   name: string | null;
-  phone: string | null;
+  /** Lowercase as stored; may start with "=" or "+", so it reaches the file through guardFormula. */
+  email: string | null;
   activeCardUid: string | null;
   balancePoints: number;
   privacyConsentAt: string;

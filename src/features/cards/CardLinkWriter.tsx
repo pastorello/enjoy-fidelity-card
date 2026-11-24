@@ -63,7 +63,12 @@ function failureText(failure: CardLinkFailure, uid: string, name: string): Failu
     // A newer token issued meanwhile (`link_token_mismatch`) or anything else: write again.
     return { text: 'Link non scritto: riprova.' };
   }
-  if (failure.reason === 'wrong-card' && failure.otherUid !== undefined) {
+  // Only once write() had started can the link be on the other card (SPEC-customers-v2, point 4).
+  if (
+    failure.reason === 'wrong-card' &&
+    failure.mayHaveWritten === true &&
+    failure.otherUid !== undefined
+  ) {
     const other = formatCardLabel(failure.otherUid);
     return {
       text: `Il link potrebbe essere finito sulla card ${other}. Avvicina la card ${formatCardLabel(uid)} e riprova; poi riscrivi il link della card ${other} dalla scheda del suo cliente.`,

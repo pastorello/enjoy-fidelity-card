@@ -1,8 +1,9 @@
 import { ServerFaultError, serverFaultFor } from '../../lib/serverFault';
 import { getSupabase } from '../../lib/supabase';
+import { parseCustomerList } from './customerListRow';
 import { toCustomerSummary } from './customerRow';
-import { isCustomerErrorCode } from './errorCodes';
-import { CustomerError } from './types';
+import { isCustomerErrorCode, pointsAtExistingCustomer } from './errorCodes';
+import { CUSTOMER_LIST_PAGE_SIZE, CustomerError } from './types';
 import type { CustomerService, CustomerSummary } from './types';
 
 // The only module that calls the customers RPCs (scripts/customersBoundary.test.ts).
@@ -26,7 +27,7 @@ function failureOf(answer: Answer): Error | null {
   if (fault) return new ServerFaultError(fault);
   const code = error.message ?? '';
   if (error.code !== 'P0001' || !isCustomerErrorCode(code)) return new CustomerError('unknown');
-  if (code !== 'customer_name_taken') return new CustomerError(code);
+  if (!pointsAtExistingCustomer(code)) return new CustomerError(code);
   const existing = error.details ?? '';
   return new CustomerError(code, UUID.test(existing) ? existing : null);
 }
@@ -63,12 +64,19 @@ async function many(fn: string, args?: Record<string, unknown>): Promise<Custome
 }
 
 export const supabaseCustomerService: CustomerService = {
-  search(query) {
-    return many('search_customers', { p_query: query });
-  },
-
-  servedToday() {
-    return many('customers_served_today');
+  // The cursor goes back exactly as received. invalid_cursor and invalid_limit (22023) can only
+  // come from a bug in this client: like any unexpected answer, they are `unknown`.
+  async list({ query, after }) {
+    const customers = parseCustomerList(
+      await call('list_customers', {
+        p_query: query,
+        p_after_activity_at: after?.activityAt ?? null,
+        p_after_created_at: after?.createdAt ?? null,
+        p_after_id: after?.id ?? null,
+        p_limit: CUSTOMER_LIST_PAGE_SIZE,
+      }),
+    );
+    return { customers, hasMore: customers.length === CUSTOMER_LIST_PAGE_SIZE };
   },
 
   async get(id) {
@@ -76,21 +84,21 @@ export const supabaseCustomerService: CustomerService = {
     return customer;
   },
 
-  create({ operationId, name, phone, privacyConsent, notes }) {
+  create({ operationId, name, email, privacyConsent, notes }) {
     return one('create_customer', {
       p_operation_id: operationId,
       p_name: name,
-      p_phone: phone,
+      p_email: email,
       p_privacy_consent: privacyConsent,
       p_notes: notes,
     });
   },
 
-  update({ id, name, phone, notes }) {
+  update({ id, name, email, notes }) {
     return one('update_customer', {
       p_customer_id: id,
       p_name: name,
-      p_phone: phone,
+      p_email: email,
       p_notes: notes,
     });
   },

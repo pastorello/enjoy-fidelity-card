@@ -29,10 +29,11 @@ marketing, senza rallentare la cassa: dalla card alla conferma della spesa in me
 ## Cosa NON facciamo (non-obiettivi)
 
 - **Non contattiamo i clienti** (messaggi, offerte, campagne), perché il titolare non lo vuole: il telefono
-  del cliente serve solo a trovarlo più in fretta, ed è facoltativo.
-- **Nessuna area per il cliente oltre al saldo**: niente account, accesso, nome, movimenti o premi. L'unica
-  cosa che il cliente vede è il proprio saldo, avvicinando la card al suo telefono (pagina pubblica dal
-  link scritto sulla card, decisione del titolare del 2026-11-17). Alla cassa il flusso resta a senso unico:
+  non si raccoglie più; l'email, facoltativa, serve solo a ritrovare il cliente (decisione del 2026-11-23). Una
+  newsletter futura richiederebbe un consenso marketing separato.
+- **Nessuna area per il cliente oltre al saldo e ai premi**: niente account, accesso, nome o movimenti. Il
+  cliente vede solo il proprio saldo e, sotto, l'elenco dei premi attivi, avvicinando la card al suo telefono
+  (pagina pubblica dal link scritto sulla card, decisioni del titolare del 2026-11-17 e del 2026-11-23). Alla cassa il flusso resta a senso unico:
   il cliente consegna la card all'operatore.
 - **Niente funzionamento offline** (coda di spese in attesa di rete), perché l'utente l'ha escluso
   esplicitamente. Resta solo il reinvio idempotente dopo un errore di rete.
@@ -51,5 +52,5 @@ marketing, senza rallentare la cassa: dalla card alla conferma della spesa in me
 
 - Specifiche e wireframe sono stati scritti prima del codice e restano le **fonti di verità**
   (link in `MAP.md` §5 e in `CLAUDE.md`).
-- La card è una scorciatoia, non un requisito: tutto deve funzionare anche cercando per nome o telefono.
+- La card è una scorciatoia, non un requisito: tutto deve funzionare anche cercando per nome o email.
 - Lo storico è intoccabile: i movimenti non si cancellano, si correggono.

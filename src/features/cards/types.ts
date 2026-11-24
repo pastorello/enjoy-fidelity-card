@@ -25,6 +25,26 @@ export type CardSummary = {
   linkState: LinkState;
 };
 
+/**
+ * A card as the page of an inactive card (`/card/:cardId`) needs it: the row of `app.get_card`.
+ * `customerName` is null exactly when the customer's data was erased; `otherActiveCard` is the
+ * customer's active card a reactivation would swap out, if any.
+ */
+export type CardDetail = {
+  id: string;
+  /** Canonical uid (upper-case hex, no separators). */
+  uid: string;
+  customerId: string;
+  customerName: string | null;
+  customerAnonymized: boolean;
+  customerBalance: number;
+  active: boolean;
+  deactivatedAt: string | null;
+  /** When the card was reformatted (unbound from its customer forever), or null. */
+  releasedAt: string | null;
+  otherActiveCard: { id: string; uid: string } | null;
+};
+
 /** What `associate` answers: the active card and the card it replaced, if any. */
 export type CardAssociation = { card: CardSummary; replacedCardId: string | null };
 
@@ -43,6 +63,10 @@ export type CardsErrorKind =
   | 'card_not_found'
   | 'card_inactive'
   | 'link_token_mismatch'
+  | 'card_released'
+  | 'card_active'
+  | 'active_card_changed'
+  | 'forbidden'
   | 'network'
   | 'unknown';
 
@@ -129,6 +153,46 @@ export class LinkTokenMismatchError extends CardsError {
   }
 }
 
+/** The card was reformatted: it belongs to no customer any more. */
+export class CardReleasedError extends CardsError {
+  constructor() {
+    super('card_released');
+    this.name = 'CardReleasedError';
+  }
+}
+
+/** The card is active (reactivated meanwhile): it cannot be released. */
+export class CardActiveError extends CardsError {
+  constructor() {
+    super('card_active');
+    this.name = 'CardActiveError';
+  }
+}
+
+/** The customer's active card is not the one the admin confirmed the swap with: reload, ask again. */
+export class ActiveCardChangedError extends CardsError {
+  constructor() {
+    super('active_card_changed');
+    this.name = 'ActiveCardChangedError';
+  }
+}
+
+/** What the cards screens say to an operator refused a card action reserved to admins. */
+export const CARD_FORBIDDEN_TEXT = 'Card non attiva: chiedi a un amministratore.';
+
+/**
+ * Only an admin reactivates or reformats a deactivated card (also from Associa card). Not the
+ * `CustomerError('forbidden')` of the data erasure: `text` is the cards screens' own.
+ */
+export class CardForbiddenError extends CardsError {
+  readonly text = CARD_FORBIDDEN_TEXT;
+
+  constructor() {
+    super('forbidden');
+    this.name = 'CardForbiddenError';
+  }
+}
+
 /**
  * Everything the cards feature needs from the backend. Every method rejects with a `CardsError`, a
  * `ServerFaultError`, or (only `createCustomerWithCard`, for the form's own errors) a
@@ -139,7 +203,15 @@ export type CardsService = {
   lookup(uid: string): Promise<CardLookup>;
   /** The customer's active card, or null. */
   getActiveCard(customerId: string): Promise<CardSummary | null>;
-  /** Gives the customer this card, replacing the active one; repeating it changes nothing. */
+  /**
+   * The card with this id, as `/card/:cardId` shows it; null for an unknown id (or one that is not
+   * a uuid: no request is sent).
+   */
+  getCard(cardId: string): Promise<CardDetail | null>;
+  /**
+   * Gives the customer this card, replacing the active one; repeating it changes nothing.
+   * Reactivating the customer's own deactivated card is for admins (`forbidden` otherwise).
+   */
   associate(customerId: string, uid: string): Promise<CardAssociation>;
   /** Repeating it on a deactivated card changes nothing. */
   deactivate(cardId: string): Promise<CardSummary>;
@@ -152,4 +224,15 @@ export type CardsService = {
   issueLink(cardId: string): Promise<string>;
   /** The token read back from the card: it becomes the valid link. Idempotent with the same token. */
   confirmLink(cardId: string, token: string): Promise<CardSummary>;
+  /**
+   * Admins only: the deactivated card is active again, from "link not written".
+   * `expectedActiveCardId` is the customer's active card the admin confirmed swapping out (null
+   * for none); any other is `active_card_changed`. A card already active comes back unchanged.
+   */
+  reactivateCard(cardId: string, expectedActiveCardId: string | null): Promise<CardAssociation>;
+  /**
+   * Admins only, after the card was emptied: unbinds the deactivated card from its uid forever (the
+   * uid is free again). Idempotent on `operationId`; an active card is `card_active`.
+   */
+  releaseCard(operationId: string, cardId: string): Promise<CardSummary>;
 };

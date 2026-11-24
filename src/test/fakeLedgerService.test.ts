@@ -78,17 +78,54 @@ describe('createFakeLedgerService: purchases', () => {
     expect(balanceOf(maria.id)).toBe(136);
   });
 
-  it('updates the customers fake: balance, last served and Serviti oggi', async () => {
+  it('updates the customers fake: balance, last served and the top of the list', async () => {
     const { maria, customers, ledger } = setup();
     const { movement } = await ledger.service.recordPurchase({
       operationId: OP_1,
       customerId: maria.id,
       amountCents: 500,
     });
-    const served = await customers.service.servedToday();
-    expect(served.map((c) => c.id)).toEqual([maria.id]);
-    expect(served[0]).toMatchObject({ balance: 5, lastServedAt: movement.createdAt });
-    await expect(customers.service.get(maria.id)).resolves.toMatchObject({ balance: 5 });
+    const { customers: listed } = await customers.service.list({ query: '', after: null });
+    expect(listed[0]).toMatchObject({
+      id: maria.id,
+      balance: 5,
+      lastActivityAt: movement.createdAt,
+    });
+    await expect(customers.service.get(maria.id)).resolves.toMatchObject({
+      balance: 5,
+      lastServedAt: movement.createdAt,
+    });
+  });
+
+  it('a purchase brings the customer to the top of the list; its cancellation does not move it', async () => {
+    const { maria, customers, ledger } = setup();
+    const luca = await customers.service.create({
+      operationId: OP_4,
+      name: 'Luca Bianchi',
+      email: '',
+      privacyConsent: true,
+      notes: '',
+    });
+    const before = await customers.service.list({ query: '', after: null });
+    expect(before.customers.map((c) => c.id)).toEqual([luca.id, maria.id]);
+
+    const { movement } = await ledger.service.recordPurchase({
+      operationId: OP_1,
+      customerId: maria.id,
+      amountCents: 500,
+    });
+    const after = await customers.service.list({ query: '', after: null });
+    expect(after.customers.map((c) => c.id)).toEqual([maria.id, luca.id]);
+    expect(after.customers[0]).toMatchObject({ balance: 5, lastActivityAt: movement.createdAt });
+
+    ledger.advanceClock(1000);
+    await ledger.service.cancelMovement({ operationId: OP_2, movementId: movement.id });
+    const cancelled = await customers.service.list({ query: '', after: null });
+    expect(cancelled.customers[0]).toMatchObject({
+      id: maria.id,
+      balance: 0,
+      lastActivityAt: movement.createdAt,
+    });
   });
 
   it('refuses amounts outside 1..9.999.999 integer cents with invalid', async () => {
